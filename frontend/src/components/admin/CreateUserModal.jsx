@@ -5,7 +5,7 @@ export default function CreateUserModal({ isOpen, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
-          <h2 className="text-xl font-bold text-gray-900">Create New User</h2>
+          <h2 className="text-xl font-bold text-gray-900">Create New Users</h2>
           <button 
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"

@@ -102,7 +102,7 @@ export default function Sidebar() {
                     <div
                       className={`overflow-hidden transition-all duration-300 ease-in-out ${
                         isOpen ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0"
-                      }`}
+                     }`}
                     >
                       <ul className="pl-4 space-y-1 border-l-2 border-gray-100 ml-5">
                         {item.subItems.map((subItem) => {

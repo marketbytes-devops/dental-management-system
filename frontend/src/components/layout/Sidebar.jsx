@@ -8,7 +8,20 @@ const navItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: "📊" },
   { name: "User Management", href: "/admin/users", icon: "👥" },
   { name: "Role Permissions", href: "/admin/roles", icon: "🔑" },
-  { name: "System Logs", href: "/admin/logs", icon: "📝" },
+  {
+    name: "Patients",
+    icon: "🩺",
+    subItems: [
+      { name: "Overview", href: "/admin/patients/overview", icon: "📊" },
+      { name: "Appointments", href: "/admin/patients/appointments", icon: "📅" },
+      { name: "Registration", href: "/admin/patients/registration", icon: "📝" },
+      { name: "Check-In & Queue", href: "/admin/patients/check-in-queue", icon: "⏳" },
+      { name: "Consent & Documents", href: "/admin/patients/consent-documents", icon: "📄" },
+      { name: "Prescriptions", href: "/admin/patients/prescriptions", icon: "💊" },
+      { name: "Billing & Payments", href: "/admin/patients/billing-payments", icon: "💳" },
+      { name: "Notifications", href: "/admin/patients/notifications", icon: "🔔" },
+    ],
+  },
   {
     name: "Lab Technician",
     icon: "🔬",
@@ -75,6 +88,7 @@ const navItems = [
       { name: "Settings", href: "/admin/accountant/settings", icon: "⚙️" },
     ],
   },
+  { name: "System Logs", href: "/admin/logs", icon: "📝" },
 ];
 
 export default function Sidebar() {

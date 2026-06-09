@@ -40,6 +40,54 @@ const navItems = [
       { name: "Settings", href: "/admin/labtechnicians/settings", icon: "⚙️" },
     ],
   },
+  {
+    name: "Receptionist",
+    icon: "🛎️",
+    subItems: [
+      { name: "Dashboard", href: "/admin/receptionist/dashboard", icon: "📊" },
+
+      { name: "Appointment Booking", href: "/admin/receptionist/appointments", icon: "📅" },
+      { name: "Patient Registration", href: "/admin/receptionist/patients", icon: "👤" },
+      { name: "Check-In / Check-Out", href: "/admin/receptionist/checkin", icon: "✅" },
+
+      { name: "Doctor Schedules", href: "/admin/receptionist/doctors", icon: "👨‍⚕️" },
+      { name: "Treatment Coordination", href: "/admin/receptionist/treatments", icon: "🦷" },
+
+      { name: "Waiting Queue", href: "/admin/receptionist/queue", icon: "⏳" },
+      { name: "Patient Communication", href: "/admin/receptionist/communication", icon: "📞" },
+
+      { name: "Appointment Reminders", href: "/admin/receptionist/reminders", icon: "🔔" },
+      { name: "Patient Records", href: "/admin/receptionist/records", icon: "📂" },
+
+      { name: "Support Requests", href: "/admin/receptionist/support", icon: "🎧" },
+      { name: "Settings", href: "/admin/receptionist/settings", icon: "⚙️" },
+    ],
+  },
+  {
+    name: "Accountant",
+    icon: "💰",
+    subItems: [
+      { name: "Dashboard", href: "/admin/accountant/dashboard", icon: "📊" },
+
+      { name: "Invoice Management", href: "/admin/accountant/invoices", icon: "🧾" },
+      { name: "Payment Processing", href: "/admin/accountant/payments", icon: "💳" },
+
+      { name: "Insurance Claims", href: "/admin/accountant/claims", icon: "🛡️" },
+      { name: "Claim Verification", href: "/admin/accountant/claim-verification", icon: "✔️" },
+
+      { name: "Revenue Tracking", href: "/admin/accountant/revenue", icon: "📈" },
+      { name: "Expense Management", href: "/admin/accountant/expenses", icon: "📉" },
+
+      { name: "Refund Requests", href: "/admin/accountant/refunds", icon: "↩️" },
+      { name: "Outstanding Dues", href: "/admin/accountant/dues", icon: "⚠️" },
+
+      { name: "Payroll", href: "/admin/accountant/payroll", icon: "💵" },
+      { name: "Financial Reports", href: "/admin/accountant/reports", icon: "📋" },
+
+      { name: "Audit Logs", href: "/admin/accountant/audit", icon: "🔍" },
+      { name: "Settings", href: "/admin/accountant/settings", icon: "⚙️" },
+    ],
+  },
   { name: "System Logs", href: "/admin/logs", icon: "📝" },
 ];
 
@@ -90,20 +138,18 @@ export default function Sidebar() {
                   <li key={item.name} className="flex flex-col">
                     <button
                       onClick={() => toggleDropdown(item.name)}
-                      className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors group cursor-pointer outline-none ${
-                        isActive
-                          ? "bg-primary/10 text-primary font-semibold"
-                          : "text-gray-700 hover:bg-primary/5 hover:text-primary"
-                      }`}
+                      className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors group cursor-pointer outline-none ${isActive
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-gray-700 hover:bg-primary/5 hover:text-primary"
+                        }`}
                     >
                       <div className="flex items-center">
                         <span className="mr-3 text-lg opacity-70 group-hover:opacity-100">{item.icon}</span>
                         {item.name}
                       </div>
                       <svg
-                        className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${
-                          isOpen ? "transform rotate-180" : ""
-                        }`}
+                        className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""
+                          }`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -114,9 +160,8 @@ export default function Sidebar() {
                     </button>
 
                     <div
-                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        isOpen ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0 pointer-events-none"
-                      }`}
+                      className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0 pointer-events-none"
+                        }`}
                     >
                       <ul className="pl-4 space-y-1 border-l-2 border-gray-100 ml-5">
                         {item.subItems.map((subItem) => {
@@ -125,11 +170,10 @@ export default function Sidebar() {
                             <li key={subItem.name}>
                               <Link
                                 href={subItem.href}
-                                className={`flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors group ${
-                                  isSubActive
-                                    ? "bg-primary/5 text-primary font-semibold"
-                                    : "text-gray-600 hover:bg-primary/5 hover:text-primary"
-                                }`}
+                                className={`flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors group ${isSubActive
+                                  ? "bg-primary/5 text-primary font-semibold"
+                                  : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                  }`}
                               >
                                 <span className="mr-2.5 text-sm opacity-70 group-hover:opacity-100">{subItem.icon}</span>
                                 {subItem.name}
@@ -147,11 +191,10 @@ export default function Sidebar() {
                 <li key={item.name}>
                   <Link
                     href={item.href}
-                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors group ${
-                      isActive
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "text-gray-700 hover:bg-primary/5 hover:text-primary"
-                    }`}
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors group ${isActive
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-gray-700 hover:bg-primary/5 hover:text-primary"
+                      }`}
                   >
                     <span className="mr-3 text-lg opacity-70 group-hover:opacity-100">{item.icon}</span>
                     {item.name}

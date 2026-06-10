@@ -8,6 +8,7 @@ const navItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: "📊" },
   { name: "User Management", href: "/admin/users", icon: "👥" },
   { name: "Role Permissions", href: "/admin/roles", icon: "🔑" },
+  { name: "Doctor Workspace", href: "/doctor", icon: "👨‍⚕️" },
   {
     name: "Patients",
     icon: "🩺",
@@ -20,51 +21,6 @@ const navItems = [
       { name: "Prescriptions", href: "/admin/patients/prescriptions", icon: "💊" },
       { name: "Billing & Payments", href: "/admin/patients/billing-payments", icon: "💳" },
       { name: "Notifications", href: "/admin/patients/notifications", icon: "🔔" },
-    ],
-  },
-  {
-    name: "Doctor",
-    icon: "👨‍⚕️",
-    subItems: [
-      { name: "Dashboard", href: "/admin/doctor/dashboard", icon: "📊" },
-
-      { name: "Today's Appointments", href: "/admin/doctor/appointments", icon: "📅" },
-      { name: "Patient Queue", href: "/admin/doctor/queue", icon: "⏳" },
-
-      { name: "Patient Records", href: "/admin/doctor/patients", icon: "📂" },
-      { name: "Medical History", href: "/admin/doctor/medical-history", icon: "📋" },
-
-      { name: "Consultations", href: "/admin/doctor/consultations", icon: "🩺" },
-      { name: "Clinical Notes", href: "/admin/doctor/clinical-notes", icon: "📝" },
-
-      { name: "Treatment Plans", href: "/admin/doctor/treatment-plans", icon: "🦷" },
-      { name: "Prescriptions", href: "/admin/doctor/prescriptions", icon: "💊" },
-
-      { name: "Lab Requests", href: "/admin/doctor/lab-requests", icon: "🔬" },
-      { name: "Radiology & Imaging", href: "/admin/doctor/imaging", icon: "🩻" },
-
-      { name: "Follow-Up Management", href: "/admin/doctor/followups", icon: "🔄" },
-
-      { name: "Notifications", href: "/admin/doctor/notifications", icon: "🔔" },
-      { name: "Settings", href: "/admin/doctor/settings", icon: "⚙️" },
-    ],
-  },
-  {
-    name: "Lab Technician",
-    icon: "🔬",
-    subItems: [
-      { name: "Dashboard", href: "/admin/labtechnicians/dashboard", icon: "📊" },
-      { name: "Lab Orders", href: "/admin/labtechnicians/orders", icon: "📋" },
-      { name: "Case Tracking", href: "/admin/labtechnicians/case-tracking", icon: "🔍" },
-      { name: "CAD Design", href: "/admin/labtechnicians/cad-design", icon: "💻" },
-      { name: "Production", href: "/admin/labtechnicians/production", icon: "🏗️" },
-      { name: "Quality Control", href: "/admin/labtechnicians/quality-control", icon: "✅" },
-      { name: "Dispatch", href: "/admin/labtechnicians/dispatch", icon: "🚚" },
-      { name: "Invoices", href: "/admin/labtechnicians/invoices", icon: "💵" },
-      { name: "Warranty", href: "/admin/labtechnicians/warranty", icon: "🛡️" },
-      { name: "Reports", href: "/admin/labtechnicians/reports", icon: "📈" },
-      { name: "Notifications", href: "/admin/labtechnicians/notifications", icon: "🔔" },
-      { name: "Settings", href: "/admin/labtechnicians/settings", icon: "⚙️" },
     ],
   },
   {

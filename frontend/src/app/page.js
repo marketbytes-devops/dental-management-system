@@ -24,7 +24,7 @@ export default function Home() {
             Enter as Doctor
           </Link>
           <Link
-            href="/lab/dashboard"
+            href="/labtechnicians/dashboard"
             className="bg-white text-gray-700 text-center rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors"
           >
             Enter as Lab Technician

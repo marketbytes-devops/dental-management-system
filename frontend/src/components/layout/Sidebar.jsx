@@ -23,6 +23,33 @@ const navItems = [
     ],
   },
   {
+    name: "Doctor",
+    icon: "👨‍⚕️",
+    subItems: [
+      { name: "Dashboard", href: "/admin/doctor/dashboard", icon: "📊" },
+
+      { name: "Today's Appointments", href: "/admin/doctor/appointments", icon: "📅" },
+      { name: "Patient Queue", href: "/admin/doctor/queue", icon: "⏳" },
+
+      { name: "Patient Records", href: "/admin/doctor/patients", icon: "📂" },
+      { name: "Medical History", href: "/admin/doctor/medical-history", icon: "📋" },
+
+      { name: "Consultations", href: "/admin/doctor/consultations", icon: "🩺" },
+      { name: "Clinical Notes", href: "/admin/doctor/clinical-notes", icon: "📝" },
+
+      { name: "Treatment Plans", href: "/admin/doctor/treatment-plans", icon: "🦷" },
+      { name: "Prescriptions", href: "/admin/doctor/prescriptions", icon: "💊" },
+
+      { name: "Lab Requests", href: "/admin/doctor/lab-requests", icon: "🔬" },
+      { name: "Radiology & Imaging", href: "/admin/doctor/imaging", icon: "🩻" },
+
+      { name: "Follow-Up Management", href: "/admin/doctor/followups", icon: "🔄" },
+
+      { name: "Notifications", href: "/admin/doctor/notifications", icon: "🔔" },
+      { name: "Settings", href: "/admin/doctor/settings", icon: "⚙️" },
+    ],
+  },
+  {
     name: "Lab Technician",
     icon: "🔬",
     subItems: [

@@ -8,7 +8,7 @@ const navItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: "📊" },
   { name: "User Management", href: "/admin/users", icon: "👥" },
   { name: "Role Permissions", href: "/admin/roles", icon: "🔑" },
-  { name: "Doctor Workspace", href: "/doctor", icon: "👨‍⚕️" },
+  { name: "Doctor", href: "/admin/doctor", icon: "🔑" },
   {
     name: "Patients",
     icon: "🩺",

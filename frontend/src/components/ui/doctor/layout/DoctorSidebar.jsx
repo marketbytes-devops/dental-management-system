@@ -4,7 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const doctorNavItems = [
-  { name: "Clinical Workspace", href: "/doctor", icon: "📊" },
+  { name: "Dashboard", href: "/doctor/dashboard", icon: "🏠" },
+  { name: "Clinical Workspace", href: "/doctor/workspace", icon: "📊" },
+  { name: "Live Queue", href: "/doctor/queue", icon: "👥" },
+  { name: "Medical Alerts", href: "/doctor/alerts", icon: "⚠️" },
+  { name: "Pending Labs", href: "/doctor/labs", icon: "🔬" },
   { name: "My Performance", href: "/doctor/performance", icon: "📈" }
 ];
 

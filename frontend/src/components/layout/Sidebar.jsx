@@ -33,6 +33,7 @@ const navItems = [
       { name: "Settings", href: "/admin/receptionist/settings", icon: "⚙️" },
     ],
   },
+  
   {
     name: "Accountant",
     icon: "💰",
@@ -56,6 +57,24 @@ const navItems = [
 
       { name: "Audit Logs", href: "/admin/accountant/audit", icon: "🔍" },
       { name: "Settings", href: "/admin/accountant/settings", icon: "⚙️" },
+    ],
+  },
+  {
+    name: "Lab Technician",
+    icon: "🔬",
+    subItems: [
+      { name: "Dashboard", href: "/admin/labtechnicians/dashboard", icon: "📊" },
+      { name: "Lab Orders", href: "/admin/labtechnicians/orders", icon: "📋" },
+      { name: "Case Tracking", href: "/admin/labtechnicians/case-tracking", icon: "🔍" },
+      { name: "CAD Design", href: "/admin/labtechnicians/cad-design", icon: "💻" },
+      { name: "Production", href: "/admin/labtechnicians/production", icon: "🏗️" },
+      { name: "Quality Control", href: "/admin/labtechnicians/quality-control", icon: "✅" },
+      { name: "Dispatch", href: "/admin/labtechnicians/dispatch", icon: "🚚" },
+      { name: "Invoices", href: "/admin/labtechnicians/invoices", icon: "💵" },
+      { name: "Warranty", href: "/admin/labtechnicians/warranty", icon: "🛡️" },
+      { name: "Reports", href: "/admin/labtechnicians/reports", icon: "📈" },
+      { name: "Notifications", href: "/admin/labtechnicians/notifications", icon: "🔔" },
+      { name: "Settings", href: "/admin/labtechnicians/settings", icon: "⚙️" },
     ],
   },
   { name: "System Logs", href: "/admin/logs", icon: "📝" },

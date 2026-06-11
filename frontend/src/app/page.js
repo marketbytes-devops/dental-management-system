@@ -30,6 +30,12 @@ export default function Home() {
             Enter as Lab Technician
           </Link>
           <Link
+            href="/frontdesk/receptionist/dashboard"
+            className="bg-white text-gray-700 text-center rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            Enter as Front Desk
+          </Link>
+          <Link
             href="/patient/dashboard"
             className="bg-white text-gray-700 text-center rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors"
           >

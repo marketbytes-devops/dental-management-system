@@ -7,13 +7,13 @@ import ToothIcon from "@/components/ui/ToothIcon";
 
 const navItems = [
   { name: "My Dashboard",    href: "/patient/dashboard",      icon: Home },
-  { name: "My Appointments", href: "/patient/appointments",   icon: Calendar },
-  { name: "My Profile",      href: "/patient/profile",        icon: User },
-  { name: "Self Check-In",   href: "/patient/check-in",       icon: CheckSquare },
-  { name: "My Documents",    href: "/patient/documents",      icon: FileText },
-  { name: "My Records",      href: "/patient/records",        icon: Pill },
-  { name: "My Bills",        href: "/patient/billing",        icon: CreditCard },
-  { name: "Notifications",   href: "/patient/notifications",  icon: Bell },
+  { name: "My Appointments", href: "/patient/dashboard",      icon: Calendar },
+  { name: "My Profile",      href: "/patient/dashboard",      icon: User },
+  { name: "Self Check-In",   href: "/patient/dashboard",      icon: CheckSquare },
+  { name: "My Documents",    href: "/patient/dashboard",      icon: FileText },
+  { name: "My Records",      href: "/patient/dashboard",      icon: Pill },
+  { name: "My Bills",        href: "/patient/dashboard",      icon: CreditCard },
+  { name: "Notifications",   href: "/patient/dashboard",      icon: Bell },
 ];
 
 export default function PatientSidebar() {

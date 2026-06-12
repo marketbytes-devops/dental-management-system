@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Search, Bell, HelpCircle, Sparkles } from "lucide-react";
 
 export default function Navbar() {
@@ -35,9 +36,9 @@ export default function Navbar() {
           <HelpCircle className="w-5 h-5" />
         </button>
         <div className="h-6 w-px bg-gray-200 mx-1"></div>
-        <button className="flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
+        <Link href="/" className="flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
           Logout
-        </button>
+        </Link>
       </div>
     </header>
   );

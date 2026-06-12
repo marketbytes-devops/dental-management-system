@@ -28,7 +28,8 @@ import ToothIcon from "@/components/ui/ToothIcon";
 export default function Home() {
   const router = useRouter();
 
-  // Booking Modal States
+  // Booking Modal & Auth Gate States
+  const [isAuthGateOpen, setIsAuthGateOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [bookingStep, setBookingStep] = useState(1); // 1: Form, 2: Success
   const [bookingData, setBookingData] = useState({
@@ -54,6 +55,15 @@ export default function Home() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState("");
+
+  // Dummy Credentials Constant
+  const dummyCredentials = {
+    patient: { identifier: "9876543210", password: "patient123" },
+    doctor: { identifier: "anoop.nair", password: "doctor123" },
+    lab: { identifier: "alen.john", password: "lab123" },
+    frontdesk: { identifier: "desk.executive", password: "desk123" },
+    admin: { identifier: "admin", password: "admin123" }
+  };
 
   // Role Constants
   const roles = {
@@ -103,7 +113,14 @@ export default function Home() {
   const handleRoleSelect = (roleKey) => {
     setSelectedRole(roleKey);
     setAuthError("");
-    setLoginData({ identifier: "", password: "" });
+    
+    // Auto-fill dummy credentials
+    const credentials = dummyCredentials[roleKey];
+    setLoginData({
+      identifier: credentials ? credentials.identifier : "",
+      password: credentials ? credentials.password : ""
+    });
+    
     setAuthView("login");
   };
 
@@ -164,6 +181,25 @@ export default function Home() {
     setIsBookingOpen(false);
   };
 
+  // Trigger Auth Gate actions
+  const triggerAuthGateAction = (action) => {
+    setIsAuthGateOpen(false);
+    
+    // Scroll to portals element
+    const element = document.getElementById("portals");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+
+    if (action === "login") {
+      handleRoleSelect("patient");
+    } else if (action === "register") {
+      setSelectedRole("patient");
+      setAuthError("");
+      setAuthView("register");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-primary selection:text-white">
       {/* Top Navbar */}
@@ -178,7 +214,7 @@ export default function Home() {
             <a href="#features" className="hover:text-primary transition-colors">Features</a>
             <a href="#portals" className="hover:text-primary transition-colors">Staff Portals</a>
             <button 
-              onClick={() => setIsBookingOpen(true)}
+              onClick={() => setIsAuthGateOpen(true)}
               className="hover:text-primary transition-colors cursor-pointer"
             >
               Book Appointment
@@ -216,7 +252,7 @@ export default function Home() {
 
             <div className="flex flex-wrap gap-4 pt-2">
               <button 
-                onClick={() => setIsBookingOpen(true)}
+                onClick={() => setIsAuthGateOpen(true)}
                 className="flex items-center gap-2 bg-gradient-to-r from-primary to-secondary text-white font-bold px-7 py-3.5 rounded-2xl shadow-lg shadow-primary/25 hover:shadow-primary/45 transition-all hover:scale-102 cursor-pointer"
               >
                 <Calendar className="w-5 h-5" /> Book Appointment
@@ -399,7 +435,7 @@ export default function Home() {
 
                   <div>
                     <h3 className="text-xl font-bold">Sign In</h3>
-                    <p className="text-slate-400 text-xs mt-1">Enter your {selectedRole === "patient" ? "Mobile Number" : "Username"} and Password</p>
+                    <p className="text-slate-400 text-xs mt-1">Enter your credentials or use the pre-filled demo account</p>
                   </div>
 
                   <form onSubmit={handleLoginSubmit} className="space-y-4">
@@ -415,7 +451,7 @@ export default function Home() {
                           value={loginData.identifier}
                           onChange={(e) => setLoginData({ ...loginData, identifier: e.target.value })}
                           placeholder={selectedRole === "patient" ? "+91 XXXXX XXXXX" : "eg. anoop.nair"}
-                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-primary transition-all text-white placeholder:text-slate-600"
+                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-primary transition-all text-white placeholder:text-slate-650"
                         />
                       </div>
                     </div>
@@ -430,9 +466,16 @@ export default function Home() {
                           value={loginData.password}
                           onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                           placeholder="••••••••"
-                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-primary transition-all text-white placeholder:text-slate-600"
+                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-primary transition-all text-white placeholder:text-slate-650"
                         />
                       </div>
+                    </div>
+
+                    {/* Pre-filled Demo Credentials Box */}
+                    <div className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-3 text-[10px] text-slate-400 space-y-1 text-left">
+                      <p className="font-bold text-slate-350">Demo Credentials (Pre-filled):</p>
+                      <p>Login ID: <span className="text-primary font-mono select-all font-bold">{dummyCredentials[selectedRole]?.identifier}</span></p>
+                      <p>Password: <span className="text-primary font-mono select-all font-bold">{dummyCredentials[selectedRole]?.password}</span></p>
                     </div>
 
                     {authError && <p className="text-danger text-[11px] font-semibold">{authError}</p>}
@@ -598,156 +641,50 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* APPOINTMENT BOOKING MODAL */}
-      {isBookingOpen && (
+      {/* AUTHENTICATION GATE MODAL FOR BOOK APPOINTMENT */}
+      {isAuthGateOpen && (
         <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-2xl p-8 max-w-md w-full relative space-y-6 animate-scaleIn text-left">
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-2xl p-8 max-w-sm w-full relative space-y-6 text-center animate-scaleIn">
             
             {/* Close Button */}
             <button 
-              onClick={resetBooking}
+              onClick={() => setIsAuthGateOpen(false)}
               className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition-colors p-1.5 hover:bg-slate-50 rounded-xl cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
-            {/* STEP 1: FORM */}
-            {bookingStep === 1 ? (
-              <div className="space-y-5">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider mb-2">
-                    Request Appointment
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900">Schedule Your Roster Slot</h3>
-                  <p className="text-slate-400 text-xs">Fill in your information to reserve a clinical consultation.</p>
-                </div>
+            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+              <Calendar className="w-8 h-8" />
+            </div>
 
-                <form onSubmit={handleBookingSubmit} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Full Name</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={bookingData.name}
-                      onChange={(e) => setBookingData({ ...bookingData, name: e.target.value })}
-                      placeholder="eg. Rahul Kumar"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-xs outline-none focus:border-primary focus:bg-white transition-all text-slate-800"
-                    />
-                  </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-slate-900">Sign In to Book Appointment</h3>
+              <p className="text-slate-500 text-xs leading-relaxed">
+                To reserve an appointment slot with a SmileCare specialist, you must sign in as a patient or create a new registration record.
+              </p>
+            </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Mobile Number</label>
-                    <input 
-                      type="tel" 
-                      required
-                      value={bookingData.phone}
-                      onChange={(e) => setBookingData({ ...bookingData, phone: e.target.value })}
-                      placeholder="eg. +91 98765 43210"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-xs outline-none focus:border-primary focus:bg-white transition-all text-slate-800"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Service Type</label>
-                      <select 
-                        value={bookingData.service}
-                        onChange={(e) => setBookingData({ ...bookingData, service: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none focus:border-primary focus:bg-white text-slate-700"
-                      >
-                        <option value="General Dentistry">General Dentistry</option>
-                        <option value="Endodontics">Endodontics</option>
-                        <option value="Orthodontics">Orthodontics</option>
-                        <option value="Oral Surgery">Oral Surgery</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Specialist</label>
-                      <select 
-                        value={bookingData.doctor}
-                        onChange={(e) => setBookingData({ ...bookingData, doctor: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none focus:border-primary focus:bg-white text-slate-700"
-                      >
-                        <option value="Dr. Anoop Nair">Dr. Anoop Nair</option>
-                        <option value="Dr. James Kurt">Dr. James Kurt</option>
-                        <option value="Dr. Sarah Jenkins">Dr. Sarah Jenkins</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Date</label>
-                      <input 
-                        type="date" 
-                        required
-                        value={bookingData.date}
-                        onChange={(e) => setBookingData({ ...bookingData, date: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none focus:border-primary focus:bg-white text-slate-700"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Preferred Slot</label>
-                      <select 
-                        value={bookingData.slot}
-                        onChange={(e) => setBookingData({ ...bookingData, slot: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs outline-none focus:border-primary focus:bg-white text-slate-700"
-                      >
-                        <option value="Morning (09:00 AM - 12:00 PM)">Morning</option>
-                        <option value="Afternoon (02:00 PM - 05:00 PM)">Afternoon</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <button 
-                    type="submit"
-                    className="w-full bg-primary text-white text-xs font-bold py-3 rounded-2xl hover:bg-primary/95 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 cursor-pointer mt-4"
-                  >
-                    Confirm Booking Request <Check className="w-4 h-4" />
-                  </button>
-                </form>
-              </div>
-            ) : (
-              /* STEP 2: SUCCESS VIEW */
-              <div className="flex flex-col items-center justify-center text-center py-6 space-y-4">
-                <div className="w-16 h-16 rounded-full bg-success/10 text-success flex items-center justify-center animate-pulse">
-                  <CheckCircle2 className="w-10 h-10" />
-                </div>
-                
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-slate-900">Request Received!</h3>
-                  <p className="text-slate-500 text-xs max-w-sm">
-                    Thank you <span className="font-bold text-slate-800">{bookingData.name}</span>. Your request for <span className="font-bold text-slate-800">{bookingData.service}</span> with <span className="font-bold text-slate-800">{bookingData.doctor}</span> is queued.
-                  </p>
-                </div>
-
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-xs space-y-1.5 w-full">
-                  <div className="flex justify-between">
-                    <span className="text-slate-450">Date:</span>
-                    <span className="font-bold text-slate-700">{bookingData.date}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-450">Preferred Slot:</span>
-                    <span className="font-bold text-slate-700">{bookingData.slot}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-450">Contact:</span>
-                    <span className="font-bold text-slate-700">{bookingData.phone}</span>
-                  </div>
-                </div>
-
-                <p className="text-[10px] text-slate-400 font-semibold italic">A confirmation SMS and reminder will be sent to your phone number shortly.</p>
-
-                <button 
-                  onClick={resetBooking}
-                  className="w-full bg-slate-900 text-white text-xs font-bold py-3 rounded-2xl hover:bg-slate-800 transition-all cursor-pointer mt-4"
-                >
-                  Done
-                </button>
-              </div>
-            )}
+            <div className="space-y-3">
+              <button 
+                onClick={() => triggerAuthGateAction("login")}
+                className="w-full bg-primary hover:bg-primary/95 text-white text-xs font-bold py-3 rounded-2xl transition-all shadow-md shadow-primary/20 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Sign In as Patient <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                onClick={() => triggerAuthGateAction("register")}
+                className="w-full bg-secondary hover:bg-secondary/95 text-white text-xs font-bold py-3 rounded-2xl transition-all shadow-md shadow-secondary/20 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Register New Account <UserPlus className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                onClick={() => setIsAuthGateOpen(false)}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold py-2.5 rounded-2xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
 
           </div>
         </div>

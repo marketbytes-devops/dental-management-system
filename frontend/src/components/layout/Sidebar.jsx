@@ -42,8 +42,8 @@ import ToothIcon from "@/components/ui/ToothIcon";
 const navItems = [
   { name: "Dashboard", href: "/admin/dashboard", icon: BarChart3 },
   { name: "User Management", href: "/admin/users", icon: Users },
-  { name: "Role Permissions", href: "/admin/roles", icon: Key },
-  { name: "Doctor", href: "/admin/doctor", icon: Stethoscope },
+  { name: "Role Permissions", href: "/admin/dashboard", icon: Key },
+  { name: "Doctor", href: "/admin/dashboard", icon: Stethoscope },
  
   {
     name: "Receptionist",
@@ -101,7 +101,7 @@ const navItems = [
       { name: "Settings", href: "/admin/labtechnicians/settings", icon: Settings },
     ],
   },
-  { name: "System Logs", href: "/admin/logs", icon: FileEdit },
+  { name: "System Logs", href: "/admin/dashboard", icon: FileEdit },
 ];
 
 export default function Sidebar() {

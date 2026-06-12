@@ -45,9 +45,9 @@ export default function PatientNavbar() {
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
             R
           </div>
-          <button className="flex items-center bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
+          <Link href="/" className="flex items-center bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
             Logout
-          </button>
+          </Link>
         </div>
       </div>
     </header>

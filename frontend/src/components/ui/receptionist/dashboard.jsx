@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Calendar, CheckSquare, Hourglass, Stethoscope, Users } from "lucide-react";
 
 export default function ReceptionistDashboard() {
   const [appointments, setAppointments] = useState([
@@ -55,7 +56,9 @@ export default function ReceptionistDashboard() {
             <h3 className="text-2xl font-black text-gray-800">{appointments.length}</h3>
             <p className="text-xs text-primary font-semibold mt-1">2 remaining slots</p>
           </div>
-          <span className="text-3xl bg-primary/10 p-3 rounded-xl">📅</span>
+          <span className="bg-primary/10 p-3 rounded-xl text-primary flex items-center justify-center shrink-0">
+            <Calendar className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between">
@@ -66,7 +69,9 @@ export default function ReceptionistDashboard() {
             </h3>
             <p className="text-xs text-success font-semibold mt-1">Direct to chair</p>
           </div>
-          <span className="text-3xl bg-success/10 p-3 rounded-xl">✅</span>
+          <span className="bg-success/10 p-3 rounded-xl text-success flex items-center justify-center shrink-0">
+            <CheckSquare className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between">
@@ -75,7 +80,9 @@ export default function ReceptionistDashboard() {
             <h3 className="text-2xl font-black text-gray-800">{queue.length}</h3>
             <p className="text-xs text-warning font-semibold mt-1">Est. wait: 15 min</p>
           </div>
-          <span className="text-3xl bg-warning/10 p-3 rounded-xl">⏳</span>
+          <span className="bg-warning/10 p-3 rounded-xl text-warning flex items-center justify-center shrink-0">
+            <Hourglass className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between">
@@ -84,7 +91,9 @@ export default function ReceptionistDashboard() {
             <h3 className="text-2xl font-black text-gray-800">3</h3>
             <p className="text-xs text-purple-650 font-semibold mt-1">All departments</p>
           </div>
-          <span className="text-3xl bg-purple-50 p-3 rounded-xl text-purple-600">👨‍⚕️</span>
+          <span className="bg-purple-50 p-3 rounded-xl text-purple-600 flex items-center justify-center shrink-0">
+            <Stethoscope className="w-6 h-6" />
+          </span>
         </div>
       </div>
 
@@ -155,8 +164,8 @@ export default function ReceptionistDashboard() {
 
           <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
             {queue.length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-gray-200 rounded-xl">
-                <span className="text-2xl">🛋️</span>
+              <div className="text-center py-10 border border-dashed border-gray-200 rounded-xl flex flex-col items-center">
+                <Users className="w-8 h-8 text-gray-300" />
                 <p className="text-xs text-gray-400 mt-2 font-bold">Lounge is currently empty.</p>
               </div>
             ) : (

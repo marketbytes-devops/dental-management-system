@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ClipboardList, Hourglass, Microscope, Flame, Search, Calendar } from "lucide-react";
 
 const INITIAL_ORDERS = [
   {
@@ -369,7 +370,9 @@ export default function LabOrders() {
             <h3 className="text-3xl font-extrabold text-gray-900">{totalCases}</h3>
             <p className="text-xs text-gray-500 font-medium mt-2">Active cases in dashboard</p>
           </div>
-          <span className="text-3xl opacity-80 z-10">📋</span>
+          <span className="bg-primary/10 p-3 rounded-xl text-primary flex items-center justify-center shrink-0 z-10">
+            <ClipboardList className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between relative overflow-hidden group hover:border-warning/45 transition-all duration-300">
@@ -381,7 +384,9 @@ export default function LabOrders() {
               <span>●</span> Requires attention
             </p>
           </div>
-          <span className="text-3xl opacity-80 z-10">⌛</span>
+          <span className="bg-warning/10 p-3 rounded-xl text-warning flex items-center justify-center shrink-0 z-10">
+            <Hourglass className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between relative overflow-hidden group hover:border-purple-55/35 transition-all duration-300">
@@ -389,9 +394,11 @@ export default function LabOrders() {
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">In Production</p>
             <h3 className="text-3xl font-extrabold text-gray-900">{inProductionCases}</h3>
-            <p className="text-xs text-purple-600 font-semibold mt-2">Accepted & active</p>
+            <p className="text-xs text-purple-650 font-semibold mt-2">Accepted & active</p>
           </div>
-          <span className="text-3xl opacity-80 z-10">🔬</span>
+          <span className="bg-purple-50 p-3 rounded-xl text-purple-600 flex items-center justify-center shrink-0 z-10">
+            <Microscope className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between relative overflow-hidden group hover:border-danger/45 transition-all duration-300">
@@ -403,14 +410,16 @@ export default function LabOrders() {
               <span>⚠️</span> Priority handling
             </p>
           </div>
-          <span className="text-3xl opacity-80 z-10">🔥</span>
+          <span className="bg-danger/10 p-3 rounded-xl text-danger flex items-center justify-center shrink-0 z-10">
+            <Flame className="w-6 h-6" />
+          </span>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden p-6 space-y-4">
         <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
           <div className="relative w-full lg:w-96 flex items-center bg-gray-55 rounded-xl px-4 py-2.5 border border-gray-200 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-            <span className="text-gray-400 mr-2.5">🔍</span>
+            <Search className="text-gray-400 mr-2.5 w-4 h-4 shrink-0" />
             <input 
               type="text" 
               placeholder="Search Case ID, patient, or dentist..." 
@@ -512,7 +521,7 @@ export default function LabOrders() {
                 <tr>
                   <td colSpan="8" className="px-6 py-10 text-center text-gray-450">
                     <div className="flex flex-col items-center justify-center space-y-2">
-                      <span className="text-4xl">🔍</span>
+                      <Search className="w-8 h-8 text-gray-300" />
                       <p className="font-semibold text-base text-gray-750">No lab orders found</p>
                       <p className="text-xs text-gray-400">Try adjusting your filters or search term.</p>
                     </div>
@@ -701,7 +710,7 @@ export default function LabOrders() {
                         <div>
                           <p className="text-xs text-gray-400">Due Date</p>
                           <p className="text-sm font-bold text-gray-900 mt-0.5 flex items-center gap-1.5">
-                            📅 {selectedOrder.dueDate}
+                            <Calendar className="w-4 h-4 text-gray-500" /> {selectedOrder.dueDate}
                             {selectedOrder.dueDate === "2026-06-10" && (
                               <span className="text-xs text-danger font-extrabold bg-danger/5 px-2 py-0.5 rounded">
                                 Urgent Delivery Today

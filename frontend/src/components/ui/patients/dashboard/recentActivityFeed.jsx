@@ -1,7 +1,10 @@
+import { Pill, CreditCard, FileText } from "lucide-react";
+import ToothIcon from "@/components/ui/ToothIcon";
+
 const activities = [
   {
-    icon: "🦷",
-    iconBg: "bg-primary/10",
+    icon: ToothIcon,
+    iconBg: "bg-primary/10 text-primary",
     title: "Scaling & Polishing completed",
     subtitle: "by Dr. Anoop Nair",
     time: "May 12, 2026",
@@ -9,8 +12,8 @@ const activities = [
     tagColor: "bg-primary/10 text-primary",
   },
   {
-    icon: "💊",
-    iconBg: "bg-warning/10",
+    icon: Pill,
+    iconBg: "bg-warning/10 text-warning",
     title: "Amoxicillin 500mg prescribed",
     subtitle: "1 cap × 3 times/day for 5 days",
     time: "May 12, 2026",
@@ -18,8 +21,8 @@ const activities = [
     tagColor: "bg-warning/10 text-warning",
   },
   {
-    icon: "💳",
-    iconBg: "bg-success/10",
+    icon: CreditCard,
+    iconBg: "bg-success/10 text-success",
     title: "Invoice #INV-089 paid",
     subtitle: "₹450 — Scaling & Polishing",
     time: "May 12, 2026",
@@ -27,8 +30,8 @@ const activities = [
     tagColor: "bg-success/10 text-success",
   },
   {
-    icon: "📄",
-    iconBg: "bg-secondary/10",
+    icon: FileText,
+    iconBg: "bg-secondary/10 text-secondary",
     title: "Consent form signed",
     subtitle: "For upcoming Root Canal procedure",
     time: "Jun 10, 2026",
@@ -53,9 +56,9 @@ export default function RecentActivityFeed() {
           >
             {/* Icon */}
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-lg ${item.iconBg}`}
+              className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${item.iconBg}`}
             >
-              {item.icon}
+              <item.icon className="w-5 h-5" />
             </div>
 
             {/* Content */}

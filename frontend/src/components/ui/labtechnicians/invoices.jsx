@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Coins, CreditCard, Receipt } from "lucide-react";
 
 const INITIAL_INVOICES = [
   { id: "INV-2026-041", caseId: "CASE-2026-001", patient: "Aditya Verma", dentist: "Dr. Anoop Nair", clinic: "SmileCare Central", amount: 4500, status: "Paid", date: "2026-06-10", items: [{ name: "Zirconia Crown (Ultra-Translucent)", qty: 1, rate: 3500 }, { name: "Laboratory Model Fabrication", qty: 1, rate: 1000 }] },
@@ -67,7 +68,9 @@ export default function LabInvoices() {
             <h3 className="text-2xl font-black text-gray-900">₹{totalRevenue.toLocaleString()}</h3>
             <p className="text-xs text-success font-semibold mt-1">From {paidCount} completed fabrications</p>
           </div>
-          <span className="text-3xl bg-success/10 p-3 rounded-xl">💰</span>
+          <span className="bg-success/10 p-3 rounded-xl text-success flex items-center justify-center shrink-0">
+            <Coins className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
@@ -76,7 +79,9 @@ export default function LabInvoices() {
             <h3 className="text-2xl font-black text-gray-900">₹{pendingPayments.toLocaleString()}</h3>
             <p className="text-xs text-warning font-semibold mt-1">Outstanding clinic balances</p>
           </div>
-          <span className="text-3xl bg-warning/10 p-3 rounded-xl">💳</span>
+          <span className="bg-warning/10 p-3 rounded-xl text-warning flex items-center justify-center shrink-0">
+            <CreditCard className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
@@ -85,7 +90,9 @@ export default function LabInvoices() {
             <h3 className="text-2xl font-black text-gray-900">{invoices.length}</h3>
             <p className="text-xs text-gray-450 mt-1">Active billing cases</p>
           </div>
-          <span className="text-3xl bg-primary/10 p-3 rounded-xl">🧾</span>
+          <span className="bg-primary/10 p-3 rounded-xl text-primary flex items-center justify-center shrink-0">
+            <Receipt className="w-6 h-6" />
+          </span>
         </div>
       </div>
 

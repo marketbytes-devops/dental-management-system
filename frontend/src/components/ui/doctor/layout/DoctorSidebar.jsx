@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ClipboardList, Users, AlertTriangle, Microscope, TrendingUp, Stethoscope } from "lucide-react";
+import { Home, ClipboardList, Users, AlertTriangle, Microscope, TrendingUp, Stethoscope, Share2 } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 
 const doctorNavItems = [
@@ -11,6 +11,7 @@ const doctorNavItems = [
   { name: "Live Queue", href: "/doctor/queue", icon: Users },
   { name: "Medical Alerts", href: "/doctor/alerts", icon: AlertTriangle },
   { name: "Pending Labs", href: "/doctor/labs", icon: Microscope },
+  { name: "Referrals", href: "/doctor/referrals", icon: Share2 },
   { name: "My Performance", href: "/doctor/performance", icon: TrendingUp }
 ];
 

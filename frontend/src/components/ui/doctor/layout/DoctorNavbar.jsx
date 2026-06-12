@@ -1,12 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Search, Bell, HelpCircle, Sparkles } from "lucide-react";
+import { useDoctor } from "@/app/doctor/layout";
+import { Search, Bell, HelpCircle, Sparkles, Share2 } from "lucide-react";
 
 export default function DoctorNavbar() {
+  const { referrals, patients } = useDoctor();
+  const [showNotifications, setShowNotifications] = useState(false);
+
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+  const pendingIncoming = referrals ? referrals.filter(r => r.referredBy !== "Dr. Anoop Nair" && r.status === "Pending") : [];
 
   return (
     <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 shadow-sm z-10">
@@ -29,11 +36,55 @@ export default function DoctorNavbar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center">
+      <div className="flex items-center gap-4 relative">
+        <button 
+          onClick={() => setShowNotifications(!showNotifications)}
+          className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center cursor-pointer outline-none"
+        >
           <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-danger rounded-full border-2 border-white animate-pulse"></span>
+          {pendingIncoming.length > 0 && (
+            <span className="absolute top-0.5 right-0.5 w-4.5 h-4.5 bg-danger text-white text-[8px] font-black rounded-full flex items-center justify-center border border-white animate-pulse">
+              {pendingIncoming.length}
+            </span>
+          )}
         </button>
+
+        {/* Notifications Popover */}
+        {showNotifications && (
+          <div className="absolute right-0 top-12 w-80 bg-white border border-gray-150 rounded-2xl shadow-xl z-50 p-4 space-y-3 animate-fade-in text-left">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Clinical Notifications</span>
+              <span className="text-[9px] font-bold bg-danger/10 text-danger px-2 py-0.5 rounded">
+                {pendingIncoming.length} New Referral{pendingIncoming.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            
+            <div className="space-y-2 max-h-[240px] overflow-y-auto">
+              {pendingIncoming.map(ref => {
+                const pat = patients[ref.patientToken];
+                return (
+                  <Link 
+                    key={ref.id}
+                    href="/doctor/referrals"
+                    onClick={() => setShowNotifications(false)}
+                    className="block p-2.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all text-xs"
+                  >
+                    <p className="font-bold text-gray-800 flex items-center gap-1">
+                      <Share2 className="w-3 h-3 text-primary" /> Referral consultation
+                    </p>
+                    <p className="text-[11px] text-gray-505 mt-1">
+                      <span className="font-bold">{ref.referredBy}</span> referred patient <span className="font-semibold text-gray-750">{pat?.name}</span> for {ref.speciality} evaluation.
+                    </p>
+                    <span className="text-[9px] text-gray-405 font-semibold block mt-1">{ref.date}</span>
+                  </Link>
+                );
+              })}
+              {pendingIncoming.length === 0 && (
+                <p className="text-xs text-gray-405 text-center py-6 font-medium">No new notifications.</p>
+              )}
+            </div>
+          </div>
+        )}
         <button className="p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center">
           <HelpCircle className="w-5 h-5" />
         </button>

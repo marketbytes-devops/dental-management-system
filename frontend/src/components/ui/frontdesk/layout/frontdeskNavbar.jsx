@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { HelpCircle, Sparkles } from "lucide-react";
+
 export default function FrontdeskNavbar() {
   const hour = new Date().getHours();
   const greeting =
@@ -10,8 +12,8 @@ export default function FrontdeskNavbar() {
   return (
     <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 shadow-sm z-10">
       <div>
-        <p className="text-sm font-semibold text-gray-900">
-          {greeting}, Desk Executive 👋
+        <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+          {greeting}, Desk Executive <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
         </p>
         <p className="text-xs text-gray-500">Lobby desk portal</p>
       </div>
@@ -19,10 +21,10 @@ export default function FrontdeskNavbar() {
       <div className="flex items-center gap-4">
         {/* Help */}
         <button
-          className="p-2 text-gray-400 hover:text-primary transition-colors"
+          className="p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center"
           aria-label="Help"
         >
-          <span className="text-xl">❓</span>
+          <HelpCircle className="w-5 h-5" />
         </button>
 
         <div className="h-6 w-px bg-gray-200 mx-1" />

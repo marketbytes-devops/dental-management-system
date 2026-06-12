@@ -3,81 +3,105 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import {
+  BarChart3,
+  Users,
+  Key,
+  Stethoscope,
+  ConciergeBell,
+  Calendar,
+  UserPlus,
+  CheckSquare,
+  Hourglass,
+  Phone,
+  Bell,
+  FolderOpen,
+  Headphones,
+  Settings,
+  Coins,
+  Receipt,
+  CreditCard,
+  Shield,
+  ShieldCheck,
+  TrendingUp,
+  TrendingDown,
+  Undo2,
+  AlertCircle,
+  Banknote,
+  FileText,
+  Search,
+  Microscope,
+  ClipboardList,
+  Laptop,
+  Wrench,
+  Truck,
+  FileEdit
+} from "lucide-react";
+import ToothIcon from "@/components/ui/ToothIcon";
 
 const navItems = [
-  { name: "Dashboard", href: "/admin/dashboard", icon: "📊" },
-  { name: "User Management", href: "/admin/users", icon: "👥" },
-  { name: "Role Permissions", href: "/admin/roles", icon: "🔑" },
-  { name: "Doctor", href: "/admin/doctor", icon: "🔑" },
+  { name: "Dashboard", href: "/admin/dashboard", icon: BarChart3 },
+  { name: "User Management", href: "/admin/users", icon: Users },
+  { name: "Role Permissions", href: "/admin/roles", icon: Key },
+  { name: "Doctor", href: "/admin/doctor", icon: Stethoscope },
  
   {
     name: "Receptionist",
-    icon: "🛎️",
+    icon: ConciergeBell,
     subItems: [
-      { name: "Dashboard", href: "/admin/receptionist/dashboard", icon: "📊" },
-
-      { name: "Appointment Booking", href: "/admin/receptionist/appointments", icon: "📅" },
-      { name: "Patient Registration", href: "/admin/receptionist/patients", icon: "👤" },
-      { name: "Check-In / Check-Out", href: "/admin/receptionist/checkin", icon: "✅" },
-
-      { name: "Doctor Schedules", href: "/admin/receptionist/doctors", icon: "👨‍⚕️" },
-      { name: "Treatment Coordination", href: "/admin/receptionist/treatments", icon: "🦷" },
-
-      { name: "Waiting Queue", href: "/admin/receptionist/queue", icon: "⏳" },
-      { name: "Patient Communication", href: "/admin/receptionist/communication", icon: "📞" },
-
-      { name: "Appointment Reminders", href: "/admin/receptionist/reminders", icon: "🔔" },
-      { name: "Patient Records", href: "/admin/receptionist/records", icon: "📂" },
-
-      { name: "Support Requests", href: "/admin/receptionist/support", icon: "🎧" },
-      { name: "Settings", href: "/admin/receptionist/settings", icon: "⚙️" },
+      { name: "Dashboard", href: "/admin/receptionist/dashboard", icon: BarChart3 },
+      { name: "Appointment Booking", href: "/admin/receptionist/appointments", icon: Calendar },
+      { name: "Patient Registration", href: "/admin/receptionist/patients", icon: UserPlus },
+      { name: "Check-In / Check-Out", href: "/admin/receptionist/checkin", icon: CheckSquare },
+      { name: "Doctor Schedules", href: "/admin/receptionist/doctors", icon: Stethoscope },
+      { name: "Treatment Coordination", href: "/admin/receptionist/treatments", icon: ToothIcon },
+      { name: "Waiting Queue", href: "/admin/receptionist/queue", icon: Hourglass },
+      { name: "Patient Communication", href: "/admin/receptionist/communication", icon: Phone },
+      { name: "Appointment Reminders", href: "/admin/receptionist/reminders", icon: Bell },
+      { name: "Patient Records", href: "/admin/receptionist/records", icon: FolderOpen },
+      { name: "Support Requests", href: "/admin/receptionist/support", icon: Headphones },
+      { name: "Settings", href: "/admin/receptionist/settings", icon: Settings },
     ],
   },
   
   {
     name: "Accountant",
-    icon: "💰",
+    icon: Coins,
     subItems: [
-      { name: "Dashboard", href: "/admin/accountant/dashboard", icon: "📊" },
-
-      { name: "Invoice Management", href: "/admin/accountant/invoices", icon: "🧾" },
-      { name: "Payment Processing", href: "/admin/accountant/payments", icon: "💳" },
-
-      { name: "Insurance Claims", href: "/admin/accountant/claims", icon: "🛡️" },
-      { name: "Claim Verification", href: "/admin/accountant/claim-verification", icon: "✔️" },
-
-      { name: "Revenue Tracking", href: "/admin/accountant/revenue", icon: "📈" },
-      { name: "Expense Management", href: "/admin/accountant/expenses", icon: "📉" },
-
-      { name: "Refund Requests", href: "/admin/accountant/refunds", icon: "↩️" },
-      { name: "Outstanding Dues", href: "/admin/accountant/dues", icon: "⚠️" },
-
-      { name: "Payroll", href: "/admin/accountant/payroll", icon: "💵" },
-      { name: "Financial Reports", href: "/admin/accountant/reports", icon: "📋" },
-
-      { name: "Audit Logs", href: "/admin/accountant/audit", icon: "🔍" },
-      { name: "Settings", href: "/admin/accountant/settings", icon: "⚙️" },
+      { name: "Dashboard", href: "/admin/accountant/dashboard", icon: BarChart3 },
+      { name: "Invoice Management", href: "/admin/accountant/invoices", icon: Receipt },
+      { name: "Payment Processing", href: "/admin/accountant/payments", icon: CreditCard },
+      { name: "Insurance Claims", href: "/admin/accountant/claims", icon: Shield },
+      { name: "Claim Verification", href: "/admin/accountant/claim-verification", icon: ShieldCheck },
+      { name: "Revenue Tracking", href: "/admin/accountant/revenue", icon: TrendingUp },
+      { name: "Expense Management", href: "/admin/accountant/expenses", icon: TrendingDown },
+      { name: "Refund Requests", href: "/admin/accountant/refunds", icon: Undo2 },
+      { name: "Outstanding Dues", href: "/admin/accountant/dues", icon: AlertCircle },
+      { name: "Payroll", href: "/admin/accountant/payroll", icon: Banknote },
+      { name: "Financial Reports", href: "/admin/accountant/reports", icon: FileText },
+      { name: "Audit Logs", href: "/admin/accountant/audit", icon: Search },
+      { name: "Settings", href: "/admin/accountant/settings", icon: Settings },
     ],
   },
   {
     name: "Lab Technician",
-    icon: "🔬",
+    icon: Microscope,
     subItems: [
-      { name: "Dashboard", href: "/admin/labtechnicians/dashboard", icon: "📊" },
-      { name: "Lab Orders", href: "/admin/labtechnicians/orders", icon: "📋" },
-      { name: "Case Tracking", href: "/admin/labtechnicians/case-tracking", icon: "🔍" },
-      { name: "CAD Design", href: "/admin/labtechnicians/cad-design", icon: "💻" },
-      { name: "Production", href: "/admin/labtechnicians/production", icon: "🏗️" },
-      { name: "Quality Control", href: "/admin/labtechnicians/quality-control", icon: "✅" },
-      { name: "Dispatch", href: "/admin/labtechnicians/dispatch", icon: "🚚" },
-      { name: "Invoices", href: "/admin/labtechnicians/invoices", icon: "💵" },
-      { name: "Warranty", href: "/admin/labtechnicians/warranty", icon: "🛡️" },
-      { name: "Reports", href: "/admin/labtechnicians/reports", icon: "📈" },
-      { name: "Notifications", href: "/admin/labtechnicians/notifications", icon: "🔔" },
-      { name: "Settings", href: "/admin/labtechnicians/settings", icon: "⚙️" },
+      { name: "Dashboard", href: "/admin/labtechnicians/dashboard", icon: BarChart3 },
+      { name: "Lab Orders", href: "/admin/labtechnicians/orders", icon: ClipboardList },
+      { name: "Case Tracking", href: "/admin/labtechnicians/case-tracking", icon: Search },
+      { name: "CAD Design", href: "/admin/labtechnicians/cad-design", icon: Laptop },
+      { name: "Production", href: "/admin/labtechnicians/production", icon: Wrench },
+      { name: "Quality Control", href: "/admin/labtechnicians/quality-control", icon: CheckSquare },
+      { name: "Dispatch", href: "/admin/labtechnicians/dispatch", icon: Truck },
+      { name: "Invoices", href: "/admin/labtechnicians/invoices", icon: Banknote },
+      { name: "Warranty", href: "/admin/labtechnicians/warranty", icon: Shield },
+      { name: "Reports", href: "/admin/labtechnicians/reports", icon: TrendingUp },
+      { name: "Notifications", href: "/admin/labtechnicians/notifications", icon: Bell },
+      { name: "Settings", href: "/admin/labtechnicians/settings", icon: Settings },
     ],
   },
-  { name: "System Logs", href: "/admin/logs", icon: "📝" },
+  { name: "System Logs", href: "/admin/logs", icon: FileEdit },
 ];
 
 export default function Sidebar() {
@@ -105,7 +129,7 @@ export default function Sidebar() {
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm">
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
         <span className="text-xl font-bold text-primary flex items-center gap-2">
-          <span className="text-2xl">🦷</span> SmileCare
+          <ToothIcon className="w-6 h-6 text-primary" strokeWidth={2.5} /> SmileCare
         </span>
         <span className="ml-2 text-[10px] font-bold bg-primary/10 text-primary px-2 py-1 rounded-md uppercase tracking-wider">
           Admin
@@ -133,7 +157,9 @@ export default function Sidebar() {
                         }`}
                     >
                       <div className="flex items-center">
-                        <span className="mr-3 text-lg opacity-70 group-hover:opacity-100">{item.icon}</span>
+                        <span className="mr-3 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
+                          <item.icon className="w-5 h-5" />
+                        </span>
                         {item.name}
                       </div>
                       <svg
@@ -164,7 +190,9 @@ export default function Sidebar() {
                                   : "text-gray-600 hover:bg-primary/5 hover:text-primary"
                                   }`}
                               >
-                                <span className="mr-2.5 text-sm opacity-70 group-hover:opacity-100">{subItem.icon}</span>
+                                <span className="mr-2.5 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
+                                  <subItem.icon className="w-4 h-4" />
+                                </span>
                                 {subItem.name}
                               </Link>
                             </li>
@@ -185,7 +213,9 @@ export default function Sidebar() {
                       : "text-gray-700 hover:bg-primary/5 hover:text-primary"
                       }`}
                   >
-                    <span className="mr-3 text-lg opacity-70 group-hover:opacity-100">{item.icon}</span>
+                    <span className="mr-3 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
+                      <item.icon className="w-5 h-5" />
+                    </span>
                     {item.name}
                   </Link>
                 </li>

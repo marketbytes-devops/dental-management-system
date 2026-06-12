@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Calendar } from "lucide-react";
 
 const TRACKING_CASES = [
   {
@@ -126,7 +127,7 @@ export default function CaseTracking() {
               <div>
                 <label className="text-[10px] font-bold text-gray-450 uppercase tracking-wider">Delivery Due Date</label>
                 <p className="text-sm font-bold text-danger mt-0.5 flex items-center gap-1">
-                  📅 {currentCase.dueDate}
+                  <Calendar className="w-4 h-4 text-danger" /> {currentCase.dueDate}
                 </p>
               </div>
             </div>

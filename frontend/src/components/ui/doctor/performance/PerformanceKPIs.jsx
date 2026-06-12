@@ -1,5 +1,7 @@
 "use client";
 
+import { Users, Hourglass, CreditCard, Star } from "lucide-react";
+
 export default function PerformanceKPIs() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
@@ -13,7 +15,9 @@ export default function PerformanceKPIs() {
             <span>↑</span> 12% this month
           </p>
         </div>
-        <span className="text-2xl bg-primary/10 p-2.5 rounded-xl text-primary shrink-0">👥</span>
+        <span className="bg-primary/10 p-2.5 rounded-xl text-primary shrink-0 flex items-center justify-center">
+          <Users className="w-6 h-6" />
+        </span>
       </div>
 
       {/* Card 2: Avg treatment time */}
@@ -26,7 +30,9 @@ export default function PerformanceKPIs() {
             <span>↓</span> -3 mins vs last month
           </p>
         </div>
-        <span className="text-2xl bg-secondary/10 p-2.5 rounded-xl text-secondary shrink-0">⏳</span>
+        <span className="bg-secondary/10 p-2.5 rounded-xl text-secondary shrink-0 flex items-center justify-center">
+          <Hourglass className="w-6 h-6" />
+        </span>
       </div>
 
       {/* Card 3: Revenue Contribution */}
@@ -39,7 +45,9 @@ export default function PerformanceKPIs() {
             <span>↑</span> 18% vs monthly target
           </p>
         </div>
-        <span className="text-2xl bg-success/10 p-2.5 rounded-xl text-success shrink-0">💳</span>
+        <span className="bg-success/10 p-2.5 rounded-xl text-success shrink-0 flex items-center justify-center">
+          <CreditCard className="w-6 h-6" />
+        </span>
       </div>
 
       {/* Card 4: Satisfaction */}
@@ -52,7 +60,9 @@ export default function PerformanceKPIs() {
             Based on 86 patient reviews
           </p>
         </div>
-        <span className="text-2xl bg-warning/10 p-2.5 rounded-xl text-warning shrink-0">⭐</span>
+        <span className="bg-warning/10 p-2.5 rounded-xl text-warning shrink-0 flex items-center justify-center">
+          <Star className="w-6 h-6" fill="currentColor" />
+        </span>
       </div>
     </div>
   );

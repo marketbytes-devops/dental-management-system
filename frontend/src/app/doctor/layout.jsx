@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import DoctorSidebar from "@/components/ui/doctor/layout/DoctorSidebar";
 import DoctorNavbar from "@/components/ui/doctor/layout/DoctorNavbar";
 import EmergencyPopup from "@/components/ui/doctor/workspace/EmergencyPopup";
+import ToothIcon from "@/components/ui/ToothIcon";
 
 // Create context
 const DoctorContext = createContext(null);
@@ -480,7 +481,7 @@ export default function DoctorLayout({ children }) {
         {/* Global Toast */}
         {notification && (
           <div className="fixed bottom-5 right-5 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50 animate-bounce">
-            <span className="text-primary">🦷</span>
+            <ToothIcon className="w-5 h-5 text-primary shrink-0" />
             <span className="text-sm font-semibold">{notification}</span>
           </div>
         )}

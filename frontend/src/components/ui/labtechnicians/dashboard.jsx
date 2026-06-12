@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ClipboardList, Hourglass, Settings, CheckSquare, Truck, CheckCircle } from "lucide-react";
 
 export default function LabDashboard() {
   const [animate, setAnimate] = useState(false);
@@ -12,12 +13,12 @@ export default function LabDashboard() {
 
   // Mock statistics data
   const stats = [
-    { name: "Total Orders", value: 142, icon: "📋", change: "+12% this wk", color: "border-primary/30 text-primary bg-primary/5" },
-    { name: "Pending Cases", value: 18, icon: "⌛", change: "Requires review", color: "border-warning/30 text-warning bg-warning/5" },
-    { name: "In Progress", value: 34, icon: "⚙️", change: "On schedule", color: "border-purple-500/30 text-purple-600 bg-purple-50" },
-    { name: "QC Pending", value: 8, icon: "✅", change: "Inspection ready", color: "border-amber-500/30 text-amber-600 bg-amber-50" },
-    { name: "Ready Dispatch", value: 12, icon: "🚚", change: "Awaiting courier", color: "border-info/30 text-secondary bg-secondary/5" },
-    { name: "Completed Cases", value: 70, icon: "🎉", change: "Delivered", color: "border-success/30 text-success bg-success/5" }
+    { name: "Total Orders", value: 142, icon: ClipboardList, change: "+12% this wk", color: "border-primary/30 text-primary bg-primary/5" },
+    { name: "Pending Cases", value: 18, icon: Hourglass, change: "Requires review", color: "border-warning/30 text-warning bg-warning/5" },
+    { name: "In Progress", value: 34, icon: Settings, change: "On schedule", color: "border-purple-500/30 text-purple-650 bg-purple-50" },
+    { name: "QC Pending", value: 8, icon: CheckSquare, change: "Inspection ready", color: "border-amber-500/30 text-amber-600 bg-amber-50" },
+    { name: "Ready Dispatch", value: 12, icon: Truck, change: "Awaiting courier", color: "border-info/30 text-secondary bg-secondary/5" },
+    { name: "Completed Cases", value: 70, icon: CheckCircle, change: "Delivered", color: "border-success/30 text-success bg-success/5" }
   ];
 
   // Daily Production chart (mock 7 days data)
@@ -77,8 +78,8 @@ export default function LabDashboard() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg ${stat.color}`}>
-                {stat.icon}
+              <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${stat.color}`}>
+                <stat.icon className="w-5 h-5" />
               </span>
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Active

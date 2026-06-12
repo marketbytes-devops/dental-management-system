@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Calendar } from "lucide-react";
 
 const INITIAL_CASES = [
   { id: "CASE-2026-001", patient: "Aditya Verma", dentist: "Dr. Anoop Nair", type: "Crown", material: "Zirconia", stage: "New Cases", priority: "High", dueDate: "2026-06-10", tech: "AJ" },
@@ -126,7 +127,7 @@ export default function LabProduction() {
                       {/* Bottom Row: Due date & Tech avatar */}
                       <div className="mt-3.5 pt-2 border-t border-gray-100 flex items-center justify-between">
                         <span className="text-[10px] text-gray-400 font-semibold flex items-center gap-1">
-                          📅 {c.dueDate}
+                          <Calendar className="w-3.5 h-3.5 text-gray-400" /> {c.dueDate}
                         </span>
                         
                         <div className="flex items-center gap-1.5">

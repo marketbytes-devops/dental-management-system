@@ -3,43 +3,70 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import {
+  ConciergeBell,
+  Coins,
+  BarChart3,
+  Calendar,
+  UserPlus,
+  CheckSquare,
+  Stethoscope,
+  Hourglass,
+  Phone,
+  Bell,
+  FolderOpen,
+  Headphones,
+  Settings,
+  Receipt,
+  CreditCard,
+  Shield,
+  ShieldCheck,
+  TrendingUp,
+  TrendingDown,
+  Undo2,
+  AlertCircle,
+  Banknote,
+  FileText,
+  Search
+} from "lucide-react";
+import ToothIcon from "@/components/ui/ToothIcon";
 
 const navItems = [
   {
     name: "Receptionist Services",
-    icon: "🛎️",
+    icon: ConciergeBell,
     subItems: [
-      { name: "Dashboard", href: "/frontdesk/receptionist/dashboard", icon: "📊" },
-      { name: "Appointment Booking", href: "/frontdesk/receptionist/appointments", icon: "📅" },
-      { name: "Patient Registration", href: "/frontdesk/receptionist/patients", icon: "👤" },
-      { name: "Check-In / Check-Out", href: "/frontdesk/receptionist/checkin", icon: "✅" },
-      { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: "👨‍⚕️" },
-      { name: "Treatment Coordination", href: "/frontdesk/receptionist/treatments", icon: "🦷" },
-      { name: "Waiting Queue", href: "/frontdesk/receptionist/queue", icon: "⏳" },
-      { name: "Patient Communication", href: "/frontdesk/receptionist/communication", icon: "📞" },
-      { name: "Appointment Reminders", href: "/frontdesk/receptionist/reminders", icon: "🔔" },
-      { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: "📂" },
-      { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: "🎧" },
-      { name: "Settings", href: "/frontdesk/receptionist/settings", icon: "⚙️" },
+      { name: "Dashboard", href: "/frontdesk/receptionist/dashboard", icon: BarChart3 },
+      { name: "Appointment Booking", href: "/frontdesk/receptionist/appointments", icon: Calendar },
+      { name: "Patient Registration", href: "/frontdesk/receptionist/patients", icon: UserPlus },
+      { name: "Check-In / Check-Out", href: "/frontdesk/receptionist/checkin", icon: CheckSquare },
+      { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: Stethoscope },
+      { name: "Treatment Coordination", href: "/frontdesk/receptionist/treatments", icon: ToothIcon },
+      { name: "Waiting Queue", href: "/frontdesk/receptionist/queue", icon: Hourglass },
+      { name: "Patient Communication", href: "/frontdesk/receptionist/communication", icon: Phone },
+      { name: "Appointment Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },
+      { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },
+      { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },
+      { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings },
     ],
   },
   {
     name: "Accountant Services",
-    icon: "💰",
+    icon: Coins,
     subItems: [
-      { name: "Dashboard", href: "/frontdesk/accountant/dashboard", icon: "📊" },
-      { name: "Invoice Management", href: "/frontdesk/accountant/invoices", icon: "🧾" },
-      { name: "Payment Processing", href: "/frontdesk/accountant/payments", icon: "💳" },
-      { name: "Insurance Claims", href: "/frontdesk/accountant/claims", icon: "🛡️" },
-      { name: "Claim Verification", href: "/frontdesk/accountant/claim-verification", icon: "✔️" },
-      { name: "Revenue Tracking", href: "/frontdesk/accountant/revenue", icon: "📈" },
-      { name: "Expense Management", href: "/frontdesk/accountant/expenses", icon: "📉" },
-      { name: "Refund Requests", href: "/frontdesk/accountant/refunds", icon: "↩️" },
-      { name: "Outstanding Dues", href: "/frontdesk/accountant/dues", icon: "⚠️" },
-      { name: "Payroll", href: "/frontdesk/accountant/payroll", icon: "💵" },
-      { name: "Financial Reports", href: "/frontdesk/accountant/reports", icon: "📋" },
-      { name: "Audit Logs", href: "/frontdesk/accountant/audit", icon: "🔍" },
-      { name: "Settings", href: "/frontdesk/accountant/settings", icon: "⚙️" },
+      { name: "Dashboard", href: "/frontdesk/accountant/dashboard", icon: BarChart3 },
+      { name: "Invoice Management", href: "/frontdesk/accountant/invoices", icon: Receipt },
+      { name: "Payment Processing", href: "/frontdesk/accountant/payments", icon: CreditCard },
+      { name: "Insurance Claims", href: "/frontdesk/accountant/claims", icon: Shield },
+      { name: "Claim Verification", href: "/frontdesk/accountant/claim-verification", icon: ShieldCheck },
+      { name: "Revenue Tracking", href: "/frontdesk/accountant/revenue", icon: TrendingUp },
+      { name: "Expense Management", href: "/frontdesk/accountant/expenses", icon: TrendingDown },
+      { name: "Refund Requests", href: "/frontdesk/accountant/refunds", icon: Undo2 },
+      { name: "Outstanding Dues", href: "/frontdesk/accountant/dues", icon: AlertCircle },
+      { name: "Payroll", href: "/frontdesk/accountant/payroll", icon: Banknote },
+      { name: "Financial Reports", href: "/frontdesk/accountant/reports", icon: FileText },
+      { name: "Audit Logs", href: "/frontdesk/accountant/audit", icon: Search },
+      { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings },
     ],
   },
 ];
@@ -69,7 +96,7 @@ export default function FrontdeskSidebar() {
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm">
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
         <span className="text-xl font-bold text-primary flex items-center gap-2">
-          <span className="text-2xl">🦷</span> SmileCare
+          <ToothIcon className="w-6 h-6 text-primary" strokeWidth={2.5} /> SmileCare
         </span>
         <span className="ml-2 text-[10px] font-bold bg-primary/10 text-primary px-2 py-1 rounded-md uppercase tracking-wider">
           Desk
@@ -95,7 +122,9 @@ export default function FrontdeskSidebar() {
                       }`}
                   >
                     <div className="flex items-center">
-                      <span className="mr-3 text-lg opacity-70 group-hover:opacity-100">{item.icon}</span>
+                      <span className="mr-3 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
+                        <item.icon className="w-5 h-5" />
+                      </span>
                       {item.name}
                     </div>
                     <svg
@@ -126,7 +155,9 @@ export default function FrontdeskSidebar() {
                                 : "text-gray-600 hover:bg-primary/5 hover:text-primary"
                                 }`}
                             >
-                              <span className="mr-2.5 text-sm opacity-70 group-hover:opacity-100">{subItem.icon}</span>
+                              <span className="mr-2.5 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
+                                <subItem.icon className="w-4 h-4" />
+                              </span>
                               {subItem.name}
                             </Link>
                           </li>

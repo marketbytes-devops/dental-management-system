@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Home, Calendar, User, CheckSquare, FileText, Pill, CreditCard, Bell } from "lucide-react";
+import ToothIcon from "@/components/ui/ToothIcon";
 
 const navItems = [
-  { name: "My Dashboard",    href: "/patient/dashboard",      icon: "🏠" },
-  { name: "My Appointments", href: "/patient/appointments",   icon: "📅" },
-  { name: "My Profile",      href: "/patient/profile",        icon: "👤" },
-  { name: "Self Check-In",   href: "/patient/check-in",       icon: "✅" },
-  { name: "My Documents",    href: "/patient/documents",      icon: "📄" },
-  { name: "My Records",      href: "/patient/records",        icon: "💊" },
-  { name: "My Bills",        href: "/patient/billing",        icon: "💳" },
-  { name: "Notifications",   href: "/patient/notifications",  icon: "🔔" },
+  { name: "My Dashboard",    href: "/patient/dashboard",      icon: Home },
+  { name: "My Appointments", href: "/patient/appointments",   icon: Calendar },
+  { name: "My Profile",      href: "/patient/profile",        icon: User },
+  { name: "Self Check-In",   href: "/patient/check-in",       icon: CheckSquare },
+  { name: "My Documents",    href: "/patient/documents",      icon: FileText },
+  { name: "My Records",      href: "/patient/records",        icon: Pill },
+  { name: "My Bills",        href: "/patient/billing",        icon: CreditCard },
+  { name: "Notifications",   href: "/patient/notifications",  icon: Bell },
 ];
 
 export default function PatientSidebar() {
@@ -22,7 +24,7 @@ export default function PatientSidebar() {
       {/* Brand */}
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
         <span className="text-xl font-bold text-primary flex items-center gap-2">
-          <span className="text-2xl">🦷</span> SmileCare
+          <ToothIcon className="w-6 h-6 text-primary" strokeWidth={2.5} /> SmileCare
         </span>
         <span className="ml-2 text-[10px] font-bold bg-primary/10 text-primary px-2 py-1 rounded-md uppercase tracking-wider">
           Patient
@@ -48,8 +50,8 @@ export default function PatientSidebar() {
                         : "text-gray-700 hover:bg-primary/5 hover:text-primary"
                     }`}
                   >
-                    <span className="mr-3 text-lg opacity-70 group-hover:opacity-100">
-                      {item.icon}
+                    <span className="mr-3 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
+                      <item.icon className="w-5 h-5" />
                     </span>
                     {item.name}
                     {/* Notification dot for Notifications link */}

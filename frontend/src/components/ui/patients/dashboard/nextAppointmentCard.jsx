@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { Calendar } from "lucide-react";
 
 export default function NextAppointmentCard({ appointment }) {
   if (!appointment) {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-4">
-        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-2xl">
-          📅
+        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
+          <Calendar className="w-6 h-6" />
         </div>
         <div>
           <p className="text-sm font-semibold text-gray-900">No upcoming appointments</p>

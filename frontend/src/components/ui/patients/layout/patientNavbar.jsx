@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { Bell, HelpCircle, Sparkles } from "lucide-react";
+
 export default function PatientNavbar() {
   const hour = new Date().getHours();
   const greeting =
@@ -11,8 +13,8 @@ export default function PatientNavbar() {
     <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 shadow-sm z-10">
       {/* Greeting */}
       <div>
-        <p className="text-sm font-semibold text-gray-900">
-          {greeting}, Rahul 👋
+        <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+          {greeting}, Rahul <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
         </p>
         <p className="text-xs text-gray-500">Patient ID: PT-10042</p>
       </div>
@@ -21,19 +23,19 @@ export default function PatientNavbar() {
       <div className="flex items-center gap-4">
         {/* Notification bell */}
         <button
-          className="relative p-2 text-gray-400 hover:text-primary transition-colors"
+          className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center"
           aria-label="Notifications"
         >
-          <span className="text-xl">🔔</span>
+          <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-danger rounded-full border-2 border-white" />
         </button>
 
         {/* Help */}
         <button
-          className="p-2 text-gray-400 hover:text-primary transition-colors"
+          className="p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center"
           aria-label="Help"
         >
-          <span className="text-xl">❓</span>
+          <HelpCircle className="w-5 h-5" />
         </button>
 
         <div className="h-6 w-px bg-gray-200 mx-1" />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Coins, TrendingUp, AlertCircle, Shield } from "lucide-react";
 
 export default function AccountantDashboard() {
   const [payments, setPayments] = useState([
@@ -30,7 +31,9 @@ export default function AccountantDashboard() {
             <h3 className="text-2xl font-black text-gray-800">₹46,700</h3>
             <p className="text-xs text-success font-semibold mt-1">↑ 14% vs last Thursday</p>
           </div>
-          <span className="text-3xl bg-success/10 p-3 rounded-xl">💰</span>
+          <span className="bg-success/10 p-3 rounded-xl text-success flex items-center justify-center shrink-0">
+            <Coins className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between">
@@ -39,7 +42,9 @@ export default function AccountantDashboard() {
             <h3 className="text-2xl font-black text-gray-800">₹4,82,000</h3>
             <p className="text-xs text-primary font-semibold mt-1">Target: ₹5,00,000</p>
           </div>
-          <span className="text-3xl bg-primary/10 p-3 rounded-xl">📈</span>
+          <span className="bg-primary/10 p-3 rounded-xl text-primary flex items-center justify-center shrink-0">
+            <TrendingUp className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between">
@@ -48,7 +53,9 @@ export default function AccountantDashboard() {
             <h3 className="text-2xl font-black text-gray-800">₹17,500</h3>
             <p className="text-xs text-danger font-semibold mt-1">2 critical accounts</p>
           </div>
-          <span className="text-3xl bg-danger/10 p-3 rounded-xl">⚠️</span>
+          <span className="bg-danger/10 p-3 rounded-xl text-danger flex items-center justify-center shrink-0">
+            <AlertCircle className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between">
@@ -57,7 +64,9 @@ export default function AccountantDashboard() {
             <h3 className="text-2xl font-black text-gray-800">8 Claims</h3>
             <p className="text-xs text-warning font-semibold mt-1">Est. value: ₹1,20,050</p>
           </div>
-          <span className="text-3xl bg-warning/10 p-3 rounded-xl">🛡️</span>
+          <span className="bg-warning/10 p-3 rounded-xl text-warning flex items-center justify-center shrink-0">
+            <Shield className="w-6 h-6" />
+          </span>
         </div>
       </div>
 

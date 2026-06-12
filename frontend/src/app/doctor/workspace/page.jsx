@@ -7,6 +7,7 @@ import ToothChart from "@/components/ui/doctor/workspace/ToothChart";
 import PrescriptionForm from "@/components/ui/doctor/workspace/PrescriptionForm";
 import LabOrderForm from "@/components/ui/doctor/workspace/LabOrderForm";
 import ClinicalNotes from "@/components/ui/doctor/workspace/ClinicalNotes";
+import ReferralForm from "@/components/ui/doctor/workspace/ReferralForm";
 import TimelineHistory from "@/components/ui/doctor/workspace/TimelineHistory";
 
 export default function DoctorWorkspacePage() {
@@ -27,7 +28,8 @@ export default function DoctorWorkspacePage() {
     handleRemoveDraftMed,
     handleSavePrescription,
     handleSubmitLabOrder,
-    handleSubmitDiagNote
+    handleSubmitDiagNote,
+    handleReferPatient
   } = useDoctor();
 
   if (!viewingPatient) {
@@ -90,6 +92,12 @@ export default function DoctorWorkspacePage() {
           {/* Add Diagnosis Clinical Notes Form */}
           <ClinicalNotes
             onSubmitDiagNote={handleSubmitDiagNote}
+          />
+
+          {/* Outgoing Specialist Referral Form */}
+          <ReferralForm
+            patientToken={viewingPatient.token}
+            onReferPatient={handleReferPatient}
           />
 
           {/* Patient Clinical History Timeline */}

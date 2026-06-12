@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Package, Truck, CheckCircle } from "lucide-react";
 
 const INITIAL_SHIPMENTS = [
   { id: "TRK-2026-981", caseId: "CASE-2026-005", patient: "Vikram Malhotra", dentist: "Dr. Anoop Nair", courier: "SmileCare Express", dispatchDate: "2026-06-10 10:15 AM", estDelivery: "Today, 03:30 PM", status: "In Transit" },
@@ -45,7 +46,9 @@ export default function LabDispatch() {
             <h3 className="text-2xl font-black text-gray-900">{readyCount}</h3>
             <p className="text-xs text-warning font-semibold mt-1">Awaiting courier pickup</p>
           </div>
-          <span className="text-3xl bg-warning/10 p-3 rounded-xl">📦</span>
+          <span className="bg-warning/10 p-3 rounded-xl text-warning flex items-center justify-center shrink-0">
+            <Package className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
@@ -54,7 +57,9 @@ export default function LabDispatch() {
             <h3 className="text-2xl font-black text-gray-900">{transitCount}</h3>
             <p className="text-xs text-primary font-semibold mt-1">Active transit on road</p>
           </div>
-          <span className="text-3xl bg-primary/10 p-3 rounded-xl">🚚</span>
+          <span className="bg-primary/10 p-3 rounded-xl text-primary flex items-center justify-center shrink-0">
+            <Truck className="w-6 h-6" />
+          </span>
         </div>
 
         <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
@@ -63,7 +68,9 @@ export default function LabDispatch() {
             <h3 className="text-2xl font-black text-gray-900">{deliveredCount}</h3>
             <p className="text-xs text-success font-semibold mt-1">Delivery completed</p>
           </div>
-          <span className="text-3xl bg-success/10 p-3 rounded-xl">🎉</span>
+          <span className="bg-success/10 p-3 rounded-xl text-success flex items-center justify-center shrink-0">
+            <CheckCircle className="w-6 h-6" />
+          </span>
         </div>
       </div>
 

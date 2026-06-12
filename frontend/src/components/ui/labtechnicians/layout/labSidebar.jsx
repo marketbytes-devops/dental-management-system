@@ -2,20 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BarChart3, ClipboardList, Search, Laptop, Wrench, CheckSquare, Truck, Receipt, ShieldCheck, TrendingUp, Bell, Settings } from "lucide-react";
+import ToothIcon from "@/components/ui/ToothIcon";
 
 const navItems = [
-  { name: "Dashboard", href: "/labtechnicians/dashboard", icon: "📊" },
-  { name: "Lab Orders", href: "/labtechnicians/orders", icon: "📋" },
-  { name: "Case Tracking", href: "/labtechnicians/case-tracking", icon: "🔍" },
-  { name: "CAD Design", href: "/labtechnicians/cad-design", icon: "💻" },
-  { name: "Production", href: "/labtechnicians/production", icon: "🏗️" },
-  { name: "Quality Control", href: "/labtechnicians/quality-control", icon: "✅" },
-  { name: "Dispatch", href: "/labtechnicians/dispatch", icon: "🚚" },
-  { name: "Invoices", href: "/labtechnicians/invoices", icon: "💵" },
-  { name: "Warranty", href: "/labtechnicians/warranty", icon: "🛡️" },
-  { name: "Reports", href: "/labtechnicians/reports", icon: "📈" },
-  { name: "Notifications", href: "/labtechnicians/notifications", icon: "🔔" },
-  { name: "Settings", href: "/labtechnicians/settings", icon: "⚙️" },
+  { name: "Dashboard", href: "/labtechnicians/dashboard", icon: BarChart3 },
+  { name: "Lab Orders", href: "/labtechnicians/orders", icon: ClipboardList },
+  { name: "Case Tracking", href: "/labtechnicians/case-tracking", icon: Search },
+  { name: "CAD Design", href: "/labtechnicians/cad-design", icon: Laptop },
+  { name: "Production", href: "/labtechnicians/production", icon: Wrench },
+  { name: "Quality Control", href: "/labtechnicians/quality-control", icon: CheckSquare },
+  { name: "Dispatch", href: "/labtechnicians/dispatch", icon: Truck },
+  { name: "Invoices", href: "/labtechnicians/invoices", icon: Receipt },
+  { name: "Warranty", href: "/labtechnicians/warranty", icon: ShieldCheck },
+  { name: "Reports", href: "/labtechnicians/reports", icon: TrendingUp },
+  { name: "Notifications", href: "/labtechnicians/notifications", icon: Bell },
+  { name: "Settings", href: "/labtechnicians/settings", icon: Settings },
 ];
 
 export default function LabSidebar() {
@@ -26,7 +28,7 @@ export default function LabSidebar() {
       {/* Brand */}
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
         <span className="text-xl font-bold text-primary flex items-center gap-2">
-          <span className="text-2xl">🦷</span> SmileCare
+          <ToothIcon className="w-6 h-6 text-primary" strokeWidth={2.5} /> SmileCare
         </span>
         <span className="ml-2 text-[10px] font-bold bg-primary/10 text-primary px-2 py-1 rounded-md uppercase tracking-wider">
           Lab Tech
@@ -52,8 +54,8 @@ export default function LabSidebar() {
                         : "text-gray-700 hover:bg-primary/5 hover:text-primary"
                     }`}
                   >
-                    <span className="mr-3 text-lg opacity-70 group-hover:opacity-100">
-                      {item.icon}
+                    <span className="mr-3 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
+                      <item.icon className="w-5 h-5" />
                     </span>
                     {item.name}
                     {/* Notification dot for Notifications link */}

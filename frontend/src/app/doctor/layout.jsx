@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import DoctorSidebar from "@/components/ui/doctor/layout/DoctorSidebar";
 import DoctorNavbar from "@/components/ui/doctor/layout/DoctorNavbar";
 import EmergencyPopup from "@/components/ui/doctor/workspace/EmergencyPopup";
+import ToothIcon from "@/components/ui/ToothIcon";
 
 // Create context
 const DoctorContext = createContext(null);
@@ -139,6 +140,111 @@ export default function DoctorLayout({ children }) {
   // Prescription draft & notes
   const [rxDraft, setRxDraft] = useState([]);
   const [notification, setNotification] = useState("");
+
+  // Referrals database
+  const [referrals, setReferrals] = useState([
+    {
+      id: "REF-201",
+      patientToken: "#004", // Rahul Kumar
+      referredBy: "Dr. Sarah Jenkins",
+      speciality: "Orthodontics",
+      date: "10-06-2026",
+      reason: "Patient needs evaluation for root canal treatment before orthodontic brackets are placed on upper jaw.",
+      clinicalNotes: "Tooth #16 shows deep dentinal caries. General bone density is good.",
+      teethChart: { 16: "active-treatment" },
+      status: "Pending", // Pending | Completed
+      myConsultationNotes: "",
+      myMedications: []
+    },
+    {
+      id: "REF-202",
+      patientToken: "#006", // Priya Nair
+      referredBy: "Dr. James Kurt",
+      speciality: "Oral Surgery",
+      date: "11-06-2026",
+      reason: "Patient is pregnant (2nd trimester). Needs professional scaling and localized gingival evaluation.",
+      clinicalNotes: "Bleeding gums on brushing. Soft tissue swelling in lower anterior quadrant.",
+      teethChart: {},
+      status: "Pending",
+      myConsultationNotes: "",
+      myMedications: []
+    }
+  ]);
+
+  // Outgoing referral handler
+  const handleReferPatient = (patientToken, doctorNameWithSpeciality, reason) => {
+    const [docName, docSpec] = doctorNameWithSpeciality.split(" - ");
+    const newRef = {
+      id: `REF-${Math.floor(200 + Math.random() * 800)}`,
+      patientToken,
+      referredBy: "Dr. Anoop Nair",
+      speciality: docSpec || "General Dentistry",
+      targetDoctor: docName,
+      date: "12-06-2026 (Today)",
+      reason: reason,
+      clinicalNotes: patients[patientToken]?.chiefComplaint || "",
+      teethChart: patients[patientToken]?.teethChart || {},
+      status: "Pending",
+      myConsultationNotes: "",
+      myMedications: []
+    };
+
+    setReferrals(prev => [newRef, ...prev]);
+
+    // Add event to patient timeline
+    const timelineEvent = {
+      date: "10-06-2026 (Today)",
+      note: `Outbound Referral generated to ${docName} (${docSpec}). Reason: ${reason}`,
+      type: "Referral"
+    };
+
+    setPatients(prev => ({
+      ...prev,
+      [patientToken]: {
+        ...prev[patientToken],
+        timeline: [timelineEvent, ...prev[patientToken].timeline]
+      }
+    }));
+
+    showNotification(`Patient referred to ${docName} successfully.`);
+  };
+
+  // Incoming referral response handler
+  const handleCompleteReferral = (refId, consultationNotes, medications) => {
+    setReferrals(prev => prev.map(ref => {
+      if (ref.id === refId) {
+        return {
+          ...ref,
+          status: "Completed",
+          myConsultationNotes: consultationNotes,
+          myMedications: medications
+        };
+      }
+      return ref;
+    }));
+
+    // Find the referral to fetch patient info
+    const referral = referrals.find(r => r.id === refId);
+    if (referral) {
+      // Append to patient timeline
+      const timelineEvent = {
+        date: "10-06-2026 (Today)",
+        note: `Consultation complete by Dr. Anoop Nair: ${consultationNotes}`,
+        type: "Consultation",
+        details: medications
+      };
+
+      setPatients(prev => ({
+        ...prev,
+        [referral.patientToken]: {
+          ...prev[referral.patientToken],
+          timeline: [timelineEvent, ...prev[referral.patientToken].timeline]
+        }
+      }));
+
+      showNotification(`Completed consultation for referral ${refId}.`);
+    }
+  };
 
   const showNotification = (msg) => {
     setNotification(msg);
@@ -461,7 +567,11 @@ export default function DoctorLayout({ children }) {
       handleRemoveDraftMed,
       handleSavePrescription,
       handleSubmitDiagNote,
-      handleAddAlert
+      handleAddAlert,
+      referrals,
+      setReferrals,
+      handleReferPatient,
+      handleCompleteReferral
     }}>
       <div className="flex h-screen bg-background overflow-hidden">
         {/* Sidebar Nav */}
@@ -480,7 +590,7 @@ export default function DoctorLayout({ children }) {
         {/* Global Toast */}
         {notification && (
           <div className="fixed bottom-5 right-5 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50 animate-bounce">
-            <span className="text-primary">🦷</span>
+            <ToothIcon className="w-5 h-5 text-primary shrink-0" />
             <span className="text-sm font-semibold">{notification}</span>
           </div>
         )}

@@ -1,3 +1,7 @@
+"use client";
+
+import Link from "next/link";
+
 export default function PatientDashboardPage() {
 
   // Mock Data — replace with API calls when backend is ready
@@ -37,7 +41,7 @@ export default function PatientDashboardPage() {
   const outstandingBalance = pendingInvoices.reduce((sum, i) => sum + i.patientDue, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
 
       {/* Page Header */}
       <div>
@@ -104,15 +108,15 @@ export default function PatientDashboardPage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button className="bg-primary text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary/90 shadow-sm shadow-primary/30 transition-colors flex items-center justify-center gap-2">
+          <Link href="/patient/appointments" className="bg-primary text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary/90 shadow-sm shadow-primary/30 transition-colors flex items-center justify-center gap-2">
             📅 Book Appointment
-          </button>
-          <button className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+          </Link>
+          <Link href="/patient/bills" className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
             💳 Pay Outstanding Bill
-          </button>
-          <button className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+          </Link>
+          <Link href="/patient/appointments?tab=checkin" className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
             ✅ Self Check-In
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -136,20 +140,20 @@ export default function PatientDashboardPage() {
                 </span>
               </div>
               <div className="flex gap-2">
-                <button className="flex-1 text-xs font-medium bg-primary text-white rounded-xl py-2 hover:bg-primary/90 transition-colors">
+                <Link href="/patient/appointments?tab=checkin" className="flex-1 text-xs font-medium bg-primary text-white rounded-xl py-2 hover:bg-primary/90 transition-colors text-center">
                   Check In
-                </button>
-                <button className="flex-1 text-xs font-medium border border-gray-200 text-gray-600 rounded-xl py-2 hover:bg-gray-50 transition-colors">
+                </Link>
+                <Link href="/patient/appointments" className="flex-1 text-xs font-medium border border-gray-200 text-gray-600 rounded-xl py-2 hover:bg-gray-50 transition-colors text-center">
                   Reschedule
-                </button>
+                </Link>
               </div>
             </div>
           ) : (
             <div className="text-center py-6">
               <p className="text-sm text-gray-400">No upcoming appointments.</p>
-              <button className="mt-3 text-xs font-medium text-primary hover:underline">
+              <Link href="/patient/appointments" className="mt-3 inline-block text-xs font-medium text-primary hover:underline">
                 Book one now →
-              </button>
+              </Link>
             </div>
           )}
         </div>
@@ -158,13 +162,13 @@ export default function PatientDashboardPage() {
         <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
-            <button className="text-sm text-primary font-medium hover:underline">View All</button>
+            <Link href="/patient/records" className="text-sm text-primary font-medium hover:underline">View All</Link>
           </div>
           <div className="space-y-4">
 
             {completedAppointments.slice(0, 1).map(appt => (
               <div key={appt.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-lg">
                   🦷
                 </div>
                 <div className="flex-1">
@@ -177,7 +181,7 @@ export default function PatientDashboardPage() {
 
             {activeRx.slice(0, 1).map(rx => (
               <div key={rx.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
-                <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center text-warning">
+                <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center text-warning text-lg">
                   💊
                 </div>
                 <div className="flex-1">
@@ -190,14 +194,14 @@ export default function PatientDashboardPage() {
 
             {pendingInvoices.slice(0, 1).map(inv => (
               <div key={inv.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
-                <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center text-danger">
+                <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center text-danger text-lg">
                   💳
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">Invoice Pending</p>
-                  <p className="text-xs text-gray-500">{inv.treatment} — ₹{inv.patientDue.toLocaleString()} due</p>
+                  <p className="text-xs text-gray-505">{inv.treatment} — ₹{inv.patientDue.toLocaleString()} due</p>
                 </div>
-                <span className="text-xs text-gray-400">{inv.date}</span>
+                <span className="text-xs text-gray-405">{inv.date}</span>
               </div>
             ))}
 

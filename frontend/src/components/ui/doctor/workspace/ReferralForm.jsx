@@ -53,7 +53,7 @@ export default function ReferralForm({ patientToken, onReferPatient }) {
             value={reasonInput}
             onChange={(e) => setReasonInput(e.target.value)}
             placeholder="Write clinical justification or request for evaluation..."
-            className="w-full px-4 py-2 bg-gray-55 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 placeholder:text-gray-400"
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 placeholder:text-gray-400"
             required
           />
         </div>

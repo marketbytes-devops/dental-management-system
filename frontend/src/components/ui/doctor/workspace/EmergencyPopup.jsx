@@ -14,7 +14,7 @@ export default function EmergencyPopup({ emergencyAlert, onAcknowledge, onConsul
           </div>
         </div>
         <div className="p-6 space-y-4">
-          <div className="p-3 bg-gray-50 border border-gray-150 rounded-xl">
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
             <span className="text-[10px] font-bold text-gray-400 block uppercase">Emergency Patient</span>
             <span className="text-sm font-extrabold text-gray-900 block">{emergencyAlert.name}</span>
             <span className="text-xs text-gray-500 font-semibold">{emergencyAlert.gender}, {emergencyAlert.age} yrs • Token {emergencyAlert.token}</span>

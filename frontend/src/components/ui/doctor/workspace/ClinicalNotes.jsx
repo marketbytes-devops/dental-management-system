@@ -21,7 +21,7 @@ export default function ClinicalNotes({ onSubmitDiagNote }) {
           value={diagNoteInput}
           onChange={(e) => setDiagNoteInput(e.target.value)}
           placeholder="Write diagnostic observations or active findings..."
-          className="w-full px-4 py-2 bg-gray-55 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           required
         />
         <div className="flex justify-end">

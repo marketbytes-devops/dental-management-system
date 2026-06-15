@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ClipboardList, Search, Laptop, Wrench, CheckSquare, Truck, Receipt, ShieldCheck, TrendingUp, Bell, Settings } from "lucide-react";
+import { BarChart3, ClipboardList, Search, Laptop, Wrench, CheckSquare, Truck, Receipt, ShieldCheck, TrendingUp, Bell, Settings, Calendar } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 
 const navItems = [
@@ -17,6 +17,7 @@ const navItems = [
   { name: "Warranty", href: "/labtechnicians/warranty", icon: ShieldCheck },
   { name: "Reports", href: "/labtechnicians/reports", icon: TrendingUp },
   { name: "Notifications", href: "/labtechnicians/notifications", icon: Bell },
+  { name: "Leave Management", href: "/labtechnicians/leave", icon: Calendar },
   { name: "Settings", href: "/labtechnicians/settings", icon: Settings },
 ];
 

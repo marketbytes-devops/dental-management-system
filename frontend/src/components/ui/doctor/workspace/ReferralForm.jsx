@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Share2 } from "lucide-react";
+import { Share2, Globe, Building } from "lucide-react";
 
 const clinicDoctors = [
   { id: "doc-1", name: "Dr. Sarah Jenkins", speciality: "Orthodontics" },
@@ -12,39 +12,125 @@ const clinicDoctors = [
 ];
 
 export default function ReferralForm({ patientToken, onReferPatient }) {
+  const [referralType, setReferralType] = useState("Internal"); // Internal | External
   const [selectedDoctor, setSelectedDoctor] = useState(
     `${clinicDoctors[0].name} - ${clinicDoctors[0].speciality}`
   );
+  const [externalDoctor, setExternalDoctor] = useState("");
+  const [externalSpeciality, setExternalSpeciality] = useState("");
+  const [externalFacility, setExternalFacility] = useState("");
   const [reasonInput, setReasonInput] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!reasonInput.trim()) return;
+
+    if (referralType === "Internal") {
+      onReferPatient(patientToken, selectedDoctor, reasonInput.trim(), "Internal", "");
+    } else {
+      const docName = externalDoctor.trim() || "External Specialist";
+      const spec = externalSpeciality.trim() || "General Specialist";
+      const doctorStr = `${docName} - ${spec}`;
+      onReferPatient(patientToken, doctorStr, reasonInput.trim(), "External", externalFacility.trim());
+      // Reset external inputs
+      setExternalDoctor("");
+      setExternalSpeciality("");
+      setExternalFacility("");
+    }
     
-    onReferPatient(patientToken, selectedDoctor, reasonInput.trim());
     setReasonInput("");
   };
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
+      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
         <Share2 className="w-4 h-4 text-primary" /> Refer to Specialist Doctor
       </h4>
+
+      {/* Referral Type Selector Tabs */}
+      <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+        <button
+          type="button"
+          onClick={() => setReferralType("Internal")}
+          className={`flex-1 text-center py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+            referralType === "Internal" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          Internal (In-Clinic)
+        </button>
+        <button
+          type="button"
+          onClick={() => setReferralType("External")}
+          className={`flex-1 text-center py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+            referralType === "External" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-900"
+          }`}
+        >
+          External (Outside)
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="space-y-1">
-          <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Select Specialist Doctor</label>
-          <select
-            value={selectedDoctor}
-            onChange={(e) => setSelectedDoctor(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-          >
-            {clinicDoctors.map((doc) => (
-              <option key={doc.id} value={`${doc.name} - ${doc.speciality}`}>
-                {doc.name} ({doc.speciality})
-              </option>
-            ))}
-          </select>
-        </div>
+        {referralType === "Internal" ? (
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Select Specialist Doctor</label>
+            <select
+              value={selectedDoctor}
+              onChange={(e) => setSelectedDoctor(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+            >
+              {clinicDoctors.map((doc) => (
+                <option key={doc.id} value={`${doc.name} - ${doc.speciality}`}>
+                  {doc.name} ({doc.speciality})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">External Doctor Name</label>
+              <div className="relative flex items-center bg-gray-50 rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+                <Globe className="absolute left-3 w-3.5 h-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="e.g. Dr. Amit Patel"
+                  value={externalDoctor}
+                  onChange={(e) => setExternalDoctor(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-transparent text-xs text-gray-800 outline-none placeholder:text-gray-400"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Speciality</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Orthodontics"
+                  value={externalSpeciality}
+                  onChange={(e) => setExternalSpeciality(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary placeholder:text-gray-400"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Hospital / Facility</label>
+                <div className="relative flex items-center bg-gray-50 rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+                  <Building className="absolute left-2.5 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="e.g. Apollo Hospital"
+                    value={externalFacility}
+                    onChange={(e) => setExternalFacility(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 bg-transparent text-xs text-gray-800 outline-none placeholder:text-gray-400"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-1">
           <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Reason for Referral</label>
@@ -61,7 +147,7 @@ export default function ReferralForm({ patientToken, onReferPatient }) {
         <div className="flex justify-end">
           <button
             type="submit"
-            className="px-3.5 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/95 transition-colors cursor-pointer"
+            className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 transition-all shadow-sm shadow-primary/10 cursor-pointer outline-none"
           >
             Refer Patient
           </button>

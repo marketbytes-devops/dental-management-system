@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useDoctor } from "@/app/doctor/layout";
 import AlertsTracker from "@/components/ui/doctor/alerts/AlertsTracker";
@@ -11,10 +12,49 @@ export default function DoctorAlertsPage() {
     activePatient,
     activePatientToken,
     handleAddAlert,
-    setViewingPatientToken
+    setViewingPatientToken,
+    notifications = [],
+    markAsRead,
+    markAsUnread
   } = useDoctor();
 
+  const [newlyAddedIds, setNewlyAddedIds] = useState([]);
+  const newlyAddedIdsRef = useRef([]);
+
+  useEffect(() => {
+    newlyAddedIdsRef.current = newlyAddedIds;
+  }, [newlyAddedIds]);
+
+  useEffect(() => {
+    if (notifications && notifications.length > 0) {
+      const pageNotifications = notifications.filter(
+        n => n.status === "unread" && n.link === "/doctor/alerts"
+      );
+      if (pageNotifications.length > 0) {
+        const itemIds = pageNotifications.map(n => n.itemId);
+        setNewlyAddedIds(itemIds);
+        pageNotifications.forEach(n => markAsRead(n.id));
+      }
+    }
+
+    const reminderTimer = setTimeout(() => {
+      const remainingUnread = newlyAddedIdsRef.current;
+      if (remainingUnread.length > 0) {
+        remainingUnread.forEach(itemId => markAsUnread(itemId));
+      }
+    }, 15000);
+
+    return () => {
+      clearTimeout(reminderTimer);
+      const remainingUnread = newlyAddedIdsRef.current;
+      if (remainingUnread.length > 0) {
+        remainingUnread.forEach(itemId => markAsUnread(itemId));
+      }
+    };
+  }, []);
+
   const handleFocusProfile = (token) => {
+    setNewlyAddedIds(prev => prev.filter(id => id !== token));
     setViewingPatientToken(token);
     router.push("/doctor/workspace");
   };
@@ -32,6 +72,8 @@ export default function DoctorAlertsPage() {
         activePatientToken={activePatientToken}
         onAddAlert={handleAddAlert}
         onFocusProfile={handleFocusProfile}
+        newlyAddedIds={newlyAddedIds}
+        setNewlyAddedIds={setNewlyAddedIds}
       />
     </div>
   );

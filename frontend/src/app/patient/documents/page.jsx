@@ -30,9 +30,6 @@ export default function PatientDocumentsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Documents & Consent Forms</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Review, sign, and view all dental clinic files, X-rays, and treatment authorizations.
-        </p>
       </div>
 
       {/* Consent Status Indicator */}

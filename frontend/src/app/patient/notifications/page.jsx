@@ -15,7 +15,6 @@ export default function NotificationsPage() {
     <div className="space-y-6 max-w-6xl mx-auto pb-10">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-1">My Notifications</h1>
-        <p className="text-gray-500 text-sm">Stay updated on your appointments, care instructions, and reminders.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

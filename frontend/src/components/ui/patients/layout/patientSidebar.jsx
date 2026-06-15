@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Home, Calendar, User, CheckSquare, FileText, Pill, CreditCard, Bell } from "lucide-react";
+import { Home, Calendar, User, CheckSquare, FileText, Pill, CreditCard, Bell, Settings } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 
 const navItems = [
@@ -15,6 +15,7 @@ const navItems = [
   { name: "My Records",      href: "/patient/records",        icon: Pill },
   { name: "My Bills",        href: "/patient/billing",          icon: CreditCard },
   { name: "Notifications",   href: "/patient/notifications",  icon: Bell },
+  { name: "Settings",        href: "/patient/settings",       icon: Settings },
 ];
 
 function NavLinks() {

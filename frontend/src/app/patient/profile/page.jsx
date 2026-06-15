@@ -5,6 +5,7 @@ import ProfileHeader from "@/components/ui/patients/profile/profileHeader";
 import ProfileSection from "@/components/ui/patients/profile/profileSection";
 import InsuranceCard from "@/components/ui/patients/profile/insuranceCard";
 import EditProfileModal from "@/components/ui/patients/profile/editProfileModal";
+import { Pencil } from "lucide-react";
 
 // Mock Data
 const INITIAL_PATIENT = {
@@ -48,15 +49,12 @@ export default function ProfilePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">My Profile</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage your personal data, contact information, and insurance policies.
-          </p>
         </div>
         <button
           onClick={() => setIsEditing(true)}
-          className="px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary/5 border border-primary/20 text-primary text-sm font-semibold rounded-xl hover:bg-primary hover:text-white hover:border-primary shadow-sm transition-colors cursor-pointer"
         >
-          ✏️ Edit Profile
+          <Pencil className="w-4 h-4" /> Edit Profile
         </button>
       </div>
 

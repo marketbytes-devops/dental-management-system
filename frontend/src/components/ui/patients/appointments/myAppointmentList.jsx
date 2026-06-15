@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AppointmentCard from "./appointmentCard";
+import { Calendar } from "lucide-react";
 
 const TABS = ["All", "Upcoming", "Completed", "Cancelled"];
 
@@ -74,7 +75,7 @@ export default function MyAppointmentList({ appointments, onReschedule, onCancel
       {/* Appointment Cards */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-          <div className="text-4xl mb-3">📅</div>
+          <div className="flex justify-center mb-3 text-gray-300"><Calendar className="w-12 h-12" /></div>
           <p className="text-sm font-semibold text-gray-700">No appointments found</p>
           <p className="text-xs text-gray-400 mt-1">
             {searchQuery ? "Try a different search term." : "No appointments match this filter."}

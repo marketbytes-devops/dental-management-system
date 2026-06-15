@@ -153,7 +153,10 @@ export default function DoctorLayout({ children }) {
       status: "unread",
       dotColor: "red",
       timestamp: "10 mins ago",
-      itemId: "REF-201"
+      receivedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      itemId: "REF-201",
+      patientId: "#004",
+      patientName: "Rahul Kumar"
     },
     {
       id: "notif-2",
@@ -163,7 +166,10 @@ export default function DoctorLayout({ children }) {
       status: "unread",
       dotColor: "green",
       timestamp: "30 mins ago",
-      itemId: "LAB-698"
+      receivedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      itemId: "LAB-698",
+      patientId: "#004",
+      patientName: "Rahul Kumar"
     }
   ]);
 
@@ -176,6 +182,7 @@ export default function DoctorLayout({ children }) {
       id: `notif-${Date.now()}`,
       status: "unread",
       timestamp: "Just now",
+      receivedAt: new Date().toISOString(),
       ...newNotif
     };
     setNotifications(prev => [notifWithId, ...prev]);
@@ -202,8 +209,8 @@ export default function DoctorLayout({ children }) {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: "read" } : n));
   };
 
-  const markAsUnread = (itemId) => {
-    setNotifications(prev => prev.map(n => n.itemId === itemId ? { ...n, status: "unread" } : n));
+  const markAsUnread = (idOrItemId) => {
+    setNotifications(prev => prev.map(n => (n.id === idOrItemId || n.itemId === idOrItemId) ? { ...n, status: "unread" } : n));
   };
 
   const markAllAsRead = () => {
@@ -218,7 +225,9 @@ export default function DoctorLayout({ children }) {
         type: "referral",
         link: "/doctor/referrals",
         dotColor: "red",
-        itemId: "REF-201"
+        itemId: "REF-201",
+        patientId: "#004",
+        patientName: "Rahul Kumar"
       });
     }, 6000);
     return () => clearTimeout(timer);
@@ -442,7 +451,9 @@ export default function DoctorLayout({ children }) {
         type: "alerts",
         link: "/doctor/alerts",
         dotColor: "red",
-        itemId: newToken
+        itemId: newToken,
+        patientId: newToken,
+        patientName: "Commander Vikram"
       });
     }, 5000);
   };

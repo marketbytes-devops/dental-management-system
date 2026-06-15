@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   Home, ClipboardList, Users, AlertTriangle, Microscope, TrendingUp, Stethoscope, Share2,
-  Pill, Award, ShieldAlert, Scissors, Sparkles, ChevronLeft, ChevronRight
+  Pill, Award, ShieldAlert, Scissors, Sparkles, ChevronLeft, ChevronRight, Bell
 } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 import { useDoctor } from "@/app/doctor/layout";
@@ -29,6 +29,7 @@ const doctorNavItems = [
   { name: "Medical Alerts", href: "/doctor/alerts", icon: AlertTriangle },
   { name: "Pending Labs", href: "/doctor/labs", icon: Microscope },
   { name: "Referrals", href: "/doctor/referrals", icon: Share2 },
+  { name: "Notifications", href: "/doctor/notifications", icon: Bell },
   { name: "My Performance", href: "/doctor/performance", icon: TrendingUp }
 ];
 
@@ -38,6 +39,9 @@ export default function DoctorSidebar({ isMinimized = false, onToggleMinimize })
   const [openWorkspace, setOpenWorkspace] = useState(false);
 
   const getUnreadCount = (href) => {
+    if (href === "/doctor/notifications") {
+      return notifications ? notifications.filter(n => n.status === "unread").length : 0;
+    }
     return notifications
       ? notifications.filter(n => n.status === "unread" && n.link === href).length
       : 0;

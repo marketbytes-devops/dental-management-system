@@ -112,6 +112,15 @@ export default function DoctorNavbar() {
                 <p className="text-xs text-gray-400 text-center py-6 font-medium">No new notifications.</p>
               )}
             </div>
+            <div className="pt-2 border-t border-gray-100 text-center">
+              <Link 
+                href="/doctor/notifications"
+                onClick={() => setShowNotifications(false)}
+                className="text-xs font-bold text-primary hover:underline block cursor-pointer"
+              >
+                View All Notifications
+              </Link>
+            </div>
           </div>
         )}
         <button className="p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center">

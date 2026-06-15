@@ -42,9 +42,6 @@ export default function PatientBillingPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Billing & Payments</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            View statements, insurance deductions, and settle your outstanding balances online.
-          </p>
         </div>
       </div>
 

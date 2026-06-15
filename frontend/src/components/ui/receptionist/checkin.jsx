@@ -14,6 +14,11 @@ export default function ReceptionistCheckIn() {
     { id: 102, name: "Aby Thomas", doctor: "Dr. Priya Varma", checkedInAt: "11:15 AM", priority: "Routine", status: "Waiting" },
   ]);
 
+  const [pendingOtpPatients, setPendingOtpPatients] = useState([
+    { id: 201, name: "Anita Menon", doctor: "Dr. Anoop Nair", phone: "+91 98765 43210", submittedAt: "11:25 AM", priority: "Emergency" },
+    { id: 202, name: "Rohit Sharma", doctor: "Dr. Priya Varma", phone: "+91 91234 56789", submittedAt: "11:30 AM", priority: "Routine" },
+  ]);
+
   const [selectedAppId, setSelectedAppId] = useState("");
   const [priority, setPriority] = useState("Routine");
   const [assignedDoctor, setAssignedDoctor] = useState("Dr. Anoop Nair");
@@ -53,6 +58,32 @@ export default function ReceptionistCheckIn() {
 
   const handleCallToChair = (id) => {
     setActiveQueue(prev => prev.map(q => q.id === id ? { ...q, status: "In Chair" } : q));
+  };
+
+  const handleSendOtp = (id) => {
+    const patient = pendingOtpPatients.find(p => p.id === id);
+    if (!patient) return;
+    
+    alert(`OTP sent to ${patient.phone} for ${patient.name}.`);
+    
+    // In a real app, this would trigger an SMS. 
+    // The patient would then enter the OTP on their app to move to the Active Queue.
+    // For this mock, we can just leave them in this list until they "verify", 
+    // or simulate moving them automatically after 3 seconds:
+    setTimeout(() => {
+      setPendingOtpPatients(prev => prev.filter(p => p.id !== id));
+      setActiveQueue(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          name: patient.name,
+          doctor: patient.doctor,
+          checkedInAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          priority: patient.priority,
+          status: "Waiting"
+        }
+      ]);
+    }, 3000);
   };
 
   return (
@@ -123,8 +154,42 @@ export default function ReceptionistCheckIn() {
           )}
         </div>
 
+        {/* Pending App Check-ins (OTP) */}
+        <div className="lg:col-span-5 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-base font-extrabold text-gray-900">App Check-Ins (Pending OTP)</h3>
+            <span className="bg-warning/10 text-warning text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Action Required</span>
+          </div>
+          
+          <div className="space-y-3">
+            {pendingOtpPatients.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">No patients waiting for OTP verification.</p>
+            ) : (
+              pendingOtpPatients.map(p => (
+                <div key={p.id} className="border border-gray-100 rounded-xl p-3 bg-gray-50 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">{p.name}</h4>
+                    <p className="text-[10px] text-gray-500">Submitted: {p.submittedAt}</p>
+                    {p.priority === "Emergency" && (
+                      <span className="inline-block mt-1 bg-danger/10 text-danger text-[9px] font-black uppercase px-1.5 py-0.5 rounded animate-pulse">
+                        Emergency
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleSendOtp(p.id)}
+                    className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
+                  >
+                    Send OTP
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
         {/* Checked In Queue & Checkout Panel */}
-        <div className="lg:col-span-7 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="lg:col-span-12 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4 mt-2">
           <h3 className="text-base font-extrabold text-gray-900">Arrived Patients Queue</h3>
 
           <div className="overflow-x-auto">

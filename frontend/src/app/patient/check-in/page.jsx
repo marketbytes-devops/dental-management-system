@@ -3,7 +3,8 @@
 import { useState } from "react";
 import TodaysAppointmentBanner from "@/components/ui/patients/check-in/todaysAppointmentBanner";
 import CheckInSymptomForm from "@/components/ui/patients/check-in/checkInSymptomForm";
-import OtpInput from "@/components/ui/patients/check-in/otpInput";
+import FrontDeskVerification from "@/components/ui/patients/check-in/frontDeskVerification";
+import PatientOtpEntry from "@/components/ui/patients/check-in/patientOtpEntry";
 import CheckInStepper from "@/components/ui/patients/check-in/checkInStepper";
 import CheckInConfirmation from "@/components/ui/patients/check-in/checkInConfirmation";
 
@@ -21,7 +22,7 @@ const TODAY_APPOINTMENTS = [
 ];
 
 export default function CheckInPage() {
-  const [step, setStep] = useState(1); // Steps: 1 = Select, 2 = Symptoms, 3 = OTP, 4 = Confirmation
+  const [step, setStep] = useState(1); // Steps: 1=Select, 2=Symptoms, 3=Wait for OTP, 4=Enter OTP, 5=Confirmation
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [symptomData, setSymptomData] = useState(null);
 
@@ -35,8 +36,12 @@ export default function CheckInPage() {
     setStep(3);
   };
 
-  const handleOtpVerify = () => {
+  const handleOtpSent = () => {
     setStep(4);
+  };
+
+  const handleOtpVerify = () => {
+    setStep(5);
   };
 
   const handleBack = () => {
@@ -50,9 +55,6 @@ export default function CheckInPage() {
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Select an Appointment</h3>
-              <p className="text-sm text-gray-500">
-                Choose the appointment you would like to check-in for today. Only confirmed appointments are eligible.
-              </p>
             </div>
             {TODAY_APPOINTMENTS.length > 0 ? (
               TODAY_APPOINTMENTS.map((appt) => (
@@ -78,14 +80,21 @@ export default function CheckInPage() {
         );
       case 3:
         return (
-          <OtpInput
-            onVerify={handleOtpVerify}
+          <FrontDeskVerification
+            isEmergency={symptomData?.isEmergency}
+            onOtpSent={handleOtpSent}
             onBack={handleBack}
-            phone="+91 98765 43210"
           />
         );
       case 4:
-        return <CheckInConfirmation appointment={selectedAppt} />;
+        return (
+          <PatientOtpEntry
+            onVerify={handleOtpVerify}
+            onBack={handleBack}
+          />
+        );
+      case 5:
+        return <CheckInConfirmation appointment={selectedAppt} isEmergency={symptomData?.isEmergency} />;
       default:
         return null;
     }
@@ -94,8 +103,9 @@ export default function CheckInPage() {
   const stepsMeta = [
     { number: 1, label: "Select" },
     { number: 2, label: "Symptoms" },
-    { number: 3, label: "Verify" },
-    { number: 4, label: "Confirmed" },
+    { number: 3, label: "Wait" },
+    { number: 4, label: "Verify OTP" },
+    { number: 5, label: "Confirmed" },
   ];
 
   return (

@@ -4,6 +4,7 @@ import { useState } from "react";
 import MyAppointmentList from "@/components/ui/patients/appointments/myAppointmentList";
 import BookAppointmentModal from "@/components/ui/patients/appointments/bookAppointmentModal";
 import RescheduleModal from "@/components/ui/patients/appointments/rescheduleModal";
+import { Calendar } from "lucide-react";
 
 // ─── Mock data (replace with API calls when backend is ready) ───────────────
 const INITIAL_APPOINTMENTS = [
@@ -119,15 +120,12 @@ export default function PatientAppointmentsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-semibold text-gray-900">My Appointments</h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Manage all your dental visits in one place.
-                    </p>
                 </div>
                 <button
                     onClick={() => setShowBookModal(true)}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl shadow-sm shadow-primary/30 hover:bg-primary/90 transition-colors"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary/5 border border-primary/20 text-primary text-sm font-semibold rounded-xl shadow-sm hover:bg-primary hover:text-white hover:border-primary transition-colors cursor-pointer"
                 >
-                    📅 Book New Appointment
+                    <Calendar className="w-4 h-4" /> Book New Appointment
                 </button>
             </div>
 

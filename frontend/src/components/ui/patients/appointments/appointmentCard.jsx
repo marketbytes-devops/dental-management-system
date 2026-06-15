@@ -1,4 +1,5 @@
 "use client";
+import { User, Clock, Hash, FileText, CheckCircle2 } from "lucide-react";
 
 const STATUS_STYLES = {
   Confirmed: "bg-success/10 text-success",
@@ -55,16 +56,16 @@ export default function AppointmentCard({ appointment, onReschedule, onCancel })
           </span>
         </div>
 
-        <p className="text-xs text-gray-500 mb-1">
-          👨‍⚕️ <span className="font-medium text-gray-700">{doctor}</span>
+        <p className="text-xs text-gray-500 mb-1 flex items-center gap-1.5">
+          <User className="w-3.5 h-3.5" /> <span className="font-medium text-gray-700">{doctor}</span>
         </p>
-        <p className="text-xs text-gray-500">
-          🕐 {time}
+        <p className="text-xs text-gray-500 flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5" /> {time}
           <span className="mx-2 text-gray-300">|</span>
-          🆔 <span className="font-medium text-gray-600">{id}</span>
+          <Hash className="w-3.5 h-3.5" /> <span className="font-medium text-gray-600">{id}</span>
         </p>
         {notes && (
-          <p className="mt-2 text-xs text-gray-400 italic truncate">📝 {notes}</p>
+          <p className="mt-2 text-xs text-gray-400 italic truncate flex items-center gap-1.5"><FileText className="w-3 h-3" /> {notes}</p>
         )}
       </div>
 
@@ -74,7 +75,7 @@ export default function AppointmentCard({ appointment, onReschedule, onCancel })
           {(isConfirmed || isPending) && (
             <button
               onClick={() => onReschedule?.(appointment)}
-              className="px-3 py-1.5 text-xs font-semibold border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 hover:border-primary/30 hover:text-primary transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold bg-primary/5 border border-primary/20 text-primary rounded-xl hover:bg-primary hover:text-white hover:border-primary transition-colors cursor-pointer"
             >
               Reschedule
             </button>
@@ -82,7 +83,7 @@ export default function AppointmentCard({ appointment, onReschedule, onCancel })
           {(isConfirmed || isPending) && (
             <button
               onClick={() => onCancel?.(appointment)}
-              className="px-3 py-1.5 text-xs font-semibold border border-danger/20 text-danger rounded-xl hover:bg-danger/5 transition-colors"
+              className="px-3 py-1.5 text-xs font-semibold border border-danger/20 text-danger rounded-xl hover:bg-danger hover:text-white transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -93,7 +94,7 @@ export default function AppointmentCard({ appointment, onReschedule, onCancel })
       {/* Completed check mark */}
       {status === "Completed" && (
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-success/10 flex items-center justify-center text-success text-sm">
-          ✓
+          <CheckCircle2 className="w-5 h-5" />
         </div>
       )}
     </div>

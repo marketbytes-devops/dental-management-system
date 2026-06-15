@@ -111,10 +111,10 @@ export default function PatientDashboardPage() {
           <Link href="/patient/appointments" className="bg-primary text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary/90 shadow-sm shadow-primary/30 transition-colors flex items-center justify-center gap-2">
             📅 Book Appointment
           </Link>
-          <Link href="/patient/bills" className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+          <Link href="/patient/billing" className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
             💳 Pay Outstanding Bill
           </Link>
-          <Link href="/patient/appointments?tab=checkin" className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+          <Link href="/patient/check-in" className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
             ✅ Self Check-In
           </Link>
         </div>
@@ -140,7 +140,7 @@ export default function PatientDashboardPage() {
                 </span>
               </div>
               <div className="flex gap-2">
-                <Link href="/patient/appointments?tab=checkin" className="flex-1 text-xs font-medium bg-primary text-white rounded-xl py-2 hover:bg-primary/90 transition-colors text-center">
+                <Link href="/patient/check-in" className="flex-1 text-xs font-medium bg-primary text-white rounded-xl py-2 hover:bg-primary/90 transition-colors text-center">
                   Check In
                 </Link>
                 <Link href="/patient/appointments" className="flex-1 text-xs font-medium border border-gray-200 text-gray-600 rounded-xl py-2 hover:bg-gray-50 transition-colors text-center">

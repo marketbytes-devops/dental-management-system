@@ -7,7 +7,9 @@ export default function AlertsTracker({
   activePatient,
   activePatientToken,
   onAddAlert,
-  onFocusProfile
+  onFocusProfile,
+  newlyAddedIds = [],
+  setNewlyAddedIds
 }) {
   const [newAlertText, setNewAlertText] = useState("");
 
@@ -29,7 +31,15 @@ export default function AlertsTracker({
           {Object.values(patients).map((p) => {
             const hasAlerts = p.medicalAlerts && p.medicalAlerts.length > 0;
             return (
-              <div key={p.token} className={`p-5 flex justify-between items-start gap-4 transition-colors ${hasAlerts ? "bg-red-50/[0.01]" : ""}`}>
+              <div 
+                key={p.token} 
+                className={`p-5 flex justify-between items-start gap-4 transition-colors cursor-pointer hover:bg-gray-50/50 ${hasAlerts ? "bg-red-50/[0.01]" : ""}`}
+                onClick={() => {
+                  if (setNewlyAddedIds) {
+                    setNewlyAddedIds(prev => prev.filter(id => id !== p.token));
+                  }
+                }}
+              >
                 <div className="flex gap-4">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-lg ${
                     hasAlerts ? "bg-danger/10 text-danger" : "bg-gray-100 text-gray-450"
@@ -39,6 +49,9 @@ export default function AlertsTracker({
                   <div>
                     <h4 className="text-sm font-bold text-gray-955 flex items-center gap-2">
                       {p.name}
+                      {newlyAddedIds.includes(p.token) && (
+                        <span className="w-2 h-2 rounded-full bg-danger animate-pulse shrink-0" title="New Alert Update" />
+                      )}
                       <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.2 rounded">{p.token}</span>
                     </h4>
                     <p className="text-xs text-gray-500 font-semibold mt-0.5">{p.gender}, {p.age} yrs • {p.procedure}</p>

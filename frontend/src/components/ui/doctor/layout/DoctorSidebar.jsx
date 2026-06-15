@@ -8,6 +8,7 @@ import {
   Pill, Award, ShieldAlert, Scissors, Sparkles, ChevronLeft, ChevronRight
 } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
+import { useDoctor } from "@/app/doctor/layout";
 
 const doctorNavItems = [
   { name: "Dashboard", href: "/doctor/dashboard", icon: Home },
@@ -33,7 +34,14 @@ const doctorNavItems = [
 
 export default function DoctorSidebar({ isMinimized = false, onToggleMinimize }) {
   const pathname = usePathname();
+  const { notifications = [] } = useDoctor();
   const [openWorkspace, setOpenWorkspace] = useState(false);
+
+  const getUnreadCount = (href) => {
+    return notifications
+      ? notifications.filter(n => n.status === "unread" && n.link === href).length
+      : 0;
+  };
 
   // Auto-expand dropdown if pathname is on a clinical workspace sub-route
   useEffect(() => {
@@ -169,27 +177,39 @@ export default function DoctorSidebar({ isMinimized = false, onToggleMinimize })
                     <Link
                       href={item.href}
                       title={item.name}
-                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all group cursor-pointer outline-none ${
+                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all group cursor-pointer outline-none relative ${
                         isActive
                           ? "bg-primary/10 text-primary font-bold"
                           : "text-gray-700 hover:bg-primary/5 hover:text-primary"
                       }`}
                     >
                       <item.icon className="w-5 h-5 shrink-0" />
+                      {getUnreadCount(item.href) > 0 && (
+                        <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-danger text-white text-[8px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
+                          {getUnreadCount(item.href)}
+                        </span>
+                      )}
                     </Link>
                   ) : (
                     <Link
                       href={item.href}
-                      className={`flex items-center px-3 py-2 text-sm font-semibold rounded-lg transition-colors group cursor-pointer outline-none w-full ${
+                      className={`flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg transition-colors group cursor-pointer outline-none w-full ${
                         isActive
                           ? "bg-primary/10 text-primary font-bold"
                           : "text-gray-700 hover:bg-primary/5 hover:text-primary"
                       }`}
                     >
-                      <span className="mr-3 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
-                        <item.icon className="w-5 h-5" />
-                      </span>
-                      {item.name}
+                      <div className="flex items-center">
+                        <span className="mr-3 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
+                          <item.icon className="w-5 h-5" />
+                        </span>
+                        {item.name}
+                      </div>
+                      {getUnreadCount(item.href) > 0 && (
+                        <span className="bg-danger text-white text-[10px] font-black px-2 py-0.5 rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
+                          {getUnreadCount(item.href)}
+                        </span>
+                      )}
                     </Link>
                   )}
                 </li>

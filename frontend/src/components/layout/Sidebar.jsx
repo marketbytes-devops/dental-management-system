@@ -40,21 +40,11 @@ import {
 import ToothIcon from "@/components/ui/ToothIcon";
 
 const navItems = [
-<<<<<<< HEAD
-  { name: "Dashboard", href: "/admin/dashboard", icon: "📊" },
-  { name: "User Management", href: "/admin/users", icon: "👥" },
-  { name: "Role Permissions", href: "/admin/roles", icon: "🔑" },
-  { name: "Doctor", href: "/admin/doctor", icon: "🔑" },
-  { name: "Patient", href: "/admin/patients", icon: "🩺" },
-
-
-=======
   { name: "Dashboard", href: "/admin/dashboard", icon: BarChart3 },
   { name: "User Management", href: "/admin/users", icon: Users },
-  { name: "Role Permissions", href: "/admin/dashboard", icon: Key },
-  { name: "Doctor", href: "/admin/dashboard", icon: Stethoscope },
- 
->>>>>>> 3536f10a366abf7a292c2961f5c069278ac466cd
+  { name: "Role Permissions", href: "/admin/roles", icon: Key },
+  { name: "Doctor", href: "/admin/doctor", icon: Stethoscope },
+  { name: "Patient", href: "/admin/patients", icon: Users },
   {
     name: "Receptionist",
     icon: ConciergeBell,

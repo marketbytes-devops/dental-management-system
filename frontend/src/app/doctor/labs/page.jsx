@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { useDoctor } from "@/app/doctor/layout";
 import LabOrdersTable from "@/components/ui/doctor/labs/LabOrdersTable";
 
@@ -9,8 +10,46 @@ export default function DoctorLabsPage() {
     patients,
     handleMarkLabDelivered,
     handleSubmitLabOrder,
-    viewingPatientToken
+    viewingPatientToken,
+    notifications = [],
+    markAsRead,
+    markAsUnread
   } = useDoctor();
+
+  const [newlyAddedIds, setNewlyAddedIds] = useState([]);
+  const newlyAddedIdsRef = useRef([]);
+
+  useEffect(() => {
+    newlyAddedIdsRef.current = newlyAddedIds;
+  }, [newlyAddedIds]);
+
+  useEffect(() => {
+    if (notifications && notifications.length > 0) {
+      const pageNotifications = notifications.filter(
+        n => n.status === "unread" && n.link === "/doctor/labs"
+      );
+      if (pageNotifications.length > 0) {
+        const itemIds = pageNotifications.map(n => n.itemId);
+        setNewlyAddedIds(itemIds);
+        pageNotifications.forEach(n => markAsRead(n.id));
+      }
+    }
+
+    const reminderTimer = setTimeout(() => {
+      const remainingUnread = newlyAddedIdsRef.current;
+      if (remainingUnread.length > 0) {
+        remainingUnread.forEach(itemId => markAsUnread(itemId));
+      }
+    }, 15000);
+
+    return () => {
+      clearTimeout(reminderTimer);
+      const remainingUnread = newlyAddedIdsRef.current;
+      if (remainingUnread.length > 0) {
+        remainingUnread.forEach(itemId => markAsUnread(itemId));
+      }
+    };
+  }, []);
 
   const activeLabCount = labOrders.filter(l => l.status !== "Delivered").length;
 
@@ -28,6 +67,8 @@ export default function DoctorLabsPage() {
         onMarkLabDelivered={handleMarkLabDelivered}
         onSubmitLabOrder={handleSubmitLabOrder}
         viewingPatientToken={viewingPatientToken}
+        newlyAddedIds={newlyAddedIds}
+        setNewlyAddedIds={setNewlyAddedIds}
       />
     </div>
   );

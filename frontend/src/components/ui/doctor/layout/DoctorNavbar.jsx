@@ -3,17 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useDoctor } from "@/app/doctor/layout";
-import { Search, Bell, HelpCircle, Sparkles, Share2 } from "lucide-react";
+import { Search, Bell, HelpCircle, Sparkles, Share2, Microscope, AlertTriangle } from "lucide-react";
 
 export default function DoctorNavbar() {
-  const { referrals, patients } = useDoctor();
+  const { notifications = [], bellAnimating, markAsRead, patients } = useDoctor();
   const [showNotifications, setShowNotifications] = useState(false);
 
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  const pendingIncoming = referrals ? referrals.filter(r => r.referredBy !== "Dr. Anoop Nair" && r.status === "Pending") : [];
+  const unreadNotifications = notifications.filter(n => n.status === "unread");
+  const unreadCount = unreadNotifications.length;
+  const bellDotColor = unreadCount > 0 ? unreadNotifications[0].dotColor : null;
 
   return (
     <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 shadow-sm z-10">
@@ -41,11 +43,11 @@ export default function DoctorNavbar() {
           onClick={() => setShowNotifications(!showNotifications)}
           className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center cursor-pointer outline-none"
         >
-          <Bell className="w-5 h-5" />
-          {pendingIncoming.length > 0 && (
-            <span className="absolute top-0.5 right-0.5 w-4.5 h-4.5 bg-danger text-white text-[8px] font-black rounded-full flex items-center justify-center border border-white animate-pulse">
-              {pendingIncoming.length}
-            </span>
+          <Bell className={`w-5 h-5 transition-transform ${bellAnimating ? "animate-bell-ring text-primary" : ""}`} />
+          {unreadCount > 0 && (
+            <span className={`absolute top-1 right-1 w-2.5 h-2.5 rounded-full border border-white ${
+              bellDotColor === "green" ? "bg-success animate-dot-pulse-green" : "bg-danger animate-dot-pulse-red"
+            }`} />
           )}
         </button>
 
@@ -55,32 +57,59 @@ export default function DoctorNavbar() {
             <div className="flex justify-between items-center pb-2 border-b border-gray-100">
               <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Clinical Notifications</span>
               <span className="text-[9px] font-bold bg-danger/10 text-danger px-2 py-0.5 rounded">
-                {pendingIncoming.length} New Referral{pendingIncoming.length !== 1 ? "s" : ""}
+                {unreadCount} New
               </span>
             </div>
             
             <div className="space-y-2 max-h-[240px] overflow-y-auto">
-              {pendingIncoming.map(ref => {
-                const pat = patients[ref.patientToken];
+              {notifications.map(notif => {
+                const getNotifIcon = () => {
+                  switch (notif.type) {
+                    case "referral":
+                      return <Share2 className="w-3.5 h-3.5 text-primary" />;
+                    case "labs":
+                      return <Microscope className="w-3.5 h-3.5 text-secondary" />;
+                    case "alerts":
+                      return <AlertTriangle className="w-3.5 h-3.5 text-danger" />;
+                    default:
+                      return <Bell className="w-3.5 h-3.5 text-gray-400" />;
+                  }
+                };
+
                 return (
                   <Link 
-                    key={ref.id}
-                    href="/doctor/referrals"
-                    onClick={() => setShowNotifications(false)}
-                    className="block p-2.5 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all text-xs"
+                    key={notif.id}
+                    href={notif.link}
+                    onClick={() => {
+                      markAsRead(notif.id);
+                      setShowNotifications(false);
+                    }}
+                    className={`block p-2.5 rounded-xl border border-transparent transition-all text-xs relative ${
+                      notif.status === "unread" 
+                        ? "bg-gray-50/80 hover:bg-gray-50 border-gray-100 font-semibold" 
+                        : "hover:bg-gray-50"
+                    }`}
                   >
-                    <p className="font-bold text-gray-800 flex items-center gap-1">
-                      <Share2 className="w-3 h-3 text-primary" /> Referral consultation
+                    <div className="flex justify-between items-start">
+                      <p className="font-bold text-gray-800 flex items-center gap-1.5 capitalize">
+                        {getNotifIcon()}
+                        {notif.type} notification
+                      </p>
+                      {notif.status === "unread" && (
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${
+                          notif.dotColor === "green" ? "bg-success animate-pulse" : "bg-danger animate-pulse"
+                        }`} />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-600 mt-1 leading-normal font-normal">
+                      {notif.message}
                     </p>
-                    <p className="text-[11px] text-gray-505 mt-1">
-                      <span className="font-bold">{ref.referredBy}</span> referred patient <span className="font-semibold text-gray-750">{pat?.name}</span> for {ref.speciality} evaluation.
-                    </p>
-                    <span className="text-[9px] text-gray-405 font-semibold block mt-1">{ref.date}</span>
+                    <span className="text-[9px] text-gray-400 font-semibold block mt-1">{notif.timestamp}</span>
                   </Link>
                 );
               })}
-              {pendingIncoming.length === 0 && (
-                <p className="text-xs text-gray-405 text-center py-6 font-medium">No new notifications.</p>
+              {notifications.length === 0 && (
+                <p className="text-xs text-gray-400 text-center py-6 font-medium">No new notifications.</p>
               )}
             </div>
           </div>

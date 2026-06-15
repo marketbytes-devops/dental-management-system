@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useDoctor } from "@/app/doctor/layout";
 import { 
   ArrowRight, 
@@ -26,8 +26,46 @@ export default function DoctorReferralsPage() {
   const { 
     referrals, 
     handleCompleteReferral,
-    patients 
+    patients,
+    notifications = [],
+    markAsRead,
+    markAsUnread
   } = useDoctor();
+
+  const [newlyAddedIds, setNewlyAddedIds] = useState([]);
+  const newlyAddedIdsRef = useRef([]);
+
+  useEffect(() => {
+    newlyAddedIdsRef.current = newlyAddedIds;
+  }, [newlyAddedIds]);
+
+  useEffect(() => {
+    if (notifications && notifications.length > 0) {
+      const pageNotifications = notifications.filter(
+        n => n.status === "unread" && n.link === "/doctor/referrals"
+      );
+      if (pageNotifications.length > 0) {
+        const itemIds = pageNotifications.map(n => n.itemId);
+        setNewlyAddedIds(itemIds);
+        pageNotifications.forEach(n => markAsRead(n.id));
+      }
+    }
+
+    const reminderTimer = setTimeout(() => {
+      const remainingUnread = newlyAddedIdsRef.current;
+      if (remainingUnread.length > 0) {
+        remainingUnread.forEach(itemId => markAsUnread(itemId));
+      }
+    }, 15000);
+
+    return () => {
+      clearTimeout(reminderTimer);
+      const remainingUnread = newlyAddedIdsRef.current;
+      if (remainingUnread.length > 0) {
+        remainingUnread.forEach(itemId => markAsUnread(itemId));
+      }
+    };
+  }, []);
 
   const [activeTab, setActiveTab] = useState("incoming"); // incoming | outgoing
   const [selectedReferralId, setSelectedReferralId] = useState(null);
@@ -193,6 +231,7 @@ export default function DoctorReferralsPage() {
                       setSelectedReferralId(ref.id);
                       setConsultNotes(ref.myConsultationNotes || "");
                       setMedsList([]);
+                      setNewlyAddedIds(prev => prev.filter(id => id !== ref.id));
                     }}
                     className={`w-full text-left p-4 rounded-xl border transition-all flex flex-col justify-between items-start cursor-pointer hover:scale-101 ${
                       isSelected 
@@ -203,7 +242,12 @@ export default function DoctorReferralsPage() {
                     <div className="flex justify-between items-start w-full">
                       <div>
                         <span className="text-[10px] font-bold text-gray-400">{ref.id} • {ref.date}</span>
-                        <h4 className="font-bold text-gray-900 text-sm mt-0.5">{pat?.name || "Unknown Patient"}</h4>
+                        <h4 className="font-bold text-gray-900 text-sm mt-0.5 flex items-center gap-1.5">
+                          {pat?.name || "Unknown Patient"}
+                          {newlyAddedIds.includes(ref.id) && (
+                            <span className="w-2 h-2 rounded-full bg-danger animate-pulse shrink-0" title="New Referral" />
+                          )}
+                        </h4>
                       </div>
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
                         ref.status === "Pending" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"

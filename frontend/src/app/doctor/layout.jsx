@@ -1,11 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import DoctorSidebar from "@/components/ui/doctor/layout/DoctorSidebar";
 import DoctorNavbar from "@/components/ui/doctor/layout/DoctorNavbar";
 import EmergencyPopup from "@/components/ui/doctor/workspace/EmergencyPopup";
 import ToothIcon from "@/components/ui/ToothIcon";
+import { Share2, Microscope, AlertTriangle, Bell, X } from "lucide-react";
 
 // Create context
 const DoctorContext = createContext(null);
@@ -141,6 +142,87 @@ export default function DoctorLayout({ children }) {
   // Prescription draft & notes
   const [rxDraft, setRxDraft] = useState([]);
   const [notification, setNotification] = useState("");
+
+  // Notifications State & Logic
+  const [notifications, setNotifications] = useState([
+    {
+      id: "notif-1",
+      message: "Incoming orthodontic referral from Dr. Sarah Jenkins for Rahul Kumar",
+      type: "referral",
+      link: "/doctor/referrals",
+      status: "unread",
+      dotColor: "red",
+      timestamp: "10 mins ago",
+      itemId: "REF-201"
+    },
+    {
+      id: "notif-2",
+      message: "Lab Case LAB-698 for Rahul Kumar is ready / shipped",
+      type: "labs",
+      link: "/doctor/labs",
+      status: "unread",
+      dotColor: "green",
+      timestamp: "30 mins ago",
+      itemId: "LAB-698"
+    }
+  ]);
+
+  const [activeToast, setActiveToast] = useState(null);
+  const [toastAnimation, setToastAnimation] = useState(""); // "slide-in" | "slide-out"
+  const [bellAnimating, setBellAnimating] = useState(false);
+
+  const triggerNotification = (newNotif) => {
+    const notifWithId = {
+      id: `notif-${Date.now()}`,
+      status: "unread",
+      timestamp: "Just now",
+      ...newNotif
+    };
+    setNotifications(prev => [notifWithId, ...prev]);
+    setActiveToast(notifWithId);
+    setToastAnimation("slide-in");
+
+    if (window.toastTimeout) clearTimeout(window.toastTimeout);
+    if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+
+    window.toastTimeout = setTimeout(() => {
+      setToastAnimation("slide-out");
+      window.toastExitTimeout = setTimeout(() => {
+        setActiveToast(null);
+        setToastAnimation("");
+        setBellAnimating(true);
+        setTimeout(() => {
+          setBellAnimating(false);
+        }, 2400);
+      }, 400);
+    }, 4500);
+  };
+
+  const markAsRead = (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: "read" } : n));
+  };
+
+  const markAsUnread = (itemId) => {
+    setNotifications(prev => prev.map(n => n.itemId === itemId ? { ...n, status: "unread" } : n));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, status: "read" })));
+  };
+
+  // Trigger a demo notification 6s after layout mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      triggerNotification({
+        message: "Incoming referral from Dr. Sarah Jenkins for patient Rahul Kumar",
+        type: "referral",
+        link: "/doctor/referrals",
+        dotColor: "red",
+        itemId: "REF-201"
+      });
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Referrals database
   const [referrals, setReferrals] = useState([
@@ -355,6 +437,13 @@ export default function DoctorLayout({ children }) {
 
       setEmergencyAlert(newPatient);
       showNotification("🚨 URGENT: Emergency patient Vikram checked in at desk!");
+      triggerNotification({
+        message: "🚨 URGENT: Emergency patient Commander Vikram checked in at desk!",
+        type: "alerts",
+        link: "/doctor/alerts",
+        dotColor: "red",
+        itemId: newToken
+      });
     }, 5000);
   };
 
@@ -578,7 +667,16 @@ export default function DoctorLayout({ children }) {
       handleReferPatient,
       handleCompleteReferral,
       sidebarMinimized,
-      setSidebarMinimized
+      setSidebarMinimized,
+      notifications,
+      activeToast,
+      toastAnimation,
+      bellAnimating,
+      triggerNotification,
+      markAsRead,
+      markAsUnread,
+      markAllAsRead,
+      setBellAnimating
     }}>
       <div className="flex h-screen bg-background overflow-hidden">
         {/* Sidebar Nav */}
@@ -602,6 +700,37 @@ export default function DoctorLayout({ children }) {
           </div>
         )}
 
+        {/* Swipeable Notification Toast */}
+        {activeToast && (
+          <NotificationToast 
+            toast={activeToast} 
+            animation={toastAnimation}
+            onDismiss={() => {
+              if (window.toastTimeout) clearTimeout(window.toastTimeout);
+              if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+              setToastAnimation("slide-out");
+              window.toastExitTimeout = setTimeout(() => {
+                setActiveToast(null);
+                setToastAnimation("");
+                setBellAnimating(true);
+                setTimeout(() => setBellAnimating(false), 2400);
+              }, 400);
+            }}
+            onClick={() => {
+              const link = activeToast.link;
+              const id = activeToast.id;
+              markAsRead(id);
+              if (window.toastTimeout) clearTimeout(window.toastTimeout);
+              if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+              setActiveToast(null);
+              setToastAnimation("");
+              router.push(link);
+            }}
+          />
+        )}
+
+        {/* Simulator removed */}
+
         {/* Critical Emergency Interruption Modal Popup */}
         <EmergencyPopup
           emergencyAlert={emergencyAlert}
@@ -621,5 +750,107 @@ export default function DoctorLayout({ children }) {
         />
       </div>
     </DoctorContext.Provider>
+  );
+}
+
+// Swipeable Toast Component
+function NotificationToast({ toast, animation, onDismiss, onClick }) {
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startX = useRef(0);
+
+  const handleStart = (clientX) => {
+    setIsDragging(true);
+    startX.current = clientX;
+  };
+
+  const handleMove = (clientX) => {
+    if (!isDragging) return;
+    const offset = clientX - startX.current;
+    if (offset > 0) {
+      setDragOffset(offset);
+    }
+  };
+
+  const handleEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    if (dragOffset > 120) {
+      onDismiss();
+    } else {
+      setDragOffset(0);
+    }
+  };
+
+  const getIcon = () => {
+    switch (toast.type) {
+      case "referral":
+        return <Share2 className="w-5 h-5 text-primary" />;
+      case "labs":
+        return <Microscope className="w-5 h-5 text-secondary" />;
+      case "alerts":
+        return <AlertTriangle className="w-5 h-5 text-danger" />;
+      default:
+        return <Bell className="w-5 h-5 text-gray-400" />;
+    }
+  };
+
+  return (
+    <div
+      onMouseDown={(e) => handleStart(e.clientX)}
+      onMouseMove={(e) => handleMove(e.clientX)}
+      onMouseUp={handleEnd}
+      onMouseLeave={handleEnd}
+      onTouchStart={(e) => handleStart(e.touches[0].clientX)}
+      onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+      onTouchEnd={handleEnd}
+      onClick={onClick}
+      style={{
+        transform: isDragging ? `translateX(${dragOffset}px)` : undefined,
+        transition: isDragging ? "none" : "transform 0.2s ease-out",
+        cursor: isDragging ? "grabbing" : "pointer",
+      }}
+      className={`fixed top-20 right-5 max-w-sm w-96 bg-white/95 backdrop-blur-md border border-gray-100 rounded-2xl shadow-xl p-4 flex gap-3 z-50 select-none ${
+        animation === "slide-in" ? "animate-slide-in" : "animate-slide-out"
+      }`}
+    >
+      <div className="flex flex-col items-center gap-1">
+        <div className="p-2 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+          {getIcon()}
+        </div>
+        <span className={`w-2.5 h-2.5 rounded-full ${toast.dotColor === 'green' ? 'bg-success' : 'bg-danger'}`} />
+      </div>
+
+      <div className="flex-1 min-w-0 pr-4">
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+            New {toast.type} Notification
+          </span>
+          <span className="text-[9px] text-gray-400 font-semibold">{toast.timestamp}</span>
+        </div>
+        <p className="text-xs font-semibold text-gray-800 mt-1 leading-normal line-clamp-2">
+          {toast.message}
+        </p>
+        <span className="text-[9px] font-semibold text-primary mt-2 block hover:underline">
+          Click to view →
+        </span>
+      </div>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDismiss();
+        }}
+        className="absolute top-2 right-2 text-gray-300 hover:text-gray-600 cursor-pointer p-1 rounded-full hover:bg-gray-50 transition-colors"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-150 rounded-l-md flex flex-col justify-between items-center py-1">
+        <div className="w-0.5 h-1 bg-gray-300 rounded" />
+        <div className="w-0.5 h-1 bg-gray-300 rounded" />
+        <div className="w-0.5 h-1 bg-gray-300 rounded" />
+      </div>
+    </div>
   );
 }

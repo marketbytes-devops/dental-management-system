@@ -17,7 +17,8 @@ import {
   Stethoscope, 
   Clock,
   ClipboardList,
-  X
+  X,
+  Search
 } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 
@@ -30,14 +31,40 @@ export default function DoctorReferralsPage() {
 
   const [activeTab, setActiveTab] = useState("incoming"); // incoming | outgoing
   const [selectedReferralId, setSelectedReferralId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Consultation Response Form States
   const [consultNotes, setConsultNotes] = useState("");
   const [medsList, setMedsList] = useState([]);
   const [currentMed, setCurrentMed] = useState({ name: "", dosage: "", duration: "" });
 
-  const incomingReferrals = referrals.filter(r => r.referredBy !== "Dr. Anoop Nair");
-  const outgoingReferrals = referrals.filter(r => r.referredBy === "Dr. Anoop Nair");
+  const incomingReferrals = referrals
+    .filter(r => r.referredBy !== "Dr. Anoop Nair")
+    .filter(r => {
+      const pat = patients[r.patientToken];
+      const nameMatch = pat?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      const idMatch = r.patientToken?.toLowerCase().includes(searchQuery.toLowerCase());
+      return nameMatch || idMatch;
+    })
+    .sort((a, b) => {
+      if (a.status === "Pending" && b.status === "Completed") return -1;
+      if (a.status === "Completed" && b.status === "Pending") return 1;
+      return 0;
+    });
+
+  const outgoingReferrals = referrals
+    .filter(r => r.referredBy === "Dr. Anoop Nair")
+    .filter(r => {
+      const pat = patients[r.patientToken];
+      const nameMatch = pat?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      const idMatch = r.patientToken?.toLowerCase().includes(searchQuery.toLowerCase());
+      return nameMatch || idMatch;
+    })
+    .sort((a, b) => {
+      if (a.status === "Pending" && b.status === "Completed") return -1;
+      if (a.status === "Completed" && b.status === "Pending") return 1;
+      return 0;
+    });
 
   const selectedReferral = referrals.find(r => r.id === selectedReferralId);
   const selectedPatient = selectedReferral ? patients[selectedReferral.patientToken] : null;
@@ -127,13 +154,32 @@ export default function DoctorReferralsPage() {
 
       {/* Split View */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
         {/* Left List Pane */}
         <div className={`space-y-4 ${selectedReferralId ? "lg:col-span-4" : "lg:col-span-12"}`}>
           <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
               {activeTab === "incoming" ? "Consultations Requested of Me" : "Referred by Me to Other Doctors"}
             </h3>
+
+            {/* Search Input Box */}
+            <div className="relative flex items-center bg-gray-50 border border-gray-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary rounded-xl px-3 py-2 transition-all">
+              <Search className="text-gray-400 mr-2 w-4 h-4 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search patient name or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent border-none outline-none text-xs w-full placeholder:text-gray-400 text-gray-800"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="text-gray-400 hover:text-gray-600 text-xs font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
 
             <div className="space-y-3">
               {(activeTab === "incoming" ? incomingReferrals : outgoingReferrals).map((ref) => {

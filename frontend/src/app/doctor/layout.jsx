@@ -118,6 +118,7 @@ export default function DoctorLayout({ children }) {
   const [activePatientToken, setActivePatientToken] = useState("#004");
   const [viewingPatientToken, setViewingPatientToken] = useState("#004");
   const [completedPatientHistory, setCompletedPatientHistory] = useState(["#003"]);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
   const [emergencyAlert, setEmergencyAlert] = useState(null);
   const [hasTriggeredAutoEmergency, setHasTriggeredAutoEmergency] = useState(false);
@@ -480,6 +481,50 @@ export default function DoctorLayout({ children }) {
     showNotification("Clinical diagnosis note updated.");
   };
 
+  // Submit Specialty Log (auto-save aware)
+  const handleSubmitSpecialtyLog = (noteText, sheetLabel, isAutoSave = false) => {
+    if (!viewingPatientToken) return;
+
+    setPatients(prev => {
+      const patient = prev[viewingPatientToken];
+      if (!patient) return prev;
+
+      const specialtyPrefix = `[${sheetLabel} Log]`;
+      const existingEventIndex = patient.timeline.findIndex(
+        event => event.type === "Clinical Note" && event.note.startsWith(specialtyPrefix)
+      );
+
+      let updatedTimeline = [...patient.timeline];
+
+      if (existingEventIndex > -1) {
+        updatedTimeline[existingEventIndex] = {
+          ...updatedTimeline[existingEventIndex],
+          note: noteText,
+          date: "10-06-2026 (Today)"
+        };
+      } else {
+        const newTimelineEvent = {
+          date: "10-06-2026 (Today)",
+          note: noteText,
+          type: "Clinical Note"
+        };
+        updatedTimeline = [newTimelineEvent, ...updatedTimeline];
+      }
+
+      return {
+        ...prev,
+        [viewingPatientToken]: {
+          ...patient,
+          timeline: updatedTimeline
+        }
+      };
+    });
+
+    if (!isAutoSave) {
+      showNotification(`${sheetLabel} workspace logs saved!`);
+    }
+  };
+
   // Add Chronic Safety Alert Warning
   const handleAddAlert = (alertText) => {
     if (!activePatient) return;
@@ -493,47 +538,6 @@ export default function DoctorLayout({ children }) {
     }));
     showNotification(`Medical alert added to ${activePatient.name}`);
   };
-
-  // 10-Second Auto Emergency Trigger simulation
-  useEffect(() => {
-    if (pathname === "/doctor/workspace" && !hasTriggeredAutoEmergency) {
-      const timer = setTimeout(() => {
-        setHasTriggeredAutoEmergency(true);
-
-        setPatients(prevPatients => {
-          const lastTokenNum = parseInt(Object.keys(prevPatients).sort().pop().replace("#", "") || "8");
-          const newToken = `#${String(lastTokenNum + 1).padStart(3, "0")}`;
-
-          if (prevPatients[newToken]) return prevPatients;
-
-          const newPatient = {
-            token: newToken,
-            name: "Commander Vikram",
-            age: 45,
-            gender: "Male",
-            phone: "+91 99999 88888",
-            procedure: "Acute Abscess Drainage",
-            chiefComplaint: "Acute severe swelling and unbearable pain in lower jaw, feverish.",
-            medicalAlerts: ["Cardiac Pacemaker", "Penicillin Allergy"],
-            teethChart: { 46: "active-treatment" },
-            timeline: [{ date: "10-06-2026", note: "Emergency check-in. High pain score.", type: "Check-In" }]
-          };
-
-          setQueue(prevQueue => {
-            if (prevQueue.some(q => q.token === newToken)) return prevQueue;
-            return [...prevQueue, { token: newToken, time: "03:45 PM", status: "Waiting", priority: "Urgent" }];
-          });
-
-          setEmergencyAlert(newPatient);
-          showNotification("🚨 URGENT: Emergency patient Vikram checked in at desk!");
-
-          return { ...prevPatients, [newToken]: newPatient };
-        });
-      }, 10000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [pathname, hasTriggeredAutoEmergency]);
 
   return (
     <DoctorContext.Provider value={{
@@ -567,15 +571,18 @@ export default function DoctorLayout({ children }) {
       handleRemoveDraftMed,
       handleSavePrescription,
       handleSubmitDiagNote,
+      handleSubmitSpecialtyLog,
       handleAddAlert,
       referrals,
       setReferrals,
       handleReferPatient,
-      handleCompleteReferral
+      handleCompleteReferral,
+      sidebarMinimized,
+      setSidebarMinimized
     }}>
       <div className="flex h-screen bg-background overflow-hidden">
         {/* Sidebar Nav */}
-        <DoctorSidebar />
+        <DoctorSidebar isMinimized={sidebarMinimized} onToggleMinimize={() => setSidebarMinimized(!sidebarMinimized)} />
 
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Top Bar */}

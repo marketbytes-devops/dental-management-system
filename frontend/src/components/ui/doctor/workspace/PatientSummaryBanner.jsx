@@ -17,17 +17,10 @@ export default function PatientSummaryBanner({
   const isHistorical = viewingPatient.token !== activePatientToken;
 
   return (
-    <div className="bg-white border-b border-gray-150">
+    <div className="bg-white border-b border-gray-100">
       {/* Header Bar */}
       <div className="bg-primary/5 px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div className="flex items-center gap-4">
-          <button
-            onClick={onGoBack}
-            className="px-3.5 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
-          >
-            <span>←</span> Go Back
-          </button>
-          <div className="h-6 w-px bg-gray-300"></div>
           <div>
             <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
               Clinical Sheet: {viewingPatient.name}
@@ -43,16 +36,10 @@ export default function PatientSummaryBanner({
 
         {/* Workspace Controls */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={onSimulateEmergency}
-            className="px-3.5 py-2 bg-danger/10 hover:bg-danger/15 text-danger border border-danger/20 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
-          >
-            🚨 Simulate Emergency (5s Delay)
-          </button>
           {completedPatientHistory && completedPatientHistory.length > 0 && (
             <button
               onClick={onViewPreviousPatient}
-              className="px-3.5 py-2 bg-white hover:bg-gray-55 text-gray-605 border border-gray-205 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
+              className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
             >
               <span>📂</span> View Previous Patient
             </button>
@@ -62,6 +49,12 @@ export default function PatientSummaryBanner({
             className="px-4 py-2 bg-primary text-white hover:bg-primary/95 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-primary/10 cursor-pointer outline-none"
           >
             <span>📢</span> Call Next Patient
+          </button>
+          <button
+            onClick={onGoBack}
+            className="px-3 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer outline-none"
+          >
+            <span>←</span> Back
           </button>
         </div>
       </div>

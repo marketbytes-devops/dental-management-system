@@ -70,6 +70,7 @@ export default function DoctorReferralsPage() {
   const [activeTab, setActiveTab] = useState("incoming"); // incoming | outgoing
   const [selectedReferralId, setSelectedReferralId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterReferralType, setFilterReferralType] = useState("all");
 
   // Consultation Response Form States
   const [consultNotes, setConsultNotes] = useState("");
@@ -78,6 +79,7 @@ export default function DoctorReferralsPage() {
 
   const incomingReferrals = referrals
     .filter(r => r.referredBy !== "Dr. Anoop Nair")
+    .filter(r => filterReferralType === "all" || (r.referralType || "Internal") === filterReferralType)
     .filter(r => {
       const pat = patients[r.patientToken];
       const nameMatch = pat?.name?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -92,6 +94,7 @@ export default function DoctorReferralsPage() {
 
   const outgoingReferrals = referrals
     .filter(r => r.referredBy === "Dr. Anoop Nair")
+    .filter(r => filterReferralType === "all" || (r.referralType || "Internal") === filterReferralType)
     .filter(r => {
       const pat = patients[r.patientToken];
       const nameMatch = pat?.name?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -219,6 +222,19 @@ export default function DoctorReferralsPage() {
               )}
             </div>
 
+            {/* Referral Type Selector Dropdown */}
+            <div className="relative flex items-center bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 transition-all">
+              <select
+                value={filterReferralType}
+                onChange={(e) => setFilterReferralType(e.target.value)}
+                className="bg-transparent border-none outline-none text-xs w-full text-gray-700 cursor-pointer"
+              >
+                <option value="all">All Referrals (Internal & External)</option>
+                <option value="Internal">Internal (In-Clinic)</option>
+                <option value="External">External (Outside)</option>
+              </select>
+            </div>
+
             <div className="space-y-3">
               {(activeTab === "incoming" ? incomingReferrals : outgoingReferrals).map((ref) => {
                 const pat = patients[ref.patientToken];
@@ -239,7 +255,7 @@ export default function DoctorReferralsPage() {
                         : "border-gray-100 bg-white hover:border-gray-300"
                     }`}
                   >
-                    <div className="flex justify-between items-start w-full">
+                    <div className="flex justify-between items-start w-full gap-2">
                       <div>
                         <span className="text-[10px] font-bold text-gray-400">{ref.id} • {ref.date}</span>
                         <h4 className="font-bold text-gray-900 text-sm mt-0.5 flex items-center gap-1.5">
@@ -249,11 +265,18 @@ export default function DoctorReferralsPage() {
                           )}
                         </h4>
                       </div>
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
-                        ref.status === "Pending" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
-                      }`}>
-                        {ref.status}
-                      </span>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                          (ref.referralType || "Internal") === "External" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"
+                        }`}>
+                          {ref.referralType || "Internal"}
+                        </span>
+                        <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                          ref.status === "Pending" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
+                        }`}>
+                          {ref.status}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="w-full border-t border-dashed border-gray-200/60 my-3"></div>
@@ -261,8 +284,16 @@ export default function DoctorReferralsPage() {
                     <div className="text-xs text-gray-505 space-y-1 w-full">
                       <div className="flex justify-between">
                         <span>{activeTab === "incoming" ? "Referred By:" : "Target Doctor:"}</span>
-                        <span className="font-bold text-gray-800">{ref.referredBy} ({ref.speciality})</span>
+                        <span className="font-bold text-gray-800">
+                          {activeTab === "incoming" ? ref.referredBy : ref.targetDoctor} ({ref.speciality})
+                        </span>
                       </div>
+                      {ref.referralType === "External" && ref.externalFacility && (
+                        <div className="flex justify-between text-[11px]">
+                          <span>Facility:</span>
+                          <span className="font-semibold text-gray-700">{ref.externalFacility}</span>
+                        </div>
+                      )}
                       <p className="line-clamp-2 italic text-[11px] text-gray-400 mt-1">"{ref.reason}"</p>
                     </div>
                   </button>
@@ -285,9 +316,21 @@ export default function DoctorReferralsPage() {
             {/* Detail Header */}
             <div className="flex justify-between items-start border-b border-gray-100 pb-5">
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest bg-primary/10 text-primary px-2.5 py-1 rounded">
-                  Referral Details
-                </span>
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest bg-primary/10 text-primary px-2.5 py-1 rounded">
+                    Referral Details
+                  </span>
+                  <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded ${
+                    (selectedReferral.referralType || "Internal") === "External" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"
+                  }`}>
+                    {selectedReferral.referralType || "Internal"} Referral
+                  </span>
+                  {selectedReferral.referralType === "External" && selectedReferral.externalFacility && (
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest bg-purple-100 text-purple-800 px-2.5 py-1 rounded">
+                      🏥 {selectedReferral.externalFacility}
+                    </span>
+                  )}
+                </div>
                 <h2 className="text-lg font-bold text-gray-900 mt-2">
                   Referred Patient: {selectedPatient?.name}
                 </h2>
@@ -305,9 +348,13 @@ export default function DoctorReferralsPage() {
 
             {/* Referral Reason Box */}
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4.5 space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-gray-400 uppercase tracking-wider">Referring Doctor Notes</span>
-                <span className="font-bold text-slate-800">{selectedReferral.referredBy} ({selectedReferral.speciality})</span>
+              <div className="flex justify-between items-center text-xs gap-4 flex-wrap">
+                <span className="font-bold text-gray-400 uppercase tracking-wider">
+                  {selectedReferral.referredBy === "Dr. Anoop Nair" ? "My Referral Notes" : "Referring Doctor Notes"}
+                </span>
+                <span className="font-bold text-slate-800">
+                  From: {selectedReferral.referredBy} ({selectedReferral.speciality}) ➜ To: {selectedReferral.targetDoctor || "Me"} {selectedReferral.externalFacility ? `(${selectedReferral.externalFacility})` : ""}
+                </span>
               </div>
               <p className="text-sm font-medium text-gray-700 italic">"{selectedReferral.reason}"</p>
             </div>

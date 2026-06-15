@@ -246,7 +246,8 @@ export default function DoctorLayout({ children }) {
       teethChart: { 16: "active-treatment" },
       status: "Pending", // Pending | Completed
       myConsultationNotes: "",
-      myMedications: []
+      myMedications: [],
+      referralType: "Internal"
     },
     {
       id: "REF-202",
@@ -259,12 +260,29 @@ export default function DoctorLayout({ children }) {
       teethChart: {},
       status: "Pending",
       myConsultationNotes: "",
-      myMedications: []
+      myMedications: [],
+      referralType: "Internal"
+    },
+    {
+      id: "REF-203",
+      patientToken: "#003", // Sneha Joseph
+      referredBy: "Dr. Anoop Nair",
+      speciality: "Orthodontics",
+      targetDoctor: "Dr. Rajesh Shah",
+      date: "12-06-2026",
+      reason: "Referred outside for specialized lingual orthodontics not available in-house.",
+      clinicalNotes: "Patient prefers lingual brackets.",
+      teethChart: { 18: "restored" },
+      status: "Pending",
+      myConsultationNotes: "",
+      myMedications: [],
+      referralType: "External",
+      externalFacility: "Apex Orthodontic Center"
     }
   ]);
 
   // Outgoing referral handler
-  const handleReferPatient = (patientToken, doctorNameWithSpeciality, reason) => {
+  const handleReferPatient = (patientToken, doctorNameWithSpeciality, reason, referralType = "Internal", externalFacility = "") => {
     const [docName, docSpec] = doctorNameWithSpeciality.split(" - ");
     const newRef = {
       id: `REF-${Math.floor(200 + Math.random() * 800)}`,
@@ -278,7 +296,9 @@ export default function DoctorLayout({ children }) {
       teethChart: patients[patientToken]?.teethChart || {},
       status: "Pending",
       myConsultationNotes: "",
-      myMedications: []
+      myMedications: [],
+      referralType,
+      externalFacility
     };
 
     setReferrals(prev => [newRef, ...prev]);
@@ -286,7 +306,7 @@ export default function DoctorLayout({ children }) {
     // Add event to patient timeline
     const timelineEvent = {
       date: "10-06-2026 (Today)",
-      note: `Outbound Referral generated to ${docName} (${docSpec}). Reason: ${reason}`,
+      note: `Outbound ${referralType} Referral generated to ${docName}${externalFacility ? ` at ${externalFacility}` : ""} (${docSpec || "Specialist"}). Reason: ${reason}`,
       type: "Referral"
     };
 

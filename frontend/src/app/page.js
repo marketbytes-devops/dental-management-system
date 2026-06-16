@@ -97,7 +97,7 @@ export default function Home() {
       icon: Clock,
       color: "border-green-200 hover:border-green-400 bg-green-50/50 text-green-600",
       accent: "bg-green-500",
-      redirect: "/frontdesk/receptionist/dashboard"
+      redirect: "/frontdesk"
     },
     admin: {
       name: "Administrator",

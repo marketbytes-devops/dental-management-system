@@ -94,6 +94,12 @@ export default function FrontdeskSidebar() {
     setOpenDropdowns((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
+  const filteredNavItems = navItems.filter((item) => {
+    if (pathname?.startsWith("/frontdesk/receptionist") && item.name === "Receptionist Services") return true;
+    if (pathname?.startsWith("/frontdesk/accountant") && item.name === "Accountant Services") return true;
+    return false;
+  });
+
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm">
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
@@ -108,7 +114,7 @@ export default function FrontdeskSidebar() {
         <div className="px-4 mb-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-2">Front Desk</p>
           <ul className="space-y-1">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const hasSubItems = !!item.subItems;
               const isOpen = !!openDropdowns[item.name];
               const isActive =
@@ -179,8 +185,12 @@ export default function FrontdeskSidebar() {
             FD
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-medium text-gray-900">Front Desk User</span>
-            <span className="text-xs text-gray-500">Reception & Accounting</span>
+            <span className="text-sm font-medium text-gray-900">
+              {pathname?.startsWith("/frontdesk/receptionist") ? "Receptionist" : "Accountant"}
+            </span>
+            <span className="text-xs text-gray-500">
+              {pathname?.startsWith("/frontdesk/receptionist") ? "Front Desk" : "Finance"}
+            </span>
           </div>
         </div>
       </div>

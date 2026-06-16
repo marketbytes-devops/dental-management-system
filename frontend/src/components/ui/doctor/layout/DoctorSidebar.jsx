@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   Home, ClipboardList, Users, AlertTriangle, Microscope, TrendingUp, Stethoscope, Share2,
-  Pill, Award, ShieldAlert, Scissors, Sparkles, ChevronLeft, ChevronRight, Bell, Calendar
+  Pill, Award, ShieldAlert, Scissors, Sparkles, ChevronLeft, ChevronRight, Bell, Calendar, User
 } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 import { useDoctor } from "@/app/doctor/layout";
@@ -31,7 +31,8 @@ const doctorNavItems = [
   { name: "Referrals", href: "/doctor/referrals", icon: Share2 },
   { name: "Notifications", href: "/doctor/notifications", icon: Bell },
   { name: "Leave Management", href: "/doctor/leave", icon: Calendar },
-  { name: "My Performance", href: "/doctor/performance", icon: TrendingUp }
+  { name: "My Performance", href: "/doctor/performance", icon: TrendingUp },
+  { name: "My Profile", href: "/doctor/profile", icon: User }
 ];
 
 export default function DoctorSidebar({ isMinimized = false, onToggleMinimize }) {

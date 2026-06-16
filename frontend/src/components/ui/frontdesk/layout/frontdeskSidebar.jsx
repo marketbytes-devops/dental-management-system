@@ -76,23 +76,6 @@ const navItems = [
 export default function FrontdeskSidebar() {
   const pathname = usePathname();
   const [openDropdowns, setOpenDropdowns] = useState({});
-  const [activeRoles, setActiveRoles] = useState(["Receptionist", "Accountant"]);
-
-  // Load active roles on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedRoles = localStorage.getItem("smilecare_active_user_roles");
-      if (savedRoles) {
-        try {
-          setActiveRoles(JSON.parse(savedRoles));
-        } catch (e) {
-          console.error("Failed to parse active user roles", e);
-        }
-      } else {
-        localStorage.setItem("smilecare_active_user_roles", JSON.stringify(["Receptionist", "Accountant"]));
-      }
-    }
-  }, []);
 
   useEffect(() => {
     if (pathname) {
@@ -111,22 +94,6 @@ export default function FrontdeskSidebar() {
     setOpenDropdowns((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
-  const handleSimulateRole = (roles) => {
-    setActiveRoles(roles);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("smilecare_active_user_roles", JSON.stringify(roles));
-    }
-  };
-
-  // Filter navigation items dynamically based on the active user roles
-  const filteredNavItems = navItems.filter((item) => {
-    if (item.name === "Receptionist Services") {
-      return activeRoles.includes("Receptionist");
-    }
-    if (item.name === "Accountant Services") {
-      return activeRoles.includes("Accountant");
-    }
-    return true;
   const filteredNavItems = navItems.filter((item) => {
     if (pathname?.startsWith("/frontdesk/receptionist") && item.name === "Receptionist Services") return true;
     if (pathname?.startsWith("/frontdesk/accountant") && item.name === "Accountant Services") return true;
@@ -135,8 +102,6 @@ export default function FrontdeskSidebar() {
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm">
-      
-      {/* Brand Header */}
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
         <span className="text-xl font-bold text-primary flex items-center gap-2">
           <ToothIcon className="w-6 h-6 text-primary" strokeWidth={2.5} /> SmileCare
@@ -145,8 +110,6 @@ export default function FrontdeskSidebar() {
           Desk
         </span>
       </div>
-
-      {/* Navigation list */}
       <nav className="flex-1 overflow-y-auto py-4">
         <div className="px-4 mb-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-2">Front Desk</p>
@@ -154,7 +117,8 @@ export default function FrontdeskSidebar() {
             {filteredNavItems.map((item) => {
               const hasSubItems = !!item.subItems;
               const isOpen = !!openDropdowns[item.name];
-              const isActive = (hasSubItems && item.subItems.some((sub) => pathname === sub.href));
+              const isActive =
+                (hasSubItems && item.subItems.some((sub) => pathname === sub.href));
 
               return (
                 <li key={item.name} className="flex flex-col">
@@ -174,7 +138,7 @@ export default function FrontdeskSidebar() {
                     <svg
                       className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""
                         }`}
-                      fill="none"
+                      fill="none; outline: none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
                       strokeWidth="2.5"
@@ -212,54 +176,14 @@ export default function FrontdeskSidebar() {
                 </li>
               );
             })}
-            {filteredNavItems.length === 0 && (
-              <p className="text-xs text-gray-400 italic text-center py-6">No authorized services assigned.</p>
-            )}
           </ul>
         </div>
       </nav>
-
-      {/* Role Simulator and Roster Footer Panel */}
-      <div className="border-t border-gray-100 bg-gray-50/60 p-4 space-y-3">
-        {/* Active user status badge */}
+      <div className="p-4 border-t border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
             FD
           </div>
-          <div className="flex flex-col text-left">
-            <span className="text-xs font-bold text-gray-900 leading-tight">Front Desk Staff</span>
-            <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5 tracking-wide leading-none">
-              {activeRoles.join(" & ")}
-            </span>
-          </div>
-        </div>
-
-        {/* Real-time switcher buttons */}
-        <div className="space-y-1">
-          <span className="text-[8px] font-black uppercase text-gray-400 tracking-wider block text-left">Simulate Roster Roles</span>
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => handleSimulateRole(["Receptionist"])}
-              className={`flex-1 text-center py-1 rounded-lg text-[9px] font-bold border transition-all cursor-pointer outline-none ${
-                activeRoles.includes("Receptionist") && !activeRoles.includes("Accountant")
-                  ? "bg-secondary text-white border-secondary"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
-              }`}
-              title="Simulate Receptionist-only module access view"
-            >
-              Receptionist Only
-            </button>
-            <button
-              onClick={() => handleSimulateRole(["Receptionist", "Accountant"])}
-              className={`flex-1 text-center py-1 rounded-lg text-[9px] font-bold border transition-all cursor-pointer outline-none ${
-                activeRoles.includes("Receptionist") && activeRoles.includes("Accountant")
-                  ? "bg-primary text-white border-primary"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
-              }`}
-              title="Simulate dual Receptionist & Accountant access views"
-            >
-              Both Roles
-            </button>
           <div className="flex flex-col">
             <span className="text-sm font-medium text-gray-900">
               {pathname?.startsWith("/frontdesk/receptionist") ? "Receptionist" : "Accountant"}
@@ -270,7 +194,6 @@ export default function FrontdeskSidebar() {
           </div>
         </div>
       </div>
-
     </div>
   );
 }

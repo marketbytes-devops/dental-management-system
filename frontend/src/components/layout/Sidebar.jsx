@@ -45,6 +45,7 @@ const navItems = [
   { name: "Role Permissions", href: "/admin/roles", icon: Key },
   { name: "Doctor", href: "/admin/doctor", icon: Stethoscope },
   { name: "Patient", href: "/admin/patients", icon: Users },
+  { name: "Inventory", href: "/admin/inventory", icon: ClipboardList },
   {
     name: "Receptionist",
     icon: ConciergeBell,

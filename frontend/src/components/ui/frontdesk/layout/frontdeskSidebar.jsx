@@ -127,6 +127,10 @@ export default function FrontdeskSidebar() {
       return activeRoles.includes("Accountant");
     }
     return true;
+  const filteredNavItems = navItems.filter((item) => {
+    if (pathname?.startsWith("/frontdesk/receptionist") && item.name === "Receptionist Services") return true;
+    if (pathname?.startsWith("/frontdesk/accountant") && item.name === "Accountant Services") return true;
+    return false;
   });
 
   return (
@@ -256,6 +260,13 @@ export default function FrontdeskSidebar() {
             >
               Both Roles
             </button>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-900">
+              {pathname?.startsWith("/frontdesk/receptionist") ? "Receptionist" : "Accountant"}
+            </span>
+            <span className="text-xs text-gray-500">
+              {pathname?.startsWith("/frontdesk/receptionist") ? "Front Desk" : "Finance"}
+            </span>
           </div>
         </div>
       </div>

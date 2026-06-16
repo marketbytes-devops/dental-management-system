@@ -216,7 +216,7 @@ export default function LabOrders() {
         return "bg-primary/10 text-primary border border-primary/20";
       case "Low":
       default:
-        return "bg-gray-100 text-gray-650 border border-gray-200";
+        return "bg-gray-100 text-gray-600 border border-gray-200";
     }
   };
 
@@ -418,7 +418,7 @@ export default function LabOrders() {
 
       <div className="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden p-6 space-y-4">
         <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full lg:w-96 flex items-center bg-gray-55 rounded-xl px-4 py-2.5 border border-gray-200 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <div className="relative w-full lg:w-96 flex items-center bg-gray-50 rounded-xl px-4 py-2.5 border border-gray-200 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
             <Search className="text-gray-400 mr-2.5 w-4 h-4 shrink-0" />
             <input 
               type="text" 
@@ -430,7 +430,7 @@ export default function LabOrders() {
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery("")}
-                className="text-gray-400 hover:text-gray-650 ml-1.5 text-xs bg-gray-200/60 rounded-full w-5 h-5 flex items-center justify-center"
+                className="text-gray-400 hover:text-gray-600 ml-1.5 text-xs bg-gray-200/60 rounded-full w-5 h-5 flex items-center justify-center"
               >
                 ✕
               </button>
@@ -534,7 +534,7 @@ export default function LabOrders() {
                     className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
                     onClick={() => openDetailsDrawer(order)}
                   >
-                    <td className="px-6 py-4 font-bold text-gray-905 text-xs group-hover:text-primary transition-colors">
+                    <td className="px-6 py-4 font-bold text-gray-900 text-xs group-hover:text-primary transition-colors">
                       {order.id}
                     </td>
                     <td className="px-6 py-4 font-medium text-gray-800">
@@ -557,7 +557,7 @@ export default function LabOrders() {
                         {order.priority}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-650 font-medium">
+                    <td className="px-6 py-4 text-gray-600 font-medium">
                       {order.dueDate === "2026-06-10" ? (
                         <span className="text-danger font-semibold flex items-center gap-1">
                           Today ⚠️
@@ -633,7 +633,7 @@ export default function LabOrders() {
             <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
               <div className="pointer-events-auto w-screen max-w-md transform bg-white shadow-2xl transition-all duration-300 animate-in slide-in-from-right duration-300">
                 <div className="flex h-full flex-col overflow-y-scroll bg-white">
-                  <div className="bg-gray-55 px-6 py-6 border-b border-gray-100">
+                  <div className="bg-gray-50 px-6 py-6 border-b border-gray-100">
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-extrabold text-primary uppercase tracking-wider">Lab Case Details</span>
@@ -641,7 +641,7 @@ export default function LabOrders() {
                       </div>
                       <button 
                         onClick={() => setIsDrawerOpen(false)}
-                        className="text-gray-400 hover:text-gray-655 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                        className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
                       >
                         ✕
                       </button>
@@ -649,7 +649,7 @@ export default function LabOrders() {
                   </div>
 
                   <div className="relative flex-1 px-6 py-6 space-y-6">
-                    <div className="bg-gray-55 rounded-xl p-4 flex items-center justify-between border border-gray-100">
+                    <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between border border-gray-100">
                       <div>
                         <p className="text-xs text-gray-400 font-medium">Current Status</p>
                         <div className="flex items-center gap-2 mt-1">
@@ -724,7 +724,7 @@ export default function LabOrders() {
                             <div className="h-px bg-gray-100"></div>
                             <div>
                               <p className="text-xs text-gray-400">Notes from Dentist</p>
-                              <p className="text-xs text-gray-650 mt-1 leading-relaxed bg-gray-50 p-2.5 rounded-lg border border-gray-100 italic">
+                              <p className="text-xs text-gray-600 mt-1 leading-relaxed bg-gray-50 p-2.5 rounded-lg border border-gray-100 italic">
                                 "{selectedOrder.notes}"
                               </p>
                             </div>
@@ -810,11 +810,11 @@ export default function LabOrders() {
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-55/50">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
               <h2 className="text-lg font-bold text-gray-900">Edit Lab Specifications</h2>
               <button 
                 onClick={() => setIsEditModalOpen(false)}
-                className="text-gray-400 hover:text-gray-655 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
               >
                 ✕
               </button>
@@ -828,7 +828,7 @@ export default function LabOrders() {
                     type="text" 
                     readOnly 
                     value={editFormData.id}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-505 outline-none text-sm cursor-not-allowed"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 outline-none text-sm cursor-not-allowed"
                   />
                 </div>
 
@@ -905,7 +905,7 @@ export default function LabOrders() {
                 </div>
               </div>
 
-              <div className="p-6 border-t border-gray-100 bg-gray-55/50 flex justify-end gap-3">
+              <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
                 <button 
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
@@ -928,20 +928,20 @@ export default function LabOrders() {
       {isRejectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-55/50">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <span className="text-danger">⚠️</span> Reject Lab Case {rejectTargetId}
               </h2>
               <button 
                 onClick={() => setIsRejectModalOpen(false)}
-                className="text-gray-400 hover:text-gray-655 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
               >
                 ✕
               </button>
             </div>
 
             <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-550">
+              <p className="text-sm text-gray-500">
                 Please provide a reason for rejecting this case. This reason will be communicated back to the ordering dentist immediately.
               </p>
               
@@ -958,7 +958,7 @@ export default function LabOrders() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-100 bg-gray-55/50 flex justify-end gap-3">
+            <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
               <button 
                 type="button"
                 onClick={() => setIsRejectModalOpen(false)}

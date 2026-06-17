@@ -3,18 +3,19 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Home, Calendar, User, CheckSquare, FileText, Pill, CreditCard, Bell } from "lucide-react";
+import { Home, Calendar, User, CheckSquare, FileText, Pill, CreditCard, Bell, Settings } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 
 const navItems = [
   { name: "My Dashboard",    href: "/patient/dashboard",      icon: Home },
   { name: "My Appointments", href: "/patient/appointments",   icon: Calendar },
   { name: "My Profile",      href: "/patient/profile",        icon: User },
-  { name: "Self Check-In",   href: "/patient/appointments?tab=checkin", icon: CheckSquare },
+  { name: "Self Check-In",   href: "/patient/check-in", icon: CheckSquare },
   { name: "My Documents",    href: "/patient/documents",      icon: FileText },
   { name: "My Records",      href: "/patient/records",        icon: Pill },
-  { name: "My Bills",        href: "/patient/bills",          icon: CreditCard },
+  { name: "My Bills",        href: "/patient/billing",          icon: CreditCard },
   { name: "Notifications",   href: "/patient/notifications",  icon: Bell },
+  { name: "Settings",        href: "/patient/settings",       icon: Settings },
 ];
 
 function NavLinks() {
@@ -25,14 +26,7 @@ function NavLinks() {
   return (
     <ul className="space-y-1">
       {navItems.map((item) => {
-        let isActive = false;
-        if (item.name === "Self Check-In") {
-          isActive = pathname === "/patient/appointments" && currentTab === "checkin";
-        } else if (item.name === "My Appointments") {
-          isActive = pathname === "/patient/appointments" && currentTab !== "checkin";
-        } else {
-          isActive = pathname === item.href;
-        }
+        const isActive = pathname === item.href;
 
         return (
           <li key={item.name}>

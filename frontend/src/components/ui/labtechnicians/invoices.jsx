@@ -41,7 +41,7 @@ export default function LabInvoices() {
   };
 
   const handleSendInvoice = () => {
-    triggerToast(`Invoice ${currentInvoice.id} sent successfully to ${currentInvoice.dentist}.`);
+    triggerToast(`Invoice ${currentInvoice.id} sent successfully to the Accountant.`);
   };
 
   return (
@@ -123,7 +123,7 @@ export default function LabInvoices() {
                   <tr 
                     key={inv.id} 
                     onClick={() => setSelectedInvId(inv.id)}
-                    className={`hover:bg-gray-55/60 transition-colors cursor-pointer ${
+                    className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
                       selectedInvId === inv.id ? "bg-primary/5" : ""
                     }`}
                   >
@@ -234,7 +234,7 @@ export default function LabInvoices() {
               onClick={handleSendInvoice}
               className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-750 font-extrabold rounded-xl text-xs hover:bg-gray-50 transition-colors cursor-pointer"
             >
-              ✉️ Send to Dentist
+              ✉️ Send to Accountant
             </button>
           </div>
         </div>

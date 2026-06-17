@@ -8,7 +8,9 @@ export default function LabOrdersTable({
   activeLabCount,
   onMarkLabDelivered,
   onSubmitLabOrder,
-  viewingPatientToken
+  viewingPatientToken,
+  newlyAddedIds = [],
+  setNewlyAddedIds
 }) {
   // Local form state
   const [labOrderItem, setLabOrderItem] = useState("Zirconia Crown");
@@ -57,8 +59,21 @@ export default function LabOrdersTable({
               {labOrders.map((order) => {
                 const pt = patients[order.patientToken];
                 return (
-                  <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 text-xs font-bold text-gray-900">{order.id}</td>
+                  <tr 
+                    key={order.id} 
+                    className="hover:bg-gray-50/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      if (setNewlyAddedIds) {
+                        setNewlyAddedIds(prev => prev.filter(id => id !== order.id));
+                      }
+                    }}
+                  >
+                    <td className="px-6 py-4 text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                      {order.id}
+                      {newlyAddedIds.includes(order.id) && (
+                        <span className="w-2 h-2 rounded-full bg-danger animate-pulse shrink-0" title="New Lab Update" />
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <span className="text-xs font-bold text-gray-955 block">{pt ? pt.name : "Walk-in Patient"}</span>
                       <span className="text-[10px] text-gray-400 font-medium">Token: {order.patientToken}</span>

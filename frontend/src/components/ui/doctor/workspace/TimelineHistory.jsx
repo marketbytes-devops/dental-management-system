@@ -20,7 +20,7 @@ export default function TimelineHistory({ timeline = [] }) {
               }`}>
                 {event.type.charAt(0)}
               </div>
-              <div className="flex-1 bg-gray-55/50 p-3 rounded-xl border border-gray-100">
+              <div className="flex-1 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[9px] font-bold text-gray-400">{event.date}</span>
                   <span className="text-[8px] font-bold text-primary bg-primary/5 px-1 rounded">{event.type}</span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Calendar, CheckCircle2 } from "lucide-react";
 
 const TIME_SLOTS = [
   "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM",
@@ -95,7 +96,7 @@ export default function BookAppointmentModal({ onClose, onBook }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">📅 Book Appointment</h2>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Book Appointment</h2>
             <p className="text-xs text-gray-500 mt-0.5">Fill in the details below to schedule a visit</p>
           </div>
           <button
@@ -109,7 +110,7 @@ export default function BookAppointmentModal({ onClose, onBook }) {
         {/* Success state */}
         {success ? (
           <div className="p-12 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center text-3xl mb-4">✅</div>
+            <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mb-4"><CheckCircle2 className="w-8 h-8 text-success" /></div>
             <h3 className="text-base font-bold text-gray-900">Appointment Requested!</h3>
             <p className="text-sm text-gray-500 mt-1">
               Your appointment has been submitted and is pending confirmation.
@@ -222,12 +223,12 @@ export default function BookAppointmentModal({ onClose, onBook }) {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 px-4 py-2.5 text-sm font-semibold bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2.5 text-sm font-semibold bg-primary/5 border border-primary/20 text-primary rounded-xl hover:bg-primary hover:text-white hover:border-primary transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 group cursor-pointer"
               >
                 {submitting ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Booking…</>
+                  <><span className="w-4 h-4 border-2 border-primary/30 border-t-primary group-hover:border-white/30 group-hover:border-t-white rounded-full animate-spin" /> Booking…</>
                 ) : (
-                  "📅 Confirm Booking"
+                  <><Calendar className="w-4 h-4 text-primary group-hover:text-white" /> Confirm Booking</>
                 )}
               </button>
             </div>

@@ -1,11 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import DoctorSidebar from "@/components/ui/doctor/layout/DoctorSidebar";
 import DoctorNavbar from "@/components/ui/doctor/layout/DoctorNavbar";
 import EmergencyPopup from "@/components/ui/doctor/workspace/EmergencyPopup";
 import ToothIcon from "@/components/ui/ToothIcon";
+import { Share2, Microscope, AlertTriangle, Bell, X } from "lucide-react";
 
 // Create context
 const DoctorContext = createContext(null);
@@ -118,6 +119,7 @@ export default function DoctorLayout({ children }) {
   const [activePatientToken, setActivePatientToken] = useState("#004");
   const [viewingPatientToken, setViewingPatientToken] = useState("#004");
   const [completedPatientHistory, setCompletedPatientHistory] = useState(["#003"]);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
   const [emergencyAlert, setEmergencyAlert] = useState(null);
   const [hasTriggeredAutoEmergency, setHasTriggeredAutoEmergency] = useState(false);
@@ -141,6 +143,96 @@ export default function DoctorLayout({ children }) {
   const [rxDraft, setRxDraft] = useState([]);
   const [notification, setNotification] = useState("");
 
+  // Notifications State & Logic
+  const [notifications, setNotifications] = useState([
+    {
+      id: "notif-1",
+      message: "Incoming orthodontic referral from Dr. Sarah Jenkins for Rahul Kumar",
+      type: "referral",
+      link: "/doctor/referrals",
+      status: "unread",
+      dotColor: "red",
+      timestamp: "10 mins ago",
+      receivedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      itemId: "REF-201",
+      patientId: "#004",
+      patientName: "Rahul Kumar"
+    },
+    {
+      id: "notif-2",
+      message: "Lab Case LAB-698 for Rahul Kumar is ready / shipped",
+      type: "labs",
+      link: "/doctor/labs",
+      status: "unread",
+      dotColor: "green",
+      timestamp: "30 mins ago",
+      receivedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      itemId: "LAB-698",
+      patientId: "#004",
+      patientName: "Rahul Kumar"
+    }
+  ]);
+
+  const [activeToast, setActiveToast] = useState(null);
+  const [toastAnimation, setToastAnimation] = useState(""); // "slide-in" | "slide-out"
+  const [bellAnimating, setBellAnimating] = useState(false);
+
+  const triggerNotification = (newNotif) => {
+    const notifWithId = {
+      id: `notif-${Date.now()}`,
+      status: "unread",
+      timestamp: "Just now",
+      receivedAt: new Date().toISOString(),
+      ...newNotif
+    };
+    setNotifications(prev => [notifWithId, ...prev]);
+    setActiveToast(notifWithId);
+    setToastAnimation("slide-in");
+
+    if (window.toastTimeout) clearTimeout(window.toastTimeout);
+    if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+
+    window.toastTimeout = setTimeout(() => {
+      setToastAnimation("slide-out");
+      window.toastExitTimeout = setTimeout(() => {
+        setActiveToast(null);
+        setToastAnimation("");
+        setBellAnimating(true);
+        setTimeout(() => {
+          setBellAnimating(false);
+        }, 2400);
+      }, 400);
+    }, 4500);
+  };
+
+  const markAsRead = (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: "read" } : n));
+  };
+
+  const markAsUnread = (idOrItemId) => {
+    setNotifications(prev => prev.map(n => (n.id === idOrItemId || n.itemId === idOrItemId) ? { ...n, status: "unread" } : n));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, status: "read" })));
+  };
+
+  // Trigger a demo notification 6s after layout mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      triggerNotification({
+        message: "Incoming referral from Dr. Sarah Jenkins for patient Rahul Kumar",
+        type: "referral",
+        link: "/doctor/referrals",
+        dotColor: "red",
+        itemId: "REF-201",
+        patientId: "#004",
+        patientName: "Rahul Kumar"
+      });
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Referrals database
   const [referrals, setReferrals] = useState([
     {
@@ -154,7 +246,8 @@ export default function DoctorLayout({ children }) {
       teethChart: { 16: "active-treatment" },
       status: "Pending", // Pending | Completed
       myConsultationNotes: "",
-      myMedications: []
+      myMedications: [],
+      referralType: "Internal"
     },
     {
       id: "REF-202",
@@ -167,12 +260,29 @@ export default function DoctorLayout({ children }) {
       teethChart: {},
       status: "Pending",
       myConsultationNotes: "",
-      myMedications: []
+      myMedications: [],
+      referralType: "Internal"
+    },
+    {
+      id: "REF-203",
+      patientToken: "#003", // Sneha Joseph
+      referredBy: "Dr. Anoop Nair",
+      speciality: "Orthodontics",
+      targetDoctor: "Dr. Rajesh Shah",
+      date: "12-06-2026",
+      reason: "Referred outside for specialized lingual orthodontics not available in-house.",
+      clinicalNotes: "Patient prefers lingual brackets.",
+      teethChart: { 18: "restored" },
+      status: "Pending",
+      myConsultationNotes: "",
+      myMedications: [],
+      referralType: "External",
+      externalFacility: "Apex Orthodontic Center"
     }
   ]);
 
   // Outgoing referral handler
-  const handleReferPatient = (patientToken, doctorNameWithSpeciality, reason) => {
+  const handleReferPatient = (patientToken, doctorNameWithSpeciality, reason, referralType = "Internal", externalFacility = "") => {
     const [docName, docSpec] = doctorNameWithSpeciality.split(" - ");
     const newRef = {
       id: `REF-${Math.floor(200 + Math.random() * 800)}`,
@@ -186,7 +296,9 @@ export default function DoctorLayout({ children }) {
       teethChart: patients[patientToken]?.teethChart || {},
       status: "Pending",
       myConsultationNotes: "",
-      myMedications: []
+      myMedications: [],
+      referralType,
+      externalFacility
     };
 
     setReferrals(prev => [newRef, ...prev]);
@@ -194,7 +306,7 @@ export default function DoctorLayout({ children }) {
     // Add event to patient timeline
     const timelineEvent = {
       date: "10-06-2026 (Today)",
-      note: `Outbound Referral generated to ${docName} (${docSpec}). Reason: ${reason}`,
+      note: `Outbound ${referralType} Referral generated to ${docName}${externalFacility ? ` at ${externalFacility}` : ""} (${docSpec || "Specialist"}). Reason: ${reason}`,
       type: "Referral"
     };
 
@@ -354,6 +466,15 @@ export default function DoctorLayout({ children }) {
 
       setEmergencyAlert(newPatient);
       showNotification("🚨 URGENT: Emergency patient Vikram checked in at desk!");
+      triggerNotification({
+        message: "🚨 URGENT: Emergency patient Commander Vikram checked in at desk!",
+        type: "alerts",
+        link: "/doctor/alerts",
+        dotColor: "red",
+        itemId: newToken,
+        patientId: newToken,
+        patientName: "Commander Vikram"
+      });
     }, 5000);
   };
 
@@ -480,6 +601,50 @@ export default function DoctorLayout({ children }) {
     showNotification("Clinical diagnosis note updated.");
   };
 
+  // Submit Specialty Log (auto-save aware)
+  const handleSubmitSpecialtyLog = (noteText, sheetLabel, isAutoSave = false) => {
+    if (!viewingPatientToken) return;
+
+    setPatients(prev => {
+      const patient = prev[viewingPatientToken];
+      if (!patient) return prev;
+
+      const specialtyPrefix = `[${sheetLabel} Log]`;
+      const existingEventIndex = patient.timeline.findIndex(
+        event => event.type === "Clinical Note" && event.note.startsWith(specialtyPrefix)
+      );
+
+      let updatedTimeline = [...patient.timeline];
+
+      if (existingEventIndex > -1) {
+        updatedTimeline[existingEventIndex] = {
+          ...updatedTimeline[existingEventIndex],
+          note: noteText,
+          date: "10-06-2026 (Today)"
+        };
+      } else {
+        const newTimelineEvent = {
+          date: "10-06-2026 (Today)",
+          note: noteText,
+          type: "Clinical Note"
+        };
+        updatedTimeline = [newTimelineEvent, ...updatedTimeline];
+      }
+
+      return {
+        ...prev,
+        [viewingPatientToken]: {
+          ...patient,
+          timeline: updatedTimeline
+        }
+      };
+    });
+
+    if (!isAutoSave) {
+      showNotification(`${sheetLabel} workspace logs saved!`);
+    }
+  };
+
   // Add Chronic Safety Alert Warning
   const handleAddAlert = (alertText) => {
     if (!activePatient) return;
@@ -493,47 +658,6 @@ export default function DoctorLayout({ children }) {
     }));
     showNotification(`Medical alert added to ${activePatient.name}`);
   };
-
-  // 10-Second Auto Emergency Trigger simulation
-  useEffect(() => {
-    if (pathname === "/doctor/workspace" && !hasTriggeredAutoEmergency) {
-      const timer = setTimeout(() => {
-        setHasTriggeredAutoEmergency(true);
-
-        setPatients(prevPatients => {
-          const lastTokenNum = parseInt(Object.keys(prevPatients).sort().pop().replace("#", "") || "8");
-          const newToken = `#${String(lastTokenNum + 1).padStart(3, "0")}`;
-
-          if (prevPatients[newToken]) return prevPatients;
-
-          const newPatient = {
-            token: newToken,
-            name: "Commander Vikram",
-            age: 45,
-            gender: "Male",
-            phone: "+91 99999 88888",
-            procedure: "Acute Abscess Drainage",
-            chiefComplaint: "Acute severe swelling and unbearable pain in lower jaw, feverish.",
-            medicalAlerts: ["Cardiac Pacemaker", "Penicillin Allergy"],
-            teethChart: { 46: "active-treatment" },
-            timeline: [{ date: "10-06-2026", note: "Emergency check-in. High pain score.", type: "Check-In" }]
-          };
-
-          setQueue(prevQueue => {
-            if (prevQueue.some(q => q.token === newToken)) return prevQueue;
-            return [...prevQueue, { token: newToken, time: "03:45 PM", status: "Waiting", priority: "Urgent" }];
-          });
-
-          setEmergencyAlert(newPatient);
-          showNotification("🚨 URGENT: Emergency patient Vikram checked in at desk!");
-
-          return { ...prevPatients, [newToken]: newPatient };
-        });
-      }, 10000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [pathname, hasTriggeredAutoEmergency]);
 
   return (
     <DoctorContext.Provider value={{
@@ -567,15 +691,27 @@ export default function DoctorLayout({ children }) {
       handleRemoveDraftMed,
       handleSavePrescription,
       handleSubmitDiagNote,
+      handleSubmitSpecialtyLog,
       handleAddAlert,
       referrals,
       setReferrals,
       handleReferPatient,
-      handleCompleteReferral
+      handleCompleteReferral,
+      sidebarMinimized,
+      setSidebarMinimized,
+      notifications,
+      activeToast,
+      toastAnimation,
+      bellAnimating,
+      triggerNotification,
+      markAsRead,
+      markAsUnread,
+      markAllAsRead,
+      setBellAnimating
     }}>
       <div className="flex h-screen bg-background overflow-hidden">
         {/* Sidebar Nav */}
-        <DoctorSidebar />
+        <DoctorSidebar isMinimized={sidebarMinimized} onToggleMinimize={() => setSidebarMinimized(!sidebarMinimized)} />
 
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Top Bar */}
@@ -594,6 +730,37 @@ export default function DoctorLayout({ children }) {
             <span className="text-sm font-semibold">{notification}</span>
           </div>
         )}
+
+        {/* Swipeable Notification Toast */}
+        {activeToast && (
+          <NotificationToast 
+            toast={activeToast} 
+            animation={toastAnimation}
+            onDismiss={() => {
+              if (window.toastTimeout) clearTimeout(window.toastTimeout);
+              if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+              setToastAnimation("slide-out");
+              window.toastExitTimeout = setTimeout(() => {
+                setActiveToast(null);
+                setToastAnimation("");
+                setBellAnimating(true);
+                setTimeout(() => setBellAnimating(false), 2400);
+              }, 400);
+            }}
+            onClick={() => {
+              const link = activeToast.link;
+              const id = activeToast.id;
+              markAsRead(id);
+              if (window.toastTimeout) clearTimeout(window.toastTimeout);
+              if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+              setActiveToast(null);
+              setToastAnimation("");
+              router.push(link);
+            }}
+          />
+        )}
+
+        {/* Simulator removed */}
 
         {/* Critical Emergency Interruption Modal Popup */}
         <EmergencyPopup
@@ -614,5 +781,107 @@ export default function DoctorLayout({ children }) {
         />
       </div>
     </DoctorContext.Provider>
+  );
+}
+
+// Swipeable Toast Component
+function NotificationToast({ toast, animation, onDismiss, onClick }) {
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startX = useRef(0);
+
+  const handleStart = (clientX) => {
+    setIsDragging(true);
+    startX.current = clientX;
+  };
+
+  const handleMove = (clientX) => {
+    if (!isDragging) return;
+    const offset = clientX - startX.current;
+    if (offset > 0) {
+      setDragOffset(offset);
+    }
+  };
+
+  const handleEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    if (dragOffset > 120) {
+      onDismiss();
+    } else {
+      setDragOffset(0);
+    }
+  };
+
+  const getIcon = () => {
+    switch (toast.type) {
+      case "referral":
+        return <Share2 className="w-5 h-5 text-primary" />;
+      case "labs":
+        return <Microscope className="w-5 h-5 text-secondary" />;
+      case "alerts":
+        return <AlertTriangle className="w-5 h-5 text-danger" />;
+      default:
+        return <Bell className="w-5 h-5 text-gray-400" />;
+    }
+  };
+
+  return (
+    <div
+      onMouseDown={(e) => handleStart(e.clientX)}
+      onMouseMove={(e) => handleMove(e.clientX)}
+      onMouseUp={handleEnd}
+      onMouseLeave={handleEnd}
+      onTouchStart={(e) => handleStart(e.touches[0].clientX)}
+      onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+      onTouchEnd={handleEnd}
+      onClick={onClick}
+      style={{
+        transform: isDragging ? `translateX(${dragOffset}px)` : undefined,
+        transition: isDragging ? "none" : "transform 0.2s ease-out",
+        cursor: isDragging ? "grabbing" : "pointer",
+      }}
+      className={`fixed top-20 right-5 max-w-sm w-96 bg-white/95 backdrop-blur-md border border-gray-100 rounded-2xl shadow-xl p-4 flex gap-3 z-50 select-none ${
+        animation === "slide-in" ? "animate-slide-in" : "animate-slide-out"
+      }`}
+    >
+      <div className="flex flex-col items-center gap-1">
+        <div className="p-2 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+          {getIcon()}
+        </div>
+        <span className={`w-2.5 h-2.5 rounded-full ${toast.dotColor === 'green' ? 'bg-success' : 'bg-danger'}`} />
+      </div>
+
+      <div className="flex-1 min-w-0 pr-4">
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
+            New {toast.type} Notification
+          </span>
+          <span className="text-[9px] text-gray-400 font-semibold">{toast.timestamp}</span>
+        </div>
+        <p className="text-xs font-semibold text-gray-800 mt-1 leading-normal line-clamp-2">
+          {toast.message}
+        </p>
+        <span className="text-[9px] font-semibold text-primary mt-2 block hover:underline">
+          Click to view →
+        </span>
+      </div>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDismiss();
+        }}
+        className="absolute top-2 right-2 text-gray-300 hover:text-gray-600 cursor-pointer p-1 rounded-full hover:bg-gray-50 transition-colors"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gray-150 rounded-l-md flex flex-col justify-between items-center py-1">
+        <div className="w-0.5 h-1 bg-gray-300 rounded" />
+        <div className="w-0.5 h-1 bg-gray-300 rounded" />
+        <div className="w-0.5 h-1 bg-gray-300 rounded" />
+      </div>
+    </div>
   );
 }

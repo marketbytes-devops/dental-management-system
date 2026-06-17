@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle, Check } from "lucide-react";
 
 export default function CheckInSymptomForm({ onSubmit, onBack }) {
   const [primaryReason, setPrimaryReason] = useState("routine");
@@ -132,7 +133,7 @@ export default function CheckInSymptomForm({ onSubmit, onBack }) {
                       : "border-gray-300 bg-white"
                   }`}
                 >
-                  {isChecked && <span className="text-[10px] leading-none">✓</span>}
+                  {isChecked && <Check className="w-3 h-3" />}
                 </div>
                 {symptom.label}
               </button>
@@ -159,7 +160,7 @@ export default function CheckInSymptomForm({ onSubmit, onBack }) {
       <div className="flex items-center justify-between p-3 bg-danger/5 border border-danger/20 rounded-xl">
         <div className="space-y-0.5">
           <span className="text-xs sm:text-sm font-bold text-danger flex items-center gap-1.5">
-            ⚠️ Is this a dental emergency?
+            <AlertTriangle className="w-4 h-4" /> Is this a dental emergency?
           </span>
           <p className="text-[11px] text-gray-500">
             Severe swelling, heavy bleeding, or uncontrolled pain.
@@ -187,7 +188,7 @@ export default function CheckInSymptomForm({ onSubmit, onBack }) {
         </button>
         <button
           type="submit"
-          className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl shadow-sm shadow-primary/30 hover:bg-primary/90 transition-colors"
+          className="px-6 py-2.5 bg-primary/5 border border-primary/20 text-primary text-sm font-semibold rounded-xl hover:bg-primary hover:text-white hover:border-primary shadow-sm transition-colors cursor-pointer"
         >
           Continue
         </button>

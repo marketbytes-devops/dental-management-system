@@ -1,5 +1,6 @@
 import { useState } from "react";
 import SignatureCanvas from "./signatureCanvas";
+import { PenTool, Keyboard } from "lucide-react";
 
 export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
   const [typedName, setTypedName] = useState("");
@@ -89,7 +90,7 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
                     : "border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                ✏️ Draw Signature
+                <PenTool className="w-4 h-4" /> Draw Signature
               </button>
               <button
                 type="button"
@@ -100,7 +101,7 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
                     : "border-gray-200 text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                ⌨️ Type Name
+                <Keyboard className="w-4 h-4" /> Type Name
               </button>
             </div>
 
@@ -129,7 +130,7 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
                     type="button"
                     onClick={() => handleSignSubmit(null)}
                     disabled={!typedName.trim()}
-                    className="px-5 py-2 bg-primary text-white text-xs font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+                    className="px-5 py-2 bg-primary/5 border border-primary/20 text-primary text-xs font-semibold rounded-lg hover:bg-primary hover:text-white hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     Apply Signature
                   </button>

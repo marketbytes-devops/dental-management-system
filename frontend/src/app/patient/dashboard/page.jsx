@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import LastVisitSummaryCard from "@/components/ui/patients/dashboard/lastVisitSummaryCard";
+import { Calendar, CreditCard, CheckSquare, Clock, Pill } from "lucide-react";
+import ToothIcon from "@/components/ui/ToothIcon";
 
 export default function PatientDashboardPage() {
 
@@ -46,9 +49,6 @@ export default function PatientDashboardPage() {
       {/* Page Header */}
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">My Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Welcome back, {currentPatient.name}. Here's your health summary.
-        </p>
       </div>
 
       {/* Row 1 — KPI Cards */}
@@ -91,16 +91,7 @@ export default function PatientDashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-warning/30 transition-colors">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-warning/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Active Prescriptions</p>
-            <h3 className="text-2xl font-bold text-gray-900">{activeRx.length}</h3>
-            <p className="text-xs text-warning font-medium mt-2">
-              Take medications on time
-            </p>
-          </div>
-        </div>
+        <LastVisitSummaryCard lastVisit={completedAppointments[0]} />
 
       </div>
 
@@ -108,14 +99,14 @@ export default function PatientDashboardPage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Link href="/patient/appointments" className="bg-primary text-white rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary/90 shadow-sm shadow-primary/30 transition-colors flex items-center justify-center gap-2">
-            📅 Book Appointment
+          <Link href="/patient/appointments" className="bg-primary/5 border border-primary/20 text-primary rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary hover:text-white hover:border-primary shadow-sm transition-colors flex items-center justify-center gap-2 group">
+            <Calendar className="w-4 h-4 text-primary group-hover:text-white transition-colors" /> Book Appointment
           </Link>
-          <Link href="/patient/bills" className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-            💳 Pay Outstanding Bill
+          <Link href="/patient/billing" className="bg-primary/5 border border-primary/20 text-primary rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary hover:text-white hover:border-primary shadow-sm transition-colors flex items-center justify-center gap-2 group">
+            <CreditCard className="w-4 h-4 text-primary group-hover:text-white transition-colors" /> Pay Outstanding Bill
           </Link>
-          <Link href="/patient/appointments?tab=checkin" className="bg-white text-gray-700 rounded-xl px-6 py-3 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-            ✅ Self Check-In
+          <Link href="/patient/check-in" className="bg-primary/5 border border-primary/20 text-primary rounded-xl px-6 py-3 text-sm font-medium hover:bg-primary hover:text-white hover:border-primary shadow-sm transition-colors flex items-center justify-center gap-2 group">
+            <CheckSquare className="w-4 h-4 text-primary group-hover:text-white transition-colors" /> Self Check-In
           </Link>
         </div>
       </div>
@@ -132,18 +123,18 @@ export default function PatientDashboardPage() {
                 <p className="text-sm font-semibold text-gray-900">{nextAppointment.treatment}</p>
                 <p className="text-xs text-gray-500 mt-1">{nextAppointment.doctor}</p>
                 <div className="flex items-center gap-3 mt-3">
-                  <span className="text-xs font-medium text-primary">📅 {nextAppointment.date}</span>
-                  <span className="text-xs font-medium text-primary">🕐 {nextAppointment.time}</span>
+                  <span className="text-xs font-medium text-primary flex items-center gap-1"><Calendar className="w-3 h-3" /> {nextAppointment.date}</span>
+                  <span className="text-xs font-medium text-primary flex items-center gap-1"><Clock className="w-3 h-3" /> {nextAppointment.time}</span>
                 </div>
                 <span className="inline-block mt-3 px-2.5 py-1 rounded-md text-xs font-semibold bg-success/10 text-success">
                   {nextAppointment.status}
                 </span>
               </div>
               <div className="flex gap-2">
-                <Link href="/patient/appointments?tab=checkin" className="flex-1 text-xs font-medium bg-primary text-white rounded-xl py-2 hover:bg-primary/90 transition-colors text-center">
+                <Link href="/patient/check-in" className="flex-1 text-xs font-medium bg-primary/5 border border-primary/20 text-primary rounded-xl py-2 hover:bg-primary hover:text-white hover:border-primary transition-colors text-center shadow-sm">
                   Check In
                 </Link>
-                <Link href="/patient/appointments" className="flex-1 text-xs font-medium border border-gray-200 text-gray-600 rounded-xl py-2 hover:bg-gray-50 transition-colors text-center">
+                <Link href="/patient/appointments" className="flex-1 text-xs font-medium bg-primary/5 border border-primary/20 text-primary rounded-xl py-2 hover:bg-primary hover:text-white hover:border-primary transition-colors text-center shadow-sm">
                   Reschedule
                 </Link>
               </div>
@@ -169,7 +160,7 @@ export default function PatientDashboardPage() {
             {completedAppointments.slice(0, 1).map(appt => (
               <div key={appt.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-lg">
-                  🦷
+                  <ToothIcon className="w-5 h-5 text-primary" strokeWidth={2} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">Visit Completed</p>
@@ -182,7 +173,7 @@ export default function PatientDashboardPage() {
             {activeRx.slice(0, 1).map(rx => (
               <div key={rx.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
                 <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center text-warning text-lg">
-                  💊
+                  <Pill className="w-5 h-5 text-warning" strokeWidth={2} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">Prescription Issued</p>
@@ -195,7 +186,7 @@ export default function PatientDashboardPage() {
             {pendingInvoices.slice(0, 1).map(inv => (
               <div key={inv.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
                 <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center text-danger text-lg">
-                  💳
+                  <CreditCard className="w-5 h-5 text-danger" strokeWidth={2} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">Invoice Pending</p>

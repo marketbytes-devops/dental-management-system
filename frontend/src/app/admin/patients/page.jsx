@@ -1,0 +1,309 @@
+"use client";
+
+import { useState } from "react";
+import { Users, Search, FolderOpen, Heart, ShieldAlert, Eye, X, History } from "lucide-react";
+
+export default function GlobalPatientDirectoryPage() {
+  const initialPatients = [
+    {
+      token: "#003",
+      name: "Sneha Joseph",
+      age: 27,
+      gender: "Female",
+      phone: "+91 91234 56789",
+      procedure: "Scaling & Extraction",
+      chiefComplaint: "Mobility in upper molar, general calculus accumulation.",
+      medicalAlerts: ["Bleeding disorder (Mild)"],
+      timeline: [
+        { date: "09-06-2026", note: "Diagnostic scaling completed. Cavity check on upper jaw.", type: "Procedure" },
+        { date: "09-06-2026", note: "Prescribed Chlorhexidine mouthwash and Vitamin K supplements.", type: "Prescription" }
+      ]
+    },
+    {
+      token: "#004",
+      name: "Rahul Kumar",
+      age: 32,
+      gender: "Male",
+      phone: "+91 98765 43210",
+      procedure: "Root Canal Treatment",
+      chiefComplaint: "Severe throbbing pain in the upper right back tooth (#16), sensitive to hot & cold.",
+      medicalAlerts: ["Hypertension (BP 140/90)", "Clindamycin Sensitivity"],
+      timeline: [
+        { date: "08-06-2026", note: "Diagnostic digital X-ray completed. Deep dentinal caries reaching pulp on #16.", type: "Diagnostic" },
+        { date: "08-06-2026", note: "Prescribed Ibuprofen 400mg for pain control.", type: "Prescription" },
+        { date: "09-06-2026", note: "RCT Stage 1 initiated. Pulpectomy completed on #16.", type: "Procedure" }
+      ]
+    },
+    {
+      token: "#005",
+      name: "Rohan Varma",
+      age: 28,
+      gender: "Male",
+      phone: "+91 88776 65544",
+      procedure: "Dental Filling",
+      chiefComplaint: "Food lodgement and mild sensitivity in lower left molar (#36).",
+      medicalAlerts: [],
+      timeline: [
+        { date: "09-06-2026", note: "Clinical exam shows Class I caries on #36 occlusal surface.", type: "Diagnostic" }
+      ]
+    },
+    {
+      token: "#006",
+      name: "Priya Nair",
+      age: 34,
+      gender: "Female",
+      phone: "+91 77665 54433",
+      procedure: "Scaling & Polishing",
+      chiefComplaint: "Bleeding gums during brushing, yellowish deposits.",
+      medicalAlerts: ["Pregnant (2nd Trimester)"],
+      timeline: [
+        { date: "10-06-2026", note: "Calculus deposits noted in lower anteriors.", type: "Diagnostic" }
+      ]
+    },
+    {
+      token: "#007",
+      name: "Deepak Kurian",
+      age: 45,
+      gender: "Male",
+      phone: "+91 66554 43322",
+      procedure: "Crown Fitting",
+      chiefComplaint: "Need permanent crown on tooth #46 following root canal therapy.",
+      medicalAlerts: ["Penicillin Allergy"],
+      timeline: [
+        { date: "01-06-2026", note: "RCT completed. Canal obturation satisfactory.", type: "Procedure" },
+        { date: "05-06-2026", note: "Tooth preparation done on #46. Elastomeric impression taken.", type: "Lab Order" }
+      ]
+    },
+    {
+      token: "#008",
+      name: "Meera Pillai",
+      age: 62,
+      gender: "Female",
+      phone: "+91 55443 32211",
+      procedure: "Tooth Extraction",
+      chiefComplaint: "Pain and mobility in lower right third molar (#48).",
+      medicalAlerts: ["Diabetic (Controlled)", "Taking Aspirin 75mg daily"],
+      timeline: [
+        { date: "09-06-2026", note: "OPG confirms Grade III mobility and bone loss around root of #48.", type: "Diagnostic" }
+      ]
+    }
+  ];
+
+  const [patients] = useState(initialPatients);
+  const [search, setSearch] = useState("");
+  const [filterProcedure, setFilterProcedure] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState(null);
+
+  const filteredPatients = patients.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
+                          p.phone.includes(search) || 
+                          p.token.toLowerCase().includes(search.toLowerCase());
+    const matchesProcedure = filterProcedure === "" || p.procedure.includes(filterProcedure);
+    return matchesSearch && matchesProcedure;
+  });
+
+  return (
+    <div className="space-y-6 text-left animate-fade-in relative">
+      {/* Header */}
+      <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Users className="w-6 h-6 text-primary" /> Patient Registry Directory
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">Global audit interface for EDR patient files and clinical chart history.</p>
+        </div>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white border border-gray-100 p-5 rounded-2xl shadow-sm">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Registered Patients</span>
+          <span className="text-3xl font-black text-gray-900 mt-2 block">{patients.length}</span>
+        </div>
+        <div className="bg-white border border-gray-100 p-5 rounded-2xl shadow-sm">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Medical Warnings</span>
+          <span className="text-3xl font-black text-rose-500 mt-2 block">
+            {patients.filter(p => p.medicalAlerts.length > 0).length}
+          </span>
+        </div>
+        <div className="bg-white border border-gray-100 p-5 rounded-2xl shadow-sm">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Major Procedures</span>
+          <span className="text-3xl font-black text-primary mt-2 block">
+            {patients.filter(p => p.procedure.includes("Root Canal") || p.procedure.includes("Extraction")).length}
+          </span>
+        </div>
+        <div className="bg-white border border-gray-100 p-5 rounded-2xl shadow-sm">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Avg Visit Count</span>
+          <span className="text-3xl font-black text-gray-700 mt-2 block">2.4</span>
+        </div>
+      </div>
+
+      {/* Directory Table Area */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        
+        {/* Filters Panel */}
+        <div className="p-4 border-b border-gray-100 bg-gray-50/25 flex flex-wrap gap-3">
+          <div className="relative flex items-center bg-white border border-gray-200 rounded-xl px-3 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary w-64 transition-all">
+            <Search className="w-4 h-4 text-gray-400 mr-2" />
+            <input
+              type="text"
+              placeholder="Search by Name, Phone, or Token..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-transparent border-none outline-none text-xs w-full placeholder:text-gray-400 text-gray-800"
+            />
+          </div>
+
+          <select 
+            value={filterProcedure} 
+            onChange={(e) => setFilterProcedure(e.target.value)}
+            className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-primary text-gray-700 cursor-pointer"
+          >
+            <option value="">All Procedures</option>
+            <option value="Scaling">Scaling & Cleaning</option>
+            <option value="Root Canal">Root Canal Treatment</option>
+            <option value="Filling">Filling</option>
+            <option value="Extraction">Extraction / Surgery</option>
+            <option value="Crown">Crown Fitting</option>
+          </select>
+        </div>
+
+        {/* Patients Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <th className="py-4.5 px-6">Token ID</th>
+                <th className="py-4.5 px-6">Patient Details</th>
+                <th className="py-4.5 px-6">Planned Treatment</th>
+                <th className="py-4.5 px-6">Clinical Alerts</th>
+                <th className="py-4.5 px-6 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 text-sm">
+              {filteredPatients.map(p => (
+                <tr key={p.token} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="py-4 px-6 font-mono text-xs text-gray-400 font-bold">{p.token}</td>
+                  <td className="py-4 px-6">
+                    <div className="font-bold text-gray-900">{p.name}</div>
+                    <div className="text-[10px] text-gray-500 font-semibold mt-0.5">{p.gender}, {p.age} years • {p.phone}</div>
+                  </td>
+                  <td className="py-4 px-6 text-xs text-primary font-bold">{p.procedure}</td>
+                  <td className="py-4 px-6">
+                    {p.medicalAlerts.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {p.medicalAlerts.map((alert, idx) => (
+                          <span key={idx} className="bg-red-50 text-rose-600 text-[9px] font-black uppercase px-2 py-0.5 rounded border border-rose-100">
+                            {alert}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">None</span>
+                    )}
+                  </td>
+                  <td className="py-4 px-6 text-right">
+                    <button
+                      onClick={() => setSelectedPatient(p)}
+                      className="px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
+                    >
+                      Audit Details
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filteredPatients.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="text-center py-12 text-gray-400 font-semibold italic">
+                    No registered patients found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      {/* Audit Modal Overlay */}
+      {selectedPatient && (
+        <div className="fixed inset-0 bg-gray-950/45 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-gray-150 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-primary/5 px-6 py-4 flex items-center justify-between border-b border-gray-100">
+              <div className="text-left">
+                <h3 className="font-extrabold text-lg text-gray-900">Patient Case Dossier</h3>
+                <p className="text-[10px] text-gray-500 font-bold uppercase mt-0.5">Audit Stamp & Clinical Logs</p>
+              </div>
+              <button 
+                onClick={() => setSelectedPatient(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full cursor-pointer outline-none"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-left">
+              {/* Profile card */}
+              <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl">
+                <div className="flex justify-between">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Patient Profile</span>
+                  <span className="text-[10px] font-mono font-bold bg-primary/10 text-primary px-2 rounded-full">{selectedPatient.token}</span>
+                </div>
+                <h4 className="text-base font-extrabold text-gray-900 mt-1">{selectedPatient.name}</h4>
+                <p className="text-xs text-gray-550 font-semibold mt-0.5">
+                  {selectedPatient.gender}, {selectedPatient.age} yrs • {selectedPatient.phone}
+                </p>
+              </div>
+
+              {/* Chief complaint & Procedure */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Chief Complaint</span>
+                <p className="text-xs text-gray-700 italic font-semibold">"{selectedPatient.chiefComplaint}"</p>
+              </div>
+
+              {/* Medical Alerts */}
+              {selectedPatient.medicalAlerts.length > 0 && (
+                <div className="space-y-1.5 p-3.5 bg-red-50 border border-red-100 rounded-xl text-xs text-rose-700 font-semibold">
+                  <span className="font-black block text-[10px] uppercase text-rose-600 mb-1">Medical Warnings</span>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedPatient.medicalAlerts.map((a, i) => (
+                      <span key={i} className="bg-rose-100 px-2 py-0.5 rounded text-[9px] font-black uppercase text-rose-700">{a}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Clinical Timeline History */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                  <History className="w-3.5 h-3.5" /> Clinical Timeline Audit
+                </span>
+                <div className="max-h-[160px] overflow-y-auto border border-gray-100 rounded-xl p-3.5 space-y-3 bg-gray-50/20">
+                  {selectedPatient.timeline.map((event, idx) => (
+                    <div key={idx} className="flex gap-3 text-left">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0"></div>
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400">{event.date} • {event.type}</p>
+                        <p className="text-xs text-gray-700 font-semibold mt-0.5">{event.note}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setSelectedPatient(null)}
+                className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-250 text-xs font-bold rounded-xl transition-colors cursor-pointer outline-none"
+              >
+                Close Audit View
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

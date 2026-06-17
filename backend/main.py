@@ -6,6 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 # from modules.auth.router import router as auth_router
 # from modules.doctor.router import router as doctor_router
 
+from database import Base, engine
+from modules.patient.models import PatientModel
+from modules.frontdesk.models import AppointmentModel
+from modules.lab.models import LabOrderModel
+from modules.doctor.models import DoctorModel
+from modules.admin.models import AdminModel
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+
 app = FastAPI(title="SmileCare Dental Management API", version="1.0.0")
 
 app.add_middleware(

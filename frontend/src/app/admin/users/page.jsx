@@ -19,25 +19,33 @@ export default function UsersPage() {
 
   const [users, setUsers] = useState([]);
 
-  // Load initial users from localStorage or fall back to default
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("smilecare_users");
-      if (saved) {
-        try {
-          setUsers(JSON.parse(saved));
-        } catch (e) {
-          console.error("Failed to parse saved users list", e);
-          setUsers(defaultUsers);
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/admin/users");
+      if (!response.ok) throw new Error("Failed to load users.");
+      const data = await response.json();
+      setUsers(data);
+    } catch (err) {
+      console.error(err);
+      // Resilient fallback to localStorage
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("smilecare_users");
+        if (saved) {
+          try {
+            setUsers(JSON.parse(saved));
+            return;
+          } catch (e) {}
         }
-      } else {
-        setUsers(defaultUsers);
-        localStorage.setItem("smilecare_users", JSON.stringify(defaultUsers));
       }
+      setUsers(defaultUsers);
     }
+  };
+
+  useEffect(() => {
+    fetchUsers();
   }, []);
 
-  const handleCreateUser = (newUser) => {
+  const handleCreateUser = async (newUser) => {
     const formattedRoles = newUser.roles.map(r => 
       r === "doctor" ? "Doctor" : 
       r === "lab" ? "Lab Tech" :
@@ -46,28 +54,30 @@ export default function UsersPage() {
       r.charAt(0).toUpperCase() + r.slice(1)
     );
 
-    const createdUser = {
-      id: users.length + 1,
-      name: newUser.name,
-      roles: formattedRoles,
-      specialties: newUser.specialties || [],
-      email: newUser.email,
-      status: "Active"
-    };
+    try {
+      const response = await fetch("http://localhost:8000/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newUser.name,
+          email: newUser.email,
+          password: newUser.password,
+          roles: formattedRoles,
+          specialties: newUser.specialties || []
+        })
+      });
 
-    const updatedUsers = [...users, createdUser];
-    setUsers(updatedUsers);
-    
-    if (typeof window !== "undefined") {
-      localStorage.setItem("smilecare_users", JSON.stringify(updatedUsers));
-      // Save last created receptionist/accountant roles for front desk testing
-      if (newUser.roles.includes("receptionist") || newUser.roles.includes("accountant")) {
-        localStorage.setItem("smilecare_active_user_roles", JSON.stringify(formattedRoles));
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to create user.");
       }
-    }
 
-    setToastMessage(`User "${newUser.name}" successfully registered!`);
-    setTimeout(() => setToastMessage(""), 3000);
+      setToastMessage(`User "${newUser.name}" successfully registered!`);
+      setTimeout(() => setToastMessage(""), 3000);
+      fetchUsers();
+    } catch (err) {
+      alert(err.message || "An error occurred while creating the user.");
+    }
   };
 
   const getRoleColor = (role) => {
@@ -81,16 +91,20 @@ export default function UsersPage() {
     }
   };
 
-  const toggleStatus = (id) => {
-    const updated = users.map(user => {
-      if (user.id === id) {
-        return { ...user, status: user.status === "Active" ? "Inactive" : "Active" };
+  const toggleStatus = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:8000/admin/users/${id}/status`, {
+        method: "PUT"
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to update status.");
       }
-      return user;
-    });
-    setUsers(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("smilecare_users", JSON.stringify(updated));
+
+      fetchUsers();
+    } catch (err) {
+      alert(err.message || "An error occurred while updating user status.");
     }
   };
 

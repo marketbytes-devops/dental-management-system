@@ -119,7 +119,7 @@ function LoginContent() {
     }
   }, [searchParams]);
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!emailId.trim() || !password) {
       setAuthError("Please fill in all credentials.");
@@ -130,42 +130,76 @@ function LoginContent() {
 
     const targetRoleKey = detectRole(emailId);
 
-    // Simulated short delay for professional feel
-    setTimeout(() => {
-      setIsSubmitting(false);
-      
-      if (!targetRoleKey) {
-        setAuthError("Invalid credentials. Try using one of the demo accounts listed below.");
-        return;
-      }
-
-      const creds = dummyCredentials[targetRoleKey];
-      
-      // Dynamic check for registered patient
-      const isRegisteredPatient = targetRoleKey === "patient" && typeof window !== "undefined" && 
-        (localStorage.getItem("patient_email") === emailId.trim() || localStorage.getItem("patient_phone") === emailId.trim());
-
-      const expectedPassword = isRegisteredPatient ? "patient123" : creds?.password;
-
-      if (password !== expectedPassword && password !== "patient123") {
-        setAuthError("Incorrect password for this account.");
-        return;
-      }
-
-      const targetRole = roles[targetRoleKey];
-      if (targetRole) {
-        if (targetRoleKey === "patient") {
-          localStorage.setItem("patient_token", "demo-token");
-          if (!localStorage.getItem("patient_name")) {
-            localStorage.setItem("patient_name", "Demo Patient");
-          }
-          if (!localStorage.getItem("patient_phone")) {
-            localStorage.setItem("patient_phone", emailId);
-          }
+    // 1. Patient flow (stays local-only as requested)
+    if (targetRoleKey === "patient") {
+      setTimeout(() => {
+        setIsSubmitting(false);
+        const registeredEmail = localStorage.getItem("patient_email");
+        const registeredPhone = localStorage.getItem("patient_phone");
+        
+        const isRegisteredPatient = (registeredEmail && emailId.trim().toLowerCase() === registeredEmail.toLowerCase()) ||
+          (registeredPhone && emailId.trim().replace(/\s+/g, "") === registeredPhone.replace(/\s+/g, ""));
+          
+        if (!isRegisteredPatient && emailId.trim().toLowerCase() !== "patient@example.com") {
+          setAuthError("Patient account not found. Please register first.");
+          return;
         }
-        router.push(targetRole.redirect);
+        
+        localStorage.setItem("patient_token", "demo-token");
+        if (!localStorage.getItem("patient_name")) {
+          localStorage.setItem("patient_name", isRegisteredPatient ? localStorage.getItem("patient_name") || "Registered Patient" : "Demo Patient");
+        }
+        if (!localStorage.getItem("patient_phone")) {
+          localStorage.setItem("patient_phone", emailId);
+        }
+        router.push("/patient/dashboard");
+      }, 800);
+      return;
+    }
+
+    // 2. Staff flow (hits real PostgreSQL database via backend API)
+    try {
+      const response = await fetch("http://localhost:8000/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: emailId.trim(),
+          password: password
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Invalid credentials.");
       }
-    }, 1200);
+
+      const userData = await response.json();
+      setIsSubmitting(false);
+
+      // Save user details to localStorage
+      localStorage.setItem("staff_user", JSON.stringify(userData));
+      
+      // Determine redirect path based on their roles
+      const userRoles = userData.roles.map(r => r.toLowerCase());
+      
+      let redirectPath = "/";
+      if (userRoles.includes("admin")) {
+        redirectPath = "/admin/dashboard";
+      } else if (userRoles.includes("doctor")) {
+        redirectPath = "/doctor/dashboard";
+      } else if (userRoles.includes("lab tech")) {
+        redirectPath = "/labtechnicians/dashboard";
+      } else if (userRoles.includes("receptionist")) {
+        redirectPath = "/frontdesk";
+      } else if (userRoles.includes("accountant")) {
+        redirectPath = userRoles.includes("receptionist") ? "/frontdesk" : "/frontdesk/accountant/dashboard";
+      }
+
+      router.push(redirectPath);
+    } catch (err) {
+      setIsSubmitting(false);
+      setAuthError(err.message || "Failed to log in. Please try again.");
+    }
   };
 
   return (

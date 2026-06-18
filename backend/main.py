@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Import routers from modules (to be implemented)
 # from modules.auth.router import router as auth_router
 # from modules.doctor.router import router as doctor_router
+from modules.patient.router import router as patient_router
 
 from database import Base, engine
 from modules.patient.models import PatientModel
@@ -26,6 +27,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(patient_router)
 
 @app.get("/")
 def read_root():

@@ -11,3 +11,5 @@ class PatientModel(Base):
     age = Column(Integer)
     gender = Column(String)
     phone = Column(String)
+    email = Column(String, unique=True, index=True)
+    password = Column(String)

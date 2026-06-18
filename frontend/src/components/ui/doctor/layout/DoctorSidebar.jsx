@@ -39,6 +39,20 @@ export default function DoctorSidebar({ isMinimized = false, onToggleMinimize })
   const pathname = usePathname();
   const { notifications = [] } = useDoctor();
   const [openWorkspace, setOpenWorkspace] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("staff_user");
+      if (saved) {
+        try {
+          setCurrentUser(JSON.parse(saved));
+        } catch (e) {
+          console.error("Failed to parse staff_user", e);
+        }
+      }
+    }
+  }, []);
 
   const getUnreadCount = (href) => {
     if (href === "/doctor/notifications") {
@@ -55,6 +69,18 @@ export default function DoctorSidebar({ isMinimized = false, onToggleMinimize })
       setOpenWorkspace(true);
     }
   }, [pathname]);
+
+  const filteredNavItems = doctorNavItems.map(item => {
+    if (item.name === "Clinical Workspace" && item.subItems) {
+      const userSpecs = currentUser?.specialties || [];
+      const filteredSubs = item.subItems.filter(sub => {
+        if (sub.name === "General Dentistry") return true;
+        return userSpecs.some(spec => spec.toLowerCase() === sub.name.toLowerCase());
+      });
+      return { ...item, subItems: filteredSubs };
+    }
+    return item;
+  });
 
   return (
     <div className={`bg-white border-r border-gray-200 flex flex-col h-full shadow-sm transition-all duration-300 relative ${isMinimized ? "w-16" : "w-64"}`}>
@@ -91,7 +117,7 @@ export default function DoctorSidebar({ isMinimized = false, onToggleMinimize })
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-3">Workspace</p>
           )}
           <ul className="space-y-1">
-            {doctorNavItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const hasSubItems = !!item.subItems;
               const isParentActive = hasSubItems && pathname.startsWith(item.href);
               const isActive = !hasSubItems && pathname === item.href;
@@ -228,13 +254,17 @@ export default function DoctorSidebar({ isMinimized = false, onToggleMinimize })
       {/* Profile Section Footer */}
       <div className={`p-4 border-t border-gray-100 shrink-0 bg-gray-50/50 flex ${isMinimized ? "justify-center" : "items-center"}`}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-primary shrink-0" title="Dr. Anoop Nair">
+          <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-primary shrink-0" title={currentUser?.name || "Dr. Anoop Nair"}>
             <Stethoscope className="w-5 h-5" />
           </div>
           {!isMinimized && (
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-bold text-gray-900 truncate">Dr. Anoop Nair</span>
-              <span className="text-[10px] text-gray-500 font-semibold truncate">MDS - Endodontist</span>
+              <span className="text-sm font-bold text-gray-900 truncate">{currentUser?.name || "Dr. Anoop Nair"}</span>
+              <span className="text-[10px] text-gray-500 font-semibold truncate">
+                {currentUser?.specialties && currentUser.specialties.length > 0 
+                  ? `MDS - ${currentUser.specialties.join(", ")}` 
+                  : "Specialist Dentist"}
+              </span>
             </div>
           )}
         </div>

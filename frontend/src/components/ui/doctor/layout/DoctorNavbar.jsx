@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useDoctor } from "@/app/doctor/layout";
 import { Search, Bell, HelpCircle, Sparkles, Share2, Microscope, AlertTriangle } from "lucide-react";
@@ -8,6 +8,20 @@ import { Search, Bell, HelpCircle, Sparkles, Share2, Microscope, AlertTriangle }
 export default function DoctorNavbar() {
   const { notifications = [], bellAnimating, markAsRead, patients } = useDoctor();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("staff_user");
+      if (saved) {
+        try {
+          setCurrentUser(JSON.parse(saved));
+        } catch (e) {
+          console.error("Failed to parse staff_user", e);
+        }
+      }
+    }
+  }, []);
 
   const hour = new Date().getHours();
   const greeting =
@@ -17,15 +31,21 @@ export default function DoctorNavbar() {
   const unreadCount = unreadNotifications.length;
   const bellDotColor = unreadCount > 0 ? unreadNotifications[0].dotColor : null;
 
+  const doctorFirstName = currentUser?.name ? currentUser.name.replace("Dr. ", "").split(" ")[0] : "Anoop";
+
   return (
     <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 shadow-sm z-10">
       {/* Greeting */}
       <div className="flex items-center gap-6">
         <div>
           <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-            {greeting}, Dr. Anoop <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+            {greeting}, Dr. {doctorFirstName} <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
           </p>
-          <p className="text-xs text-gray-500">Specialist Dentist</p>
+          <p className="text-xs text-gray-500">
+            {currentUser?.specialties && currentUser.specialties.length > 0 
+              ? currentUser.specialties.join(", ") 
+              : "Specialist Dentist"}
+          </p>
         </div>
 
         <div className="hidden md:flex items-center bg-gray-50 rounded-lg px-3 py-1.5 border border-gray-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary w-80 transition-all">

@@ -7,3 +7,15 @@ class PatientBase(BaseModel):
     age: int
     gender: str
     phone: str
+
+class PatientCreate(PatientBase):
+    email: str
+    password: str
+
+class PatientResponse(PatientBase):
+    id: int
+    token: str
+    email: str
+
+    class Config:
+        from_attributes = True

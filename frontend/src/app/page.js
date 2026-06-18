@@ -8,20 +8,15 @@ import {
   User, 
   Shield, 
   Microscope, 
-  Key, 
-  Phone, 
-  Lock, 
   Sparkles, 
-  Check, 
-  ArrowRight, 
-  ArrowLeft, 
+  ChevronRight,
+  UserPlus,
   Heart,
   Clock,
   CheckCircle2,
   X,
   Activity,
-  ChevronRight,
-  UserPlus
+  ArrowRight
 } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 
@@ -30,40 +25,6 @@ export default function Home() {
 
   // Booking Modal & Auth Gate States
   const [isAuthGateOpen, setIsAuthGateOpen] = useState(false);
-  const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [bookingStep, setBookingStep] = useState(1); // 1: Form, 2: Success
-  const [bookingData, setBookingData] = useState({
-    name: "",
-    phone: "",
-    service: "General Dentistry",
-    doctor: "Dr. Anoop Nair",
-    date: "",
-    slot: "Morning (09:00 AM - 12:00 PM)"
-  });
-
-  // Auth States
-  const [authView, setAuthView] = useState("role-select"); // role-select | login | register
-  const [selectedRole, setSelectedRole] = useState(null); // patient | doctor | lab | frontdesk | admin
-  const [loginData, setLoginData] = useState({ identifier: "", password: "" });
-  const [registerData, setRegisterData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    password: "",
-    age: "",
-    gender: "Female"
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [authError, setAuthError] = useState("");
-
-  // Dummy Credentials Constant
-  const dummyCredentials = {
-    patient: { identifier: "9876543210", password: "patient123" },
-    doctor: { identifier: "anoop.nair", password: "doctor123" },
-    lab: { identifier: "alen.john", password: "lab123" },
-    frontdesk: { identifier: "desk.executive", password: "desk123" },
-    admin: { identifier: "admin", password: "admin123" }
-  };
 
   // Role Constants
   const roles = {
@@ -109,94 +70,13 @@ export default function Home() {
     }
   };
 
-  // Handlers
-  const handleRoleSelect = (roleKey) => {
-    setSelectedRole(roleKey);
-    setAuthError("");
-    
-    // Auto-fill dummy credentials
-    const credentials = dummyCredentials[roleKey];
-    setLoginData({
-      identifier: credentials ? credentials.identifier : "",
-      password: credentials ? credentials.password : ""
-    });
-    
-    setAuthView("login");
-  };
-
-  const handleLoginSubmit = (e) => {
-    e.preventDefault();
-    if (!loginData.identifier || !loginData.password) {
-      setAuthError("Please fill in all credentials.");
-      return;
-    }
-    setAuthError("");
-    setIsSubmitting(true);
-
-    // Simulated short delay for professional feel
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const targetRole = roles[selectedRole];
-      if (targetRole) {
-        router.push(targetRole.redirect);
-      }
-    }, 1200);
-  };
-
-  const handleRegisterSubmit = (e) => {
-    e.preventDefault();
-    if (!registerData.name || !registerData.phone || !registerData.password) {
-      setAuthError("Please fill in Name, Phone, and Password.");
-      return;
-    }
-    setAuthError("");
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      setIsSubmitting(false);
-      // Simulate registering patient and sending to dashboard
-      router.push("/patient/dashboard");
-    }, 1200);
-  };
-
-  const handleBookingSubmit = (e) => {
-    e.preventDefault();
-    if (!bookingData.name || !bookingData.phone || !bookingData.date) {
-      alert("Please fill in Name, Phone, and Appointment Date.");
-      return;
-    }
-    setBookingStep(2); // Show success screen
-  };
-
-  const resetBooking = () => {
-    setBookingData({
-      name: "",
-      phone: "",
-      service: "General Dentistry",
-      doctor: "Dr. Anoop Nair",
-      date: "",
-      slot: "Morning (09:00 AM - 12:00 PM)"
-    });
-    setBookingStep(1);
-    setIsBookingOpen(false);
-  };
-
   // Trigger Auth Gate actions
   const triggerAuthGateAction = (action) => {
     setIsAuthGateOpen(false);
-    
-    // Scroll to portals element
-    const element = document.getElementById("portals");
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-    }
-
     if (action === "login") {
-      handleRoleSelect("patient");
+      router.push("/login?role=patient");
     } else if (action === "register") {
-      setSelectedRole("patient");
-      setAuthError("");
-      setAuthView("register");
+      router.push("/register");
     }
   };
 
@@ -205,10 +85,10 @@ export default function Home() {
       {/* Top Navbar */}
       <header className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 z-40 transition-all">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => { setAuthView("role-select"); setSelectedRole(null); }}>
+          <Link href="/" className="flex items-center gap-2 cursor-pointer">
             <ToothIcon className="w-8 h-8 text-primary" strokeWidth={2.5} />
             <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">SmileCare</span>
-          </div>
+          </Link>
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
             <a href="#features" className="hover:text-primary transition-colors">Features</a>
@@ -222,12 +102,12 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <a 
-              href="#portals" 
+            <Link 
+              href="/login" 
               className="bg-primary text-white text-xs font-semibold px-4.5 py-2 rounded-xl shadow-md shadow-primary/20 hover:bg-primary/95 transition-all hover:scale-102 cursor-pointer"
             >
               Portal Login
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -257,12 +137,12 @@ export default function Home() {
               >
                 <Calendar className="w-5 h-5" /> Book Appointment
               </button>
-              <a 
-                href="#portals"
+              <Link 
+                href="/login"
                 className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 font-bold px-7 py-3.5 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer"
               >
                 Portal Sign In <ChevronRight className="w-4 h-4" />
-              </a>
+              </Link>
             </div>
 
             {/* Quick Metrics */}
@@ -357,7 +237,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Portals / Authentication Area */}
+      {/* Portals Selector Area */}
       <section id="portals" className="py-20 bg-slate-900 px-6 text-white relative">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#0ea5e912_1px,transparent_1px),linear-gradient(to_bottom,#0ea5e912_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
 
@@ -384,241 +264,38 @@ export default function Home() {
           </div>
 
           <div className="lg:col-span-7 flex justify-center">
-            {/* Main Auth Card Container */}
+            {/* Role Gateway Container */}
             <div className="bg-slate-800 border border-slate-700/60 rounded-3xl p-8 shadow-2xl max-w-lg w-full min-h-[420px] flex flex-col justify-between">
               
-              {/* VIEW 1: ROLE SELECTION */}
-              {authView === "role-select" && (
-                <div className="space-y-6 w-full">
-                  <div>
-                    <h3 className="text-xl font-bold text-white">Select Your Portal</h3>
-                    <p className="text-slate-400 text-xs mt-1">Choose your workspace to sign in</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {Object.entries(roles).map(([key, role]) => {
-                      const Icon = role.icon;
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => handleRoleSelect(key)}
-                          className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-700/60 hover:bg-slate-700/40 text-left transition-all hover:scale-102 group cursor-pointer"
-                        >
-                          <div className="w-9 h-9 rounded-xl bg-slate-700 flex items-center justify-center text-slate-300 group-hover:text-primary group-hover:bg-slate-650 transition-colors shrink-0">
-                            <Icon className="w-4.5 h-4.5" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{role.name}</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{role.description}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+              <div className="space-y-6 w-full">
+                <div>
+                  <h3 className="text-xl font-bold text-white">Select Your Portal</h3>
+                  <p className="text-slate-400 text-xs mt-1">Choose your workspace to sign in</p>
                 </div>
-              )}
 
-              {/* VIEW 2: LOGIN CREDENTIALS */}
-              {authView === "login" && selectedRole && (
-                <div className="space-y-6 w-full">
-                  <div className="flex items-center justify-between">
-                    <button 
-                      onClick={() => setAuthView("role-select")}
-                      className="flex items-center gap-1 text-slate-400 hover:text-white text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      <ArrowLeft className="w-3.5 h-3.5" /> Back
-                    </button>
-                    <span className="text-[10px] font-bold tracking-widest uppercase bg-primary/20 text-primary px-2.5 py-1 rounded">
-                      {roles[selectedRole].name}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="text-xl font-bold">Sign In</h3>
-                    <p className="text-slate-400 text-xs mt-1">Enter your credentials or use the pre-filled demo account</p>
-                  </div>
-
-                  <form onSubmit={handleLoginSubmit} className="space-y-4">
-                    <div className="space-y-1 text-left">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                        {selectedRole === "patient" ? "Mobile Number" : "Username"}
-                      </label>
-                      <div className="relative flex items-center">
-                        <User className="absolute left-3.5 text-slate-500 w-4 h-4" />
-                        <input 
-                          type="text" 
-                          required
-                          value={loginData.identifier}
-                          onChange={(e) => setLoginData({ ...loginData, identifier: e.target.value })}
-                          placeholder={selectedRole === "patient" ? "+91 XXXXX XXXXX" : "eg. anoop.nair"}
-                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-primary transition-all text-white placeholder:text-slate-650"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1 text-left">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Password</label>
-                      <div className="relative flex items-center">
-                        <Lock className="absolute left-3.5 text-slate-500 w-4 h-4" />
-                        <input 
-                          type="password" 
-                          required
-                          value={loginData.password}
-                          onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                          placeholder="••••••••"
-                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-primary transition-all text-white placeholder:text-slate-650"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Pre-filled Demo Credentials Box */}
-                    <div className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-3 text-[10px] text-slate-400 space-y-1 text-left">
-                      <p className="font-bold text-slate-350">Demo Credentials (Pre-filled):</p>
-                      <p>Login ID: <span className="text-primary font-mono select-all font-bold">{dummyCredentials[selectedRole]?.identifier}</span></p>
-                      <p>Password: <span className="text-primary font-mono select-all font-bold">{dummyCredentials[selectedRole]?.password}</span></p>
-                    </div>
-
-                    {authError && <p className="text-danger text-[11px] font-semibold">{authError}</p>}
-
-                    <button 
-                      type="submit" 
-                      disabled={isSubmitting}
-                      className="w-full bg-primary text-white text-xs font-bold py-3 rounded-xl hover:bg-primary/95 transition-all shadow-md shadow-primary/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isSubmitting ? (
-                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                      ) : (
-                        <>Sign In <ArrowRight className="w-3.5 h-3.5" /></>
-                      )}
-                    </button>
-                  </form>
-
-                  {selectedRole === "patient" && (
-                    <div className="text-center pt-2">
-                      <button 
-                        onClick={() => { setAuthView("register"); setAuthError(""); }}
-                        className="text-xs text-secondary hover:text-secondary/80 font-bold transition-all cursor-pointer"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {Object.entries(roles).map(([key, role]) => {
+                    const Icon = role.icon;
+                    return (
+                      <Link
+                        key={key}
+                        href={`/login?role=${key}`}
+                        className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-700/60 hover:bg-slate-700/40 text-left transition-all hover:scale-102 group cursor-pointer"
                       >
-                        Not registered? Create Patient Account
-                      </button>
-                    </div>
-                  )}
+                        <div className="w-9 h-9 rounded-xl bg-slate-700 flex items-center justify-center text-slate-300 group-hover:text-primary group-hover:bg-slate-650 transition-colors shrink-0">
+                          <Icon className="w-4.5 h-4.5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{role.name}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{role.description}</p>
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
 
-              {/* VIEW 3: PATIENT REGISTRATION */}
-              {authView === "register" && (
-                <div className="space-y-5 w-full">
-                  <div className="flex items-center justify-between">
-                    <button 
-                      onClick={() => setAuthView("login")}
-                      className="flex items-center gap-1 text-slate-400 hover:text-white text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      <ArrowLeft className="w-3.5 h-3.5" /> Back to Login
-                    </button>
-                    <span className="text-[10px] font-bold tracking-widest uppercase bg-secondary/20 text-secondary px-2.5 py-1 rounded">
-                      Registration
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="text-xl font-bold">Create Patient Account</h3>
-                    <p className="text-slate-400 text-xs mt-1">Register to start managing your records and booking history</p>
-                  </div>
-
-                  <form onSubmit={handleRegisterSubmit} className="space-y-3 text-left">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Full Name</label>
-                        <input 
-                          type="text" 
-                          required
-                          value={registerData.name}
-                          onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
-                          placeholder="Rahul Kumar"
-                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2 px-3 text-xs outline-none focus:border-primary text-white"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Mobile Number</label>
-                        <input 
-                          type="text" 
-                          required
-                          value={registerData.phone}
-                          onChange={(e) => setRegisterData({ ...registerData, phone: e.target.value })}
-                          placeholder="+91 98765 43210"
-                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2 px-3 text-xs outline-none focus:border-primary text-white"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Email Address</label>
-                      <input 
-                        type="email" 
-                        required
-                        value={registerData.email}
-                        onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                        placeholder="rahul@example.com"
-                        className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2 px-3 text-xs outline-none focus:border-primary text-white"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Password</label>
-                        <input 
-                          type="password" 
-                          required
-                          value={registerData.password}
-                          onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                          placeholder="••••••"
-                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2 px-3 text-xs outline-none focus:border-primary text-white"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Age</label>
-                        <input 
-                          type="number" 
-                          required
-                          value={registerData.age}
-                          onChange={(e) => setRegisterData({ ...registerData, age: e.target.value })}
-                          placeholder="32"
-                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2 px-3 text-xs outline-none focus:border-primary text-white"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Gender</label>
-                        <select 
-                          value={registerData.gender}
-                          onChange={(e) => setRegisterData({ ...registerData, gender: e.target.value })}
-                          className="w-full bg-slate-900 border border-slate-750 rounded-xl py-2 px-2 text-xs outline-none focus:border-primary text-white"
-                        >
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {authError && <p className="text-danger text-[11px] font-semibold">{authError}</p>}
-
-                    <button 
-                      type="submit" 
-                      disabled={isSubmitting}
-                      className="w-full bg-secondary text-white text-xs font-bold py-2.5 rounded-xl hover:bg-secondary/95 transition-all shadow-md shadow-secondary/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
-                    >
-                      {isSubmitting ? (
-                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                      ) : (
-                        <>Register & Sign In <ArrowRight className="w-3.5 h-3.5" /></>
-                      )}
-                    </button>
-                  </form>
-                </div>
-              )}
-
-              {/* Dynamic Footer Information in Auth Card */}
+              {/* Secure Stamp */}
               <div className="border-t border-slate-700/60 pt-4 flex items-center gap-2 text-[10px] text-slate-500">
                 <Shield className="w-3.5 h-3.5 text-slate-400" />
                 <span>Protected by SmileCare HIPAA Compliance Standard.</span>

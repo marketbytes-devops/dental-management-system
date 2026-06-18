@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Users, Search, FolderOpen, Heart, ShieldAlert, Eye, X, History } from "lucide-react";
+import { Users, Search, X, History, CreditCard, User, Activity, AlertTriangle, FileText, IndianRupee } from "lucide-react";
 
 export default function GlobalPatientDirectoryPage() {
   const initialPatients = [
@@ -11,13 +11,21 @@ export default function GlobalPatientDirectoryPage() {
       age: 27,
       gender: "Female",
       phone: "+91 91234 56789",
+      bloodGroup: "O+",
       procedure: "Scaling & Extraction",
       chiefComplaint: "Mobility in upper molar, general calculus accumulation.",
       medicalAlerts: ["Bleeding disorder (Mild)"],
       timeline: [
         { date: "09-06-2026", note: "Diagnostic scaling completed. Cavity check on upper jaw.", type: "Procedure" },
         { date: "09-06-2026", note: "Prescribed Chlorhexidine mouthwash and Vitamin K supplements.", type: "Prescription" }
-      ]
+      ],
+      paymentDetails: {
+        totalBilled: 2500,
+        amountPaid: 2500,
+        balance: 0,
+        status: "Paid",
+        lastPaymentDate: "09-06-2026"
+      }
     },
     {
       token: "#004",
@@ -25,6 +33,7 @@ export default function GlobalPatientDirectoryPage() {
       age: 32,
       gender: "Male",
       phone: "+91 98765 43210",
+      bloodGroup: "B+",
       procedure: "Root Canal Treatment",
       chiefComplaint: "Severe throbbing pain in the upper right back tooth (#16), sensitive to hot & cold.",
       medicalAlerts: ["Hypertension (BP 140/90)", "Clindamycin Sensitivity"],
@@ -32,7 +41,14 @@ export default function GlobalPatientDirectoryPage() {
         { date: "08-06-2026", note: "Diagnostic digital X-ray completed. Deep dentinal caries reaching pulp on #16.", type: "Diagnostic" },
         { date: "08-06-2026", note: "Prescribed Ibuprofen 400mg for pain control.", type: "Prescription" },
         { date: "09-06-2026", note: "RCT Stage 1 initiated. Pulpectomy completed on #16.", type: "Procedure" }
-      ]
+      ],
+      paymentDetails: {
+        totalBilled: 8000,
+        amountPaid: 3000,
+        balance: 5000,
+        status: "Pending",
+        lastPaymentDate: "08-06-2026"
+      }
     },
     {
       token: "#005",
@@ -40,12 +56,20 @@ export default function GlobalPatientDirectoryPage() {
       age: 28,
       gender: "Male",
       phone: "+91 88776 65544",
+      bloodGroup: "A-",
       procedure: "Dental Filling",
       chiefComplaint: "Food lodgement and mild sensitivity in lower left molar (#36).",
       medicalAlerts: [],
       timeline: [
         { date: "09-06-2026", note: "Clinical exam shows Class I caries on #36 occlusal surface.", type: "Diagnostic" }
-      ]
+      ],
+      paymentDetails: {
+        totalBilled: 1500,
+        amountPaid: 1500,
+        balance: 0,
+        status: "Paid",
+        lastPaymentDate: "09-06-2026"
+      }
     },
     {
       token: "#006",
@@ -53,12 +77,20 @@ export default function GlobalPatientDirectoryPage() {
       age: 34,
       gender: "Female",
       phone: "+91 77665 54433",
+      bloodGroup: "AB+",
       procedure: "Scaling & Polishing",
       chiefComplaint: "Bleeding gums during brushing, yellowish deposits.",
       medicalAlerts: ["Pregnant (2nd Trimester)"],
       timeline: [
         { date: "10-06-2026", note: "Calculus deposits noted in lower anteriors.", type: "Diagnostic" }
-      ]
+      ],
+      paymentDetails: {
+        totalBilled: 1200,
+        amountPaid: 0,
+        balance: 1200,
+        status: "Pending",
+        lastPaymentDate: "N/A"
+      }
     },
     {
       token: "#007",
@@ -66,13 +98,21 @@ export default function GlobalPatientDirectoryPage() {
       age: 45,
       gender: "Male",
       phone: "+91 66554 43322",
+      bloodGroup: "O-",
       procedure: "Crown Fitting",
       chiefComplaint: "Need permanent crown on tooth #46 following root canal therapy.",
       medicalAlerts: ["Penicillin Allergy"],
       timeline: [
         { date: "01-06-2026", note: "RCT completed. Canal obturation satisfactory.", type: "Procedure" },
         { date: "05-06-2026", note: "Tooth preparation done on #46. Elastomeric impression taken.", type: "Lab Order" }
-      ]
+      ],
+      paymentDetails: {
+        totalBilled: 6000,
+        amountPaid: 3000,
+        balance: 3000,
+        status: "Partially Paid",
+        lastPaymentDate: "05-06-2026"
+      }
     },
     {
       token: "#008",
@@ -80,12 +120,20 @@ export default function GlobalPatientDirectoryPage() {
       age: 62,
       gender: "Female",
       phone: "+91 55443 32211",
+      bloodGroup: "B-",
       procedure: "Tooth Extraction",
       chiefComplaint: "Pain and mobility in lower right third molar (#48).",
       medicalAlerts: ["Diabetic (Controlled)", "Taking Aspirin 75mg daily"],
       timeline: [
         { date: "09-06-2026", note: "OPG confirms Grade III mobility and bone loss around root of #48.", type: "Diagnostic" }
-      ]
+      ],
+      paymentDetails: {
+        totalBilled: 2000,
+        amountPaid: 2000,
+        balance: 0,
+        status: "Paid",
+        lastPaymentDate: "09-06-2026"
+      }
     }
   ];
 
@@ -93,6 +141,7 @@ export default function GlobalPatientDirectoryPage() {
   const [search, setSearch] = useState("");
   const [filterProcedure, setFilterProcedure] = useState("");
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [activeTab, setActiveTab] = useState("profile"); // profile, clinical, payment
 
   const filteredPatients = patients.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -204,7 +253,10 @@ export default function GlobalPatientDirectoryPage() {
                   </td>
                   <td className="py-4 px-6 text-right">
                     <button
-                      onClick={() => setSelectedPatient(p)}
+                      onClick={() => {
+                        setSelectedPatient(p);
+                        setActiveTab("profile");
+                      }}
                       className="px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
                     >
                       Audit Details
@@ -232,7 +284,7 @@ export default function GlobalPatientDirectoryPage() {
             <div className="bg-primary/5 px-6 py-4 flex items-center justify-between border-b border-gray-100">
               <div className="text-left">
                 <h3 className="font-extrabold text-lg text-gray-900">Patient Case Dossier</h3>
-                <p className="text-[10px] text-gray-500 font-bold uppercase mt-0.5">Audit Stamp & Clinical Logs</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase mt-0.5">EMR & Clinical Chart</p>
               </div>
               <button 
                 onClick={() => setSelectedPatient(null)}
@@ -242,54 +294,135 @@ export default function GlobalPatientDirectoryPage() {
               </button>
             </div>
 
-            <div className="p-6 space-y-5 text-left">
-              {/* Profile card */}
-              <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl">
-                <div className="flex justify-between">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase">Patient Profile</span>
-                  <span className="text-[10px] font-mono font-bold bg-primary/10 text-primary px-2 rounded-full">{selectedPatient.token}</span>
-                </div>
-                <h4 className="text-base font-extrabold text-gray-900 mt-1">{selectedPatient.name}</h4>
-                <p className="text-xs text-gray-550 font-semibold mt-0.5">
-                  {selectedPatient.gender}, {selectedPatient.age} yrs • {selectedPatient.phone}
-                </p>
-              </div>
+            {/* Tabs */}
+            <div className="flex border-b border-gray-100 px-6 bg-gray-50/50">
+              <button 
+                onClick={() => setActiveTab("profile")}
+                className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors outline-none cursor-pointer ${activeTab === 'profile' ? 'border-primary text-primary' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+              >
+                <div className="flex items-center gap-1.5"><User className="w-4 h-4"/> Profile</div>
+              </button>
+              <button 
+                onClick={() => setActiveTab("clinical")}
+                className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors outline-none cursor-pointer ${activeTab === 'clinical' ? 'border-primary text-primary' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+              >
+                <div className="flex items-center gap-1.5"><Activity className="w-4 h-4"/> Clinical</div>
+              </button>
+              <button 
+                onClick={() => setActiveTab("payment")}
+                className={`py-3 px-4 text-xs font-bold border-b-2 transition-colors outline-none cursor-pointer ${activeTab === 'payment' ? 'border-primary text-primary' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+              >
+                <div className="flex items-center gap-1.5"><CreditCard className="w-4 h-4"/> Payment</div>
+              </button>
+            </div>
 
-              {/* Chief complaint & Procedure */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Chief Complaint</span>
-                <p className="text-xs text-gray-700 italic font-semibold">"{selectedPatient.chiefComplaint}"</p>
-              </div>
-
-              {/* Medical Alerts */}
-              {selectedPatient.medicalAlerts.length > 0 && (
-                <div className="space-y-1.5 p-3.5 bg-red-50 border border-red-100 rounded-xl text-xs text-rose-700 font-semibold">
-                  <span className="font-black block text-[10px] uppercase text-rose-600 mb-1">Medical Warnings</span>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedPatient.medicalAlerts.map((a, i) => (
-                      <span key={i} className="bg-rose-100 px-2 py-0.5 rounded text-[9px] font-black uppercase text-rose-700">{a}</span>
-                    ))}
+            <div className="p-6 h-[320px] overflow-y-auto">
+              {activeTab === 'profile' && (
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl">
+                    <div className="flex justify-between mb-4">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> Basic Details</span>
+                      <span className="text-[10px] font-mono font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full">{selectedPatient.token}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Full Name</span>
+                        <h4 className="text-sm font-extrabold text-gray-900 mt-0.5">{selectedPatient.name}</h4>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Contact</span>
+                        <h4 className="text-sm font-extrabold text-gray-900 mt-0.5">{selectedPatient.phone}</h4>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Demographics</span>
+                        <h4 className="text-sm font-extrabold text-gray-900 mt-0.5">{selectedPatient.gender}, {selectedPatient.age} yrs</h4>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Blood Group</span>
+                        <h4 className="text-sm font-extrabold text-gray-900 mt-0.5">{selectedPatient.bloodGroup}</h4>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Clinical Timeline History */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                  <History className="w-3.5 h-3.5" /> Clinical Timeline Audit
-                </span>
-                <div className="max-h-[160px] overflow-y-auto border border-gray-100 rounded-xl p-3.5 space-y-3 bg-gray-50/20">
-                  {selectedPatient.timeline.map((event, idx) => (
-                    <div key={idx} className="flex gap-3 text-left">
-                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0"></div>
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400">{event.date} • {event.type}</p>
-                        <p className="text-xs text-gray-700 font-semibold mt-0.5">{event.note}</p>
+              {activeTab === 'clinical' && (
+                <div className="space-y-5 animate-in fade-in duration-200 text-left">
+                  {/* Medical Alerts */}
+                  {selectedPatient.medicalAlerts.length > 0 && (
+                    <div className="space-y-1.5 p-3.5 bg-red-50 border border-red-100 rounded-xl text-xs text-rose-700 font-semibold">
+                      <span className="font-black flex items-center gap-1 text-[10px] uppercase text-rose-600 mb-1">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Medical Warnings
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedPatient.medicalAlerts.map((a, i) => (
+                          <span key={i} className="bg-rose-100 px-2 py-0.5 rounded text-[9px] font-black uppercase text-rose-700">{a}</span>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Chief complaint */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Chief Complaint</span>
+                    <p className="text-xs text-gray-700 italic font-semibold border-l-2 border-primary pl-3 py-1">"{selectedPatient.chiefComplaint}"</p>
+                  </div>
+
+                  {/* Clinical Timeline History */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                      <History className="w-3.5 h-3.5" /> Clinical Timeline Audit
+                    </span>
+                    <div className="border border-gray-100 rounded-xl p-3.5 space-y-3 bg-gray-50/20">
+                      {selectedPatient.timeline.map((event, idx) => (
+                        <div key={idx} className="flex gap-3 text-left">
+                          <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0"></div>
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400">{event.date} • {event.type}</p>
+                            <p className="text-xs text-gray-700 font-semibold mt-0.5">{event.note}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {activeTab === 'payment' && (
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl space-y-4">
+                    <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><IndianRupee className="w-3.5 h-3.5" /> Billing Overview</span>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                        selectedPatient.paymentDetails.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 
+                        selectedPatient.paymentDetails.status === 'Pending' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {selectedPatient.paymentDetails.status}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white p-3 rounded-lg border border-gray-100">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Total Billed</span>
+                        <h4 className="text-lg font-black text-gray-900 mt-1 flex items-center"><IndianRupee className="w-4 h-4 mr-0.5"/> {selectedPatient.paymentDetails.totalBilled}</h4>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-gray-100">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Amount Paid</span>
+                        <h4 className="text-lg font-black text-emerald-600 mt-1 flex items-center"><IndianRupee className="w-4 h-4 mr-0.5"/> {selectedPatient.paymentDetails.amountPaid}</h4>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-rose-100 bg-rose-50/30 col-span-2 flex justify-between items-center">
+                        <span className="text-xs font-bold text-rose-500 uppercase">Outstanding Balance</span>
+                        <h4 className="text-xl font-black text-rose-600 flex items-center"><IndianRupee className="w-5 h-5 mr-0.5"/> {selectedPatient.paymentDetails.balance}</h4>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">Last Payment Date</span>
+                      <p className="text-xs font-bold text-gray-700 mt-0.5">{selectedPatient.paymentDetails.lastPaymentDate}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end">
@@ -297,7 +430,7 @@ export default function GlobalPatientDirectoryPage() {
                 onClick={() => setSelectedPatient(null)}
                 className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-250 text-xs font-bold rounded-xl transition-colors cursor-pointer outline-none"
               >
-                Close Audit View
+                Close EMR View
               </button>
             </div>
           </div>

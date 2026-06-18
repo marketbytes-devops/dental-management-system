@@ -89,9 +89,19 @@ backend/smilecare.db
 backend/.env
 frontend/.env*
 
+# IDE / Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Debug logs
 npm-debug.log*
@@ -105,4 +115,5 @@ frontend/.pnpm-debug.log*
 
 # Vercel
 .vercel
+
 

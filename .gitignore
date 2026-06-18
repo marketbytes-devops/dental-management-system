@@ -25,6 +25,70 @@ build/
 *.pem
 
 # debug
+# ========================
+# Frontend (Next.js)
+# ========================
+
+# dependencies
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+!frontend/.yarn/patches
+!frontend/.yarn/plugins
+!frontend/.yarn/releases
+!frontend/.yarn/versions
+
+# testing
+frontend/coverage/
+
+# next.js
+frontend/.next/
+frontend/out/
+
+# production
+frontend/build/
+
+# vercel
+frontend/.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# ========================
+# Backend (Python/FastAPI)
+# ========================
+
+# virtual environment
+backend/venv/
+
+# byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# database
+backend/*.db
+
+# ========================
+# Common
+# ========================
+
+# env files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -39,3 +103,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# misc
+*.pem

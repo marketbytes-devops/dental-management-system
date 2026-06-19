@@ -87,6 +87,11 @@ function LoginContent() {
       }
     }
 
+    // Check admin username specifically
+    if (cleaned === "admin") {
+      return "admin";
+    }
+
     // Check localStorage registered patient
     if (typeof window !== "undefined") {
       const registeredEmail = localStorage.getItem("patient_email");
@@ -99,8 +104,22 @@ function LoginContent() {
       }
     }
 
-    // Fallback: If it contains '@', treat as patient
+    // If it ends with @smilecare.com, it is staff/admin/doctor/etc.
+    if (cleaned.endsWith("@smilecare.com")) {
+      if (cleaned.startsWith("admin")) return "admin";
+      if (cleaned.startsWith("doctor") || cleaned.startsWith("anoop")) return "doctor";
+      if (cleaned.startsWith("lab") || cleaned.startsWith("anita")) return "lab";
+      if (cleaned.startsWith("frontdesk") || cleaned.startsWith("sneha") || cleaned.startsWith("receptionist")) return "frontdesk";
+      return "admin"; // Default staff role badge
+    }
+
+    // Fallback: If it contains '@' and not @smilecare.com, treat as patient
     if (cleaned.includes("@")) {
+      return "patient";
+    }
+
+    // Fallback: if it's a 10 digit number, treat as patient
+    if (/^\d{10}$/.test(cleaned.replace(/\s+/g, ""))) {
       return "patient";
     }
 
@@ -120,8 +139,8 @@ function LoginContent() {
     setAuthError("");
     setIsSubmitting(true);
 
-    // 1. Try Staff flow first (hits real PostgreSQL database via backend API)
     try {
+      // Call the unified login endpoint
       const response = await fetch("http://localhost:8000/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -131,15 +150,60 @@ function LoginContent() {
         })
       });
 
-      if (response.ok) {
-        const userData = await response.json();
-        setIsSubmitting(false);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Invalid credentials.");
+      }
 
-        // Save user details to localStorage
-        localStorage.setItem("staff_user", JSON.stringify(userData));
+      const tokenData = await response.json();
+      const jwtToken = tokenData.access_token;
+      const roleType = tokenData.role_type;
+
+      if (roleType === "patient") {
+        // Fetch patient profile details using the JWT token
+        const profileResponse = await fetch("http://localhost:8000/patient/profile", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${jwtToken}`
+          }
+        });
+
+        if (!profileResponse.ok) {
+          throw new Error("Failed to fetch patient profile.");
+        }
+
+        const patientProfile = await profileResponse.json();
+        
+        // Save details to localStorage
+        localStorage.setItem("patient_jwt_token", jwtToken);
+        localStorage.setItem("patient_token", patientProfile.token);
+        localStorage.setItem("patient_name", patientProfile.name);
+        localStorage.setItem("patient_phone", patientProfile.phone);
+        localStorage.setItem("patient_email", patientProfile.email);
+
+        setIsSubmitting(false);
+        router.push("/patient/dashboard");
+      } else {
+        // Fetch staff profile details using the JWT token
+        const profileResponse = await fetch("http://localhost:8000/auth/profile", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${jwtToken}`
+          }
+        });
+
+        if (!profileResponse.ok) {
+          throw new Error("Failed to fetch staff profile.");
+        }
+
+        const staffProfile = await profileResponse.json();
+
+        // Save details to localStorage
+        localStorage.setItem("staff_jwt_token", jwtToken);
+        localStorage.setItem("staff_user", JSON.stringify(staffProfile));
         
         // Determine redirect path based on their roles
-        const userRoles = userData.roles.map(r => r.toLowerCase());
+        const userRoles = staffProfile.roles.map(r => r.toLowerCase());
         
         let redirectPath = "/";
         if (userRoles.includes("admin")) {
@@ -154,55 +218,9 @@ function LoginContent() {
           redirectPath = userRoles.includes("receptionist") ? "/frontdesk" : "/frontdesk/accountant/dashboard";
         }
 
+        setIsSubmitting(false);
         router.push(redirectPath);
-        return;
       }
-    } catch (err) {
-      console.warn("Staff login attempt failed:", err);
-    }
-
-    // 2. Fallback to Patient flow (connected to backend API)
-    try {
-      const response = await fetch("http://localhost:8000/patient/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: emailId.trim(),
-          password: password
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Invalid credentials.");
-      }
-
-      const tokenData = await response.json();
-      const jwtToken = tokenData.access_token;
-
-      // Fetch patient profile details using the JWT token
-      const profileResponse = await fetch("http://localhost:8000/patient/profile", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${jwtToken}`
-        }
-      });
-
-      if (!profileResponse.ok) {
-        throw new Error("Failed to fetch patient profile.");
-      }
-
-      const patientProfile = await profileResponse.json();
-      
-      // Save details to localStorage
-      localStorage.setItem("patient_jwt_token", jwtToken);
-      localStorage.setItem("patient_token", patientProfile.token);
-      localStorage.setItem("patient_name", patientProfile.name);
-      localStorage.setItem("patient_phone", patientProfile.phone);
-      localStorage.setItem("patient_email", patientProfile.email);
-
-      setIsSubmitting(false);
-      router.push("/patient/dashboard");
     } catch (err) {
       setIsSubmitting(false);
       setAuthError(err.message || "Failed to log in. Please try again.");

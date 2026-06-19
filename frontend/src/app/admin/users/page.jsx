@@ -9,6 +9,18 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [toastMessage, setToastMessage] = useState("");
+  const [editingUser, setEditingUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("staff_user");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    return null;
+  });
 
   const defaultUsers = [
     { id: 1, name: "Dr. Anoop Nair", roles: ["Doctor"], specialties: ["Endodontics"], email: "anoop@smilecare.com", status: "Active" },
@@ -43,6 +55,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCreateUser = async (newUser) => {
@@ -77,6 +90,69 @@ export default function UsersPage() {
       fetchUsers();
     } catch (err) {
       alert(err.message || "An error occurred while creating the user.");
+    }
+  };
+
+  const handleEditUser = async (id, updatedUser) => {
+    const formattedRoles = updatedUser.roles.map(r => 
+      r === "doctor" ? "Doctor" : 
+      r === "lab" ? "Lab Tech" :
+      r === "receptionist" ? "Receptionist" :
+      r === "accountant" ? "Accountant" :
+      r.charAt(0).toUpperCase() + r.slice(1)
+    );
+
+    try {
+      const payload = {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        roles: formattedRoles,
+        specialties: updatedUser.specialties || []
+      };
+
+      if (updatedUser.password) {
+        payload.password = updatedUser.password;
+      }
+
+      const response = await fetch(`http://localhost:8000/admin/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to update user.");
+      }
+
+      setToastMessage(`User "${updatedUser.name}" successfully updated!`);
+      setTimeout(() => setToastMessage(""), 3000);
+      fetchUsers();
+    } catch (err) {
+      alert(err.message || "An error occurred while updating the user.");
+    }
+  };
+
+  const handleDeleteUser = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the account for ${name}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:8000/admin/users/${id}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to delete user.");
+      }
+
+      setToastMessage(`User "${name}" successfully deleted!`);
+      setTimeout(() => setToastMessage(""), 3000);
+      fetchUsers();
+    } catch (err) {
+      alert(err.message || "An error occurred while deleting the user.");
     }
   };
 
@@ -133,7 +209,10 @@ export default function UsersPage() {
         </div>
         
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingUser(null);
+            setIsModalOpen(true);
+          }}
           className="px-4.5 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/95 transition-all shadow-md shadow-primary/10 flex items-center gap-1.5 cursor-pointer outline-none hover:scale-102"
         >
           <UserPlus className="w-4 h-4" /> Add New Staff
@@ -223,18 +302,33 @@ export default function UsersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4.5 text-right">
-                    <button 
-                      onClick={() => toggleStatus(user.id)}
-                      className="text-gray-400 hover:text-primary transition-colors px-2 text-xs font-bold cursor-pointer outline-none"
-                    >
-                      {user.status === "Active" ? "Deactivate" : "Activate"}
-                    </button>
-                    <button 
-                      onClick={() => alert(`Editing profile data for ${user.name}...`)}
-                      className="text-gray-400 hover:text-gray-600 transition-colors px-2 text-xs font-bold cursor-pointer outline-none"
-                    >
-                      Edit
-                    </button>
+                    <div className="flex justify-end items-center gap-2">
+                      {(!currentUser || currentUser.id !== user.id) && (
+                        <button 
+                          onClick={() => toggleStatus(user.id)}
+                          className="text-gray-400 hover:text-primary transition-colors px-1 text-xs font-bold cursor-pointer outline-none"
+                        >
+                          {user.status === "Active" ? "Deactivate" : "Activate"}
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => {
+                          setEditingUser(user);
+                          setIsModalOpen(true);
+                        }}
+                        className="text-gray-400 hover:text-gray-650 transition-colors px-1 text-xs font-bold cursor-pointer outline-none"
+                      >
+                        Edit
+                      </button>
+                      {(!currentUser || currentUser.id !== user.id) && (
+                        <button 
+                          onClick={() => handleDeleteUser(user.id, user.name)}
+                          className="text-rose-450 hover:text-rose-600 transition-colors px-1 text-xs font-bold cursor-pointer outline-none"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -254,8 +348,13 @@ export default function UsersPage() {
       {/* Creation Modal Overlay */}
       <CreateUserModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingUser(null);
+        }} 
         onCreateUser={handleCreateUser}
+        editUser={editingUser}
+        onEditUser={handleEditUser}
       />
     </div>
   );

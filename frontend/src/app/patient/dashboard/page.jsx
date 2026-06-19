@@ -1,17 +1,28 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import LastVisitSummaryCard from "@/components/ui/patients/dashboard/lastVisitSummaryCard";
 import { Calendar, CreditCard, CheckSquare, Clock, Pill } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 
 export default function PatientDashboardPage() {
+  const [patientName, setPatientName] = useState("Rahul Kumar");
+  const [patientId, setPatientId] = useState("PT-10042");
 
-  // Mock Data — replace with API calls when backend is ready
+  useEffect(() => {
+    const name = localStorage.getItem("patient_name");
+    const id = localStorage.getItem("patient_token");
+    setTimeout(() => {
+      if (name) setPatientName(name);
+      if (id) setPatientId(id);
+    }, 0);
+  }, []);
+
   const currentPatient = {
-    id: "PT-10042",
-    name: "Rahul Kumar",
-    avatar: "R",
+    id: patientId,
+    name: patientName,
+    avatar: patientName ? patientName.charAt(0).toUpperCase() : "P",
     dob: "1990-04-15",
     phone: "+91 98765 43210",
     email: "rahul@example.com",

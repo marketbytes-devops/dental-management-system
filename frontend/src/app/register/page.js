@@ -146,6 +146,24 @@ export default function RegisterPage() {
       localStorage.setItem("patient_phone", data.phone);
       localStorage.setItem("patient_email", data.email);
 
+      // Automatically log in to get JWT token
+      try {
+        const loginResponse = await fetch("http://localhost:8000/patient/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email.trim(),
+            password: formData.password
+          })
+        });
+        if (loginResponse.ok) {
+          const loginData = await loginResponse.json();
+          localStorage.setItem("patient_jwt_token", loginData.access_token);
+        }
+      } catch (loginErr) {
+        console.error("Auto-login failed:", loginErr);
+      }
+
       router.push("/patient/dashboard");
     } catch (err) {
       setAuthError(err.message || "Something went wrong.");

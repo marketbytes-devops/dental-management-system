@@ -14,7 +14,10 @@ def get_password_hash(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            hashed_password.encode("utf-8")
+        )
     except Exception:
         return False
 
@@ -71,3 +74,20 @@ def create_patient(db: Session, patient_in: PatientCreate) -> PatientModel:
     db.commit()
     db.refresh(db_patient)
     return db_patient
+
+
+def login_patient(db: Session, patient_in):
+    patient = db.query(PatientModel).filter(
+        PatientModel.email == patient_in.email
+    ).first()
+
+    if not patient:
+        return None
+
+    if not verify_password(
+        patient_in.password,
+        patient.password
+    ):
+        return None
+
+    return patient

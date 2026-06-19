@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ProfileHeader from "@/components/ui/patients/profile/profileHeader";
 import ProfileSection from "@/components/ui/patients/profile/profileSection";
 import InsuranceCard from "@/components/ui/patients/profile/insuranceCard";
 import EditProfileModal from "@/components/ui/patients/profile/editProfileModal";
 import { Pencil } from "lucide-react";
 
-// Mock Data
+// Mock Data as fallback
 const INITIAL_PATIENT = {
   id: "PT-10042",
   name: "Rahul Kumar",
@@ -25,6 +25,55 @@ const INITIAL_PATIENT = {
 export default function ProfilePage() {
   const [patient, setPatient] = useState(INITIAL_PATIENT);
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProfile() {
+      const token = localStorage.getItem("patient_jwt_token");
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const response = await fetch("http://localhost:8000/patient/profile", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          // Map backend schema to UI format
+          const formatted = {
+            id: data.token,
+            name: data.name,
+            avatar: data.name.charAt(0).toUpperCase(),
+            dob: data.date_of_birth || "Not specified",
+            phone: data.phone,
+            email: data.email,
+            memberSince: data.created_at ? new Date(data.created_at).toLocaleDateString("en-IN", {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            }) : "Recently",
+            registeredVia: "Online Portal",
+            address: [data.address_line1, data.city, data.state, data.pincode].filter(Boolean).join(", ") || "No address provided",
+            insurance: { provider: "Not provided", policyId: "N/A", coverage: 0 },
+            emergencyContact: {
+              name: data.emergency_contact_name || "Not specified",
+              relation: "Contact",
+              phone: data.emergency_contact_phone || "Not specified"
+            },
+          };
+          setPatient(formatted);
+        }
+      } catch (err) {
+        console.error("Failed to fetch profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProfile();
+  }, []);
 
   const handleSave = (updatedData) => {
     setPatient(updatedData);

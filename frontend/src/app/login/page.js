@@ -99,6 +99,11 @@ function LoginContent() {
       }
     }
 
+    // Fallback: If it contains '@', treat as patient
+    if (cleaned.includes("@")) {
+      return "patient";
+    }
+
     return null;
   };
 
@@ -117,30 +122,53 @@ function LoginContent() {
 
     const targetRoleKey = detectRole(emailId);
 
-    // 1. Patient flow (stays local-only as requested)
+    // 1. Patient flow (connected to backend API)
     if (targetRoleKey === "patient") {
-      setTimeout(() => {
+      try {
+        const response = await fetch("http://localhost:8000/patient/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: emailId.trim(),
+            password: password
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || "Invalid credentials.");
+        }
+
+        const tokenData = await response.json();
+        const jwtToken = tokenData.access_token;
+
+        // Fetch patient profile details using the JWT token
+        const profileResponse = await fetch("http://localhost:8000/patient/profile", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${jwtToken}`
+          }
+        });
+
+        if (!profileResponse.ok) {
+          throw new Error("Failed to fetch patient profile.");
+        }
+
+        const patientProfile = await profileResponse.json();
+        
+        // Save details to localStorage
+        localStorage.setItem("patient_jwt_token", jwtToken);
+        localStorage.setItem("patient_token", patientProfile.token);
+        localStorage.setItem("patient_name", patientProfile.name);
+        localStorage.setItem("patient_phone", patientProfile.phone);
+        localStorage.setItem("patient_email", patientProfile.email);
+
         setIsSubmitting(false);
-        const registeredEmail = localStorage.getItem("patient_email");
-        const registeredPhone = localStorage.getItem("patient_phone");
-        
-        const isRegisteredPatient = (registeredEmail && emailId.trim().toLowerCase() === registeredEmail.toLowerCase()) ||
-          (registeredPhone && emailId.trim().replace(/\s+/g, "") === registeredPhone.replace(/\s+/g, ""));
-          
-        if (!isRegisteredPatient && emailId.trim().toLowerCase() !== "patient@example.com") {
-          setAuthError("Patient account not found. Please register first.");
-          return;
-        }
-        
-        localStorage.setItem("patient_token", "demo-token");
-        if (!localStorage.getItem("patient_name")) {
-          localStorage.setItem("patient_name", isRegisteredPatient ? localStorage.getItem("patient_name") || "Registered Patient" : "Demo Patient");
-        }
-        if (!localStorage.getItem("patient_phone")) {
-          localStorage.setItem("patient_phone", emailId);
-        }
         router.push("/patient/dashboard");
-      }, 800);
+      } catch (err) {
+        setIsSubmitting(false);
+        setAuthError(err.message || "Failed to log in. Please try again.");
+      }
       return;
     }
 

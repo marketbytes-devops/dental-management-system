@@ -2,21 +2,43 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Import routers from modules (to be implemented)
-# from modules.auth.router import router as auth_router
-# from modules.doctor.router import router as doctor_router
+# Import routers from modules
+from modules.auth.router import router as auth_router
+from modules.admin.router import router as admin_router
 from modules.patient.router import router as patient_router
 
-from database import Base, engine
+from database import Base, engine, SessionLocal
+from modules.auth.models import UserModel
 from modules.patient.models import PatientModel
 from modules.frontdesk.models import AppointmentModel
 from modules.lab.models import LabOrderModel
 from modules.doctor.models import DoctorModel
 from modules.admin.models import AdminModel
+from modules.auth.service import hash_password
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+# Seed default admin user if not exists
+db = SessionLocal()
+try:
+    admin_exists = db.query(UserModel).filter(UserModel.username == "admin").first()
+    if not admin_exists:
+        admin_user = UserModel(
+            name="Admin User",
+            email="admin@smilecare.com",
+            username="admin",
+            password_hash=hash_password("admin123"),
+            roles=["Admin"],
+            specialties=[],
+            status="Active"
+        )
+        db.add(admin_user)
+        db.commit()
+except Exception as e:
+    print(f"Error seeding default admin: {e}")
+finally:
+    db.close()
 
 app = FastAPI(title="SmileCare Dental Management API", version="1.0.0")
 
@@ -28,6 +50,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(patient_router)
 
 @app.get("/")

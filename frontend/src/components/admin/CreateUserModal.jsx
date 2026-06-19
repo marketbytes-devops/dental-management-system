@@ -1,14 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Shield, Lock, User, Mail } from "lucide-react";
 
-export default function CreateUserModal({ isOpen, onClose, onCreateUser }) {
+export default function CreateUserModal({ isOpen, onClose, onCreateUser, editUser, onEditUser }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [selectedSpecialties, setSelectedSpecialties] = useState([]);
   const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      if (editUser) {
+        const mappedRoles = (editUser.roles || []).map((r) => {
+          const lower = r.toLowerCase();
+          if (lower === "lab tech") return "lab";
+          return lower;
+        });
+        const timer = setTimeout(() => {
+          setName(editUser.name || "");
+          setEmail(editUser.email || "");
+          setSelectedRoles(mappedRoles);
+          setSelectedSpecialties(editUser.specialties || []);
+          setPassword("");
+        }, 0);
+        return () => clearTimeout(timer);
+      } else {
+        const timer = setTimeout(() => {
+          setName("");
+          setEmail("");
+          setSelectedRoles([]);
+          setSelectedSpecialties([]);
+          setPassword("");
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isOpen, editUser]);
 
   if (!isOpen) return null;
 
@@ -41,7 +70,8 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) return;
+    if (!name.trim() || !email.trim()) return;
+    if (!editUser && !password.trim()) return;
     
     if (selectedRoles.length === 0) {
       alert("Please select at least one role/module access.");
@@ -53,13 +83,22 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser }) {
       return;
     }
 
-    onCreateUser({
+    const payload = {
       name: name.trim(),
       email: email.trim(),
       roles: selectedRoles,
-      specialties: selectedRoles.includes("doctor") ? selectedSpecialties : [],
-      password: password.trim()
-    });
+      specialties: selectedRoles.includes("doctor") ? selectedSpecialties : []
+    };
+
+    if (password.trim()) {
+      payload.password = password.trim();
+    }
+
+    if (editUser) {
+      onEditUser(editUser.id, payload);
+    } else {
+      onCreateUser(payload);
+    }
 
     // Reset fields
     setName("");
@@ -97,8 +136,8 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser }) {
         {/* Modal Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50/50">
           <div>
-            <h2 className="text-base font-extrabold text-gray-950">Register New Staff</h2>
-            <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Clinic Member Authentication</p>
+            <h2 className="text-base font-extrabold text-gray-950">{editUser ? "Edit Staff Member" : "Register New Staff"}</h2>
+            <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">{editUser ? "Update Authentication & Roles" : "Clinic Member Authentication"}</p>
           </div>
           <button 
             onClick={onClose}
@@ -231,21 +270,25 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser }) {
               </div>
             )}
 
-            {/* Temporary Password */}
+            {/* Password */}
             <div className="space-y-1">
-              <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Temporary Password</label>
+              <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                {editUser ? "New Password (Optional)" : "Temporary Password"}
+              </label>
               <div className="relative flex items-center bg-gray-50 rounded-xl border border-gray-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
                 <Lock className="absolute left-3 w-4 h-4 text-gray-400" />
                 <input 
                   type="password" 
-                  required
+                  required={!editUser}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-9 pr-3 py-2.5 bg-transparent text-xs text-gray-800 outline-none placeholder:text-gray-400 font-semibold"
-                  placeholder="••••••••"
+                  placeholder={editUser ? "Leave empty to keep current" : "••••••••"}
                 />
               </div>
-              <p className="text-[10px] text-gray-400 font-semibold mt-1">Forced credentials reset required on initial staff login.</p>
+              <p className="text-[10px] text-gray-400 font-semibold mt-1">
+                {editUser ? "Leave blank to keep existing password." : "Forced credentials reset required on initial staff login."}
+              </p>
             </div>
           </div>
 
@@ -262,7 +305,7 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser }) {
               type="submit"
               className="px-4.5 py-2 text-xs font-bold text-white bg-primary rounded-xl hover:bg-primary/95 transition-all shadow-md shadow-primary/15 cursor-pointer outline-none"
             >
-              Create User
+              {editUser ? "Save Changes" : "Create User"}
             </button>
           </div>
         </form>

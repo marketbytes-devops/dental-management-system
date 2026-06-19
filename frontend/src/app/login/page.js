@@ -18,11 +18,7 @@ import {
 import ToothIcon from "@/components/ui/ToothIcon";
 
 const dummyCredentials = {
-  patient: { identifier: "9876543210", email: "patient@example.com", password: "patient123" },
-  doctor: { identifier: "anoop.nair", email: "doctor@example.com", password: "doctor123" },
-  lab: { identifier: "alen.john", email: "lab@example.com", password: "lab123" },
-  frontdesk: { identifier: "desk.executive", email: "frontdesk@example.com", password: "desk123" },
-  admin: { identifier: "admin", email: "admin@example.com", password: "admin123" }
+  patient: { identifier: "9876543210", email: "patient@example.com", password: "patient123" }
 };
 
 const roles = {
@@ -108,16 +104,7 @@ function LoginContent() {
 
   const activeRole = detectRole(emailId);
 
-  useEffect(() => {
-    const roleParam = searchParams.get("role");
-    if (roleParam && roles[roleParam]) {
-      const credentials = dummyCredentials[roleParam];
-      if (credentials) {
-        setEmailId(credentials.email);
-        setPassword(credentials.password);
-      }
-    }
-  }, [searchParams]);
+  // Autofill disabled
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -287,36 +274,7 @@ function LoginContent() {
           </button>
         </form>
 
-        {/* Quick Demo Accounts */}
-        <div className="space-y-2.5 pt-4 border-t border-slate-700/60">
-          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider text-left">Quick Demo Accounts</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {Object.entries(roles).map(([key, role]) => {
-              const Icon = role.icon;
-              const creds = dummyCredentials[key];
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setEmailId(creds.email);
-                    setPassword(creds.password);
-                    setAuthError("");
-                  }}
-                  className="flex items-center gap-2 p-2 rounded-xl border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/45 text-left transition-all hover:scale-102 cursor-pointer group"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-slate-750 flex items-center justify-center text-slate-350 group-hover:text-primary group-hover:bg-slate-650 transition-colors shrink-0">
-                    <Icon className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-white truncate group-hover:text-primary transition-colors">{role.name}</p>
-                    <p className="text-[8px] text-slate-400 truncate font-mono">{creds.email}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {/* Quick Demo Accounts removed */}
 
         <div className="text-center pt-1">
           <Link 

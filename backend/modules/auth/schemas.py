@@ -14,6 +14,14 @@ class UserCreate(BaseModel):
     roles: List[str]
     specialties: List[str] = []
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    roles: Optional[List[str]] = None
+    specialties: Optional[List[str]] = None
+
+
 class UserResponse(BaseModel):
     id: int
     name: str

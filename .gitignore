@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 node_modules/
 .pnp
 .pnp.*
@@ -10,26 +10,25 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 coverage/
 
-# next.js
+# Next.js
 .next/
 out/
 
-# production
+# Production
 build/
 
-# misc
+# Misc
 .DS_Store
 *.pem
 
-# debug
 # ========================
 # Frontend (Next.js)
 # ========================
 
-# dependencies
+# Dependencies
 frontend/node_modules/
 frontend/.pnp
 frontend/.pnp.*
@@ -39,20 +38,20 @@ frontend/.yarn/*
 !frontend/.yarn/releases
 !frontend/.yarn/versions
 
-# testing
+# Testing
 frontend/coverage/
 
-# next.js
+# Next.js
 frontend/.next/
 frontend/out/
 
-# production
+# Production
 frontend/build/
 
-# vercel
+# Vercel
 frontend/.vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
@@ -60,48 +59,59 @@ next-env.d.ts
 # Backend (Python/FastAPI)
 # ========================
 
-# virtual environment
+# Virtual environment
 backend/venv/
 
-# byte-compiled / optimized files
+# Byte-compiled / optimized files
 __pycache__/
 *.py[cod]
 *$py.class
+backend/__pycache__/
+backend/**/*.pyc
 
-# distribution / packaging
+# Distribution / packaging
 *.egg-info/
 dist/
 build/
 
-# database
+# Database
 backend/*.db
+backend/smilecare.db
 
 # ========================
 # Common
 # ========================
 
-# env files
+# Env files
 .env
 .env.*
+.env*
+backend/.env
+frontend/.env*
+
+# IDE / Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# debug logs
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
+# Vercel
 .vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-# misc
-*.pem

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { Home, Calendar, User, CheckSquare, FileText, Pill, CreditCard, Bell, Settings } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 
@@ -55,6 +55,20 @@ function NavLinks() {
 }
 
 export default function PatientSidebar() {
+  const [patientName, setPatientName] = useState("Patient");
+  const [patientId, setPatientId] = useState("PT-XXXXX");
+
+  useEffect(() => {
+    const name = localStorage.getItem("patient_name");
+    const token = localStorage.getItem("patient_token");
+    setTimeout(() => {
+      if (name) setPatientName(name);
+      if (token) setPatientId(token);
+    }, 0);
+  }, []);
+
+  const avatarChar = patientName ? patientName.charAt(0).toUpperCase() : "P";
+
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm">
       {/* Brand */}
@@ -83,11 +97,11 @@ export default function PatientSidebar() {
       <div className="p-4 border-t border-gray-100 shrink-0 bg-gray-50/50">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-            R
+            {avatarChar}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold text-gray-900 truncate">Rahul Kumar</span>
-            <span className="text-[10px] text-gray-500 font-semibold truncate">PT-10042</span>
+            <span className="text-sm font-bold text-gray-900 truncate">{patientName}</span>
+            <span className="text-[10px] text-gray-500 font-semibold truncate">{patientId}</span>
           </div>
         </div>
       </div>

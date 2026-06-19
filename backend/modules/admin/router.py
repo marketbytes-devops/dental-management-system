@@ -56,6 +56,7 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found."
         )
+    assert user is not None
     
     user.status = "Inactive" if user.status == "Active" else "Active"
     db.commit()
@@ -70,6 +71,7 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found."
         )
+    assert user is not None
     
     if user_data.name is not None:
         user.name = user_data.name
@@ -116,6 +118,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found."
         )
+    assert user is not None
     db.delete(user)
     db.commit()
     return {"detail": "User deleted successfully."}

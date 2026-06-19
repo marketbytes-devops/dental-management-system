@@ -148,11 +148,11 @@ export default function RegisterPage() {
 
       // Automatically log in to get JWT token
       try {
-        const loginResponse = await fetch("http://localhost:8000/patient/login", {
+        const loginResponse = await fetch("http://localhost:8000/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            email: formData.email.trim(),
+            username: formData.email.trim(),
             password: formData.password
           })
         });

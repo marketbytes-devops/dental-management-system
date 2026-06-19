@@ -41,7 +41,3 @@ class PatientResponse(PatientBase):
 
     class Config:
         from_attributes = True
-
-class PatientLogin(BaseModel):
-    email: EmailStr
-    password: str

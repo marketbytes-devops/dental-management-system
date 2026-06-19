@@ -74,20 +74,3 @@ def create_patient(db: Session, patient_in: PatientCreate) -> PatientModel:
     db.commit()
     db.refresh(db_patient)
     return db_patient
-
-
-def login_patient(db: Session, patient_in):
-    patient = db.query(PatientModel).filter(
-        PatientModel.email == patient_in.email
-    ).first()
-
-    if not patient:
-        return None
-
-    if not verify_password(
-        patient_in.password,
-        patient.password
-    ):
-        return None
-
-    return patient

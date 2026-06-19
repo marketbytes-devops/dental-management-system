@@ -7,7 +7,13 @@ from modules.auth.models import UserModel
 from modules.auth.schemas import UserCreate, UserResponse, UserUpdate
 from modules.auth.service import hash_password
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+from dependencies import require_admin
+
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)]
+)
 
 @router.get("/users", response_model=List[UserResponse])
 def get_users(db: Session = Depends(get_db)):

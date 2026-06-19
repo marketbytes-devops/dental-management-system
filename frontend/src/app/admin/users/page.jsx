@@ -33,7 +33,10 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch("http://localhost:8000/admin/users");
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/admin/users", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
       if (!response.ok) throw new Error("Failed to load users.");
       const data = await response.json();
       setUsers(data);
@@ -68,9 +71,13 @@ export default function UsersPage() {
     );
 
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
       const response = await fetch("http://localhost:8000/admin/users", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           name: newUser.name,
           email: newUser.email,
@@ -114,9 +121,13 @@ export default function UsersPage() {
         payload.password = updatedUser.password;
       }
 
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
       const response = await fetch(`http://localhost:8000/admin/users/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(payload)
       });
 
@@ -139,8 +150,10 @@ export default function UsersPage() {
     }
 
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
       const response = await fetch(`http://localhost:8000/admin/users/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
 
       if (!response.ok) {
@@ -169,8 +182,10 @@ export default function UsersPage() {
 
   const toggleStatus = async (id) => {
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
       const response = await fetch(`http://localhost:8000/admin/users/${id}/status`, {
-        method: "PUT"
+        method: "PUT",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
 
       if (!response.ok) {

@@ -2,38 +2,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
-from .schemas import PatientCreate, PatientResponse, PatientLogin
+from .schemas import PatientCreate, PatientResponse
 from .models import PatientModel
-from .service import get_patient_by_phone, get_patient_by_email, create_patient, login_patient
-from shared.utils.auth import create_access_token
+from .service import get_patient_by_phone, get_patient_by_email, create_patient
 from dependencies import get_current_user
 
 
 router = APIRouter(prefix="/patient", tags=["patient"])
 
-
-@router.post("/login")
-def patient_login(patient_in: PatientLogin, db: Session = Depends(get_db)):
-
-    patient = login_patient(db, patient_in)
-
-    if not patient:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials"
-        )
-
-    token = create_access_token(
-        {
-            "patient_id": patient.id,
-            "email": patient.email
-        }
-    )
-
-    return {
-        "access_token": token,
-        "token_type": "bearer"
-    }
 
 @router.post("/register", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
 def register_patient(patient_in: PatientCreate, db: Session = Depends(get_db)):

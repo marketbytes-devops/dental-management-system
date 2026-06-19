@@ -120,59 +120,7 @@ function LoginContent() {
     setAuthError("");
     setIsSubmitting(true);
 
-    const targetRoleKey = detectRole(emailId);
-
-    // 1. Patient flow (connected to backend API)
-    if (targetRoleKey === "patient") {
-      try {
-        const response = await fetch("http://localhost:8000/patient/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: emailId.trim(),
-            password: password
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || "Invalid credentials.");
-        }
-
-        const tokenData = await response.json();
-        const jwtToken = tokenData.access_token;
-
-        // Fetch patient profile details using the JWT token
-        const profileResponse = await fetch("http://localhost:8000/patient/profile", {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${jwtToken}`
-          }
-        });
-
-        if (!profileResponse.ok) {
-          throw new Error("Failed to fetch patient profile.");
-        }
-
-        const patientProfile = await profileResponse.json();
-        
-        // Save details to localStorage
-        localStorage.setItem("patient_jwt_token", jwtToken);
-        localStorage.setItem("patient_token", patientProfile.token);
-        localStorage.setItem("patient_name", patientProfile.name);
-        localStorage.setItem("patient_phone", patientProfile.phone);
-        localStorage.setItem("patient_email", patientProfile.email);
-
-        setIsSubmitting(false);
-        router.push("/patient/dashboard");
-      } catch (err) {
-        setIsSubmitting(false);
-        setAuthError(err.message || "Failed to log in. Please try again.");
-      }
-      return;
-    }
-
-    // 2. Staff flow (hits real PostgreSQL database via backend API)
+    // 1. Try Staff flow first (hits real PostgreSQL database via backend API)
     try {
       const response = await fetch("http://localhost:8000/auth/login", {
         method: "POST",
@@ -183,34 +131,78 @@ function LoginContent() {
         })
       });
 
+      if (response.ok) {
+        const userData = await response.json();
+        setIsSubmitting(false);
+
+        // Save user details to localStorage
+        localStorage.setItem("staff_user", JSON.stringify(userData));
+        
+        // Determine redirect path based on their roles
+        const userRoles = userData.roles.map(r => r.toLowerCase());
+        
+        let redirectPath = "/";
+        if (userRoles.includes("admin")) {
+          redirectPath = "/admin/dashboard";
+        } else if (userRoles.includes("doctor")) {
+          redirectPath = "/doctor/dashboard";
+        } else if (userRoles.includes("lab tech")) {
+          redirectPath = "/labtechnicians/dashboard";
+        } else if (userRoles.includes("receptionist")) {
+          redirectPath = "/frontdesk";
+        } else if (userRoles.includes("accountant")) {
+          redirectPath = userRoles.includes("receptionist") ? "/frontdesk" : "/frontdesk/accountant/dashboard";
+        }
+
+        router.push(redirectPath);
+        return;
+      }
+    } catch (err) {
+      console.warn("Staff login attempt failed:", err);
+    }
+
+    // 2. Fallback to Patient flow (connected to backend API)
+    try {
+      const response = await fetch("http://localhost:8000/patient/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: emailId.trim(),
+          password: password
+        })
+      });
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || "Invalid credentials.");
       }
 
-      const userData = await response.json();
-      setIsSubmitting(false);
+      const tokenData = await response.json();
+      const jwtToken = tokenData.access_token;
 
-      // Save user details to localStorage
-      localStorage.setItem("staff_user", JSON.stringify(userData));
-      
-      // Determine redirect path based on their roles
-      const userRoles = userData.roles.map(r => r.toLowerCase());
-      
-      let redirectPath = "/";
-      if (userRoles.includes("admin")) {
-        redirectPath = "/admin/dashboard";
-      } else if (userRoles.includes("doctor")) {
-        redirectPath = "/doctor/dashboard";
-      } else if (userRoles.includes("lab tech")) {
-        redirectPath = "/labtechnicians/dashboard";
-      } else if (userRoles.includes("receptionist")) {
-        redirectPath = "/frontdesk";
-      } else if (userRoles.includes("accountant")) {
-        redirectPath = userRoles.includes("receptionist") ? "/frontdesk" : "/frontdesk/accountant/dashboard";
+      // Fetch patient profile details using the JWT token
+      const profileResponse = await fetch("http://localhost:8000/patient/profile", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${jwtToken}`
+        }
+      });
+
+      if (!profileResponse.ok) {
+        throw new Error("Failed to fetch patient profile.");
       }
 
-      router.push(redirectPath);
+      const patientProfile = await profileResponse.json();
+      
+      // Save details to localStorage
+      localStorage.setItem("patient_jwt_token", jwtToken);
+      localStorage.setItem("patient_token", patientProfile.token);
+      localStorage.setItem("patient_name", patientProfile.name);
+      localStorage.setItem("patient_phone", patientProfile.phone);
+      localStorage.setItem("patient_email", patientProfile.email);
+
+      setIsSubmitting(false);
+      router.push("/patient/dashboard");
     } catch (err) {
       setIsSubmitting(false);
       setAuthError(err.message || "Failed to log in. Please try again.");

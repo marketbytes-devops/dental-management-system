@@ -147,9 +147,16 @@ export default function DoctorNavbar() {
           <HelpCircle className="w-5 h-5" />
         </button>
         <div className="h-6 w-px bg-gray-200 mx-1"></div>
-        <Link href="/" className="flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer">
+        <button
+          onClick={() => {
+            localStorage.removeItem("staff_jwt_token");
+            localStorage.removeItem("staff_user");
+            window.location.href = "/login";
+          }}
+          className="flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-650 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer outline-none"
+        >
           Logout
-        </Link>
+        </button>
       </div>
     </header>
   );

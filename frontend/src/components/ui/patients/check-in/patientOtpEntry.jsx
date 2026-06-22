@@ -28,7 +28,7 @@ export default function PatientOtpEntry({ onVerify, onBack }) {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const enteredOtp = otp.join("");
     
@@ -37,12 +37,11 @@ export default function PatientOtpEntry({ onVerify, onBack }) {
       return;
     }
 
-    // Mock verification
-    if (enteredOtp === "123456" || enteredOtp === "111111") {
+    try {
       setError("");
-      onVerify();
-    } else {
-      setError("Invalid OTP. Please try again.");
+      await onVerify(enteredOtp);
+    } catch (err) {
+      setError(err.message || "Invalid verification code. Please try again.");
     }
   };
 

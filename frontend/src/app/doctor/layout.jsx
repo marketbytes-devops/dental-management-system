@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import DoctorSidebar from "@/components/ui/doctor/layout/DoctorSidebar";
 import DoctorNavbar from "@/components/ui/doctor/layout/DoctorNavbar";
+import AuthGuard from "@/components/AuthGuard";
 import EmergencyPopup from "@/components/ui/doctor/workspace/EmergencyPopup";
 import ToothIcon from "@/components/ui/ToothIcon";
 import { Share2, Microscope, AlertTriangle, Bell, X } from "lucide-react";
@@ -660,127 +661,129 @@ export default function DoctorLayout({ children }) {
   };
 
   return (
-    <DoctorContext.Provider value={{
-      patients,
-      activePatientToken,
-      setActivePatientToken,
-      viewingPatientToken,
-      setViewingPatientToken,
-      completedPatientHistory,
-      emergencyAlert,
-      setEmergencyAlert,
-      queue,
-      labOrders,
-      rxDraft,
-      notification,
-      showNotification,
-      activePatient,
-      viewingPatient,
-      hasUrgentInQueue,
-      handleCallPatient,
-      handleCallNextPatient,
-      handleViewPreviousPatient,
-      handleSkipPatient,
-      handleRequeuePatient,
-      handleRemovePatient,
-      simulateEmergencyCheckin,
-      handleMarkLabDelivered,
-      handleSubmitLabOrder,
-      handleToggleToothState,
-      handleAddDraftMedicine,
-      handleRemoveDraftMed,
-      handleSavePrescription,
-      handleSubmitDiagNote,
-      handleSubmitSpecialtyLog,
-      handleAddAlert,
-      referrals,
-      setReferrals,
-      handleReferPatient,
-      handleCompleteReferral,
-      sidebarMinimized,
-      setSidebarMinimized,
-      notifications,
-      activeToast,
-      toastAnimation,
-      bellAnimating,
-      triggerNotification,
-      markAsRead,
-      markAsUnread,
-      markAllAsRead,
-      setBellAnimating
-    }}>
-      <div className="flex h-screen bg-background overflow-hidden">
-        {/* Sidebar Nav */}
-        <DoctorSidebar isMinimized={sidebarMinimized} onToggleMinimize={() => setSidebarMinimized(!sidebarMinimized)} />
+    <AuthGuard allowedRoles={["doctor"]} type="staff">
+      <DoctorContext.Provider value={{
+        patients,
+        activePatientToken,
+        setActivePatientToken,
+        viewingPatientToken,
+        setViewingPatientToken,
+        completedPatientHistory,
+        emergencyAlert,
+        setEmergencyAlert,
+        queue,
+        labOrders,
+        rxDraft,
+        notification,
+        showNotification,
+        activePatient,
+        viewingPatient,
+        hasUrgentInQueue,
+        handleCallPatient,
+        handleCallNextPatient,
+        handleViewPreviousPatient,
+        handleSkipPatient,
+        handleRequeuePatient,
+        handleRemovePatient,
+        simulateEmergencyCheckin,
+        handleMarkLabDelivered,
+        handleSubmitLabOrder,
+        handleToggleToothState,
+        handleAddDraftMedicine,
+        handleRemoveDraftMed,
+        handleSavePrescription,
+        handleSubmitDiagNote,
+        handleSubmitSpecialtyLog,
+        handleAddAlert,
+        referrals,
+        setReferrals,
+        handleReferPatient,
+        handleCompleteReferral,
+        sidebarMinimized,
+        setSidebarMinimized,
+        notifications,
+        activeToast,
+        toastAnimation,
+        bellAnimating,
+        triggerNotification,
+        markAsRead,
+        markAsUnread,
+        markAllAsRead,
+        setBellAnimating
+      }}>
+        <div className="flex h-screen bg-background overflow-hidden">
+          {/* Sidebar Nav */}
+          <DoctorSidebar isMinimized={sidebarMinimized} onToggleMinimize={() => setSidebarMinimized(!sidebarMinimized)} />
 
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {/* Top Bar */}
-          <DoctorNavbar />
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            {/* Top Bar */}
+            <DoctorNavbar />
 
-          {/* Main workspace container */}
-          <main className="flex-1 overflow-y-auto p-6 bg-background">
-            {children}
-          </main>
-        </div>
-
-        {/* Global Toast */}
-        {notification && (
-          <div className="fixed bottom-5 right-5 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50 animate-bounce">
-            <ToothIcon className="w-5 h-5 text-primary shrink-0" />
-            <span className="text-sm font-semibold">{notification}</span>
+            {/* Main workspace container */}
+            <main className="flex-1 overflow-y-auto p-6 bg-background">
+              {children}
+            </main>
           </div>
-        )}
 
-        {/* Swipeable Notification Toast */}
-        {activeToast && (
-          <NotificationToast 
-            toast={activeToast} 
-            animation={toastAnimation}
-            onDismiss={() => {
-              if (window.toastTimeout) clearTimeout(window.toastTimeout);
-              if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
-              setToastAnimation("slide-out");
-              window.toastExitTimeout = setTimeout(() => {
+          {/* Global Toast */}
+          {notification && (
+            <div className="fixed bottom-5 right-5 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50 animate-bounce">
+              <ToothIcon className="w-5 h-5 text-primary shrink-0" />
+              <span className="text-sm font-semibold">{notification}</span>
+            </div>
+          )}
+
+          {/* Swipeable Notification Toast */}
+          {activeToast && (
+            <NotificationToast 
+              toast={activeToast} 
+              animation={toastAnimation}
+              onDismiss={() => {
+                if (window.toastTimeout) clearTimeout(window.toastTimeout);
+                if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+                setToastAnimation("slide-out");
+                window.toastExitTimeout = setTimeout(() => {
+                  setActiveToast(null);
+                  setToastAnimation("");
+                  setBellAnimating(true);
+                  setTimeout(() => setBellAnimating(false), 2400);
+                }, 400);
+              }}
+              onClick={() => {
+                const link = activeToast.link;
+                const id = activeToast.id;
+                markAsRead(id);
+                if (window.toastTimeout) clearTimeout(window.toastTimeout);
+                if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
                 setActiveToast(null);
                 setToastAnimation("");
-                setBellAnimating(true);
-                setTimeout(() => setBellAnimating(false), 2400);
-              }, 400);
-            }}
-            onClick={() => {
-              const link = activeToast.link;
-              const id = activeToast.id;
-              markAsRead(id);
-              if (window.toastTimeout) clearTimeout(window.toastTimeout);
-              if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
-              setActiveToast(null);
-              setToastAnimation("");
-              router.push(link);
+                router.push(link);
+              }}
+            />
+          )}
+
+          {/* Simulator removed */}
+
+          {/* Critical Emergency Interruption Modal Popup */}
+          <EmergencyPopup
+            emergencyAlert={emergencyAlert}
+            onAcknowledge={() => setEmergencyAlert(null)}
+            onConsultFirst={() => {
+              if (activePatientToken && !completedPatientHistory.includes(activePatientToken)) {
+                setCompletedPatientHistory(prev => [...prev, activePatientToken]);
+              }
+              setActivePatientToken(emergencyAlert.token);
+              setViewingPatientToken(emergencyAlert.token);
+              setQueue(prev => prev.filter(q => q.token !== emergencyAlert.token));
+              setEmergencyAlert(null);
+              setRxDraft([]);
+              showNotification(`Emergency patient ${emergencyAlert.name} called to chair.`);
+              router.push("/doctor/workspace");
             }}
           />
-        )}
-
-        {/* Simulator removed */}
-
-        {/* Critical Emergency Interruption Modal Popup */}
-        <EmergencyPopup
-          emergencyAlert={emergencyAlert}
-          onAcknowledge={() => setEmergencyAlert(null)}
-          onConsultFirst={() => {
-            if (activePatientToken && !completedPatientHistory.includes(activePatientToken)) {
-              setCompletedPatientHistory(prev => [...prev, activePatientToken]);
-            }
-            setActivePatientToken(emergencyAlert.token);
-            setViewingPatientToken(emergencyAlert.token);
-            setQueue(prev => prev.filter(q => q.token !== emergencyAlert.token));
-            setEmergencyAlert(null);
-            setRxDraft([]);
-            showNotification(`Emergency patient ${emergencyAlert.name} called to chair.`);
-            router.push("/doctor/workspace");
-          }}
-        />
-      </div>
-    </DoctorContext.Provider>
+        </div>
+      </DoctorContext.Provider>
+    </AuthGuard>
   );
 }
 

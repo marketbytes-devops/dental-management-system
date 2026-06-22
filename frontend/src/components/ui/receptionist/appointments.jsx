@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Search, UserCheck, AlertTriangle } from "lucide-react";
+import { Calendar, Search, UserCheck, AlertTriangle, Clock } from "lucide-react";
 
 export default function ReceptionistAppointments() {
   const [appointments, setAppointments] = useState([]);

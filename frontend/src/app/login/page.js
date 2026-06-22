@@ -72,63 +72,7 @@ function LoginContent() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authError, setAuthError] = useState("");
-
-  const detectRole = (emailOrId) => {
-    if (!emailOrId) return null;
-    const cleaned = emailOrId.trim().toLowerCase();
-    
-    // Check dummy credentials
-    for (const [roleKey, creds] of Object.entries(dummyCredentials)) {
-      if (
-        cleaned === creds.identifier.toLowerCase() ||
-        cleaned === creds.email.toLowerCase()
-      ) {
-        return roleKey;
-      }
-    }
-
-    // Check admin username specifically
-    if (cleaned === "admin") {
-      return "admin";
-    }
-
-    // Check localStorage registered patient
-    if (typeof window !== "undefined") {
-      const registeredEmail = localStorage.getItem("patient_email");
-      const registeredPhone = localStorage.getItem("patient_phone");
-      if (
-        (registeredEmail && cleaned === registeredEmail.toLowerCase()) ||
-        (registeredPhone && cleaned === registeredPhone.replace(/\s+/g, ""))
-      ) {
-        return "patient";
-      }
-    }
-
-    // If it ends with @smilecare.com, it is staff/admin/doctor/etc.
-    if (cleaned.endsWith("@smilecare.com")) {
-      if (cleaned.startsWith("admin")) return "admin";
-      if (cleaned.startsWith("doctor") || cleaned.startsWith("anoop")) return "doctor";
-      if (cleaned.startsWith("lab") || cleaned.startsWith("anita")) return "lab";
-      if (cleaned.startsWith("frontdesk") || cleaned.startsWith("sneha") || cleaned.startsWith("receptionist")) return "frontdesk";
-      return "admin"; // Default staff role badge
-    }
-
-    // Fallback: If it contains '@' and not @smilecare.com, treat as patient
-    if (cleaned.includes("@")) {
-      return "patient";
-    }
-
-    // Fallback: if it's a 10 digit number, treat as patient
-    if (/^\d{10}$/.test(cleaned.replace(/\s+/g, ""))) {
-      return "patient";
-    }
-
-    return null;
-  };
-
-  const activeRole = detectRole(emailId);
-
-  // Autofill disabled
+  const [portalType, setPortalType] = useState(null); // 'patient', 'staff', or null
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -158,6 +102,14 @@ function LoginContent() {
       const tokenData = await response.json();
       const jwtToken = tokenData.access_token;
       const roleType = tokenData.role_type;
+
+      // Validate portal type selection matches the account type
+      if (roleType === "patient" && portalType === "staff") {
+        throw new Error("This is a Patient account. Please log in through the Patient Portal.");
+      }
+      if (roleType === "staff" && portalType === "patient") {
+        throw new Error("This is a Staff account. Please log in through the Staff Portal.");
+      }
 
       if (roleType === "patient") {
         // Fetch patient profile details using the JWT token
@@ -227,41 +179,109 @@ function LoginContent() {
     }
   };
 
+  if (!portalType) {
+    return (
+      <div className="w-full max-w-xl bg-slate-800/95 border border-slate-700/80 rounded-3xl p-8 shadow-2xl backdrop-blur-md flex flex-col justify-between min-h-[460px] animate-fadeIn">
+        <div className="space-y-6 w-full">
+          <div className="flex items-center justify-between">
+            <Link 
+              href="/"
+              className="flex items-center gap-1 text-slate-450 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Home
+            </Link>
+          </div>
+
+          <div className="text-center space-y-2">
+            <h3 className="text-2xl font-extrabold text-white tracking-tight flex items-center justify-center gap-2">
+              <Sparkles className="w-6 h-6 text-primary" /> Welcome to SmileCare
+            </h3>
+            <p className="text-slate-400 text-xs font-semibold">Please select your portal to continue</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+            {/* Patient Option Card */}
+            <button
+              onClick={() => {
+                setPortalType("patient");
+                setAuthError("");
+              }}
+              className="group flex flex-col items-center text-center p-6 bg-slate-900/60 hover:bg-slate-900 border border-slate-700/50 hover:border-sky-500/80 rounded-2xl transition-all duration-300 cursor-pointer shadow-lg hover:shadow-sky-500/10 text-left"
+            >
+              <div className="p-4 bg-sky-500/10 group-hover:bg-sky-500/20 text-sky-400 rounded-2xl transition-all duration-300 mb-4 flex items-center justify-center">
+                <User className="w-8 h-8" />
+              </div>
+              <h4 className="text-lg font-bold text-white mb-2 group-hover:text-sky-400 transition-colors text-center w-full">Patient Portal</h4>
+              <p className="text-slate-400 text-xs leading-relaxed text-center">
+                Access your dental history, view prescriptions, book appointments, and check billing statements.
+              </p>
+            </button>
+
+            {/* Staff Option Card */}
+            <button
+              onClick={() => {
+                setPortalType("staff");
+                setAuthError("");
+              }}
+              className="group flex flex-col items-center text-center p-6 bg-slate-900/60 hover:bg-slate-900 border border-slate-700/50 hover:border-indigo-500/80 rounded-2xl transition-all duration-300 cursor-pointer shadow-lg hover:shadow-indigo-500/10 text-left"
+            >
+              <div className="p-4 bg-indigo-500/10 group-hover:bg-indigo-500/20 text-indigo-400 rounded-2xl transition-all duration-300 mb-4 flex items-center justify-center">
+                <Shield className="w-8 h-8" />
+              </div>
+              <h4 className="text-lg font-bold text-white mb-2 group-hover:text-indigo-400 transition-colors text-center w-full">Staff Portal</h4>
+              <p className="text-slate-400 text-xs leading-relaxed text-center">
+                Access practitioner dashboards, manage receptionist desk, patient queues, and execute billing audits.
+              </p>
+            </button>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-700/60 pt-4 mt-6 flex items-center gap-2 text-[10px] text-slate-500 justify-center">
+          <Shield className="w-3.5 h-3.5 text-slate-400" />
+          <span>Protected by SmileCare HIPAA Compliance Standard.</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full max-w-lg bg-slate-800/95 border border-slate-700/80 rounded-3xl p-8 shadow-2xl backdrop-blur-md flex flex-col justify-between min-h-[460px]">
-      
-      <div className="space-y-6 w-full animate-fadeIn">
+    <div className="w-full max-w-lg bg-slate-800/95 border border-slate-700/80 rounded-3xl p-8 shadow-2xl backdrop-blur-md flex flex-col justify-between min-h-[460px] animate-fadeIn">
+      <div className="space-y-6 w-full">
         <div className="flex items-center justify-between">
-          <Link 
-            href="/"
-            className="flex items-center gap-1 text-slate-450 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+          <button 
+            onClick={() => {
+              setPortalType(null);
+              setEmailId("");
+              setPassword("");
+              setAuthError("");
+            }}
+            className="flex items-center gap-1 text-slate-450 hover:text-white text-xs font-bold transition-colors cursor-pointer bg-transparent border-none outline-none"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to Home
-          </Link>
-          {activeRole && (
-            <span className={`text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded ${
-              activeRole === "patient" ? "bg-sky-500/20 text-sky-400" :
-              activeRole === "doctor" ? "bg-teal-500/20 text-teal-400" :
-              activeRole === "lab" ? "bg-amber-500/20 text-amber-400" :
-              activeRole === "frontdesk" ? "bg-green-500/20 text-green-400" :
-              "bg-indigo-500/20 text-indigo-400"
-            }`}>
-              {roles[activeRole].name} Portal
-            </span>
-          )}
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to Selection
+          </button>
+          <span className={`text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded ${
+            portalType === "patient" ? "bg-sky-500/20 text-sky-400" : "bg-indigo-500/20 text-indigo-400"
+          }`}>
+            {portalType === "patient" ? "Patient" : "Staff"} Portal
+          </span>
         </div>
 
         <div>
           <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" /> Portal Login
+            <Sparkles className="w-5 h-5 text-primary" /> {portalType === "patient" ? "Patient Login" : "Staff Login"}
           </h3>
-          <p className="text-slate-400 text-xs mt-1 font-medium">Enter your credentials or choose a quick login option below</p>
+          <p className="text-slate-400 text-xs mt-1 font-medium">
+            {portalType === "patient" 
+              ? "Enter your registered email address or phone number to sign in" 
+              : "Enter your clinic credentials or username to sign in"
+            }
+          </p>
         </div>
 
         <form onSubmit={handleLoginSubmit} className="space-y-4">
           <div className="space-y-1 text-left">
             <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              Email Address or Username
+              {portalType === "patient" ? "Phone Number or Email" : "Username or Email"}
             </label>
             <div className="relative flex items-center">
               <Mail className="absolute left-3.5 text-slate-500 w-4 h-4" />
@@ -273,7 +293,7 @@ function LoginContent() {
                   setEmailId(e.target.value);
                   setAuthError("");
                 }}
-                placeholder="eg. doctor@example.com or anoop.nair"
+                placeholder={portalType === "patient" ? "eg. 9876543210 or patient@example.com" : "eg. doctor@example.com or admin"}
                 className="w-full bg-slate-900 border border-slate-700/60 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-primary transition-all text-white placeholder:text-slate-650"
               />
             </div>
@@ -312,16 +332,16 @@ function LoginContent() {
           </button>
         </form>
 
-        {/* Quick Demo Accounts removed */}
-
-        <div className="text-center pt-1">
-          <Link 
-            href="/register"
-            className="text-xs text-secondary hover:text-secondary/80 font-bold transition-all cursor-pointer"
-          >
-            Not registered? Create Patient Account
-          </Link>
-        </div>
+        {portalType === "patient" && (
+          <div className="text-center pt-1 animate-fadeIn">
+            <Link 
+              href="/register"
+              className="text-xs text-secondary hover:text-secondary/80 font-bold transition-all cursor-pointer"
+            >
+              Not registered? Create Patient Account
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="border-t border-slate-700/60 pt-4 mt-4 flex items-center gap-2 text-[10px] text-slate-500">

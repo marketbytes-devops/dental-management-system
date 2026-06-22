@@ -1,5 +1,5 @@
 # models.py - database table definitions
-from sqlalchemy import Column, Integer, String, JSON
+from sqlalchemy import Column, Integer, String, JSON, ForeignKey
 from database import Base
 
 class DoctorModel(Base):
@@ -9,6 +9,14 @@ class DoctorModel(Base):
     name = Column(String, index=True)
     specialty = Column(String)
     status = Column(String, default="Active")
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    dob = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    licence_id = Column(String, nullable=True)
+    chair_setup = Column(String, nullable=True)
+    board = Column(String, nullable=True)
+
 
 class ReferralModel(Base):
     __tablename__ = "referrals"

@@ -1,147 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Users, Search, X, History, CreditCard, User, Activity, AlertTriangle, FileText, IndianRupee } from "lucide-react";
 
 export default function GlobalPatientDirectoryPage() {
-  const initialPatients = [
-    {
-      token: "#003",
-      name: "Sneha Joseph",
-      age: 27,
-      gender: "Female",
-      phone: "+91 91234 56789",
-      bloodGroup: "O+",
-      procedure: "Scaling & Extraction",
-      chiefComplaint: "Mobility in upper molar, general calculus accumulation.",
-      medicalAlerts: ["Bleeding disorder (Mild)"],
-      timeline: [
-        { date: "09-06-2026", note: "Diagnostic scaling completed. Cavity check on upper jaw.", type: "Procedure" },
-        { date: "09-06-2026", note: "Prescribed Chlorhexidine mouthwash and Vitamin K supplements.", type: "Prescription" }
-      ],
-      paymentDetails: {
-        totalBilled: 2500,
-        amountPaid: 2500,
-        balance: 0,
-        status: "Paid",
-        lastPaymentDate: "09-06-2026"
-      }
-    },
-    {
-      token: "#004",
-      name: "Rahul Kumar",
-      age: 32,
-      gender: "Male",
-      phone: "+91 98765 43210",
-      bloodGroup: "B+",
-      procedure: "Root Canal Treatment",
-      chiefComplaint: "Severe throbbing pain in the upper right back tooth (#16), sensitive to hot & cold.",
-      medicalAlerts: ["Hypertension (BP 140/90)", "Clindamycin Sensitivity"],
-      timeline: [
-        { date: "08-06-2026", note: "Diagnostic digital X-ray completed. Deep dentinal caries reaching pulp on #16.", type: "Diagnostic" },
-        { date: "08-06-2026", note: "Prescribed Ibuprofen 400mg for pain control.", type: "Prescription" },
-        { date: "09-06-2026", note: "RCT Stage 1 initiated. Pulpectomy completed on #16.", type: "Procedure" }
-      ],
-      paymentDetails: {
-        totalBilled: 8000,
-        amountPaid: 3000,
-        balance: 5000,
-        status: "Pending",
-        lastPaymentDate: "08-06-2026"
-      }
-    },
-    {
-      token: "#005",
-      name: "Rohan Varma",
-      age: 28,
-      gender: "Male",
-      phone: "+91 88776 65544",
-      bloodGroup: "A-",
-      procedure: "Dental Filling",
-      chiefComplaint: "Food lodgement and mild sensitivity in lower left molar (#36).",
-      medicalAlerts: [],
-      timeline: [
-        { date: "09-06-2026", note: "Clinical exam shows Class I caries on #36 occlusal surface.", type: "Diagnostic" }
-      ],
-      paymentDetails: {
-        totalBilled: 1500,
-        amountPaid: 1500,
-        balance: 0,
-        status: "Paid",
-        lastPaymentDate: "09-06-2026"
-      }
-    },
-    {
-      token: "#006",
-      name: "Priya Nair",
-      age: 34,
-      gender: "Female",
-      phone: "+91 77665 54433",
-      bloodGroup: "AB+",
-      procedure: "Scaling & Polishing",
-      chiefComplaint: "Bleeding gums during brushing, yellowish deposits.",
-      medicalAlerts: ["Pregnant (2nd Trimester)"],
-      timeline: [
-        { date: "10-06-2026", note: "Calculus deposits noted in lower anteriors.", type: "Diagnostic" }
-      ],
-      paymentDetails: {
-        totalBilled: 1200,
-        amountPaid: 0,
-        balance: 1200,
-        status: "Pending",
-        lastPaymentDate: "N/A"
-      }
-    },
-    {
-      token: "#007",
-      name: "Deepak Kurian",
-      age: 45,
-      gender: "Male",
-      phone: "+91 66554 43322",
-      bloodGroup: "O-",
-      procedure: "Crown Fitting",
-      chiefComplaint: "Need permanent crown on tooth #46 following root canal therapy.",
-      medicalAlerts: ["Penicillin Allergy"],
-      timeline: [
-        { date: "01-06-2026", note: "RCT completed. Canal obturation satisfactory.", type: "Procedure" },
-        { date: "05-06-2026", note: "Tooth preparation done on #46. Elastomeric impression taken.", type: "Lab Order" }
-      ],
-      paymentDetails: {
-        totalBilled: 6000,
-        amountPaid: 3000,
-        balance: 3000,
-        status: "Partially Paid",
-        lastPaymentDate: "05-06-2026"
-      }
-    },
-    {
-      token: "#008",
-      name: "Meera Pillai",
-      age: 62,
-      gender: "Female",
-      phone: "+91 55443 32211",
-      bloodGroup: "B-",
-      procedure: "Tooth Extraction",
-      chiefComplaint: "Pain and mobility in lower right third molar (#48).",
-      medicalAlerts: ["Diabetic (Controlled)", "Taking Aspirin 75mg daily"],
-      timeline: [
-        { date: "09-06-2026", note: "OPG confirms Grade III mobility and bone loss around root of #48.", type: "Diagnostic" }
-      ],
-      paymentDetails: {
-        totalBilled: 2000,
-        amountPaid: 2000,
-        balance: 0,
-        status: "Paid",
-        lastPaymentDate: "09-06-2026"
-      }
-    }
-  ];
 
-  const [patients] = useState(initialPatients);
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterProcedure, setFilterProcedure] = useState("");
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [activeTab, setActiveTab] = useState("profile"); // profile, clinical, payment
+
+  const fetchPatients = async () => {
+    setLoading(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/admin/patients", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error("Failed to load patient directory.");
+      const data = await response.json();
+      setPatients(data);
+    } catch (err) {
+      console.error("Failed to fetch patients, using fallback data:", err);
+      setPatients(initialPatients);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients();
+  }, []);
 
   const filteredPatients = patients.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -161,6 +52,12 @@ export default function GlobalPatientDirectoryPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-1">Global audit interface for EDR patient files and clinical chart history.</p>
         </div>
+        <button
+          onClick={fetchPatients}
+          className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
+        >
+          <History className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh Registry
+        </button>
       </div>
 
       {/* Stats Summary */}
@@ -230,41 +127,49 @@ export default function GlobalPatientDirectoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 text-sm">
-              {filteredPatients.map(p => (
-                <tr key={p.token} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="py-4 px-6 font-mono text-xs text-gray-400 font-bold">{p.token}</td>
-                  <td className="py-4 px-6">
-                    <div className="font-bold text-gray-900">{p.name}</div>
-                    <div className="text-[10px] text-gray-500 font-semibold mt-0.5">{p.gender}, {p.age} years • {p.phone}</div>
-                  </td>
-                  <td className="py-4 px-6 text-xs text-primary font-bold">{p.procedure}</td>
-                  <td className="py-4 px-6">
-                    {p.medicalAlerts.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {p.medicalAlerts.map((alert, idx) => (
-                          <span key={idx} className="bg-red-50 text-rose-600 text-[9px] font-black uppercase px-2 py-0.5 rounded border border-rose-100">
-                            {alert}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">None</span>
-                    )}
-                  </td>
-                  <td className="py-4 px-6 text-right">
-                    <button
-                      onClick={() => {
-                        setSelectedPatient(p);
-                        setActiveTab("profile");
-                      }}
-                      className="px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
-                    >
-                      Audit Details
-                    </button>
+              {loading && patients.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center py-12 text-gray-500 font-semibold italic">
+                    <History className="w-4 h-4 animate-spin text-primary inline mr-2" /> Loading patient registry...
                   </td>
                 </tr>
-              ))}
-              {filteredPatients.length === 0 && (
+              ) : (
+                filteredPatients.map(p => (
+                  <tr key={p.token} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-4 px-6 font-mono text-xs text-gray-400 font-bold">{p.token}</td>
+                    <td className="py-4 px-6">
+                      <div className="font-bold text-gray-900">{p.name}</div>
+                      <div className="text-[10px] text-gray-500 font-semibold mt-0.5">{p.gender}, {p.age} years • {p.phone}</div>
+                    </td>
+                    <td className="py-4 px-6 text-xs text-primary font-bold">{p.procedure}</td>
+                    <td className="py-4 px-6">
+                      {p.medicalAlerts.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {p.medicalAlerts.map((alert, idx) => (
+                            <span key={idx} className="bg-red-50 text-rose-600 text-[9px] font-black uppercase px-2 py-0.5 rounded border border-rose-100">
+                              {alert}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">None</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <button
+                        onClick={() => {
+                          setSelectedPatient(p);
+                          setActiveTab("profile");
+                        }}
+                        className="px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
+                      >
+                        Audit Details
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+              {!loading && filteredPatients.length === 0 && (
                 <tr>
                   <td colSpan="5" className="text-center py-12 text-gray-400 font-semibold italic">
                     No registered patients found.

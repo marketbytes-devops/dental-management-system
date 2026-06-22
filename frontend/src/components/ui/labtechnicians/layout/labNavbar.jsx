@@ -46,9 +46,16 @@ export default function LabNavbar() {
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
             AJ
           </div>
-          <Link href="/" className="flex items-center bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
+          <button
+            onClick={() => {
+              localStorage.removeItem("staff_jwt_token");
+              localStorage.removeItem("staff_user");
+              window.location.href = "/login";
+            }}
+            className="flex items-center bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer outline-none"
+          >
             Logout
-          </Link>
+          </button>
         </div>
       </div>
     </header>

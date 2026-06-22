@@ -38,7 +38,7 @@ const INITIAL_FORM = {
   notes: "",
 };
 
-export default function BookAppointmentModal({ onClose, onBook }) {
+export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -66,23 +66,48 @@ export default function BookAppointmentModal({ onClose, onBook }) {
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     setSubmitting(true);
-    // Simulate async submit
-    await new Promise((r) => setTimeout(r, 900));
-    setSubmitting(false);
-    setSuccess(true);
+    try {
+      const selectedDoctorName = DOCTORS.find((d) => d.id === form.doctor)?.name ?? form.doctor;
+      const response = await fetch("http://localhost:8000/frontdesk/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient_id: patientId,
+          doctor_name: selectedDoctorName,
+          appointment_date: form.date,
+          appointment_time: form.time,
+          treatment_type: form.treatment,
+          status: "Confirmed",
+          priority: "Routine",
+          symptoms: form.notes || null
+        })
+      });
 
-    const newAppt = {
-      id: `APT-${Math.floor(Math.random() * 900 + 100)}`,
-      doctor: DOCTORS.find((d) => d.id === form.doctor)?.name ?? form.doctor,
-      treatment: form.treatment,
-      date: form.date,
-      time: form.time,
-      status: "Pending",
-      notes: form.notes,
-    };
-    onBook?.(newAppt);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Booking failed.");
+      }
 
-    setTimeout(() => onClose(), 1500);
+      const data = await response.json();
+      setSubmitting(false);
+      setSuccess(true);
+
+      const newAppt = {
+        id: data.id,
+        doctor: data.doctor_name,
+        treatment: data.treatment_type,
+        date: data.appointment_date,
+        time: data.appointment_time,
+        status: data.status,
+        notes: data.symptoms || "",
+      };
+      onBook?.(newAppt);
+
+      setTimeout(() => onClose(), 1500);
+    } catch (err) {
+      alert(err.message || "An error occurred during booking.");
+      setSubmitting(false);
+    }
   }
 
   return (

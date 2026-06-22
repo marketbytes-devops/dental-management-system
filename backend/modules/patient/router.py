@@ -1,7 +1,9 @@
 # router.py - all /patient/* endpoints
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List
 from database import get_db
+
 from .schemas import PatientCreate, PatientResponse
 from .models import PatientModel
 from .service import get_patient_by_phone, get_patient_by_email, create_patient
@@ -51,3 +53,8 @@ def get_profile(
             detail="Patient not found"
         )
     return patient
+
+@router.get("/all", response_model=List[PatientResponse])
+def get_all_patients(db: Session = Depends(get_db)):
+    return db.query(PatientModel).order_by(PatientModel.name.asc()).all()
+

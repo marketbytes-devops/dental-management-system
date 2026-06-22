@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from modules.auth.router import router as auth_router
 from modules.admin.router import router as admin_router
 from modules.patient.router import router as patient_router
+from modules.frontdesk.router import router as frontdesk_router
+
 
 from database import Base, engine, SessionLocal
 from modules.auth.models import UserModel
@@ -53,6 +55,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(patient_router)
+app.include_router(frontdesk_router)
+
 
 @app.get("/")
 def read_root():

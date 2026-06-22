@@ -1,36 +1,24 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import ProfileHeader from "@/components/ui/patients/profile/profileHeader";
 import ProfileSection from "@/components/ui/patients/profile/profileSection";
 import InsuranceCard from "@/components/ui/patients/profile/insuranceCard";
 import EditProfileModal from "@/components/ui/patients/profile/editProfileModal";
 import { Pencil } from "lucide-react";
 
-// Mock Data as fallback
-const INITIAL_PATIENT = {
-  id: "PT-10042",
-  name: "Rahul Kumar",
-  avatar: "R",
-  dob: "1990-04-15",
-  phone: "+91 98765 43210",
-  email: "rahul@example.com",
-  memberSince: "2022-08-10",
-  registeredVia: "Walk-in",
-  address: "Flat 402, Signature Residency, Sector 56, Gurgaon, HR - 122011",
-  insurance: { provider: "Star Health & Allied Insurance", policyId: "SH-2024-991", coverage: 70 },
-  emergencyContact: { name: "Priya Kumar", relation: "Spouse", phone: "+91 91234 56789" },
-};
-
 export default function ProfilePage() {
-  const [patient, setPatient] = useState(INITIAL_PATIENT);
+  const [patient, setPatient] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function fetchProfile() {
       const token = localStorage.getItem("patient_jwt_token");
       if (!token) {
+        setError("Please log in to view profile.");
         setLoading(false);
         return;
       }
@@ -65,9 +53,12 @@ export default function ProfilePage() {
             },
           };
           setPatient(formatted);
+        } else {
+          setError("Failed to load profile details.");
         }
       } catch (err) {
         console.error("Failed to fetch profile:", err);
+        setError("An error occurred loading profile.");
       } finally {
         setLoading(false);
       }
@@ -79,6 +70,29 @@ export default function ProfilePage() {
     setPatient(updatedData);
     setIsEditing(false);
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+        <p className="text-sm text-gray-500 mt-4">Loading profile...</p>
+      </div>
+    );
+  }
+
+  if (error || !patient) {
+    return (
+      <div className="max-w-md mx-auto text-center space-y-4 py-10 bg-white border border-gray-150 rounded-2xl p-6 shadow-sm">
+        <p className="text-sm text-gray-700 font-semibold">{error || "Profile not loaded."}</p>
+        <Link
+          href="/login"
+          className="inline-block px-5 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 transition-all shadow-sm"
+        >
+          Go to Login
+        </Link>
+      </div>
+    );
+  }
 
   const personalItems = [
     { label: "Date of Birth", value: patient.dob },

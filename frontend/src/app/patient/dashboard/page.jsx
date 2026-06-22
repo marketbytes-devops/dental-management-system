@@ -7,52 +7,101 @@ import { Calendar, CreditCard, CheckSquare, Clock, Pill } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 
 export default function PatientDashboardPage() {
-  const [patientName, setPatientName] = useState("Rahul Kumar");
-  const [patientId, setPatientId] = useState("PT-10042");
+  const [profile, setProfile] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const name = localStorage.getItem("patient_name");
-    const id = localStorage.getItem("patient_token");
-    setTimeout(() => {
-      if (name) setPatientName(name);
-      if (id) setPatientId(id);
-    }, 0);
+    async function loadDashboard() {
+      const token = localStorage.getItem("patient_jwt_token");
+      if (!token) {
+        setError("Please log in to view dashboard.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch patient profile
+        const profileRes = await fetch("http://localhost:8000/patient/profile", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (!profileRes.ok) {
+          throw new Error("Failed to load patient profile.");
+        }
+        const profileData = await profileRes.json();
+        setProfile(profileData);
+
+        // Fetch patient appointments
+        const apptsRes = await fetch(`http://localhost:8000/frontdesk/appointments/patient/${profileData.id}`);
+        if (apptsRes.ok) {
+          const apptsData = await apptsRes.json();
+          setAppointments(apptsData.map(appt => ({
+            id: appt.id,
+            date: appt.appointment_date,
+            time: appt.appointment_time,
+            doctor: appt.doctor_name,
+            treatment: appt.treatment_type,
+            status: appt.status,
+            priority: appt.priority
+          })));
+        }
+      } catch (err) {
+        console.error("Dashboard load error:", err);
+        setError(err.message || "An error occurred.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDashboard();
   }, []);
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+        <p className="text-sm text-gray-500 mt-4">Loading dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-md mx-auto text-center space-y-4 py-10 bg-white border border-gray-150 rounded-2xl p-6 shadow-sm">
+        <p className="text-sm text-gray-700 font-semibold">{error}</p>
+        <Link
+          href="/login"
+          className="inline-block px-5 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 transition-all shadow-sm"
+        >
+          Go to Login
+        </Link>
+      </div>
+    );
+  }
+
   const currentPatient = {
-    id: patientId,
-    name: patientName,
-    avatar: patientName ? patientName.charAt(0).toUpperCase() : "P",
-    dob: "1990-04-15",
-    phone: "+91 98765 43210",
-    email: "rahul@example.com",
-    memberSince: "2022-08-10",
-    oralHealthScore: 78,
-    registeredVia: "Walk-in",
-    insurance: { provider: "Star Health", policyId: "SH-2024-991", coverage: 70 },
-    emergencyContact: { name: "Priya Kumar", relation: "Spouse", phone: "+91 91234 56789" },
+    id: profile?.token || `PT-${profile?.id}`,
+    name: profile?.name || "Patient",
+    avatar: profile?.name ? profile.name.charAt(0).toUpperCase() : "P",
+    dob: profile?.date_of_birth || "N/A",
+    phone: profile?.phone || "N/A",
+    email: profile?.email || "N/A",
+    memberSince: profile?.created_at ? new Date(profile.created_at).toISOString().split("T")[0] : "N/A",
+    oralHealthScore: 80,
+    registeredVia: profile?.address_line1 ? "Online" : "Walk-in",
+    insurance: { provider: "None", policyId: "N/A", coverage: 0 },
+    emergencyContact: { 
+      name: profile?.emergency_contact_name || "N/A", 
+      phone: profile?.emergency_contact_phone || "N/A" 
+    },
   };
 
-  const myAppointments = [
-    { id: "APT-201", date: "2026-06-15", time: "10:30 AM", doctor: "Dr. Anoop Nair", treatment: "Root Canal", status: "Confirmed" },
-    { id: "APT-198", date: "2026-05-12", time: "11:00 AM", doctor: "Dr. Anoop Nair", treatment: "Scaling & Polishing", status: "Completed" },
-  ];
-
-  const myPrescriptions = [
-    { id: "RX-501", date: "2026-05-12", drug: "Amoxicillin 500mg", dosage: "1 cap × 3 times/day for 5 days", doctor: "Dr. Anoop Nair", active: true },
-  ];
-
-  const myInvoices = [
-    { id: "INV-089", date: "2026-05-12", treatment: "Scaling & Polishing", gross: 1500, insurancePaid: 1050, patientDue: 450, status: "Paid" },
-    { id: "INV-094", date: "2026-06-15", treatment: "Root Canal", gross: 8000, insurancePaid: 5600, patientDue: 2400, status: "Pending" },
-  ];
-
   // Derived values
-  const nextAppointment = myAppointments.find(a => a.status === "Confirmed");
-  const completedAppointments = myAppointments.filter(a => a.status === "Completed");
-  const pendingInvoices = myInvoices.filter(i => i.status === "Pending");
-  const activeRx = myPrescriptions.filter(p => p.active);
-  const outstandingBalance = pendingInvoices.reduce((sum, i) => sum + i.patientDue, 0);
+  const confirmedAppointments = appointments.filter(a => a.status === "Confirmed" || a.status === "Pending" || a.status === "Pending OTP" || a.status === "Waiting");
+  const nextAppointment = confirmedAppointments[0];
+  const completedAppointments = appointments.filter(a => a.status === "Completed");
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -81,7 +130,7 @@ export default function PatientDashboardPage() {
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Upcoming Appointments</p>
             <h3 className="text-2xl font-bold text-gray-900">
-              {myAppointments.filter(a => a.status === "Confirmed").length}
+              {confirmedAppointments.length}
             </h3>
             <p className="text-xs text-gray-500 font-medium mt-2">
               Next: {nextAppointment?.date ?? "None scheduled"}
@@ -94,10 +143,10 @@ export default function PatientDashboardPage() {
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Outstanding Balance</p>
             <h3 className="text-2xl font-bold text-gray-900">
-              ₹{outstandingBalance.toLocaleString()}
+              ₹0
             </h3>
-            <p className="text-xs text-danger font-medium mt-2">
-              {pendingInvoices.length} invoice(s) pending
+            <p className="text-xs text-gray-500 font-medium mt-2">
+              0 invoice(s) pending
             </p>
           </div>
         </div>
@@ -167,8 +216,7 @@ export default function PatientDashboardPage() {
             <Link href="/patient/records" className="text-sm text-primary font-medium hover:underline">View All</Link>
           </div>
           <div className="space-y-4">
-
-            {completedAppointments.slice(0, 1).map(appt => (
+            {completedAppointments.slice(0, 3).map(appt => (
               <div key={appt.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-lg">
                   <ToothIcon className="w-5 h-5 text-primary" strokeWidth={2} />
@@ -181,32 +229,9 @@ export default function PatientDashboardPage() {
               </div>
             ))}
 
-            {activeRx.slice(0, 1).map(rx => (
-              <div key={rx.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
-                <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center text-warning text-lg">
-                  <Pill className="w-5 h-5 text-warning" strokeWidth={2} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">Prescription Issued</p>
-                  <p className="text-xs text-gray-500">{rx.drug} — {rx.dosage}</p>
-                </div>
-                <span className="text-xs text-gray-400">{rx.date}</span>
-              </div>
-            ))}
-
-            {pendingInvoices.slice(0, 1).map(inv => (
-              <div key={inv.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
-                <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center text-danger text-lg">
-                  <CreditCard className="w-5 h-5 text-danger" strokeWidth={2} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">Invoice Pending</p>
-                  <p className="text-xs text-gray-505">{inv.treatment} — ₹{inv.patientDue.toLocaleString()} due</p>
-                </div>
-                <span className="text-xs text-gray-405">{inv.date}</span>
-              </div>
-            ))}
-
+            {completedAppointments.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-6">No recent completed visits.</p>
+            )}
           </div>
         </div>
 

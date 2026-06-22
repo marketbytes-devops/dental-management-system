@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { Check, AlertTriangle, Calendar } from "lucide-react";
 
-export default function CheckInConfirmation({ appointment, isEmergency }) {
-  const queueNo = isEmergency ? 1 : Math.floor(Math.random() * 8) + 3;
-  const waitTime = isEmergency ? 5 : queueNo * 10;
+export default function CheckInConfirmation({ appointment, isEmergency, queueNo, waitTime }) {
+  const finalQueueNo = (queueNo !== undefined && queueNo !== null) ? queueNo : (isEmergency ? 1 : Math.floor(Math.random() * 8) + 3);
+  const finalWaitTime = (waitTime !== undefined && waitTime !== null) ? waitTime : (isEmergency ? 0 : finalQueueNo * 10);
 
   return (
     <div className="text-center space-y-6 max-w-md mx-auto py-4">
@@ -56,14 +56,14 @@ export default function CheckInConfirmation({ appointment, isEmergency }) {
           isEmergency ? "bg-danger/5 border-danger/20" : "bg-white border-gray-150"
         }`}>
           <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Queue Position</p>
-          <p className={`text-3xl font-extrabold ${isEmergency ? "text-danger" : "text-primary"}`}>#{queueNo}</p>
+          <p className={`text-3xl font-extrabold ${isEmergency ? "text-danger" : "text-primary"}`}>#{finalQueueNo}</p>
           <p className="text-[10px] text-gray-500 mt-1">
             {isEmergency ? "Emergency priority" : "In line for consultation"}
           </p>
         </div>
         <div className="bg-white border border-gray-150 rounded-2xl p-4 shadow-sm">
           <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Est. Wait Time</p>
-          <p className="text-3xl font-extrabold text-secondary">~{waitTime}m</p>
+          <p className="text-3xl font-extrabold text-secondary">~{finalWaitTime}m</p>
           <p className="text-[10px] text-gray-500 mt-1">Subject to changes</p>
         </div>
       </div>

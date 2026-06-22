@@ -1,22 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw } from "lucide-react";
 
 export default function DoctorManagementPage() {
-  const initialDoctors = [
-    { id: 1, name: "Dr. Anoop Nair", specialty: "Endodontics", operatory: "Operatory 1", shift: "09:00 AM - 05:00 PM", status: "On Duty", patientsCount: 5 },
-    { id: 2, name: "Dr. Sarah Jenkins", specialty: "Orthodontics", operatory: "Operatory 2", shift: "09:00 AM - 05:00 PM", status: "On Duty", patientsCount: 3 },
-    { id: 3, name: "Dr. James Kurt", specialty: "Oral Surgery", operatory: "Operatory 3", shift: "10:00 AM - 06:00 PM", status: "On Break", patientsCount: 1 },
-    { id: 4, name: "Dr. Lisa Wong", specialty: "Pediatric Dentistry", operatory: "Operatory 4", shift: "09:00 AM - 05:00 PM", status: "Off Duty", patientsCount: 0 },
-    { id: 5, name: "Dr. Marcus Vance", specialty: "Periodontics", operatory: "Operatory 5", shift: "11:00 AM - 07:00 PM", status: "On Duty", patientsCount: 4 },
-    { id: 6, name: "Dr. Jane Miller", specialty: "Prosthodontics", operatory: "Operatory 6", shift: "09:00 AM - 05:00 PM", status: "Off Duty", patientsCount: 0 },
-  ];
-
-  const [doctors, setDoctors] = useState(initialDoctors);
+  const [doctors, setDoctors] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterSpecialty, setFilterSpecialty] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+
+  const fetchDoctors = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/admin/users", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error("Failed to load users.");
+      const data = await response.json();
+      
+      // Filter users who have the "Doctor" role
+      const doctorUsers = data.filter(user => 
+        user.roles && user.roles.some(role => role.toLowerCase() === "doctor")
+      );
+
+      // Map backend users to doctor UI fields
+      const mappedDoctors = doctorUsers.map((user, index) => {
+        const specialtyStr = user.specialties && user.specialties.length > 0 
+          ? user.specialties.join(", ") 
+          : "General Dentistry";
+          
+        return {
+          id: user.id,
+          name: user.name.startsWith("Dr.") ? user.name : `Dr. ${user.name}`,
+          specialty: specialtyStr,
+          operatory: `Operatory ${index + 1}`,
+          shift: "09:00 AM - 05:00 PM",
+          status: user.status === "Active" ? "On Duty" : "Off Duty",
+          patientsCount: 0
+        };
+      });
+      
+      setDoctors(mappedDoctors);
+    } catch (err) {
+      console.error("Error loading doctors:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDoctors();
+  }, []);
 
   const toggleStatus = (id) => {
     setDoctors(prev => prev.map(doc => {
@@ -60,10 +95,10 @@ export default function DoctorManagementPage() {
         </div>
         
         <button
-          onClick={() => setDoctors(initialDoctors)}
+          onClick={fetchDoctors}
           className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
         >
-          <RefreshCw className="w-4 h-4" /> Reset shifts
+          <RefreshCw className="w-4 h-4" /> Refresh roster
         </button>
       </div>
 

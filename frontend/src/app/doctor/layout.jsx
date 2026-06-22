@@ -120,6 +120,20 @@ export default function DoctorLayout({ children }) {
   const [viewingPatientToken, setViewingPatientToken] = useState("#004");
   const [completedPatientHistory, setCompletedPatientHistory] = useState(["#003"]);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [currentDoctorName, setCurrentDoctorName] = useState("Dr. Anoop Nair");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedUser = localStorage.getItem("staff_user");
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          const name = user.name.startsWith("Dr.") ? user.name : `Dr. ${user.name}`;
+          setCurrentDoctorName(name);
+        } catch (e) {}
+      }
+    }
+  }, []);
 
   const [emergencyAlert, setEmergencyAlert] = useState(null);
   const [hasTriggeredAutoEmergency, setHasTriggeredAutoEmergency] = useState(false);
@@ -287,7 +301,7 @@ export default function DoctorLayout({ children }) {
     const newRef = {
       id: `REF-${Math.floor(200 + Math.random() * 800)}`,
       patientToken,
-      referredBy: "Dr. Anoop Nair",
+      referredBy: currentDoctorName,
       speciality: docSpec || "General Dentistry",
       targetDoctor: docName,
       date: "12-06-2026 (Today)",
@@ -341,7 +355,7 @@ export default function DoctorLayout({ children }) {
       // Append to patient timeline
       const timelineEvent = {
         date: "10-06-2026 (Today)",
-        note: `Consultation complete by Dr. Anoop Nair: ${consultationNotes}`,
+        note: `Consultation complete by ${currentDoctorName}: ${consultationNotes}`,
         type: "Consultation",
         details: medications
       };

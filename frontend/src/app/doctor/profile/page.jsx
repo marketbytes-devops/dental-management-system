@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import DoctorProfileHeader from "@/components/ui/doctor/profile/DoctorProfileHeader";
 import DoctorProfileSection from "@/components/ui/doctor/profile/DoctorProfileSection";
@@ -8,60 +9,153 @@ import DoctorCredentialsCard from "@/components/ui/doctor/profile/DoctorCredenti
 import SecuritySettingsCard from "@/components/ui/doctor/profile/SecuritySettingsCard";
 import EditDoctorProfileModal from "@/components/ui/doctor/profile/EditDoctorProfileModal";
 
-// Initial Mock Data
+// Initial Mock Data Fallback
 const INITIAL_DOCTOR = {
-  id: "DR-20015",
-  name: "Dr. Anoop Nair",
-  dob: "1984-07-22",
-  phone: "+91 98765 12345",
-  email: "dr.anoop@smilecare.com",
-  memberSince: "2023-04-12",
-  registrationMode: "Staff Boarding",
-  address: "Apt 501, Oakwood Apartments, DLF Phase 3, Gurgaon, HR - 122002",
+  id: "DR-LOADING",
+  name: "Doctor",
+  dob: "",
+  phone: "",
+  email: "",
+  memberSince: "Recently",
+  registrationMode: "Database Unified Account",
+  address: "",
   credentials: {
-    specialty: "MDS - Endodontist",
-    department: "Conservative Dentistry & Endodontics",
-    licenceId: "DENT-88492",
-    chairSetup: "Chair 3 (Clinical Room A)",
-    board: "Dental Council of India"
+    specialty: "Dental Specialist",
+    department: "Clinical",
+    licenceId: "",
+    chairSetup: "",
+    board: ""
   }
 };
 
 export default function DoctorProfilePage() {
+  const router = useRouter();
   const [doctor, setDoctor] = useState(INITIAL_DOCTOR);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Sync state with localStorage on mount
-  useEffect(() => {
-    const savedProfile = localStorage.getItem("smilecare_doctor_profile");
-    if (savedProfile) {
-      try {
-        setDoctor(JSON.parse(savedProfile));
-      } catch (e) {
-        console.error("Failed to parse saved profile:", e);
-      }
-    }
-  }, []);
+  const fetchProfile = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/auth/profile", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
 
-  const handleSave = (updatedData) => {
-    // Update doctor data
-    const updated = {
-      ...updatedData,
-      credentials: {
-        ...doctor.credentials,
-        specialty: updatedData.credentials?.specialty || doctor.credentials.specialty,
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 404) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("staff_jwt_token");
+            localStorage.removeItem("staff_user");
+          }
+          router.push("/login");
+          return;
+        }
+        throw new Error("Failed to load profile.");
       }
-    };
-    setDoctor(updated);
-    localStorage.setItem("smilecare_doctor_profile", JSON.stringify(updated));
-    setIsEditing(false);
+      const user = await response.json();
+
+      setDoctor({
+        id: `DR-${user.id}`,
+        name: user.name,
+        dob: user.dob || "",
+        phone: user.phone || "",
+        email: user.email,
+        memberSince: user.created_at ? new Date(user.created_at).toLocaleDateString() : "Recently",
+        registrationMode: "Database Unified Account",
+        address: user.address || "",
+        credentials: {
+          specialty: user.specialties && user.specialties.length > 0 ? user.specialties.join(" & ") : "General Dentistry",
+          department: user.specialties && user.specialties.length > 0 ? `${user.specialties.join(" & ")} Department` : "Clinical",
+          licenceId: user.licence_id || "",
+          chairSetup: user.chair_setup || "",
+          board: user.board || ""
+        }
+      });
+    } catch (err) {
+      console.error("Error loading doctor profile:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const handleSave = async (updatedData) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      
+      const payload = {
+        name: updatedData.name,
+        email: updatedData.email,
+        dob: updatedData.dob || null,
+        phone: updatedData.phone || null,
+        address: updatedData.address || null,
+        licence_id: updatedData.credentials?.licenceId || null,
+        chair_setup: updatedData.credentials?.chairSetup || null,
+        board: updatedData.credentials?.board || null
+      };
+
+      const response = await fetch("http://localhost:8000/auth/profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to update profile.");
+      }
+
+      const updatedUser = await response.json();
+      
+      // Update local storage staff_user
+      if (typeof window !== "undefined") {
+        localStorage.setItem("staff_user", JSON.stringify(updatedUser));
+      }
+
+      // Map backend response back to local view state format
+      setDoctor({
+        id: `DR-${updatedUser.id}`,
+        name: updatedUser.name,
+        dob: updatedUser.dob || "",
+        phone: updatedUser.phone || "",
+        email: updatedUser.email,
+        memberSince: updatedUser.created_at ? new Date(updatedUser.created_at).toLocaleDateString() : "Recently",
+        registrationMode: "Database Unified Account",
+        address: updatedUser.address || "",
+        credentials: {
+          specialty: updatedUser.specialties && updatedUser.specialties.length > 0 ? updatedUser.specialties.join(" & ") : "General Dentistry",
+          department: updatedUser.specialties && updatedUser.specialties.length > 0 ? `${updatedUser.specialties.join(" & ")} Department` : "Clinical",
+          licenceId: updatedUser.licence_id || "",
+          chairSetup: updatedUser.chair_setup || "",
+          board: updatedUser.board || ""
+        }
+      });
+      setIsEditing(false);
+      alert("Profile updated successfully!");
+    } catch (err) {
+      alert(err.message || "An error occurred while updating your profile.");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <span className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></span>
+      </div>
+    );
+  }
+
   const personalItems = [
-    { label: "Date of Birth", value: doctor.dob },
-    { label: "Phone Number", value: doctor.phone },
+    { label: "Date of Birth", value: doctor.dob || "Not Specified" },
+    { label: "Phone Number", value: doctor.phone || "Not Specified" },
     { label: "Email Address", value: doctor.email },
-    { label: "Residential Address", value: doctor.address, fullWidth: true },
+    { label: "Residential Address", value: doctor.address || "Not Specified", fullWidth: true },
   ];
 
   return (

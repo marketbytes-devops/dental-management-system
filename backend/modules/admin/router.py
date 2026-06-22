@@ -46,7 +46,13 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
         password_hash=hashed,
         roles=user_data.roles,
         specialties=user_data.specialties,
-        status="Active"
+        status="Active",
+        dob=user_data.dob,
+        phone=user_data.phone,
+        address=user_data.address,
+        licence_id=user_data.licence_id,
+        chair_setup=user_data.chair_setup,
+        board=user_data.board
     )
     
     db.add(new_user)
@@ -111,6 +117,18 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
 
     if user_data.specialties is not None:
         user.specialties = user_data.specialties
+    if user_data.dob is not None:
+        user.dob = user_data.dob
+    if user_data.phone is not None:
+        user.phone = user_data.phone
+    if user_data.address is not None:
+        user.address = user_data.address
+    if user_data.licence_id is not None:
+        user.licence_id = user_data.licence_id
+    if user_data.chair_setup is not None:
+        user.chair_setup = user_data.chair_setup
+    if user_data.board is not None:
+        user.board = user_data.board
 
     db.commit()
     db.refresh(user)

@@ -11,6 +11,11 @@ const TIME_SLOTS = [
   "4:00 PM", "4:30 PM", "5:00 PM",
 ];
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> d63e5e655db2a293e9474fe97d705bc7cdbde092
 const TREATMENTS = [
   "Routine Check-up",
   "Scaling & Polishing",
@@ -40,6 +45,7 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   const [doctors, setDoctors] = useState([]);
 
   useEffect(() => {
+<<<<<<< HEAD
     const fetchDoctors = async () => {
       try {
         const token = typeof window !== "undefined" ? localStorage.getItem("patient_jwt_token") : null;
@@ -68,6 +74,19 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
         ]);
       }
     };
+=======
+    async function fetchDoctors() {
+      try {
+        const res = await fetch("http://localhost:8000/frontdesk/doctors");
+        if (res.ok) {
+          const data = await res.json();
+          setDoctors(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch doctors:", err);
+      }
+    }
+>>>>>>> d63e5e655db2a293e9474fe97d705bc7cdbde092
     fetchDoctors();
   }, []);
 
@@ -94,7 +113,11 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
 
     setSubmitting(true);
     try {
+<<<<<<< HEAD
       const selectedDoctorName = form.doctor;
+=======
+      const selectedDoctorName = doctors.find((d) => String(d.id) === String(form.doctor))?.name ?? form.doctor;
+>>>>>>> d63e5e655db2a293e9474fe97d705bc7cdbde092
       const response = await fetch("http://localhost:8000/frontdesk/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -184,6 +207,7 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
               >
                 <option value="">Select a doctor…</option>
                 {doctors.map((d) => (
+<<<<<<< HEAD
                   <option 
                     key={d.id || d.name} 
                     value={d.name}
@@ -191,6 +215,10 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
                     className={d.status === "Off Duty" ? "text-gray-400" : ""}
                   >
                     {d.name} — {d.specialty} ({d.status === "Off Duty" ? "Off Duty" : d.status === "On Break" ? "On Break" : "Available"})
+=======
+                  <option key={d.id} value={d.id}>
+                    {d.name} — {d.specialty}
+>>>>>>> d63e5e655db2a293e9474fe97d705bc7cdbde092
                   </option>
                 ))}
               </select>

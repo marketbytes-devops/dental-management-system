@@ -32,6 +32,23 @@ class PatientCreate(PatientBase):
     password: str
 
 
+class PatientUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address_line1: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    known_allergies: Optional[str] = None
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class PatientResponse(PatientBase):
     id: int
     token: str

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 import bcrypt
 import random
 from .models import PatientModel
-from .schemas import PatientCreate
+from .schemas import PatientCreate, PatientUpdate, PasswordChangeRequest
 
 
 def get_password_hash(password: str) -> str:
@@ -74,3 +74,26 @@ def create_patient(db: Session, patient_in: PatientCreate) -> PatientModel:
     db.commit()
     db.refresh(db_patient)
     return db_patient
+
+
+def update_patient_profile(db: Session, patient_id: int, update_in) -> PatientModel:
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        return None
+    update_data = update_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(patient, field, value)
+    db.commit()
+    db.refresh(patient)
+    return patient
+
+
+def change_patient_password(db: Session, patient_id: int, current_password: str, new_password: str) -> bool:
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        return False
+    if not verify_password(current_password, patient.password):
+        return False
+    patient.password = get_password_hash(new_password)
+    db.commit()
+    return True

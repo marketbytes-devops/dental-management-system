@@ -13,6 +13,7 @@ from database import Base, engine, SessionLocal
 from modules.auth.models import UserModel
 from modules.patient.models import PatientModel
 from modules.frontdesk.models import AppointmentModel
+from modules.frontdesk.communication_models import CommunicationLogModel
 from modules.lab.models import LabOrderModel
 from modules.doctor.models import DoctorModel
 from modules.admin.models import AdminModel

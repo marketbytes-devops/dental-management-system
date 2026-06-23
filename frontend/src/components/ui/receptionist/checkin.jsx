@@ -5,6 +5,7 @@ import { UserCheck, AlertTriangle, Clock, KeyRound, CheckCircle, Shield } from "
 
 export default function ReceptionistCheckIn() {
   const [appointments, setAppointments] = useState([]);
+<<<<<<< HEAD
   const [activeQueue, setActiveQueue] = useState([]);
   const [pendingOtpPatients, setPendingOtpPatients] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -237,6 +238,8 @@ export default function ReceptionistCheckIn() {
             </div>
 
             <button
+=======
+>>>>>>> d63e5e655db2a293e9474fe97d705bc7cdbde092
               type="submit"
               className="w-full py-2 bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer mt-2"
             >

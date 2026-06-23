@@ -11,6 +11,8 @@ const TIME_SLOTS = [
   "4:00 PM", "4:30 PM", "5:00 PM",
 ];
 
+
+
 const TREATMENTS = [
   "Routine Check-up",
   "Scaling & Polishing",
@@ -68,6 +70,17 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
         ]);
       }
     };
+    async function fetchDoctors() {
+      try {
+        const res = await fetch("http://localhost:8000/frontdesk/doctors");
+        if (res.ok) {
+          const data = await res.json();
+          setDoctors(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch doctors:", err);
+      }
+    }
     fetchDoctors();
   }, []);
 
@@ -95,6 +108,7 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
     setSubmitting(true);
     try {
       const selectedDoctorName = form.doctor;
+      const selectedDoctorName = doctors.find((d) => String(d.id) === String(form.doctor))?.name ?? form.doctor;
       const response = await fetch("http://localhost:8000/frontdesk/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -191,6 +205,8 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
                     className={d.status === "Off Duty" ? "text-gray-400" : ""}
                   >
                     {d.name} — {d.specialty} ({d.status === "Off Duty" ? "Off Duty" : d.status === "On Break" ? "On Break" : "Available"})
+                  <option key={d.id} value={d.id}>
+                    {d.name} — {d.specialty}
                   </option>
                 ))}
               </select>

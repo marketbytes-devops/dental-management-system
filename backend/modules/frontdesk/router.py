@@ -13,7 +13,10 @@ from .schemas import (
     QueueItemResponse
 )
 from .models import AppointmentModel
+from .communication_models import CommunicationLogModel
+from .communication_schemas import CommunicationSendRequest, CommunicationLogResponse
 from modules.patient.models import PatientModel
+from modules.auth.models import UserModel
 from .service import (
     create_appointment,
     get_today_appointments,
@@ -138,3 +141,86 @@ def get_live_queue(db: Session = Depends(get_db)):
             })
     return queue_items
 
+@router.get("/doctors")
+def get_public_doctors(db: Session = Depends(get_db)):
+    all_users = db.query(UserModel).filter(UserModel.status == "Active").all()
+    doctors = [u for u in all_users if any(r.lower() == "doctor" for r in (u.roles or []))]
+    
+    result = []
+    for doc in doctors:
+        specialty = ", ".join(doc.specialties) if doc.specialties else "General Dentistry"
+        name = doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}"
+        result.append({
+            "id": doc.id,
+            "name": name,
+            "specialty": specialty
+        })
+    return result
+
+# ──────────────────────────────────────────
+# Communication Log Endpoints
+# ──────────────────────────────────────────
+
+@router.post("/communications", response_model=CommunicationLogResponse)
+def send_communication(
+    payload: CommunicationSendRequest,
+    db: Session = Depends(get_db)
+):
+    """Log a communication event sent to a patient."""
+    # If patient_id given, enrich contact info from the DB
+    recipient_phone = payload.recipient_phone
+    recipient_email = payload.recipient_email
+    recipient_name = payload.recipient_name
+
+    if payload.patient_id:
+        patient = db.query(PatientModel).filter(PatientModel.id == payload.patient_id).first()
+        if patient:
+            recipient_name = patient.name
+            recipient_phone = patient.phone
+            recipient_email = patient.email
+
+    log = CommunicationLogModel(
+        patient_id=payload.patient_id,
+        recipient_name=recipient_name,
+        recipient_phone=recipient_phone,
+        recipient_email=recipient_email,
+        channel=payload.channel,
+        template=payload.template,
+        message_body=payload.message_body,
+        status="Sent",
+        sent_by=payload.sent_by or "Receptionist",
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
+
+@router.get("/communications", response_model=List[CommunicationLogResponse])
+def get_communication_logs(
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """Fetch communication history, newest first."""
+    logs = (
+        db.query(CommunicationLogModel)
+        .order_by(CommunicationLogModel.sent_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return logs
+
+
+@router.get("/communications/patient/{patient_id}", response_model=List[CommunicationLogResponse])
+def get_patient_communications(
+    patient_id: int,
+    db: Session = Depends(get_db)
+):
+    """Fetch all communication logs for a specific patient."""
+    logs = (
+        db.query(CommunicationLogModel)
+        .filter(CommunicationLogModel.patient_id == patient_id)
+        .order_by(CommunicationLogModel.sent_at.desc())
+        .all()
+    )
+    return logs

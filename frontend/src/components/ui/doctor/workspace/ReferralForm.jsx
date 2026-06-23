@@ -1,21 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Share2, Globe, Building } from "lucide-react";
 
-const clinicDoctors = [
-  { id: "doc-1", name: "Dr. Sarah Jenkins", speciality: "Orthodontics" },
-  { id: "doc-2", name: "Dr. James Kurt", speciality: "Oral Surgery" },
-  { id: "doc-3", name: "Dr. Lisa Wong", speciality: "Pediatric Dentistry" },
-  { id: "doc-4", name: "Dr. Marcus Vance", speciality: "Periodontics" },
-  { id: "doc-5", name: "Dr. Jane Miller", speciality: "Prosthodontics" }
-];
 
 export default function ReferralForm({ patientToken, onReferPatient }) {
   const [referralType, setReferralType] = useState("Internal"); // Internal | External
-  const [selectedDoctor, setSelectedDoctor] = useState(
-    `${clinicDoctors[0].name} - ${clinicDoctors[0].speciality}`
-  );
+  const [selectedDoctor, setSelectedDoctor] = useState("");
+  const [clinicDoctors, setClinicDoctors] = useState([]);
+
+  useEffect(() => {
+    async function fetchDoctors() {
+      try {
+        const res = await fetch("http://localhost:8000/frontdesk/doctors");
+        if (res.ok) {
+          const data = await res.json();
+          setClinicDoctors(data);
+          if (data.length > 0) {
+            setSelectedDoctor(`${data[0].name} - ${data[0].specialty}`);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch clinic doctors:", err);
+      }
+    }
+    fetchDoctors();
+  }, []);
   const [externalDoctor, setExternalDoctor] = useState("");
   const [externalSpeciality, setExternalSpeciality] = useState("");
   const [externalFacility, setExternalFacility] = useState("");
@@ -78,9 +88,10 @@ export default function ReferralForm({ patientToken, onReferPatient }) {
               onChange={(e) => setSelectedDoctor(e.target.value)}
               className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
             >
+              <option value="">Select a doctor...</option>
               {clinicDoctors.map((doc) => (
-                <option key={doc.id} value={`${doc.name} - ${doc.speciality}`}>
-                  {doc.name} ({doc.speciality})
+                <option key={doc.id} value={`${doc.name} - ${doc.specialty}`}>
+                  {doc.name} ({doc.specialty})
                 </option>
               ))}
             </select>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, CheckCircle2 } from "lucide-react";
 
 const TIME_SLOTS = [
@@ -10,12 +10,7 @@ const TIME_SLOTS = [
   "4:00 PM", "4:30 PM", "5:00 PM",
 ];
 
-const DOCTORS = [
-  { id: "D01", name: "Dr. Anoop Nair", speciality: "Endodontist" },
-  { id: "D02", name: "Dr. Priya Sharma", speciality: "Orthodontist" },
-  { id: "D03", name: "Dr. Rajan Mehta", speciality: "Periodontist" },
-  { id: "D04", name: "Dr. Sunita Pillai", speciality: "Oral Surgeon" },
-];
+
 
 const TREATMENTS = [
   "Routine Check-up",
@@ -43,6 +38,22 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [doctors, setDoctors] = useState([]);
+
+  useEffect(() => {
+    async function fetchDoctors() {
+      try {
+        const res = await fetch("http://localhost:8000/frontdesk/doctors");
+        if (res.ok) {
+          const data = await res.json();
+          setDoctors(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch doctors:", err);
+      }
+    }
+    fetchDoctors();
+  }, []);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -67,7 +78,7 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
 
     setSubmitting(true);
     try {
-      const selectedDoctorName = DOCTORS.find((d) => d.id === form.doctor)?.name ?? form.doctor;
+      const selectedDoctorName = doctors.find((d) => String(d.id) === String(form.doctor))?.name ?? form.doctor;
       const response = await fetch("http://localhost:8000/frontdesk/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,9 +167,9 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
                   }`}
               >
                 <option value="">Select a doctor…</option>
-                {DOCTORS.map((d) => (
+                {doctors.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.name} — {d.speciality}
+                    {d.name} — {d.specialty}
                   </option>
                 ))}
               </select>

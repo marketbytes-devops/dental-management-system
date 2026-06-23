@@ -49,24 +49,6 @@ export default function ReceptionistDoctors() {
 
   useEffect(() => { fetchDoctors(); }, []);
 
-  const handleToggleStatus = async (id) => {
-    try {
-      const token = localStorage.getItem("staff_jwt_token");
-      const res = await fetch(`http://localhost:8000/auth/doctors/${id}/status`, {
-        method: "PUT",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error("Failed to cycle status.");
-      const updated = await res.json();
-      setDoctors(prev => prev.map(d => d.id === id
-        ? { ...d, status: updated.status, slots: updated.status === "Off Duty" ? [] : d.slots }
-        : d
-      ));
-      fetchDoctors();
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const count = (key) => key === "all"
     ? doctors.length
@@ -148,7 +130,6 @@ export default function ReceptionistDoctors() {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleToggleStatus(d.id)}
                     className={`px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer transition-opacity hover:opacity-75 ${s.pill}`}
                   >
                     {s.label}

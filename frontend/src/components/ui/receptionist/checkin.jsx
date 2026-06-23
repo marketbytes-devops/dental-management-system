@@ -11,20 +11,21 @@ export default function ReceptionistCheckIn() {
 
   const [selectedAppId, setSelectedAppId] = useState("");
   const [priority, setPriority] = useState("Routine");
-  const [assignedDoctor, setAssignedDoctor] = useState("Dr. Anoop Nair");
-
-  const doctors = ["Dr. Anoop Nair", "Dr. Priya Varma", "Dr. Sarah Smith"];
+  const [assignedDoctor, setAssignedDoctor] = useState("");
+  const [doctorsList, setDoctorsList] = useState([]);
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+
       // Fetch today's appointments
       const apptsRes = await fetch("http://localhost:8000/frontdesk/appointments/today");
       if (apptsRes.ok) {
         const apptsData = await apptsRes.json();
         setAppointments(apptsData);
         
-        // Filter those waiting for OTP (online check-in patients)
         const pendingOtp = apptsData.filter(a => a.status === "Pending OTP" || a.otp_status === "Pending" || a.otp_status === "Sent");
         setPendingOtpPatients(pendingOtp);
       }
@@ -35,6 +36,22 @@ export default function ReceptionistCheckIn() {
         const queueData = await queueRes.json();
         setActiveQueue(queueData);
       }
+
+      // Fetch live doctors status
+      const doctorsRes = await fetch("http://localhost:8000/auth/doctors", { headers });
+      if (doctorsRes.ok) {
+        const doctorsData = await doctorsRes.json();
+        setDoctorsList(doctorsData);
+        if (doctorsData.length > 0 && !assignedDoctor) {
+          // Default to first active doctor
+          const activeDocs = doctorsData.filter(d => d.status !== "Off Duty");
+          if (activeDocs.length > 0) {
+            setAssignedDoctor(activeDocs[0].name);
+          } else {
+            setAssignedDoctor(doctorsData[0].name);
+          }
+        }
+      }
     } catch (err) {
       console.error("Error fetching check-in data:", err);
     } finally {
@@ -43,7 +60,9 @@ export default function ReceptionistCheckIn() {
   };
 
   useEffect(() => {
-    fetchData();
+    setTimeout(() => {
+      fetchData();
+    }, 0);
     // Poll every 5 seconds for updates
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
@@ -203,8 +222,15 @@ export default function ReceptionistCheckIn() {
                   onChange={(e) => setAssignedDoctor(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
                 >
-                  {doctors.map(d => (
-                    <option key={d} value={d}>{d}</option>
+                  {doctorsList.map(d => (
+                    <option 
+                      key={d.id} 
+                      value={d.name}
+                      disabled={d.status === "Off Duty"}
+                      className={d.status === "Off Duty" ? "text-gray-400" : ""}
+                    >
+                      {d.name} {d.status === "Off Duty" ? "(Off Duty)" : d.status === "On Break" ? "(On Break)" : "(Available)"}
+                    </option>
                   ))}
                 </select>
               </div>

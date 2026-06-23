@@ -9,30 +9,22 @@ export default function ReceptionistDoctors() {
   const fetchDoctors = async () => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/admin/users", {
+      const response = await fetch("http://localhost:8000/auth/doctors", {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
-      if (!response.ok) throw new Error("Failed to load users.");
+      if (!response.ok) throw new Error("Failed to load doctors.");
       const data = await response.json();
-      
-      // Filter users who have the "Doctor" role
-      const doctorUsers = data.filter(user => 
-        user.roles && user.roles.some(role => role.toLowerCase() === "doctor")
-      );
 
       // Map backend users to the receptionist UI format
-      const mappedDoctors = doctorUsers.map((user) => {
-        const specialtyStr = user.specialties && user.specialties.length > 0 
-          ? user.specialties[0] 
-          : "General Dentist";
-          
+      const mappedDoctors = data.map((doc) => {
         return {
-          id: user.id,
-          name: user.name.startsWith("Dr.") ? user.name : `Dr. ${user.name}`,
-          specialty: specialtyStr,
-          dept: user.specialties && user.specialties.length > 0 ? user.specialties[0] : "Clinical",
-          status: user.status === "Active" ? "Available" : "Absent",
-          slots: user.status === "Active" ? ["09:30 AM", "10:30 AM", "01:30 PM", "03:00 PM"] : []
+          id: doc.id,
+          name: doc.name,
+          specialty: doc.specialty,
+          dept: doc.specialty || "Clinical",
+          status: doc.status === "On Duty" ? "Available" : 
+                  doc.status === "On Break" ? "On Break" : "Absent",
+          slots: doc.status !== "Off Duty" ? ["09:30 AM", "10:30 AM", "01:30 PM", "03:00 PM"] : []
         };
       });
       
@@ -45,18 +37,36 @@ export default function ReceptionistDoctors() {
   };
 
   useEffect(() => {
-    fetchDoctors();
+    setTimeout(() => {
+      fetchDoctors();
+    }, 0);
   }, []);
 
-  const handleToggleStatus = (id) => {
-    const statuses = ["Available", "In Treatment", "On Break", "Absent"];
-    setDoctors(prev => prev.map(d => {
-      if (d.id === id) {
-        const nextIndex = (statuses.indexOf(d.status) + 1) % statuses.length;
-        return { ...d, status: statuses[nextIndex] };
-      }
-      return d;
-    }));
+  const handleToggleStatus = async (id) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/auth/doctors/${id}/status`, {
+        method: "PUT",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error("Failed to cycle status.");
+      const updated = await response.json();
+      
+      setDoctors(prev => prev.map(d => {
+        if (d.id === id) {
+          const nextStatus = updated.status === "On Duty" ? "Available" : 
+                             updated.status === "On Break" ? "On Break" : "Absent";
+          return { 
+            ...d, 
+            status: nextStatus,
+            slots: updated.status === "Off Duty" ? [] : ["09:30 AM", "10:30 AM", "01:30 PM", "03:00 PM"]
+          };
+        }
+        return d;
+      }));
+    } catch (err) {
+      console.error("Error cycling doctor status:", err);
+    }
   };
 
   return (
@@ -88,7 +98,7 @@ export default function ReceptionistDoctors() {
             </div>
 
             <div>
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Today's Schedule Slots</h4>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Today&apos;s Schedule Slots</h4>
               {d.slots.length === 0 ? (
                 <p className="text-xs text-gray-400 italic">No schedules for today (Absent/Off).</p>
               ) : (

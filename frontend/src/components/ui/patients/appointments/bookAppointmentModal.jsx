@@ -1,20 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, CheckCircle2 } from "lucide-react";
+
 
 const TIME_SLOTS = [
   "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM",
   "11:00 AM", "11:30 AM", "12:00 PM",
   "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
   "4:00 PM", "4:30 PM", "5:00 PM",
-];
-
-const DOCTORS = [
-  { id: "D01", name: "Dr. Anoop Nair", speciality: "Endodontist" },
-  { id: "D02", name: "Dr. Priya Sharma", speciality: "Orthodontist" },
-  { id: "D03", name: "Dr. Rajan Mehta", speciality: "Periodontist" },
-  { id: "D04", name: "Dr. Sunita Pillai", speciality: "Oral Surgeon" },
 ];
 
 const TREATMENTS = [
@@ -43,6 +37,39 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [doctors, setDoctors] = useState([]);
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("patient_jwt_token") : null;
+        const response = await fetch("http://localhost:8000/auth/doctors", {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setDoctors(data);
+        } else {
+          // Fallback to static doctors list if API fails
+          setDoctors([
+            { id: "D01", name: "Dr. Anoop Nair", specialty: "Endodontist", status: "On Duty" },
+            { id: "D02", name: "Dr. Priya Sharma", specialty: "Orthodontist", status: "On Duty" },
+            { id: "D03", name: "Dr. Rajan Mehta", specialty: "Periodontist", status: "On Duty" },
+            { id: "D04", name: "Dr. Sunita Pillai", specialty: "Oral Surgeon", status: "On Duty" },
+          ]);
+        }
+      } catch (e) {
+        console.error("Failed to fetch doctors:", e);
+        setDoctors([
+          { id: "D01", name: "Dr. Anoop Nair", specialty: "Endodontist", status: "On Duty" },
+          { id: "D02", name: "Dr. Priya Sharma", specialty: "Orthodontist", status: "On Duty" },
+          { id: "D03", name: "Dr. Rajan Mehta", specialty: "Periodontist", status: "On Duty" },
+          { id: "D04", name: "Dr. Sunita Pillai", specialty: "Oral Surgeon", status: "On Duty" },
+        ]);
+      }
+    };
+    fetchDoctors();
+  }, []);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -67,7 +94,7 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
 
     setSubmitting(true);
     try {
-      const selectedDoctorName = DOCTORS.find((d) => d.id === form.doctor)?.name ?? form.doctor;
+      const selectedDoctorName = form.doctor;
       const response = await fetch("http://localhost:8000/frontdesk/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,9 +183,14 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
                   }`}
               >
                 <option value="">Select a doctor…</option>
-                {DOCTORS.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} — {d.speciality}
+                {doctors.map((d) => (
+                  <option 
+                    key={d.id || d.name} 
+                    value={d.name}
+                    disabled={d.status === "Off Duty"}
+                    className={d.status === "Off Duty" ? "text-gray-400" : ""}
+                  >
+                    {d.name} — {d.specialty} ({d.status === "Off Duty" ? "Off Duty" : d.status === "On Break" ? "On Break" : "Available"})
                   </option>
                 ))}
               </select>

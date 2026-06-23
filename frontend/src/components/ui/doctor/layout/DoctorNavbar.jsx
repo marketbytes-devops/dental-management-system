@@ -9,19 +9,67 @@ export default function DoctorNavbar() {
   const { notifications = [], bellAnimating, markAsRead, patients } = useDoctor();
   const [showNotifications, setShowNotifications] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [currentStatus, setCurrentStatus] = useState("Active");
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("staff_user");
       if (saved) {
         try {
-          setCurrentUser(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          setTimeout(() => {
+            setCurrentUser(parsed);
+            setCurrentStatus(parsed.status || "Active");
+          }, 0);
         } catch (e) {
           console.error("Failed to parse staff_user", e);
         }
       }
     }
   }, []);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest(".status-dropdown-container")) {
+        setShowStatusDropdown(false);
+      }
+    };
+    if (showStatusDropdown) {
+      window.addEventListener("click", handleOutsideClick);
+    }
+    return () => window.removeEventListener("click", handleOutsideClick);
+  }, [showStatusDropdown]);
+
+  const handleStatusChange = async (newStatus) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      if (!token) return;
+
+      const response = await fetch("http://localhost:8000/auth/status", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) throw new Error("Failed to update status");
+
+      const data = await response.json();
+      setCurrentStatus(data.status);
+      setShowStatusDropdown(false);
+
+      if (currentUser) {
+        const updatedUser = { ...currentUser, status: data.status };
+        localStorage.setItem("staff_user", JSON.stringify(updatedUser));
+        setCurrentUser(updatedUser);
+      }
+    } catch (e) {
+      console.error("Error updating status:", e);
+    }
+  };
 
   const hour = new Date().getHours();
   const greeting =
@@ -143,6 +191,48 @@ export default function DoctorNavbar() {
             </div>
           </div>
         )}
+        {/* Status Dropdown */}
+        <div className="relative status-dropdown-container">
+          <button
+            onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-105 transition-colors text-xs font-bold text-gray-700 cursor-pointer outline-none"
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${
+              currentStatus === "Active" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+              currentStatus === "On Break" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-gray-400"
+            }`} />
+            {currentStatus === "Active" ? "On Duty" :
+             currentStatus === "On Break" ? "On Break" : "Off Duty"}
+            <span className="text-[8px] text-gray-400">▼</span>
+          </button>
+          
+          {showStatusDropdown && (
+            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-150 rounded-2xl shadow-xl z-50 p-1.5 space-y-0.5 animate-fade-in">
+              <button
+                onClick={() => handleStatusChange("Active")}
+                className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-650 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Check In (On Duty)
+              </button>
+              <button
+                onClick={() => handleStatusChange("On Break")}
+                className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-amber-50 hover:text-amber-650 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                Go On Break
+              </button>
+              <button
+                onClick={() => handleStatusChange("Inactive")}
+                className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:text-gray-900 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <span className="w-2 h-2 rounded-full bg-gray-400" />
+                Check Out (Off Duty)
+              </button>
+            </div>
+          )}
+        </div>
+
         <button className="p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center">
           <HelpCircle className="w-5 h-5" />
         </button>

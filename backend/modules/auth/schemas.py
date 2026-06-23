@@ -13,6 +13,12 @@ class UserCreate(BaseModel):
     password: str
     roles: List[str]
     specialties: List[str] = []
+    dob: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    licence_id: Optional[str] = None
+    chair_setup: Optional[str] = None
+    board: Optional[str] = None
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -20,6 +26,12 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     roles: Optional[List[str]] = None
     specialties: Optional[List[str]] = None
+    dob: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    licence_id: Optional[str] = None
+    chair_setup: Optional[str] = None
+    board: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -30,6 +42,12 @@ class UserResponse(BaseModel):
     roles: List[str]
     specialties: List[str]
     status: str
+    dob: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    licence_id: Optional[str] = None
+    chair_setup: Optional[str] = None
+    board: Optional[str] = None
     created_at: datetime
 
     class Config:

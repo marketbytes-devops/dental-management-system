@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from modules.auth.models import UserModel
 from modules.patient.models import PatientModel
-from modules.auth.schemas import UserLogin, UserResponse, TokenResponse
+from modules.doctor.models import DoctorModel
+from modules.auth.schemas import UserLogin, UserResponse, TokenResponse, UserUpdate
 from modules.auth.service import verify_password
 from shared.utils.auth import create_access_token
 from dependencies import get_current_user
@@ -101,5 +102,128 @@ def get_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
+
+    is_doctor = any(r.lower() == "doctor" for r in (user.roles or []))
+    if is_doctor:
+        doctor = db.query(DoctorModel).filter(DoctorModel.user_id == user.id).first()
+        if doctor:
+            user.dob = doctor.dob
+            user.phone = doctor.phone
+            user.address = doctor.address
+            user.licence_id = doctor.licence_id
+            user.chair_setup = doctor.chair_setup
+            user.board = doctor.board
+        else:
+            user.dob = None
+            user.phone = None
+            user.address = None
+            user.licence_id = None
+            user.chair_setup = None
+            user.board = None
+    else:
+        user.dob = None
+        user.phone = None
+        user.address = None
+        user.licence_id = None
+        user.chair_setup = None
+        user.board = None
+
     return user
+
+
+@router.put("/profile", response_model=UserResponse)
+def update_profile(
+    profile_data: UserUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload: missing user_id"
+        )
+    
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Allow staff member to update their own profile fields
+    if profile_data.name is not None:
+        user.name = profile_data.name
+    if profile_data.email is not None:
+        # Check if email is already registered by another user
+        existing = db.query(UserModel).filter(
+            UserModel.email.ilike(profile_data.email),
+            UserModel.id != user_id
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A user with this email is already registered."
+            )
+        user.email = profile_data.email
+        # Update username too
+        user.username = profile_data.email.split("@")[0]
+
+    if profile_data.password is not None:
+        from modules.auth.service import hash_password
+        user.password_hash = hash_password(profile_data.password)
+
+    db.commit()
+    db.refresh(user)
+
+    is_doctor = any(r.lower() == "doctor" for r in (user.roles or []))
+    if is_doctor:
+        doctor = db.query(DoctorModel).filter(DoctorModel.user_id == user.id).first()
+        if not doctor:
+            specialty_str = ", ".join(user.specialties) if user.specialties else "General Dentistry"
+            doctor = DoctorModel(
+                name=user.name,
+                specialty=specialty_str,
+                status=user.status,
+                user_id=user.id
+            )
+            db.add(doctor)
+            db.commit()
+            db.refresh(doctor)
+
+        if profile_data.name is not None:
+            doctor.name = user.name
+        if profile_data.dob is not None:
+            doctor.dob = profile_data.dob
+        if profile_data.phone is not None:
+            doctor.phone = profile_data.phone
+        if profile_data.address is not None:
+            doctor.address = profile_data.address
+        if profile_data.licence_id is not None:
+            doctor.licence_id = profile_data.licence_id
+        if profile_data.chair_setup is not None:
+            doctor.chair_setup = profile_data.chair_setup
+        if profile_data.board is not None:
+            doctor.board = profile_data.board
+
+        db.commit()
+        db.refresh(doctor)
+
+        user.dob = doctor.dob
+        user.phone = doctor.phone
+        user.address = doctor.address
+        user.licence_id = doctor.licence_id
+        user.chair_setup = doctor.chair_setup
+        user.board = doctor.board
+    else:
+        user.dob = None
+        user.phone = None
+        user.address = None
+        user.licence_id = None
+        user.chair_setup = None
+        user.board = None
+
+    return user
+
+
 

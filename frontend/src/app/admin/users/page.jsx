@@ -22,12 +22,7 @@ export default function UsersPage() {
     return null;
   });
 
-  const defaultUsers = [
-    { id: 1, name: "Dr. Anoop Nair", roles: ["Doctor"], specialties: ["Endodontics"], email: "anoop@smilecare.com", status: "Active" },
-    { id: 2, name: "Sneha Thomas", roles: ["Receptionist"], specialties: [], email: "sneha@smilecare.com", status: "Active" },
-    { id: 3, name: "Rahul Kumar", roles: ["Patient"], specialties: [], email: "rahul@example.com", status: "Active" },
-    { id: 4, name: "Anita Sharma", roles: ["Lab Tech"], specialties: [], email: "anita@smilecare.com", status: "Inactive" },
-  ];
+  const defaultUsers = [];
 
   const [users, setUsers] = useState([]);
 

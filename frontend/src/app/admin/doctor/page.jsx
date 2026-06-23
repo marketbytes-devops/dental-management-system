@@ -1,40 +1,69 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw } from "lucide-react";
 
 export default function DoctorManagementPage() {
-  const initialDoctors = [
-    { id: 1, name: "Dr. Anoop Nair", specialty: "Endodontics", operatory: "Operatory 1", shift: "09:00 AM - 05:00 PM", status: "On Duty", patientsCount: 5 },
-    { id: 2, name: "Dr. Sarah Jenkins", specialty: "Orthodontics", operatory: "Operatory 2", shift: "09:00 AM - 05:00 PM", status: "On Duty", patientsCount: 3 },
-    { id: 3, name: "Dr. James Kurt", specialty: "Oral Surgery", operatory: "Operatory 3", shift: "10:00 AM - 06:00 PM", status: "On Break", patientsCount: 1 },
-    { id: 4, name: "Dr. Lisa Wong", specialty: "Pediatric Dentistry", operatory: "Operatory 4", shift: "09:00 AM - 05:00 PM", status: "Off Duty", patientsCount: 0 },
-    { id: 5, name: "Dr. Marcus Vance", specialty: "Periodontics", operatory: "Operatory 5", shift: "11:00 AM - 07:00 PM", status: "On Duty", patientsCount: 4 },
-    { id: 6, name: "Dr. Jane Miller", specialty: "Prosthodontics", operatory: "Operatory 6", shift: "09:00 AM - 05:00 PM", status: "Off Duty", patientsCount: 0 },
-  ];
-
-  const [doctors, setDoctors] = useState(initialDoctors);
+  const [doctors, setDoctors] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterSpecialty, setFilterSpecialty] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [expandedDoctorId, setExpandedDoctorId] = useState(null);
 
-  const toggleStatus = (id) => {
-    setDoctors(prev => prev.map(doc => {
-      if (doc.id === id) {
-        let nextStatus = "On Duty";
-        if (doc.status === "On Duty") nextStatus = "On Break";
-        else if (doc.status === "On Break") nextStatus = "Off Duty";
-        else nextStatus = "On Duty";
-        return { ...doc, status: nextStatus };
-      }
-      return doc;
-    }));
+  const fetchDoctors = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/admin/users", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error("Failed to load users.");
+      const data = await response.json();
+      
+      // Filter users who have the "Doctor" role
+      const doctorUsers = data.filter(user => 
+        user.roles && user.roles.some(role => role.toLowerCase() === "doctor")
+      );
+
+      // Map backend users to doctor UI fields
+      const mappedDoctors = doctorUsers.map((user, index) => {
+        const specialtyStr = user.specialties && user.specialties.length > 0 
+          ? user.specialties.join(", ") 
+          : "General Dentistry";
+          
+        return {
+          id: user.id,
+          name: user.name.startsWith("Dr.") ? user.name : `Dr. ${user.name}`,
+          specialty: specialtyStr,
+          operatory: user.chair_setup || `Operatory ${index + 1}`,
+          shift: "09:00 AM - 05:00 PM",
+          status: user.status === "Active" ? "On Duty" : "Off Duty",
+          patientsCount: 0,
+          dob: user.dob,
+          phone: user.phone,
+          address: user.address,
+          licence_id: user.licence_id,
+          chair_setup: user.chair_setup,
+          board: user.board
+        };
+      });
+      
+      setDoctors(mappedDoctors);
+    } catch (err) {
+      console.error("Error loading doctors:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchDoctors();
+  }, []);
 
   const getStatusColor = (status) => {
     switch (status) {
       case "On Duty": return "bg-emerald-50 border border-emerald-200 text-emerald-700";
-      case "On Break": return "bg-amber-50 border border-amber-200 text-amber-700";
+      case "On Break": return "bg-amber-50 border border-amber-200 text-amber-705";
       case "Off Duty": return "bg-gray-50 border border-gray-200 text-gray-400";
       default: return "bg-gray-100 text-gray-600";
     }
@@ -60,10 +89,10 @@ export default function DoctorManagementPage() {
         </div>
         
         <button
-          onClick={() => setDoctors(initialDoctors)}
+          onClick={fetchDoctors}
           className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
         >
-          <RefreshCw className="w-4 h-4" /> Reset shifts
+          <RefreshCw className="w-4 h-4" /> Refresh roster
         </button>
       </div>
 
@@ -147,32 +176,66 @@ export default function DoctorManagementPage() {
             </thead>
             <tbody className="divide-y divide-gray-50 text-sm">
               {filteredDoctors.map(doc => (
-                <tr key={doc.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="py-4 px-6 font-bold text-gray-900">{doc.name}</td>
-                  <td className="py-4 px-6 text-xs text-gray-600 font-semibold">{doc.specialty}</td>
-                  <td className="py-4 px-6 font-mono text-xs text-primary font-bold">{doc.operatory}</td>
-                  <td className="py-4 px-6 text-xs text-gray-500 font-medium">{doc.shift}</td>
-                  <td className="py-4 px-6 font-mono text-xs text-gray-700 font-bold">{doc.patientsCount}</td>
-                  <td className="py-4 px-6">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${getStatusColor(doc.status)}`}>
-                      {doc.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6 text-right">
-                    <button
-                      onClick={() => toggleStatus(doc.id)}
-                      className="px-3 py-1 bg-gray-50 hover:bg-primary/5 hover:text-primary border border-gray-250 hover:border-primary/25 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
-                    >
-                      Cycle Status
-                    </button>
-                    <button
-                      onClick={() => alert(`Modifying shift details for ${doc.name}...`)}
-                      className="px-3 py-1 bg-white hover:bg-gray-150 border border-gray-250 rounded-lg text-xs font-bold transition-all cursor-pointer outline-none"
-                    >
-                      Edit Shift
-                    </button>
-                  </td>
-                </tr>
+                <Fragment key={doc.id}>
+                  <tr className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-4 px-6 font-bold text-gray-900">{doc.name}</td>
+                    <td className="py-4 px-6 text-xs text-gray-600 font-semibold">{doc.specialty}</td>
+                    <td className="py-4 px-6 font-mono text-xs text-primary font-bold">{doc.operatory}</td>
+                    <td className="py-4 px-6 text-xs text-gray-500 font-medium">{doc.shift}</td>
+                    <td className="py-4 px-6 font-mono text-xs text-gray-700 font-bold">{doc.patientsCount}</td>
+                    <td className="py-4 px-6">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${getStatusColor(doc.status)}`}>
+                        {doc.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <button
+                        onClick={() => setExpandedDoctorId(expandedDoctorId === doc.id ? null : doc.id)}
+                        className="px-3 py-1 bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
+                      >
+                        {expandedDoctorId === doc.id ? "Hide Details" : "View Details"}
+                      </button>
+                      <button
+                        onClick={() => alert(`Modifying shift details for ${doc.name}...`)}
+                        className="px-3 py-1 bg-white hover:bg-gray-150 border border-gray-250 rounded-lg text-xs font-bold transition-all cursor-pointer outline-none"
+                      >
+                        Edit Shift
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedDoctorId === doc.id && (
+                    <tr key={`${doc.id}-expanded`} className="bg-gray-50/40">
+                      <td colSpan="7" className="px-8 py-5 border-t border-b border-gray-100">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs text-left animate-fade-in">
+                          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+                            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Date of Birth</span>
+                            <span className="font-semibold text-gray-800">{doc.dob || "Not Specified"}</span>
+                          </div>
+                          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+                            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Phone Number</span>
+                            <span className="font-semibold text-gray-800">{doc.phone || "Not Specified"}</span>
+                          </div>
+                          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+                            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">License ID</span>
+                            <span className="font-semibold text-gray-800">{doc.licence_id || "Not Specified"}</span>
+                          </div>
+                          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+                            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Board / Council</span>
+                            <span className="font-semibold text-gray-800">{doc.board || "Not Specified"}</span>
+                          </div>
+                          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs">
+                            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Chair / Operatory Setup</span>
+                            <span className="font-semibold text-gray-800">{doc.chair_setup || "Not Specified"}</span>
+                          </div>
+                          <div className="bg-white p-3.5 rounded-xl border border-gray-100 shadow-2xs md:col-span-3">
+                            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Address</span>
+                            <span className="font-semibold text-gray-800">{doc.address || "Not Specified"}</span>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
               {filteredDoctors.length === 0 && (
                 <tr>
@@ -189,3 +252,4 @@ export default function DoctorManagementPage() {
     </div>
   );
 }
+

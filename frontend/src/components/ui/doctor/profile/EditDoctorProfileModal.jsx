@@ -9,6 +9,9 @@ export default function EditDoctorProfileModal({ doctor, onClose, onSave }) {
     phone: doctor.phone,
     dob: doctor.dob,
     address: doctor.address || "",
+    licenceId: doctor.credentials?.licenceId || "",
+    chairSetup: doctor.credentials?.chairSetup || "",
+    board: doctor.credentials?.board || "",
   });
 
   const handleChange = (e) => {
@@ -25,6 +28,12 @@ export default function EditDoctorProfileModal({ doctor, onClose, onSave }) {
       phone: formData.phone,
       dob: formData.dob,
       address: formData.address,
+      credentials: {
+        ...doctor.credentials,
+        licenceId: formData.licenceId,
+        chairSetup: formData.chairSetup,
+        board: formData.board
+      }
     });
   };
 
@@ -90,6 +99,39 @@ export default function EditDoctorProfileModal({ doctor, onClose, onSave }) {
                 type="text"
                 name="address"
                 value={formData.address}
+                onChange={handleChange}
+                required
+                className="w-full rounded-xl border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">License ID</label>
+              <input
+                type="text"
+                name="licenceId"
+                value={formData.licenceId}
+                onChange={handleChange}
+                required
+                className="w-full rounded-xl border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Chair / Operatory</label>
+              <input
+                type="text"
+                name="chairSetup"
+                value={formData.chairSetup}
+                onChange={handleChange}
+                required
+                className="w-full rounded-xl border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Dental Board / Council</label>
+              <input
+                type="text"
+                name="board"
+                value={formData.board}
                 onChange={handleChange}
                 required
                 className="w-full rounded-xl border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"

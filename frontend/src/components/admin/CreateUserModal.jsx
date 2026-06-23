@@ -9,6 +9,12 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser, editUse
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [selectedSpecialties, setSelectedSpecialties] = useState([]);
   const [password, setPassword] = useState("");
+  const [dob, setDob] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [licenceId, setLicenceId] = useState("");
+  const [chairSetup, setChairSetup] = useState("");
+  const [board, setBoard] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -24,6 +30,12 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser, editUse
           setSelectedRoles(mappedRoles);
           setSelectedSpecialties(editUser.specialties || []);
           setPassword("");
+          setDob(editUser.dob || "");
+          setPhone(editUser.phone || "");
+          setAddress(editUser.address || "");
+          setLicenceId(editUser.licence_id || "");
+          setChairSetup(editUser.chair_setup || "");
+          setBoard(editUser.board || "");
         }, 0);
         return () => clearTimeout(timer);
       } else {
@@ -33,6 +45,12 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser, editUse
           setSelectedRoles([]);
           setSelectedSpecialties([]);
           setPassword("");
+          setDob("");
+          setPhone("");
+          setAddress("");
+          setLicenceId("");
+          setChairSetup("");
+          setBoard("");
         }, 0);
         return () => clearTimeout(timer);
       }
@@ -87,7 +105,13 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser, editUse
       name: name.trim(),
       email: email.trim(),
       roles: selectedRoles,
-      specialties: selectedRoles.includes("doctor") ? selectedSpecialties : []
+      specialties: selectedRoles.includes("doctor") ? selectedSpecialties : [],
+      dob: dob.trim() || null,
+      phone: phone.trim() || null,
+      address: address.trim() || null,
+      licence_id: selectedRoles.includes("doctor") ? (licenceId.trim() || null) : null,
+      chair_setup: selectedRoles.includes("doctor") ? (chairSetup.trim() || null) : null,
+      board: selectedRoles.includes("doctor") ? (board.trim() || null) : null
     };
 
     if (password.trim()) {
@@ -248,6 +272,87 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser, editUse
                 ) : (
                   <p className="text-[10px] text-rose-500 font-bold mt-1">⚠️ Please assign at least one specialty dashboard.</p>
                 )}
+              </div>
+            )}
+
+            {/* DOCTOR DYNAMIC PROFILE DETAILS */}
+            {hasDoctor && (
+              <div className="space-y-4 p-4 bg-gray-50 border border-gray-150 rounded-xl animate-in fade-in duration-200">
+                <h4 className="text-[10px] uppercase font-bold text-primary tracking-wider">Doctor Credentials & Profile</h4>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Phone */}
+                  <div className="space-y-1">
+                    <label className="block text-[9px] uppercase font-bold text-gray-400 tracking-wider">Phone Number</label>
+                    <input 
+                      type="text" 
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-xs text-gray-800 outline-none focus:border-primary font-semibold"
+                      placeholder="+91 XXXXX XXXXX"
+                    />
+                  </div>
+
+                  {/* DOB */}
+                  <div className="space-y-1">
+                    <label className="block text-[9px] uppercase font-bold text-gray-400 tracking-wider">Date of Birth</label>
+                    <input 
+                      type="date" 
+                      value={dob}
+                      onChange={(e) => setDob(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-xs text-gray-800 outline-none focus:border-primary font-semibold"
+                    />
+                  </div>
+                </div>
+
+                {/* Licence ID & Chair Setup */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="block text-[9px] uppercase font-bold text-gray-400 tracking-wider">License ID</label>
+                    <input 
+                      type="text" 
+                      value={licenceId}
+                      onChange={(e) => setLicenceId(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-xs text-gray-800 outline-none focus:border-primary font-semibold"
+                      placeholder="e.g. DENT-12345"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[9px] uppercase font-bold text-gray-400 tracking-wider">Chair / Operatory</label>
+                    <input 
+                      type="text" 
+                      value={chairSetup}
+                      onChange={(e) => setChairSetup(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-xs text-gray-800 outline-none focus:border-primary font-semibold"
+                      placeholder="e.g. Chair 3 (Clinical A)"
+                    />
+                  </div>
+                </div>
+
+                {/* Board Certification */}
+                <div className="space-y-1">
+                  <label className="block text-[9px] uppercase font-bold text-gray-400 tracking-wider">Dental Board / Council</label>
+                  <input 
+                    type="text" 
+                    value={board}
+                    onChange={(e) => setBoard(e.target.value)}
+                    className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-xs text-gray-800 outline-none focus:border-primary font-semibold"
+                    placeholder="e.g. Dental Council of India"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="space-y-1">
+                  <label className="block text-[9px] uppercase font-bold text-gray-400 tracking-wider">Clinic / Residential Address</label>
+                  <textarea 
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 bg-white rounded-lg border border-gray-200 text-xs text-gray-800 outline-none focus:border-primary font-semibold resize-none"
+                    placeholder="Full residential or work address..."
+                  />
+                </div>
               </div>
             )}
 

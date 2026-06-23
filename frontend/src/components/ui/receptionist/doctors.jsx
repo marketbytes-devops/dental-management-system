@@ -1,14 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function ReceptionistDoctors() {
-  const [doctors, setDoctors] = useState([
-    { id: 1, name: "Dr. Anoop Nair", specialty: "General Dentist", dept: "Conservative", status: "Available", slots: ["09:30 AM", "10:30 AM", "11:30 AM (Sneha)", "12:00 PM (Rahul)", "03:00 PM"] },
-    { id: 2, name: "Dr. Priya Varma", specialty: "Orthodontist", dept: "Orthodontics", status: "In Treatment", slots: ["10:00 AM", "11:00 AM", "12:45 PM (Maria)", "02:00 PM (Aby)", "04:30 PM"] },
-    { id: 3, name: "Dr. Sarah Smith", specialty: "Endodontist", dept: "Root Canal Center", status: "On Break", slots: ["09:00 AM", "11:00 AM", "02:30 PM", "03:30 PM"] },
-    { id: 4, name: "Dr. James Kurt", specialty: "Oral Surgeon", dept: "Surgery", status: "Absent", slots: [] },
-  ]);
+  const [doctors, setDoctors] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchDoctors = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/admin/users", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error("Failed to load users.");
+      const data = await response.json();
+      
+      // Filter users who have the "Doctor" role
+      const doctorUsers = data.filter(user => 
+        user.roles && user.roles.some(role => role.toLowerCase() === "doctor")
+      );
+
+      // Map backend users to the receptionist UI format
+      const mappedDoctors = doctorUsers.map((user) => {
+        const specialtyStr = user.specialties && user.specialties.length > 0 
+          ? user.specialties[0] 
+          : "General Dentist";
+          
+        return {
+          id: user.id,
+          name: user.name.startsWith("Dr.") ? user.name : `Dr. ${user.name}`,
+          specialty: specialtyStr,
+          dept: user.specialties && user.specialties.length > 0 ? user.specialties[0] : "Clinical",
+          status: user.status === "Active" ? "Available" : "Absent",
+          slots: user.status === "Active" ? ["09:30 AM", "10:30 AM", "01:30 PM", "03:00 PM"] : []
+        };
+      });
+      
+      setDoctors(mappedDoctors);
+    } catch (err) {
+      console.error("Error loading receptionist doctors:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDoctors();
+  }, []);
 
   const handleToggleStatus = (id) => {
     const statuses = ["Available", "In Treatment", "On Break", "Absent"];

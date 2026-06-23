@@ -1,10 +1,10 @@
 import AuthGuard from "@/components/AuthGuard";
-import PatientPortalLayout from "@/components/ui/patients/layout/patientPortalLayout";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export default function PatientLayout({ children }) {
   return (
     <AuthGuard allowedRoles={["patient"]} type="patient">
-      <PatientPortalLayout>{children}</PatientPortalLayout>
+      <DashboardLayout>{children}</DashboardLayout>
     </AuthGuard>
   );
 }

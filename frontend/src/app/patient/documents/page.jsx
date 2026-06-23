@@ -4,7 +4,7 @@ import { useState } from "react";
 import ConsentStatusBanner from "@/components/ui/patients/documents/consentStatusBanner";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import MyDocumentLibrary from "@/components/ui/patients/documents/myDocumentLibrary";
-import { myDocuments as initialDocuments } from "@/components/ui/patients/mockData";
+import { myDocuments as initialDocuments } from "@/data/patientMockData";
 
 export default function PatientDocumentsPage() {
   const [documents, setDocuments] = useState(initialDocuments);

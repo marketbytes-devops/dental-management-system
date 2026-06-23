@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({

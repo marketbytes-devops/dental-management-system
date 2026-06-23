@@ -6,7 +6,7 @@ import OutstandingBanner from "@/components/ui/patients/billing/outstandingBanne
 import MyInvoiceList from "@/components/ui/patients/billing/myInvoiceList";
 import InvoiceDetailCard from "@/components/ui/patients/billing/invoiceDetailCard";
 import PaymentModal from "@/components/ui/patients/billing/paymentModal";
-import { myInvoices as initialInvoices } from "@/components/ui/patients/mockData";
+import { myInvoices as initialInvoices } from "@/data/patientMockData";
 
 export default function PatientBillingPage() {
   const [invoices, setInvoices] = useState(initialInvoices);

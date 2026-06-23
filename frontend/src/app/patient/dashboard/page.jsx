@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import LastVisitSummaryCard from "@/components/ui/patients/dashboard/lastVisitSummaryCard";
 import { Calendar, CreditCard, CheckSquare, Clock, Pill } from "lucide-react";
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 
 export default function PatientDashboardPage() {
   const [profile, setProfile] = useState(null);

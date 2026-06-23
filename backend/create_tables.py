@@ -6,10 +6,16 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from database import Base, engine
+from modules.auth.models import UserModel
+from modules.patient.models import PatientModel
+from modules.frontdesk.models import AppointmentModel
+from modules.frontdesk.communication_models import CommunicationLogModel
+from modules.lab.models import LabOrderModel
 from modules.doctor.models import DoctorModel, ReferralModel
+from modules.admin.models import AdminModel
 
 def main():
-    print("Initializing database tables for Doctor module...")
+    print("Initializing database tables for all modules...")
     try:
         # This will create all tables defined by models imported above
         Base.metadata.create_all(bind=engine)

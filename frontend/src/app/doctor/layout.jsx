@@ -2,11 +2,11 @@
 
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import DoctorSidebar from "@/components/ui/doctor/layout/DoctorSidebar";
-import DoctorNavbar from "@/components/ui/doctor/layout/DoctorNavbar";
+import DoctorSidebar from "@/components/layout/Sidebar";
+import DoctorNavbar from "@/components/layout/Navbar";
 import AuthGuard from "@/components/AuthGuard";
 import EmergencyPopup from "@/components/ui/doctor/workspace/EmergencyPopup";
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 import { Share2, Microscope, AlertTriangle, Bell, X } from "lucide-react";
 
 // Create context

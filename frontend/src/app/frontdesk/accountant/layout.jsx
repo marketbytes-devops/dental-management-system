@@ -1,10 +1,10 @@
 import AuthGuard from "@/components/AuthGuard";
-import AccountantPortalLayout from "@/components/ui/accountant/layout/accountantPortalLayout";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export default function AccountantLayout({ children }) {
   return (
     <AuthGuard allowedRoles={["accountant"]} type="staff">
-      <AccountantPortalLayout>{children}</AccountantPortalLayout>
+      <DashboardLayout>{children}</DashboardLayout>
     </AuthGuard>
   );
 }

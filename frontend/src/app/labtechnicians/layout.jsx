@@ -1,10 +1,10 @@
 import AuthGuard from "@/components/AuthGuard";
-import LabPortalLayout from "@/components/ui/labtechnicians/layout/labPortalLayout";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 
 export default function LabLayout({ children }) {
   return (
     <AuthGuard allowedRoles={["lab tech"]} type="staff">
-      <LabPortalLayout>{children}</LabPortalLayout>
+      <DashboardLayout>{children}</DashboardLayout>
     </AuthGuard>
   );
 }

@@ -12,6 +12,8 @@ from .schemas import (
     QueueItemResponse
 )
 from .models import AppointmentModel
+from .communication_models import CommunicationLogModel
+from .communication_schemas import CommunicationSendRequest, CommunicationLogResponse
 from modules.patient.models import PatientModel
 from .service import (
     create_appointment,
@@ -123,3 +125,71 @@ def get_live_queue(db: Session = Depends(get_db)):
             })
     return queue_items
 
+
+# ──────────────────────────────────────────
+# Communication Log Endpoints
+# ──────────────────────────────────────────
+
+@router.post("/communications", response_model=CommunicationLogResponse)
+def send_communication(
+    payload: CommunicationSendRequest,
+    db: Session = Depends(get_db)
+):
+    """Log a communication event sent to a patient."""
+    # If patient_id given, enrich contact info from the DB
+    recipient_phone = payload.recipient_phone
+    recipient_email = payload.recipient_email
+    recipient_name = payload.recipient_name
+
+    if payload.patient_id:
+        patient = db.query(PatientModel).filter(PatientModel.id == payload.patient_id).first()
+        if patient:
+            recipient_name = patient.name
+            recipient_phone = patient.phone
+            recipient_email = patient.email
+
+    log = CommunicationLogModel(
+        patient_id=payload.patient_id,
+        recipient_name=recipient_name,
+        recipient_phone=recipient_phone,
+        recipient_email=recipient_email,
+        channel=payload.channel,
+        template=payload.template,
+        message_body=payload.message_body,
+        status="Sent",
+        sent_by=payload.sent_by or "Receptionist",
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
+
+@router.get("/communications", response_model=List[CommunicationLogResponse])
+def get_communication_logs(
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """Fetch communication history, newest first."""
+    logs = (
+        db.query(CommunicationLogModel)
+        .order_by(CommunicationLogModel.sent_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return logs
+
+
+@router.get("/communications/patient/{patient_id}", response_model=List[CommunicationLogResponse])
+def get_patient_communications(
+    patient_id: int,
+    db: Session = Depends(get_db)
+):
+    """Fetch all communication logs for a specific patient."""
+    logs = (
+        db.query(CommunicationLogModel)
+        .filter(CommunicationLogModel.patient_id == patient_id)
+        .order_by(CommunicationLogModel.sent_at.desc())
+        .all()
+    )
+    return logs

@@ -42,7 +42,7 @@ import {
   User
 } from "lucide-react";
 
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 
 export const ROLE_NAV_ITEMS = {
   admin: [

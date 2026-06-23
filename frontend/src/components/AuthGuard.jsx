@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldAlert, ArrowRight } from "lucide-react";
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 
 // Helper to normalize roles
 const normalizeRole = (role) => {

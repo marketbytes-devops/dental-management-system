@@ -13,6 +13,7 @@ from .schemas import (
 )
 from .models import AppointmentModel
 from modules.patient.models import PatientModel
+from modules.auth.models import UserModel
 from .service import (
     create_appointment,
     get_today_appointments,
@@ -123,3 +124,18 @@ def get_live_queue(db: Session = Depends(get_db)):
             })
     return queue_items
 
+@router.get("/doctors")
+def get_public_doctors(db: Session = Depends(get_db)):
+    all_users = db.query(UserModel).filter(UserModel.status == "Active").all()
+    doctors = [u for u in all_users if any(r.lower() == "doctor" for r in (u.roles or []))]
+    
+    result = []
+    for doc in doctors:
+        specialty = ", ".join(doc.specialties) if doc.specialties else "General Dentistry"
+        name = doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}"
+        result.append({
+            "id": doc.id,
+            "name": name,
+            "specialty": specialty
+        })
+    return result

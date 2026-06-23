@@ -14,13 +14,13 @@ export default function ReceptionistAppointments() {
   const [form, setForm] = useState({
     appointment_time: "09:00 AM",
     appointment_date: new Date().toISOString().split("T")[0],
-    doctor_name: "Dr. Anoop Nair",
+    doctor_name: "",
     treatment_type: "Consultation",
     priority: "Routine",
     directCheckIn: false
   });
 
-  const doctors = ["Dr. Anoop Nair", "Dr. Priya Varma", "Dr. Sarah Smith"];
+  const [doctors, setDoctors] = useState([]);
   const types = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
 
   // Fetch appointments and patients
@@ -38,6 +38,15 @@ export default function ReceptionistAppointments() {
       if (patientsRes.ok) {
         const patientsData = await patientsRes.json();
         setPatients(patientsData);
+      }
+      // Fetch active doctors
+      const doctorsRes = await fetch("http://localhost:8000/frontdesk/doctors");
+      if (doctorsRes.ok) {
+        const doctorsData = await doctorsRes.json();
+        setDoctors(doctorsData);
+        if (doctorsData.length > 0) {
+          setForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
+        }
       }
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -153,7 +162,7 @@ export default function ReceptionistAppointments() {
       setForm({
         appointment_time: "09:00 AM",
         appointment_date: new Date().toISOString().split("T")[0],
-        doctor_name: "Dr. Anoop Nair",
+        doctor_name: doctors.length > 0 ? doctors[0].name : "",
         treatment_type: "Consultation",
         priority: "Routine",
         directCheckIn: false
@@ -259,8 +268,9 @@ export default function ReceptionistAppointments() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
               >
+                <option value="">Select a doctor...</option>
                 {doctors.map(d => (
-                  <option key={d} value={d}>{d}</option>
+                  <option key={d.name} value={d.name}>{d.name} — {d.specialty}</option>
                 ))}
               </select>
             </div>

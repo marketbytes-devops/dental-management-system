@@ -29,7 +29,7 @@ export default function ReceptionistPatients() {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [registeredPatient, setRegisteredPatient] = useState(null);
   const [bookingForm, setBookingForm] = useState({
-    doctor_name: "Dr. Anoop Nair",
+    doctor_name: "",
     appointment_date: new Date().toISOString().split("T")[0],
     appointment_time: "09:00 AM",
     treatment_type: "Consultation",
@@ -46,7 +46,7 @@ export default function ReceptionistPatients() {
     "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
     "Delhi", "Puducherry"
   ];
-  const doctors = ["Dr. Anoop Nair", "Dr. Priya Varma", "Dr. Sarah Smith"];
+  const [doctors, setDoctors] = useState([]);
   const treatments = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
 
   // Fetch all patients
@@ -57,6 +57,15 @@ export default function ReceptionistPatients() {
       if (response.ok) {
         const data = await response.json();
         setPatients(data);
+      }
+      
+      const doctorsRes = await fetch("http://localhost:8000/frontdesk/doctors");
+      if (doctorsRes.ok) {
+        const doctorsData = await doctorsRes.json();
+        setDoctors(doctorsData);
+        if (doctorsData.length > 0) {
+          setBookingForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
+        }
       }
     } catch (err) {
       console.error("Error fetching patients:", err);
@@ -573,8 +582,9 @@ export default function ReceptionistPatients() {
                   onChange={handleBookingInputChange}
                   className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
                 >
+                  <option value="">Select a doctor...</option>
                   {doctors.map(d => (
-                    <option key={d} value={d}>{d}</option>
+                    <option key={d.name} value={d.name}>{d.name} — {d.specialty}</option>
                   ))}
                 </select>
               </div>

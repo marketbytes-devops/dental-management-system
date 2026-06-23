@@ -1,5 +1,20 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw } from "lucide-react";
+
+export default function DoctorManagementPage() {
+  const initialDoctors = [
+    { id: 1, name: "Dr. Anoop Nair", specialty: "Endodontics", operatory: "Operatory 1", shift: "09:00 AM - 05:00 PM", status: "On Duty", patientsCount: 5 },
+    { id: 2, name: "Dr. Sarah Jenkins", specialty: "Orthodontics", operatory: "Operatory 2", shift: "09:00 AM - 05:00 PM", status: "On Duty", patientsCount: 3 },
+    { id: 3, name: "Dr. James Kurt", specialty: "Oral Surgery", operatory: "Operatory 3", shift: "10:00 AM - 06:00 PM", status: "On Break", patientsCount: 1 },
+    { id: 4, name: "Dr. Lisa Wong", specialty: "Pediatric Dentistry", operatory: "Operatory 4", shift: "09:00 AM - 05:00 PM", status: "Off Duty", patientsCount: 0 },
+    { id: 5, name: "Dr. Marcus Vance", specialty: "Periodontics", operatory: "Operatory 5", shift: "11:00 AM - 07:00 PM", status: "On Duty", patientsCount: 4 },
+    { id: 6, name: "Dr. Jane Miller", specialty: "Prosthodontics", operatory: "Operatory 6", shift: "09:00 AM - 05:00 PM", status: "Off Duty", patientsCount: 0 },
+  ];
+
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
 import { useState, useEffect, Fragment } from "react";
 import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw } from "lucide-react";
 
@@ -24,6 +39,59 @@ export default function DoctorManagementPage() {
       const doctorUsers = data.filter(user => 
         user.roles && user.roles.some(role => role.toLowerCase() === "doctor")
       );
+
+  const fetchDoctors = async () => {
+    setLoading(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/admin/doctors", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error("Failed to load doctor roster.");
+      const data = await response.json();
+      setDoctors(data);
+    } catch (err) {
+      console.error("Failed to fetch doctor list, falling back to dummy data:", err);
+      setDoctors(initialDoctors);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDoctors();
+  }, []);
+
+  const toggleStatus = async (id) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/admin/doctors/${id}/status`, {
+        method: "PUT",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error("Failed to toggle doctor status.");
+      const updated = await response.json();
+      setDoctors(prev => prev.map(doc => {
+        if (doc.id === id) {
+          return { ...doc, status: updated.status };
+        }
+        return doc;
+      }));
+    } catch (err) {
+      console.error(err);
+      // Local fallback cycling
+      setDoctors(prev => prev.map(doc => {
+        if (doc.id === id) {
+          let nextStatus = "On Duty";
+          if (doc.status === "On Duty") nextStatus = "On Break";
+          else if (doc.status === "On Break") nextStatus = "Off Duty";
+          else nextStatus = "On Duty";
+          return { ...doc, status: nextStatus };
+        }
+        return doc;
+      }));
+    }
+  };
 
       // Map backend users to doctor UI fields
       const mappedDoctors = doctorUsers.map((user, index) => {
@@ -92,6 +160,7 @@ export default function DoctorManagementPage() {
           onClick={fetchDoctors}
           className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
         >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh roster
           <RefreshCw className="w-4 h-4" /> Refresh roster
         </button>
       </div>
@@ -175,6 +244,15 @@ export default function DoctorManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 text-sm">
+              {loading && doctors.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="text-center py-12 text-gray-500 font-semibold italic">
+                    <RefreshCw className="w-4 h-4 animate-spin text-primary inline mr-2" /> Loading doctor roster...
+                  </td>
+                </tr>
+              ) : (
+                filteredDoctors.map(doc => (
+                  <tr key={doc.id} className="hover:bg-gray-50/50 transition-colors">
               {filteredDoctors.map(doc => (
                 <Fragment key={doc.id}>
                   <tr className="hover:bg-gray-50/50 transition-colors">
@@ -190,6 +268,10 @@ export default function DoctorManagementPage() {
                     </td>
                     <td className="py-4 px-6 text-right">
                       <button
+                        onClick={() => toggleStatus(doc.id)}
+                        className="px-3 py-1 bg-gray-50 hover:bg-primary/5 hover:text-primary border border-gray-250 hover:border-primary/25 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
+                      >
+                        Cycle Status
                         onClick={() => setExpandedDoctorId(expandedDoctorId === doc.id ? null : doc.id)}
                         className="px-3 py-1 bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
                       >
@@ -203,6 +285,9 @@ export default function DoctorManagementPage() {
                       </button>
                     </td>
                   </tr>
+                ))
+              )}
+              {!loading && filteredDoctors.length === 0 && (
                   {expandedDoctorId === doc.id && (
                     <tr key={`${doc.id}-expanded`} className="bg-gray-50/40">
                       <td colSpan="7" className="px-8 py-5 border-t border-b border-gray-100">

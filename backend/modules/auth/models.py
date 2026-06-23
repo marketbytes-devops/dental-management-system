@@ -15,3 +15,4 @@ class UserModel(Base):
     specialties = Column(JSON, nullable=False, default=[])
     status = Column(String, default="Active")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+

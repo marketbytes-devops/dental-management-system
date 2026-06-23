@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Stethoscope } from "lucide-react";
 import ToothIcon from "@/components/ui/ToothIcon";
 import { ROLE_NAV_ITEMS } from "./navigationConfig";
 import { useDoctor } from "@/app/doctor/layout";
@@ -35,7 +35,23 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
           try {
             const parsed = JSON.parse(staffUser);
             setCurrentUser(parsed);
-            setRole(parsed.role?.toLowerCase() || "");
+            
+            const roles = parsed.roles || [];
+            const rawRole = roles.length > 0 ? roles[0] : (parsed.role || "");
+            
+            const normalizeRole = (r) => {
+              if (!r) return "";
+              const val = r.toLowerCase().trim();
+              if (val === "admin") return "admin";
+              if (val === "doctor") return "doctor";
+              if (val === "lab tech" || val === "lab" || val === "lab technician") return "lab tech";
+              if (val === "receptionist" || val === "reception") return "receptionist";
+              if (val === "accountant" || val === "accountent") return "accountant";
+              if (val === "patient") return "patient";
+              return val;
+            };
+
+            setRole(normalizeRole(rawRole));
           } catch (e) {
             console.error("Failed to parse staff_user", e);
           }

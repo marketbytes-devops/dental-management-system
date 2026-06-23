@@ -33,7 +33,23 @@ export default function Navbar() {
           const parsed = JSON.parse(staffUser);
           setTimeout(() => {
             setCurrentUser(parsed);
-            setRole(parsed.role?.toLowerCase() || "");
+            
+            const roles = parsed.roles || [];
+            const rawRole = roles.length > 0 ? roles[0] : (parsed.role || "");
+            
+            const normalizeRole = (r) => {
+              if (!r) return "";
+              const val = r.toLowerCase().trim();
+              if (val === "admin") return "admin";
+              if (val === "doctor") return "doctor";
+              if (val === "lab tech" || val === "lab" || val === "lab technician") return "lab tech";
+              if (val === "receptionist" || val === "reception") return "receptionist";
+              if (val === "accountant" || val === "accountent") return "accountant";
+              if (val === "patient") return "patient";
+              return val;
+            };
+
+            setRole(normalizeRole(rawRole));
             setCurrentStatus(parsed.status || "Active");
           }, 0);
         } catch (e) {

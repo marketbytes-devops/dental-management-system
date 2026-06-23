@@ -42,6 +42,8 @@ import {
   User
 } from "lucide-react";
 
+import ToothIcon from "@/components/ui/ToothIcon";
+
 export const ROLE_NAV_ITEMS = {
   admin: [
     { name: "Dashboard", href: "/admin/dashboard", icon: BarChart3 },
@@ -50,6 +52,61 @@ export const ROLE_NAV_ITEMS = {
     { name: "Doctor Schedules", href: "/admin/doctor", icon: Stethoscope },
     { name: "Patient Directory", href: "/admin/patients", icon: Users },
     { name: "Inventory", href: "/admin/inventory", icon: ClipboardList },
+    {
+      name: "Receptionist",
+      icon: ConciergeBell,
+      subItems: [
+        { name: "Dashboard", href: "/admin/receptionist/dashboard", icon: BarChart3 },
+        { name: "Appointment Booking", href: "/admin/receptionist/appointments", icon: Calendar },
+        { name: "Patient Registration", href: "/admin/receptionist/patients", icon: UserPlus },
+        { name: "Check-In / Check-Out", href: "/admin/receptionist/checkin", icon: CheckSquare },
+        { name: "Doctor Schedules", href: "/admin/receptionist/doctors", icon: Stethoscope },
+        { name: "Treatment Coordination", href: "/admin/receptionist/treatments", icon: ToothIcon },
+        { name: "Waiting Queue", href: "/admin/receptionist/queue", icon: Hourglass },
+        { name: "Patient Communication", href: "/admin/receptionist/communication", icon: Phone },
+        { name: "Appointment Reminders", href: "/admin/receptionist/reminders", icon: Bell },
+        { name: "Patient Records", href: "/admin/receptionist/records", icon: FolderOpen },
+        { name: "Support Requests", href: "/admin/receptionist/support", icon: Headphones },
+        { name: "Settings", href: "/admin/receptionist/settings", icon: Settings },
+      ],
+    },
+    {
+      name: "Accountant",
+      icon: Coins,
+      subItems: [
+        { name: "Dashboard", href: "/admin/accountant/dashboard", icon: BarChart3 },
+        { name: "Invoice Management", href: "/admin/accountant/invoices", icon: Receipt },
+        { name: "Payment Processing", href: "/admin/accountant/payments", icon: CreditCard },
+        { name: "Insurance Claims", href: "/admin/accountant/claims", icon: Shield },
+        { name: "Claim Verification", href: "/admin/accountant/claim-verification", icon: ShieldCheck },
+        { name: "Revenue Tracking", href: "/admin/accountant/revenue", icon: TrendingUp },
+        { name: "Expense Management", href: "/admin/accountant/expenses", icon: TrendingDown },
+        { name: "Refund Requests", href: "/admin/accountant/refunds", icon: Undo2 },
+        { name: "Outstanding Dues", href: "/admin/accountant/dues", icon: AlertCircle },
+        { name: "Payroll", href: "/admin/accountant/payroll", icon: Banknote },
+        { name: "Financial Reports", href: "/admin/accountant/reports", icon: FileText },
+        { name: "Audit Logs", href: "/admin/accountant/audit", icon: Search },
+        { name: "Settings", href: "/admin/accountant/settings", icon: Settings },
+      ],
+    },
+    {
+      name: "Lab Technician",
+      icon: Microscope,
+      subItems: [
+        { name: "Dashboard", href: "/admin/labtechnicians/dashboard", icon: BarChart3 },
+        { name: "Lab Orders", href: "/admin/labtechnicians/orders", icon: ClipboardList },
+        { name: "Case Tracking", href: "/admin/labtechnicians/case-tracking", icon: Search },
+        { name: "CAD Design", href: "/admin/labtechnicians/cad-design", icon: Laptop },
+        { name: "Production", href: "/admin/labtechnicians/production", icon: Wrench },
+        { name: "Quality Control", href: "/admin/labtechnicians/quality-control", icon: CheckSquare },
+        { name: "Dispatch", href: "/admin/labtechnicians/dispatch", icon: Truck },
+        { name: "Invoices", href: "/admin/labtechnicians/invoices", icon: Banknote },
+        { name: "Warranty", href: "/admin/labtechnicians/warranty", icon: Shield },
+        { name: "Reports", href: "/admin/labtechnicians/reports", icon: TrendingUp },
+        { name: "Notifications", href: "/admin/labtechnicians/notifications", icon: Bell },
+        { name: "Settings", href: "/admin/labtechnicians/settings", icon: Settings },
+      ],
+    },
     { name: "System Logs", href: "/admin/dashboard", icon: FileEdit }
   ],
   doctor: [

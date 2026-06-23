@@ -20,7 +20,7 @@ import {
   X,
   Search
 } from "lucide-react";
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 
 export default function DoctorReferralsPage() {
   const { 

@@ -15,7 +15,7 @@ import {
   Sparkles,
   Mail
 } from "lucide-react";
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 
 const dummyCredentials = {
   patient: { identifier: "9876543210", email: "patient@example.com", password: "patient123" }

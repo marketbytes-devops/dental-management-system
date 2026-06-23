@@ -1,5 +1,5 @@
 import { Pill, CreditCard, FileText } from "lucide-react";
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 
 const activities = [
   {

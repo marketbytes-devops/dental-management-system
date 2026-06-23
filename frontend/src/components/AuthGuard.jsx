@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldAlert, ArrowRight } from "lucide-react";
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 
 // Helper to normalize roles
 const normalizeRole = (role) => {
@@ -100,8 +100,8 @@ export default function AuthGuard({ children, allowedRoles = [], type = "staff" 
         const allowedRolesArray = JSON.parse(allowedRolesStr);
         const normalizedAllowedRoles = allowedRolesArray.map(normalizeRole);
 
-        // Check authorization
-        const isAuthorized = normalizedUserRoles.some(r => normalizedAllowedRoles.includes(r));
+        // Check authorization (admin role gets full bypass access)
+        const isAuthorized = normalizedUserRoles.includes("admin") || normalizedUserRoles.some(r => normalizedAllowedRoles.includes(r));
 
         if (active) {
           setUserRoles(roles);
@@ -133,7 +133,7 @@ export default function AuthGuard({ children, allowedRoles = [], type = "staff" 
           const normalizedUserRoles = roles.map(normalizeRole);
           const allowedRolesArray = JSON.parse(allowedRolesStr);
           const normalizedAllowedRoles = allowedRolesArray.map(normalizeRole);
-          const isAuthorized = normalizedUserRoles.some(r => normalizedAllowedRoles.includes(r));
+          const isAuthorized = normalizedUserRoles.includes("admin") || normalizedUserRoles.some(r => normalizedAllowedRoles.includes(r));
 
           if (active) {
             setUserRoles(roles);

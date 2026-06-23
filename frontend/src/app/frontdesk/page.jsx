@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Users, Calculator } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
-import ToothIcon from "@/components/ui/ToothIcon";
+import ToothIcon from "@/components/ui/shared/ToothIcon";
 
 export default function FrontDeskLandingPage() {
   const handleLogout = () => {

@@ -5,7 +5,7 @@ import TreatmentTimeline from "@/components/ui/patients/records/treatmentTimelin
 import PrescriptionCard from "@/components/ui/patients/records/prescriptionCard";
 import ActivePrescriptions from "@/components/ui/patients/records/activePrescriptions";
 import ReferralCard from "@/components/ui/patients/records/referralCard";
-import { myAppointments, myPrescriptions } from "@/components/ui/patients/mockData";
+import { myAppointments, myPrescriptions } from "@/data/patientMockData";
 
 export default function PatientRecordsPage() {
   const [activeTab, setActiveTab] = useState("treatment"); // treatment | active-rx | all-rx | referrals

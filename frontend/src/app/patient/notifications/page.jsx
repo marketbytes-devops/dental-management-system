@@ -3,7 +3,7 @@ import NotificationList from '@/components/ui/patients/notifications/Notificatio
 import PostCareInstructions from '@/components/ui/patients/notifications/PostCareInstructions';
 import RecallReminderCard from '@/components/ui/patients/notifications/RecallReminderCard';
 import FeedbackForm from '@/components/ui/patients/notifications/FeedbackForm';
-import { myNotifications, postCareInstructions } from '@/components/ui/patients/mockData';
+import { myNotifications, postCareInstructions } from '@/data/patientMockData';
 
 export const metadata = {
   title: 'My Notifications | Patient Portal',

@@ -6,6 +6,7 @@ import ProfileHeader from "@/components/ui/patients/profile/profileHeader";
 import ProfileSection from "@/components/ui/patients/profile/profileSection";
 import InsuranceCard from "@/components/ui/patients/profile/insuranceCard";
 import EditProfileModal from "@/components/ui/patients/profile/editProfileModal";
+import PatientSecurityCard from "@/components/ui/patients/profile/patientSecurityCard";
 import { Pencil } from "lucide-react";
 
 export default function ProfilePage() {
@@ -127,6 +128,7 @@ export default function ProfilePage() {
         <div className="lg:col-span-2 space-y-6">
           <ProfileSection title="Personal Information" items={personalItems} />
           <ProfileSection title="Emergency Contact Details" items={emergencyItems} />
+          <PatientSecurityCard />
         </div>
         <div className="lg:col-span-1">
           <InsuranceCard insurance={patient.insurance} />

@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 from typing import List
 from database import get_db
 
-from .schemas import PatientCreate, PatientResponse
+from .schemas import PatientCreate, PatientResponse, PatientUpdate, PasswordChangeRequest
 from .models import PatientModel
-from .service import get_patient_by_phone, get_patient_by_email, create_patient
+from .service import get_patient_by_phone, get_patient_by_email, create_patient, update_patient_profile, change_patient_password
 from dependencies import get_current_user
 
 
@@ -58,3 +58,32 @@ def get_profile(
 def get_all_patients(db: Session = Depends(get_db)):
     return db.query(PatientModel).order_by(PatientModel.name.asc()).all()
 
+
+@router.put("/profile", response_model=PatientResponse)
+def update_profile(
+    update_in: PatientUpdate,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    updated = update_patient_profile(db, patient_id=patient_id, update_in=update_in)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    return updated
+
+
+@router.post("/change-password")
+def change_password(
+    req: PasswordChangeRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    success = change_patient_password(db, patient_id=patient_id, current_password=req.current_password, new_password=req.new_password)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect.")
+    return {"message": "Password updated successfully."}

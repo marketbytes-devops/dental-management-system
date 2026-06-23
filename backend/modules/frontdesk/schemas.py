@@ -66,4 +66,9 @@ class QueueItemResponse(BaseModel):
     priority: str
     status: str
     wait_time_estimate: int
+    age: Optional[int] = 30
+    gender: Optional[str] = "Unknown"
+    medical_alerts: Optional[List[str]] = []
+    procedure: Optional[str] = "Consultation"
+    chief_complaint: Optional[str] = None
 

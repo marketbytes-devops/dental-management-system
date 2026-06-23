@@ -139,13 +139,7 @@ export default function DoctorLayout({ children }) {
   const [emergencyAlert, setEmergencyAlert] = useState(null);
   const [hasTriggeredAutoEmergency, setHasTriggeredAutoEmergency] = useState(false);
 
-  // Waiting queue
-  const [queue, setQueue] = useState([
-    { token: "#005", time: "11:30 AM", status: "Waiting", priority: "Routine" },
-    { token: "#006", time: "11:55 AM", status: "Waiting", priority: "Routine" },
-    { token: "#007", time: "12:10 PM", status: "Waiting", priority: "Routine" },
-    { token: "#008", time: "12:30 PM", status: "Waiting", priority: "Routine" }
-  ]);
+  const [queue, setQueue] = useState([]);
 
   // Lab Orders
   const [labOrders, setLabOrders] = useState([
@@ -384,10 +378,82 @@ export default function DoctorLayout({ children }) {
   // Active Emergency badge tracker
   const hasUrgentInQueue = queue.some(q => q.priority === "Urgent");
 
+  const fetchQueue = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/frontdesk/queue");
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Filter by current doctor's name
+        const doctorNameLower = currentDoctorName ? currentDoctorName.toLowerCase() : "";
+        const doctorNameWithoutTitleLower = currentDoctorName ? currentDoctorName.replace("Dr. ", "").toLowerCase() : "";
+        
+        const myQueue = data.filter(q => {
+          if (!currentDoctorName) return true;
+          const qDocLower = q.doctor_name.toLowerCase();
+          return qDocLower.includes(doctorNameLower) || qDocLower.includes(doctorNameWithoutTitleLower);
+        });
+
+        // Map backend QueueItemResponse to expected frontend state structure
+        const mappedQueue = myQueue.map(q => ({
+          token: q.token,
+          time: q.appointment_time,
+          status: q.status,
+          priority: q.priority,
+          id: q.id
+        }));
+        
+        setQueue(mappedQueue);
+
+        // Update the patients dictionary dynamically so that clinical sheet and info can be viewed
+        setPatients(prev => {
+          const updated = { ...prev };
+          myQueue.forEach(q => {
+            updated[q.token] = {
+              token: q.token,
+              name: q.patient_name,
+              age: q.age,
+              gender: q.gender,
+              phone: q.patient_phone,
+              procedure: q.procedure || "Consultation",
+              chiefComplaint: q.chief_complaint || "Routine Checkup",
+              medicalAlerts: q.medical_alerts || [],
+              teethChart: prev[q.token]?.teethChart || {},
+              timeline: prev[q.token]?.timeline || [
+                { date: new Date(q.checked_in_at).toLocaleDateString(), note: "Checked in", type: "Check-In" }
+              ]
+            };
+          });
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch live queue for doctor:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueue();
+    const interval = setInterval(fetchQueue, 5000);
+    return () => clearInterval(interval);
+  }, [currentDoctorName]);
+
   // Call Patient from table
-  const handleCallPatient = (token) => {
+  const handleCallPatient = async (token) => {
     const p = patients[token];
     if (!p) return;
+
+    const queueItem = queue.find(item => item.token === token);
+    if (queueItem && queueItem.id) {
+      try {
+        await fetch(`http://localhost:8000/frontdesk/appointments/${queueItem.id}/call?status_str=In Chair`, {
+          method: "POST"
+        });
+        await fetchQueue();
+      } catch (err) {
+        console.error("Failed to call patient in backend:", err);
+      }
+    }
 
     setQueue(prev => prev.filter(item => item.token !== token));
 
@@ -403,7 +469,7 @@ export default function DoctorLayout({ children }) {
   };
 
   // Call Next Patient from Queue
-  const handleCallNextPatient = () => {
+  const handleCallNextPatient = async () => {
     if (queue.length === 0) {
       showNotification("No patients remaining in the waiting queue.");
       return;
@@ -414,6 +480,17 @@ export default function DoctorLayout({ children }) {
     }
 
     const nextItem = queue[0];
+    if (nextItem && nextItem.id) {
+      try {
+        await fetch(`http://localhost:8000/frontdesk/appointments/${nextItem.id}/call?status_str=In Chair`, {
+          method: "POST"
+        });
+        await fetchQueue();
+      } catch (err) {
+        console.error("Failed to call next patient in backend:", err);
+      }
+    }
+
     setQueue(prev => prev.slice(1));
 
     setActivePatientToken(nextItem.token);
@@ -437,19 +514,58 @@ export default function DoctorLayout({ children }) {
   };
 
   // Skip Patient
-  const handleSkipPatient = (token) => {
+  const handleSkipPatient = async (token) => {
+    const queueItem = queue.find(q => q.token === token);
+    if (queueItem && queueItem.id) {
+      try {
+        await fetch(`http://localhost:8000/frontdesk/appointments/${queueItem.id}/status`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "Skipped" })
+        });
+        await fetchQueue();
+      } catch (err) {
+        console.error("Failed to skip patient:", err);
+      }
+    }
     setQueue(prev => prev.map(q => q.token === token ? { ...q, status: "Skipped" } : q));
     showNotification(`Token ${token} marked as skipped.`);
   };
 
   // Requeue Patient
-  const handleRequeuePatient = (token) => {
+  const handleRequeuePatient = async (token) => {
+    const queueItem = queue.find(q => q.token === token);
+    if (queueItem && queueItem.id) {
+      try {
+        await fetch(`http://localhost:8000/frontdesk/appointments/${queueItem.id}/status`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "Waiting" })
+        });
+        await fetchQueue();
+      } catch (err) {
+        console.error("Failed to requeue patient:", err);
+      }
+    }
     setQueue(prev => prev.map(q => q.token === token ? { ...q, status: "Waiting" } : q));
     showNotification(`Token ${token} returned to waiting status.`);
   };
 
   // Remove Patient
-  const handleRemovePatient = (token) => {
+  const handleRemovePatient = async (token) => {
+    const queueItem = queue.find(q => q.token === token);
+    if (queueItem && queueItem.id) {
+      try {
+        await fetch(`http://localhost:8000/frontdesk/appointments/${queueItem.id}/status`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "Completed" })
+        });
+        await fetchQueue();
+      } catch (err) {
+        console.error("Failed to remove patient:", err);
+      }
+    }
     setQueue(prev => prev.filter(q => q.token !== token));
     showNotification(`Token ${token} removed from queue.`);
   };

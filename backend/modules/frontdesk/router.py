@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import date
 from database import get_db
 from .schemas import (
     AppointmentCreate,
@@ -112,6 +113,15 @@ def get_live_queue(db: Session = Depends(get_db)):
     for appt in sorted_appts:
         patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
         if patient:
+            age = 30
+            if patient.date_of_birth:
+                today = date.today()
+                age = today.year - patient.date_of_birth.year - ((today.month, today.day) < (patient.date_of_birth.month, patient.date_of_birth.day))
+            
+            alerts = []
+            if patient.known_allergies:
+                alerts.append(patient.known_allergies)
+                
             queue_items.append({
                 "id": appt.id,
                 "patient_name": patient.name,
@@ -122,7 +132,12 @@ def get_live_queue(db: Session = Depends(get_db)):
                 "checked_in_at": appt.checked_in_at or appt.created_at,
                 "priority": appt.priority,
                 "status": appt.status,
-                "wait_time_estimate": appt.wait_time_estimate
+                "wait_time_estimate": appt.wait_time_estimate,
+                "age": age,
+                "gender": patient.gender,
+                "medical_alerts": alerts,
+                "procedure": appt.treatment_type,
+                "chief_complaint": appt.symptoms or "Dental checkup"
             })
     return queue_items
 

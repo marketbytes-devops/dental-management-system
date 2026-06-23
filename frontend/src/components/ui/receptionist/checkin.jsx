@@ -5,6 +5,238 @@ import { UserCheck, AlertTriangle, Clock, KeyRound, CheckCircle, Shield } from "
 
 export default function ReceptionistCheckIn() {
   const [appointments, setAppointments] = useState([]);
+  const [activeQueue, setActiveQueue] = useState([]);
+  const [pendingOtpPatients, setPendingOtpPatients] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [selectedAppId, setSelectedAppId] = useState("");
+  const [priority, setPriority] = useState("Routine");
+  const [assignedDoctor, setAssignedDoctor] = useState("");
+  const [doctorsList, setDoctorsList] = useState([]);
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+
+      // Fetch today's appointments
+      const apptsRes = await fetch("http://localhost:8000/frontdesk/appointments/today");
+      if (apptsRes.ok) {
+        const apptsData = await apptsRes.json();
+        setAppointments(apptsData);
+        
+        const pendingOtp = apptsData.filter(a => a.status === "Pending OTP" || a.otp_status === "Pending" || a.otp_status === "Sent");
+        setPendingOtpPatients(pendingOtp);
+      }
+
+      // Fetch live waiting queue
+      const queueRes = await fetch("http://localhost:8000/frontdesk/queue");
+      if (queueRes.ok) {
+        const queueData = await queueRes.json();
+        setActiveQueue(queueData);
+      }
+
+      // Fetch live doctors status
+      const doctorsRes = await fetch("http://localhost:8000/auth/doctors", { headers });
+      if (doctorsRes.ok) {
+        const doctorsData = await doctorsRes.json();
+        setDoctorsList(doctorsData);
+        if (doctorsData.length > 0 && !assignedDoctor) {
+          // Default to first active doctor
+          const activeDocs = doctorsData.filter(d => d.status !== "Off Duty");
+          if (activeDocs.length > 0) {
+            setAssignedDoctor(activeDocs[0].name);
+          } else {
+            setAssignedDoctor(doctorsData[0].name);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching check-in data:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setTimeout(() => {
+      fetchData();
+    }, 0);
+    // Poll every 5 seconds for updates
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Direct manual check-in (receptionist booking / offline check-in)
+  const handleCheckIn = async (e) => {
+    e.preventDefault();
+    if (!selectedAppId) {
+      alert("Please select a patient to check-in.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${selectedAppId}/direct-checkin?priority=${priority}&doctor_name=${assignedDoctor}`, {
+        method: "POST"
+      });
+      if (response.ok) {
+        alert("Patient checked in directly. Added to live queue.");
+        setSelectedAppId("");
+        fetchData();
+      } else {
+        const err = await response.json();
+        alert(err.detail || "Direct check-in failed.");
+      }
+    } catch (err) {
+      alert("Error checking in patient.");
+    }
+  };
+
+  // Checkout patient
+  const handleCheckout = async (id, name) => {
+    try {
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Completed" })
+      });
+      if (response.ok) {
+        alert(`Patient ${name} checked out. Billing invoice updated.`);
+        fetchData();
+      } else {
+        const err = await response.json();
+        alert(err.detail || "Checkout failed.");
+      }
+    } catch (err) {
+      alert("Error checking out patient.");
+    }
+  };
+
+  // Call patient to dental chair
+  const handleCallToChair = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "In Chair" })
+      });
+      if (response.ok) {
+        fetchData();
+      }
+    } catch (err) {
+      alert("Error calling patient to chair.");
+    }
+  };
+
+  // Send OTP trigger
+  const handleSendOtp = async (id, phone, name) => {
+    try {
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/send-otp`, {
+        method: "POST"
+      });
+      if (response.ok) {
+        const data = await response.json();
+        alert(`OTP Code (${data.otp}) sent to registered number (${phone}) for patient ${name}.`);
+        fetchData();
+      }
+    } catch (err) {
+      alert("Error sending OTP.");
+    }
+  };
+
+  // Direct bypass check-in for emergency/flexible workflows
+  const handleBypassOtp = async (id, name, isEmergency) => {
+    try {
+      const pLevel = isEmergency ? "Emergency" : "Routine";
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/direct-checkin?priority=${pLevel}`, {
+        method: "POST"
+      });
+      if (response.ok) {
+        alert(`OTP bypassed for ${name}. Patient entered queue with ${pLevel} priority.`);
+        fetchData();
+      }
+    } catch (err) {
+      alert("Error bypassing OTP.");
+    }
+  };
+
+  const eligibleForDirectCheckIn = appointments.filter(
+    a => a.status === "Confirmed" && a.otp_status === "None"
+  );
+
+  return (
+    <div className="space-y-6 pb-10">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Check-In / Check-Out Desk</h1>
+        <p className="text-sm text-gray-500 mt-1">Check-in arriving patients, verify OTP check-ins, handle emergency overrides, and complete billing.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Check In Panel (Manual) */}
+        <div className="lg:col-span-6 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
+          <h3 className="text-base font-extrabold text-gray-900">Direct Patient Check-In (No OTP Required)</h3>
+          
+          <form onSubmit={handleCheckIn} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">Select Arrived Appointment</label>
+              <select
+                value={selectedAppId}
+                onChange={(e) => {
+                  setSelectedAppId(e.target.value);
+                  const selected = appointments.find(a => a.id === parseInt(e.target.value));
+                  if (selected) {
+                    setAssignedDoctor(selected.doctor_name);
+                    setPriority(selected.priority);
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+              >
+                <option value="">-- Choose Patient --</option>
+                {eligibleForDirectCheckIn.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.patient?.name} ({a.appointment_time} - {a.doctor_name})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Priority / Triage</label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                >
+                  <option value="Routine">Routine</option>
+                  <option value="Urgent">Urgent</option>
+                  <option value="Emergency">Emergency</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Route to Doctor</label>
+                <select
+                  value={assignedDoctor}
+                  onChange={(e) => setAssignedDoctor(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                >
+                  {doctorsList.map(d => (
+                    <option 
+                      key={d.id} 
+                      value={d.name}
+                      disabled={d.status === "Off Duty"}
+                      className={d.status === "Off Duty" ? "text-gray-400" : ""}
+                    >
+                      {d.name} {d.status === "Off Duty" ? "(Off Duty)" : d.status === "On Break" ? "(On Break)" : "(Available)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button
               type="submit"
               className="w-full py-2 bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer mt-2"
             >

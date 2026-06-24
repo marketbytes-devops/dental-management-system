@@ -97,6 +97,15 @@ def get_today_appointments(db: Session):
         AppointmentModel.appointment_date == today
     ).order_by(AppointmentModel.appointment_time.asc()).all()
 
+def get_tomorrow_appointments(db: Session):
+    tomorrow = date.today() + timedelta(days=1)
+
+    return (
+        db.query(AppointmentModel)
+        .filter(AppointmentModel.appointment_date == tomorrow)
+        .all()
+    )
+
 def get_patient_appointments(db: Session, patient_id: int):
     """Fetch all appointments for a specific patient."""
     return db.query(AppointmentModel).filter(

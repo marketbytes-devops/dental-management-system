@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import date
+from datetime import date,timedelta
 from database import get_db
 from .schemas import (
     AppointmentCreate,
@@ -20,6 +20,7 @@ from modules.auth.models import UserModel
 from .service import (
     create_appointment,
     get_today_appointments,
+    get_tomorrow_appointments,
     get_patient_appointments,
     initiate_self_checkin,
     send_checkin_otp,
@@ -42,6 +43,17 @@ def get_todays_appointments(db: Session = Depends(get_db)):
     appointments = get_today_appointments(db)
     for appt in appointments:
         appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    return appointments
+
+@router.get("/appointments/tomorrow", response_model=List[AppointmentResponse])
+def get_tomorrows_appointments(db: Session = Depends(get_db)):
+    appointments = get_tomorrow_appointments(db)
+    
+    for appt in appointments:
+        appt.patient = db.query(PatientModel).filter(
+            PatientModel.id == appt.patient_id
+        ).first()
+
     return appointments
 
 @router.get("/appointments/patient/{patient_id}", response_model=List[AppointmentResponse])

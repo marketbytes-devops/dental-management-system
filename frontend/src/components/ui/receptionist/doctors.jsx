@@ -36,7 +36,7 @@ export default function ReceptionistDoctors() {
   const fetchDoctors = async () => {
     try {
       const token = localStorage.getItem("staff_jwt_token");
-      const res = await fetch("http://localhost:8000/auth/doctors", {
+      const res = await fetch("http://127.0.0.1:8000/auth/doctors", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -52,7 +52,7 @@ export default function ReceptionistDoctors() {
   const handleToggleStatus = async (id) => {
     try {
       const token = localStorage.getItem("staff_jwt_token");
-      const res = await fetch(`http://localhost:8000/auth/doctors/${id}/status`, {
+      const res = await fetch(`http://127.0.0.1:8000/auth/doctors/${id}/status`, {
         method: "PUT",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

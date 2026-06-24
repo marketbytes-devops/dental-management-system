@@ -122,7 +122,7 @@ export default function RegisterPage() {
         known_allergies: formData.known_allergies.trim() || null,
       };
 
-      const response = await fetch("http://localhost:8000/patient/register", {
+      const response = await fetch("http://127.0.0.1:8000/patient/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -148,7 +148,7 @@ export default function RegisterPage() {
 
       // Automatically log in to get JWT token
       try {
-        const loginResponse = await fetch("http://localhost:8000/auth/login", {
+        const loginResponse = await fetch("http://127.0.0.1:8000/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

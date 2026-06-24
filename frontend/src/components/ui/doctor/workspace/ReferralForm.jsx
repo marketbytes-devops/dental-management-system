@@ -12,7 +12,7 @@ export default function ReferralForm({ patientToken, onReferPatient }) {
   useEffect(() => {
     async function fetchDoctors() {
       try {
-        const res = await fetch("http://localhost:8000/frontdesk/doctors");
+        const res = await fetch("http://127.0.0.1:8000/frontdesk/doctors");
         if (res.ok) {
           const data = await res.json();
           setClinicDoctors(data);

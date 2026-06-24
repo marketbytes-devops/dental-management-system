@@ -29,7 +29,7 @@ export default function UsersPage() {
   const fetchUsers = async () => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/admin/users", {
+      const response = await fetch("http://127.0.0.1:8000/admin/users", {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
       if (!response.ok) throw new Error("Failed to load users.");
@@ -67,7 +67,7 @@ export default function UsersPage() {
 
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/admin/users", {
+      const response = await fetch("http://127.0.0.1:8000/admin/users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -117,7 +117,7 @@ export default function UsersPage() {
       }
 
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/admin/users/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/admin/users/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -146,7 +146,7 @@ export default function UsersPage() {
 
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/admin/users/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/admin/users/${id}`, {
         method: "DELETE",
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
@@ -178,7 +178,7 @@ export default function UsersPage() {
   const toggleStatus = async (id) => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/admin/users/${id}/status`, {
+      const response = await fetch(`http://127.0.0.1:8000/admin/users/${id}/status`, {
         method: "PUT",
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });

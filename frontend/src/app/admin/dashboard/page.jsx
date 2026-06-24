@@ -17,7 +17,7 @@ export default function AdminDashboardPage() {
   const fetchStats = async () => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/admin/dashboard/stats", {
+      const response = await fetch("http://127.0.0.1:8000/admin/dashboard/stats", {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
       if (!response.ok) throw new Error("Failed to load dashboard stats.");

@@ -53,13 +53,13 @@ export default function ReceptionistPatients() {
   const fetchPatients = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("http://localhost:8000/patient/all");
+      const response = await fetch("http://127.0.0.1:8000/patient/all");
       if (response.ok) {
         const data = await response.json();
         setPatients(data);
       }
       
-      const doctorsRes = await fetch("http://localhost:8000/frontdesk/doctors");
+      const doctorsRes = await fetch("http://127.0.0.1:8000/frontdesk/doctors");
       if (doctorsRes.ok) {
         const doctorsData = await doctorsRes.json();
         setDoctors(doctorsData);
@@ -133,7 +133,7 @@ export default function ReceptionistPatients() {
         known_allergies: form.known_allergies.trim() || null,
       };
 
-      const response = await fetch("http://localhost:8000/patient/register", {
+      const response = await fetch("http://127.0.0.1:8000/patient/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -200,7 +200,7 @@ export default function ReceptionistPatients() {
         priority: bookingForm.priority
       };
 
-      const response = await fetch("http://localhost:8000/frontdesk/appointments", {
+      const response = await fetch("http://127.0.0.1:8000/frontdesk/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -216,7 +216,7 @@ export default function ReceptionistPatients() {
 
       // If direct check-in requested, call direct-checkin bypass endpoint
       if (bookingForm.directCheckIn) {
-        const checkinResponse = await fetch(`http://localhost:8000/frontdesk/appointments/${data.id}/direct-checkin?priority=${bookingForm.priority}&doctor_name=${bookingForm.doctor_name}`, {
+        const checkinResponse = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${data.id}/direct-checkin?priority=${bookingForm.priority}&doctor_name=${bookingForm.doctor_name}`, {
           method: "POST",
         });
         const checkinData = await checkinResponse.json();

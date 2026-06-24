@@ -21,7 +21,7 @@ export default function ReceptionistCheckIn() {
       const headers = token ? { "Authorization": `Bearer ${token}` } : {};
 
       // Fetch today's appointments
-      const apptsRes = await fetch("http://localhost:8000/frontdesk/appointments/today");
+      const apptsRes = await fetch("http://127.0.0.1:8000/frontdesk/appointments/today");
       if (apptsRes.ok) {
         const apptsData = await apptsRes.json();
         setAppointments(apptsData);
@@ -31,14 +31,14 @@ export default function ReceptionistCheckIn() {
       }
 
       // Fetch live waiting queue
-      const queueRes = await fetch("http://localhost:8000/frontdesk/queue");
+      const queueRes = await fetch("http://127.0.0.1:8000/frontdesk/queue");
       if (queueRes.ok) {
         const queueData = await queueRes.json();
         setActiveQueue(queueData);
       }
 
       // Fetch live doctors status
-      const doctorsRes = await fetch("http://localhost:8000/auth/doctors", { headers });
+      const doctorsRes = await fetch("http://127.0.0.1:8000/auth/doctors", { headers });
       if (doctorsRes.ok) {
         const doctorsData = await doctorsRes.json();
         setDoctorsList(doctorsData);
@@ -77,7 +77,7 @@ export default function ReceptionistCheckIn() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${selectedAppId}/direct-checkin?priority=${priority}&doctor_name=${assignedDoctor}`, {
+      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${selectedAppId}/direct-checkin?priority=${priority}&doctor_name=${assignedDoctor}`, {
         method: "POST"
       });
       if (response.ok) {
@@ -96,7 +96,7 @@ export default function ReceptionistCheckIn() {
   // Checkout patient
   const handleCheckout = async (id, name) => {
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
+      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "Completed" })
@@ -116,7 +116,7 @@ export default function ReceptionistCheckIn() {
   // Call patient to dental chair
   const handleCallToChair = async (id) => {
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
+      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "In Chair" })
@@ -132,7 +132,7 @@ export default function ReceptionistCheckIn() {
   // Send OTP trigger
   const handleSendOtp = async (id, phone, name) => {
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/send-otp`, {
+      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/send-otp`, {
         method: "POST"
       });
       if (response.ok) {
@@ -149,7 +149,7 @@ export default function ReceptionistCheckIn() {
   const handleBypassOtp = async (id, name, isEmergency) => {
     try {
       const pLevel = isEmergency ? "Emergency" : "Routine";
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/direct-checkin?priority=${pLevel}`, {
+      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/direct-checkin?priority=${pLevel}`, {
         method: "POST"
       });
       if (response.ok) {

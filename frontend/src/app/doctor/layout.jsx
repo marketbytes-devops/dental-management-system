@@ -484,7 +484,7 @@ export default function DoctorLayout({ children }) {
 
   const fetchQueue = async () => {
     try {
-      const response = await fetch("http://localhost:8000/frontdesk/queue");
+      const response = await fetch("http://127.0.0.1:8000/frontdesk/queue");
       if (response.ok) {
         const data = await response.json();
         
@@ -550,7 +550,7 @@ export default function DoctorLayout({ children }) {
     const queueItem = queue.find(item => item.token === token);
     if (queueItem && queueItem.id) {
       try {
-        await fetch(`http://localhost:8000/frontdesk/appointments/${queueItem.id}/call?status_str=In Chair`, {
+        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${queueItem.id}/call?status_str=In Chair`, {
           method: "POST"
         });
         await fetchQueue();
@@ -586,7 +586,7 @@ export default function DoctorLayout({ children }) {
     const nextItem = queue[0];
     if (nextItem && nextItem.id) {
       try {
-        await fetch(`http://localhost:8000/frontdesk/appointments/${nextItem.id}/call?status_str=In Chair`, {
+        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${nextItem.id}/call?status_str=In Chair`, {
           method: "POST"
         });
         await fetchQueue();
@@ -622,7 +622,7 @@ export default function DoctorLayout({ children }) {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
       try {
-        await fetch(`http://localhost:8000/frontdesk/appointments/${queueItem.id}/status`, {
+        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${queueItem.id}/status`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "Skipped" })
@@ -641,7 +641,7 @@ export default function DoctorLayout({ children }) {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
       try {
-        await fetch(`http://localhost:8000/frontdesk/appointments/${queueItem.id}/status`, {
+        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${queueItem.id}/status`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "Waiting" })
@@ -660,7 +660,7 @@ export default function DoctorLayout({ children }) {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
       try {
-        await fetch(`http://localhost:8000/frontdesk/appointments/${queueItem.id}/status`, {
+        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${queueItem.id}/status`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: "Completed" })

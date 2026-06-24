@@ -16,7 +16,7 @@ export default function GlobalPatientDirectoryPage() {
     setLoading(true);
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/admin/patients", {
+      const response = await fetch("http://127.0.0.1:8000/admin/patients", {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
       if (!response.ok) throw new Error("Failed to load patient directory.");

@@ -31,7 +31,7 @@ export default function CheckInPage() {
       }
       
       try {
-        const profileRes = await fetch("http://localhost:8000/patient/profile", {
+        const profileRes = await fetch("http://127.0.0.1:8000/patient/profile", {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -89,7 +89,7 @@ export default function CheckInPage() {
 
   const fetchAppointments = async (pId) => {
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/patient/${pId}`);
+      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/patient/${pId}`);
       if (response.ok) {
         const data = await response.json();
         
@@ -141,7 +141,7 @@ export default function CheckInPage() {
 
   const fetchQueueDetails = async (apptId) => {
     try {
-      const queueRes = await fetch("http://localhost:8000/frontdesk/queue");
+      const queueRes = await fetch("http://127.0.0.1:8000/frontdesk/queue");
       if (queueRes.ok) {
         const queueData = await queueRes.json();
         const index = queueData.findIndex(q => q.id === apptId);
@@ -175,7 +175,7 @@ export default function CheckInPage() {
     ].filter(Boolean).join(" | ");
 
     try {
-      const res = await fetch(`http://localhost:8000/frontdesk/appointments/${selectedAppt.id}/checkin`, {
+      const res = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${selectedAppt.id}/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -213,7 +213,7 @@ export default function CheckInPage() {
   const handleOtpSentSimulated = async () => {
     try {
       // Simulate receptionist clicking 'Send OTP' from patient's side
-      const res = await fetch(`http://localhost:8000/frontdesk/appointments/${selectedAppt.id}/send-otp`, {
+      const res = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${selectedAppt.id}/send-otp`, {
         method: "POST"
       });
       if (res.ok) {
@@ -241,7 +241,7 @@ export default function CheckInPage() {
 
   const handleOtpVerify = async (enteredOtp) => {
     try {
-      const res = await fetch(`http://localhost:8000/frontdesk/appointments/${selectedAppt.id}/verify-otp`, {
+      const res = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${selectedAppt.id}/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -28,19 +28,19 @@ export default function ReceptionistAppointments() {
     try {
       setIsLoading(true);
       // Fetch today's appointments
-      const apptsRes = await fetch("http://localhost:8000/frontdesk/appointments/today");
+      const apptsRes = await fetch("http://127.0.0.1:8000/frontdesk/appointments/today");
       if (apptsRes.ok) {
         const apptsData = await apptsRes.json();
         setAppointments(apptsData);
       }
       // Fetch all patients
-      const patientsRes = await fetch("http://localhost:8000/patient/all");
+      const patientsRes = await fetch("http://127.0.0.1:8000/patient/all");
       if (patientsRes.ok) {
         const patientsData = await patientsRes.json();
         setPatients(patientsData);
       }
       // Fetch active doctors
-      const doctorsRes = await fetch("http://localhost:8000/frontdesk/doctors");
+      const doctorsRes = await fetch("http://127.0.0.1:8000/frontdesk/doctors");
       if (doctorsRes.ok) {
         const doctorsData = await doctorsRes.json();
         setDoctors(doctorsData);
@@ -87,7 +87,7 @@ export default function ReceptionistAppointments() {
       return;
     }
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
+      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "Cancelled" })
@@ -129,7 +129,7 @@ export default function ReceptionistAppointments() {
         priority: form.priority
       };
 
-      const response = await fetch("http://localhost:8000/frontdesk/appointments", {
+      const response = await fetch("http://127.0.0.1:8000/frontdesk/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -145,7 +145,7 @@ export default function ReceptionistAppointments() {
 
       // Direct check-in check
       if (form.directCheckIn) {
-        const checkinResponse = await fetch(`http://localhost:8000/frontdesk/appointments/${data.id}/direct-checkin?priority=${form.priority}&doctor_name=${form.doctor_name}`, {
+        const checkinResponse = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${data.id}/direct-checkin?priority=${form.priority}&doctor_name=${form.doctor_name}`, {
           method: "POST",
         });
         const checkinData = await checkinResponse.json();

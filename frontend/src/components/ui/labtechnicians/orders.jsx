@@ -119,8 +119,43 @@ const INITIAL_ORDERS = [
 ];
 
 export default function LabOrders() {
-  const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
+
+  const fetchOrders = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/lab/orders", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mapped = data.map(o => ({
+          id: o.id,
+          patientName: o.patient_name || "Walk-in Patient",
+          dentistName: o.dentist_name || "Dr. Anoop Nair",
+          dentistContact: o.dentist_contact || "+91 98765 43210",
+          prostheticType: o.prosthetic_type,
+          material: o.material || "Zirconia",
+          shade: o.shade || "A2",
+          priority: o.priority || "Medium",
+          dueDate: o.due_date || "2026-06-15",
+          status: o.status,
+          notes: o.notes || "",
+          rejectionReason: o.rejection_reason || ""
+        }));
+        setOrders(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch lab orders:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 5000);
+    return () => clearInterval(interval);
+  }, []);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -237,34 +272,76 @@ export default function LabOrders() {
     }
   };
 
-  const handleAcceptOrder = (orderId) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: "Accepted" } : o))
-    );
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => ({ ...prev, status: "Accepted" }));
+  const handleAcceptOrder = async (orderId) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/lab/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: "Accepted" })
+      });
+      if (!response.ok) throw new Error("Failed to accept order");
+      
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev) => ({ ...prev, status: "Accepted" }));
+      }
+      triggerToast(`Case ${orderId} has been successfully accepted.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to accept order.", "error");
     }
-    triggerToast(`Case ${orderId} has been successfully accepted.`);
   };
 
-  const handleStartProduction = (orderId) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: "In Progress" } : o))
-    );
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => ({ ...prev, status: "In Progress" }));
+  const handleStartProduction = async (orderId) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/lab/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: "In Progress" })
+      });
+      if (!response.ok) throw new Error("Failed to start production");
+
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev) => ({ ...prev, status: "In Progress" }));
+      }
+      triggerToast(`Case ${orderId} status updated to In Production.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to start production.", "error");
     }
-    triggerToast(`Case ${orderId} status updated to In Production.`);
   };
 
-  const handleCompleteOrder = (orderId) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: "Completed" } : o))
-    );
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => ({ ...prev, status: "Completed" }));
+  const handleCompleteOrder = async (orderId) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/lab/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: "Completed" })
+      });
+      if (!response.ok) throw new Error("Failed to complete order");
+
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev) => ({ ...prev, status: "Completed" }));
+      }
+      triggerToast(`Case ${orderId} marked as Completed.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to complete order.", "error");
     }
-    triggerToast(`Case ${orderId} marked as Completed.`);
   };
 
   const openRejectModal = (orderId) => {
@@ -273,27 +350,37 @@ export default function LabOrders() {
     setIsRejectModalOpen(true);
   };
 
-  const handleRejectOrder = () => {
+  const handleRejectOrder = async () => {
     if (rejectReasonText.trim() === "") {
       alert("Please provide a rejection reason.");
       return;
     }
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === rejectTargetId
-          ? { ...o, status: "Rejected", rejectionReason: rejectReasonText }
-          : o
-      )
-    );
-    if (selectedOrder && selectedOrder.id === rejectTargetId) {
-      setSelectedOrder((prev) => ({
-        ...prev,
-        status: "Rejected",
-        rejectionReason: rejectReasonText
-      }));
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/lab/orders/${rejectTargetId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: "Rejected", rejection_reason: rejectReasonText })
+      });
+      if (!response.ok) throw new Error("Failed to reject order");
+
+      if (selectedOrder && selectedOrder.id === rejectTargetId) {
+        setSelectedOrder((prev) => ({
+          ...prev,
+          status: "Rejected",
+          rejectionReason: rejectReasonText
+        }));
+      }
+      setIsRejectModalOpen(false);
+      triggerToast(`Case ${rejectTargetId} has been rejected.`, "error");
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to reject order.", "error");
     }
-    setIsRejectModalOpen(false);
-    triggerToast(`Case ${rejectTargetId} has been rejected.`, "error");
   };
 
   const openEditModal = (order) => {
@@ -309,36 +396,45 @@ export default function LabOrders() {
     setIsEditModalOpen(true);
   };
 
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === editFormData.id
-          ? {
-              ...o,
-              prostheticType: editFormData.prostheticType,
-              material: editFormData.material,
-              shade: editFormData.shade,
-              priority: editFormData.priority,
-              dueDate: editFormData.dueDate,
-              notes: editFormData.notes
-            }
-          : o
-      )
-    );
-    if (selectedOrder && selectedOrder.id === editFormData.id) {
-      setSelectedOrder((prev) => ({
-        ...prev,
-        prostheticType: editFormData.prostheticType,
-        material: editFormData.material,
-        shade: editFormData.shade,
-        priority: editFormData.priority,
-        dueDate: editFormData.dueDate,
-        notes: editFormData.notes
-      }));
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/lab/orders/${editFormData.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          prosthetic_type: editFormData.prostheticType,
+          material: editFormData.material,
+          shade: editFormData.shade,
+          priority: editFormData.priority,
+          due_date: editFormData.dueDate,
+          notes: editFormData.notes
+        })
+      });
+      if (!response.ok) throw new Error("Failed to edit order specifications");
+
+      if (selectedOrder && selectedOrder.id === editFormData.id) {
+        setSelectedOrder((prev) => ({
+          ...prev,
+          prostheticType: editFormData.prostheticType,
+          material: editFormData.material,
+          shade: editFormData.shade,
+          priority: editFormData.priority,
+          dueDate: editFormData.dueDate,
+          notes: editFormData.notes
+        }));
+      }
+      setIsEditModalOpen(false);
+      triggerToast(`Case ${editFormData.id} specifications updated.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to update specifications.", "error");
     }
-    setIsEditModalOpen(false);
-    triggerToast(`Case ${editFormData.id} specifications updated.`);
   };
 
   const openDetailsDrawer = (order) => {

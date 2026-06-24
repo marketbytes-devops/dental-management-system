@@ -142,17 +142,13 @@ export default function DoctorLayout({ children }) {
   const [queue, setQueue] = useState([]);
 
   // Lab Orders
-  const [labOrders, setLabOrders] = useState([
-    { id: "LAB-701", patientToken: "#007", item: "Zirconia Crown #46", status: "In Production", labName: "Apex Dental Lab", eta: "Tomorrow" },
-    { id: "LAB-698", patientToken: "#004", item: "E-Max Overlay #16", status: "Ready / Shipped", labName: "Elite Milling Center", eta: "Today" },
-    { id: "LAB-692", patientToken: "#003", item: "Custom Partial Denture", status: "Delivered", labName: "SmileAlign Labs", eta: "Completed" }
-  ]);
+  const [labOrders, setLabOrders] = useState([]);
 
   // Prescription draft & notes
   const [rxDraft, setRxDraft] = useState([]);
   const [notification, setNotification] = useState("");
 
-  // Notifications State & Logic
+  // Notifications State & Logic (Referrals, etc.)
   const [notifications, setNotifications] = useState([
     {
       id: "notif-1",
@@ -166,21 +162,106 @@ export default function DoctorLayout({ children }) {
       itemId: "REF-201",
       patientId: "#004",
       patientName: "Rahul Kumar"
-    },
-    {
-      id: "notif-2",
-      message: "Lab Case LAB-698 for Rahul Kumar is ready / shipped",
-      type: "labs",
-      link: "/doctor/labs",
-      status: "unread",
-      dotColor: "green",
-      timestamp: "30 mins ago",
-      receivedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-      itemId: "LAB-698",
-      patientId: "#004",
-      patientName: "Rahul Kumar"
     }
   ]);
+
+  const [dbNotifications, setDbNotifications] = useState([]);
+  const allNotifications = [...dbNotifications, ...notifications];
+
+  const fetchLabOrders = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/lab/orders", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mapped = data.map(o => ({
+          id: o.id,
+          patientToken: o.patient_token,
+          item: o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`,
+          status: o.status,
+          labName: o.lab_name || "Apex Dental Lab",
+          eta: o.due_date || "3 Days"
+        }));
+        setLabOrders(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch lab orders from backend:", err);
+    }
+  };
+
+  const fetchDbNotifications = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      if (!token) return;
+      const response = await fetch("http://localhost:8000/lab/notifications?recipient_role=doctor", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mapped = data.map(n => ({
+          id: n.id,
+          message: n.desc,
+          type: "labs",
+          link: "/doctor/labs",
+          status: n.read ? "read" : "unread",
+          dotColor: n.title.toLowerCase().includes("rejected") ? "red" : "green",
+          timestamp: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          receivedAt: n.created_at,
+          itemId: n.title.split(" ").pop()
+        }));
+        setDbNotifications(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch doctor notifications from backend:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLabOrders();
+    fetchDbNotifications();
+    const interval = setInterval(() => {
+      fetchLabOrders();
+      fetchDbNotifications();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const prevUnreadCountRef = useRef(0);
+  useEffect(() => {
+    const unreadDbNotifs = dbNotifications.filter(n => n.status === "unread");
+    if (unreadDbNotifs.length > prevUnreadCountRef.current) {
+      const latest = unreadDbNotifs[0];
+      if (latest) {
+        setActiveToast({
+          id: latest.id,
+          message: latest.message,
+          type: latest.type,
+          link: latest.link,
+          dotColor: latest.dotColor,
+          timestamp: "Just now"
+        });
+        setToastAnimation("slide-in");
+        
+        if (window.toastTimeout) clearTimeout(window.toastTimeout);
+        if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+
+        window.toastTimeout = setTimeout(() => {
+          setToastAnimation("slide-out");
+          window.toastExitTimeout = setTimeout(() => {
+            setActiveToast(null);
+            setToastAnimation("");
+            setBellAnimating(true);
+            setTimeout(() => {
+              setBellAnimating(false);
+            }, 2400);
+          }, 400);
+        }, 4500);
+      }
+    }
+    prevUnreadCountRef.current = unreadDbNotifs.length;
+  }, [dbNotifications]);
 
   const [activeToast, setActiveToast] = useState(null);
   const [toastAnimation, setToastAnimation] = useState(""); // "slide-in" | "slide-out"
@@ -214,15 +295,38 @@ export default function DoctorLayout({ children }) {
     }, 4500);
   };
 
-  const markAsRead = (id) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: "read" } : n));
+  const markAsRead = async (id) => {
+    if (typeof id === "number" || !isNaN(id)) {
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+        await fetch(`http://localhost:8000/lab/notifications/${id}/read`, {
+          method: "PUT",
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        fetchDbNotifications();
+      } catch (err) {
+        console.error("Failed to mark notification read in backend:", err);
+      }
+    } else {
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: "read" } : n));
+    }
   };
 
   const markAsUnread = (idOrItemId) => {
     setNotifications(prev => prev.map(n => (n.id === idOrItemId || n.itemId === idOrItemId) ? { ...n, status: "unread" } : n));
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      await fetch(`http://localhost:8000/lab/notifications/read-all`, {
+        method: "PUT",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      fetchDbNotifications();
+    } catch (err) {
+      console.error("Failed to mark all notifications as read in backend:", err);
+    }
     setNotifications(prev => prev.map(n => ({ ...n, status: "read" })));
   };
 
@@ -610,46 +714,81 @@ export default function DoctorLayout({ children }) {
   };
 
   // Mark Lab Order Delivered
-  const handleMarkLabDelivered = (id) => {
-    setLabOrders(prev => prev.map(order => {
-      if (order.id === id) {
-        return { ...order, status: "Delivered", eta: "Completed" };
+  const handleMarkLabDelivered = async (id) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/lab/orders/${id}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          status: "Delivered"
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update status on backend");
       }
-      return order;
-    }));
-    showNotification(`Lab Case ${id} marked as Delivered.`);
+
+      showNotification(`Lab Case ${id} marked as Delivered.`);
+      fetchLabOrders();
+    } catch (err) {
+      console.error("Error marking lab order delivered:", err);
+      showNotification("Failed to mark lab order as delivered.");
+    }
   };
 
   // Submit Lab Order from form
-  const handleSubmitLabOrder = ({ item, tooth, shade, labName }) => {
-    const newOrder = {
-      id: `LAB-${Math.floor(700 + Math.random() * 200)}`,
-      patientToken: viewingPatientToken,
-      item: `${item} (Tooth #${tooth}, Shade ${shade})`,
-      status: "In Production",
-      labName: labName,
-      eta: "3 Days"
-    };
+  const handleSubmitLabOrder = async ({ item, tooth, shade, labName }) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/lab/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          patient_token: viewingPatientToken,
+          prosthetic_type: item,
+          material: `Tooth #${tooth}`,
+          shade: shade,
+          lab_name: labName,
+          due_date: "2026-06-15",
+          notes: `Tooth #${tooth}, Shade ${shade}`
+        })
+      });
 
-    setLabOrders(prev => [newOrder, ...prev]);
-
-    // Add to timeline
-    const newTimelineEvent = {
-      date: "10-06-2026 (Today)",
-      note: `Ordered ${newOrder.item} from ${labName}`,
-      type: "Lab Order"
-    };
-
-    setPatients(prev => ({
-      ...prev,
-      [viewingPatientToken]: {
-        ...prev[viewingPatientToken],
-        timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
-        teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
+      if (!response.ok) {
+        throw new Error("Failed to submit lab order to backend");
       }
-    }));
 
-    showNotification(`Lab order submitted to ${labName}.`);
+      const createdOrder = await response.json();
+      
+      // Add to timeline locally
+      const newTimelineEvent = {
+        date: "10-06-2026 (Today)",
+        note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
+        type: "Lab Order"
+      };
+
+      setPatients(prev => ({
+        ...prev,
+        [viewingPatientToken]: {
+          ...prev[viewingPatientToken],
+          timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
+          teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
+        }
+      }));
+
+      showNotification(`Lab order submitted to ${labName}.`);
+      fetchLabOrders();
+    } catch (err) {
+      console.error("Error submitting lab order:", err);
+      showNotification("Failed to submit lab order.");
+    }
   };
 
   // Interactive tooth chart select
@@ -831,7 +970,7 @@ export default function DoctorLayout({ children }) {
         handleCompleteReferral,
         sidebarMinimized,
         setSidebarMinimized,
-        notifications,
+        notifications: allNotifications,
         activeToast,
         toastAnimation,
         bellAnimating,

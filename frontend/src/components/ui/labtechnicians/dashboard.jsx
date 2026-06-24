@@ -1,11 +1,35 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ClipboardList, Hourglass, Settings, CheckSquare, Truck, CheckCircle } from "lucide-react";
+import { 
+  ClipboardList, 
+  Flame, 
+  Check, 
+  X, 
+  AlertTriangle, 
+  ArrowRight, 
+  Calendar, 
+  User,
+  Clock
+} from "lucide-react";
+import Link from "next/link";
 
 export default function LabDashboard() {
   const [animate, setAnimate] = useState(false);
   const [orders, setOrders] = useState([]);
+  
+  // Rejection modal states
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [rejectTargetId, setRejectTargetId] = useState("");
+  const [rejectReasonText, setRejectReasonText] = useState("");
+  
+  // Toast notifications state
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+
+  const triggerToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
+  };
 
   const fetchOrders = async () => {
     try {
@@ -29,71 +53,289 @@ export default function LabDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const totalCases = orders.length;
-  const pendingCases = orders.filter(o => o.status === "Pending").length;
-  const inProgressCases = orders.filter(o => o.status === "Accepted" || o.status === "In Progress").length;
-  const qcPendingCases = orders.filter(o => o.status === "QC Pending").length;
-  const readyDispatchCases = orders.filter(o => o.status === "Ready / Shipped").length;
-  const completedCases = orders.filter(o => o.status === "Completed" || o.status === "Delivered").length;
+  const handleAcceptOrder = async (orderId) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/lab/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: "Accepted" })
+      });
+      if (!response.ok) throw new Error("Failed to accept order");
+      
+      triggerToast(`Case ${orderId} has been accepted successfully.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to accept order.", "error");
+    }
+  };
+
+  const openRejectModal = (orderId) => {
+    setRejectTargetId(orderId);
+    setRejectReasonText("");
+    setIsRejectModalOpen(true);
+  };
+
+  const handleRejectOrderSubmit = async (e) => {
+    e.preventDefault();
+    if (rejectReasonText.trim() === "") {
+      alert("Please enter a reason for rejection.");
+      return;
+    }
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/lab/orders/${rejectTargetId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: "Rejected", rejection_reason: rejectReasonText })
+      });
+      if (!response.ok) throw new Error("Failed to reject order");
+
+      setIsRejectModalOpen(false);
+      triggerToast(`Case ${rejectTargetId} has been rejected.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to reject order.", "error");
+    }
+  };
+
+  const getRelativeTime = (date, referenceTime = new Date("2026-06-10T12:00:00")) => {
+    const diffMs = referenceTime - date;
+    if (diffMs < 0) return "Just now";
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) {
+      return `${diffMins} min${diffMins !== 1 ? "s" : ""} ago`;
+    }
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) {
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+    }
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+  };
+
+  const getActivityIcon = (type) => {
+    switch (type) {
+      case "submit":
+        return (
+          <span className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
+            <ClipboardList className="w-4 h-4" />
+          </span>
+        );
+      case "accept":
+        return (
+          <span className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
+            <Check className="w-4 h-4" />
+          </span>
+        );
+      case "fabrication":
+        return (
+          <span className="w-7 h-7 rounded-lg bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center">
+            <Flame className="w-4 h-4" />
+          </span>
+        );
+      case "qc":
+        return (
+          <span className="w-7 h-7 rounded-lg bg-warning/10 border border-warning/20 text-warning flex items-center justify-center">
+            <AlertTriangle className="w-4 h-4" />
+          </span>
+        );
+      case "invoice":
+        return (
+          <span className="w-7 h-7 rounded-lg bg-success/10 border border-success/20 text-success flex items-center justify-center">
+            <ArrowRight className="w-4 h-4" />
+          </span>
+        );
+      default:
+        return (
+          <span className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 text-gray-500 flex items-center justify-center">
+            <ClipboardList className="w-4 h-4" />
+          </span>
+        );
+    }
+  };
+
+  const generateActivityLogs = (ordersList) => {
+    const activities = [];
+    const referenceTime = new Date("2026-06-10T12:00:00");
+
+    ordersList.forEach(order => {
+      let createdTime;
+      try {
+        createdTime = order.created_at ? new Date(order.created_at) : new Date("2026-06-09T10:00:00");
+        if (isNaN(createdTime.getTime())) {
+          createdTime = new Date("2026-06-09T10:00:00");
+        }
+      } catch (e) {
+        createdTime = new Date("2026-06-09T10:00:00");
+      }
+
+      // 1. Submitted event (all orders)
+      activities.push({
+        id: `${order.id}-submitted`,
+        caseId: order.id,
+        text: `${order.dentist_name || "Doctor"} submitted case ${order.id}`,
+        time: createdTime,
+        type: "submit"
+      });
+
+      // 2. Accepted event (Accepted, In Progress, QC Pending, Ready / Shipped, Completed)
+      if (["Accepted", "In Progress", "QC Pending", "Ready / Shipped", "Completed"].includes(order.status)) {
+        const acceptedTime = new Date(createdTime.getTime() + 15 * 60 * 1000); // 15 mins later
+        if (acceptedTime <= referenceTime) {
+          activities.push({
+            id: `${order.id}-accepted`,
+            caseId: order.id,
+            text: `Case ${order.id} accepted by technician`,
+            time: acceptedTime,
+            type: "accept"
+          });
+        }
+      }
+
+      // 3. Fabrication (QC Pending, Ready / Shipped, Completed)
+      if (["QC Pending", "Ready / Shipped", "Completed"].includes(order.status)) {
+        const designTime = new Date(createdTime.getTime() + 45 * 60 * 1000); // 45 mins later
+        if (designTime <= referenceTime) {
+          activities.push({
+            id: `${order.id}-crown-completed`,
+            caseId: order.id,
+            text: `${order.prosthetic_type} fabrication completed for case ${order.id}`,
+            time: designTime,
+            type: "fabrication"
+          });
+        }
+      }
+
+      // 4. QC passed (Ready / Shipped, Completed)
+      if (["Ready / Shipped", "Completed"].includes(order.status)) {
+        const qcTime = new Date(createdTime.getTime() + 90 * 60 * 1000); // 90 mins later
+        if (qcTime <= referenceTime) {
+          activities.push({
+            id: `${order.id}-qc-passed`,
+            caseId: order.id,
+            text: `QC check completed for case ${order.id}`,
+            time: qcTime,
+            type: "qc"
+          });
+        }
+      }
+
+      // 5. Complete / Invoice generated (Completed)
+      if (order.status === "Completed") {
+        const completeTime = new Date(createdTime.getTime() + 120 * 60 * 1000); // 120 mins later
+        if (completeTime <= referenceTime) {
+          activities.push({
+            id: `${order.id}-invoice`,
+            caseId: order.id,
+            text: `Invoice and warranty generated for case ${order.id}`,
+            time: completeTime,
+            type: "invoice"
+          });
+        }
+      }
+    });
+
+    activities.sort((a, b) => b.time - a.time);
+    return activities.slice(0, 15);
+  };
+
+  const emergencyCases = orders.filter(o => o.priority === "Urgent" || o.priority === "High").length;
+
+  // Filters for lists
+  const pendingOrders = orders.filter(o => o.status === "Pending");
+  
+  const dueTodayOrders = orders.filter(
+    o => o.due_date === "2026-06-10" && o.status !== "Completed" && o.status !== "Rejected"
+  );
+
+  const overdueOrders = orders.filter(
+    o => o.due_date && o.due_date < "2026-06-10" && o.status !== "Completed" && o.status !== "Rejected"
+  ).map(o => {
+    let daysLate = 0;
+    try {
+      const timeDiff = new Date("2026-06-10") - new Date(o.due_date);
+      daysLate = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      if (isNaN(daysLate)) daysLate = 0;
+    } catch (e) {
+      daysLate = 0;
+    }
+    return { ...o, daysLate };
+  }).filter(o => o.daysLate > 0);
+
+  const activityLogs = generateActivityLogs(orders);
 
   const stats = [
-    { name: "Total Orders", value: totalCases, icon: ClipboardList, change: "Active in database", color: "border-primary/30 text-primary bg-primary/5" },
-    { name: "Pending Cases", value: pendingCases, icon: Hourglass, change: "Requires review", color: "border-warning/30 text-warning bg-warning/5" },
-    { name: "In Progress", value: inProgressCases, icon: Settings, change: "On schedule", color: "border-purple-500/30 text-purple-650 bg-purple-50" },
-    { name: "QC Pending", value: qcPendingCases, icon: CheckSquare, change: "Inspection ready", color: "border-amber-500/30 text-amber-600 bg-amber-50" },
-    { name: "Ready Dispatch", value: readyDispatchCases, icon: Truck, change: "Awaiting courier", color: "border-info/30 text-secondary bg-secondary/5" },
-    { name: "Completed Cases", value: completedCases, icon: CheckCircle, change: "Delivered", color: "border-success/30 text-success bg-success/5" }
+    { 
+      name: "Emergency Cases", 
+      value: emergencyCases, 
+      icon: Flame, 
+      change: "Immediate action required", 
+      color: "border-danger/30 text-danger bg-danger/5" 
+    },
+    { 
+      name: "Due Today", 
+      value: dueTodayOrders.length, 
+      icon: Calendar, 
+      change: "Cases due for completion today", 
+      color: "border-primary/30 text-primary bg-primary/5" 
+    },
+    { 
+      name: "Overdue Cases", 
+      value: overdueOrders.length, 
+      icon: AlertTriangle, 
+      change: "Action required immediately", 
+      color: "border-danger/30 text-danger bg-danger/5" 
+    }
   ];
 
-  // Daily Production chart (mock 7 days data)
-  const dailyProduction = [
-    { day: "Mon", value: 12 },
-    { day: "Tue", value: 19 },
-    { day: "Wed", value: 15 },
-    { day: "Thu", value: 24 },
-    { day: "Fri", value: 22 },
-    { day: "Sat", value: 10 },
-    { day: "Sun", value: 4 }
-  ];
+  const getPriorityBadge = (priority) => {
+    switch (priority) {
+      case "Urgent":
+        return <span className="bg-danger/10 text-danger border border-danger/20 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">Urgent</span>;
+      case "High":
+        return <span className="bg-warning/10 text-warning border border-warning/20 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">High</span>;
+      case "Medium":
+        return <span className="bg-primary/10 text-primary border border-primary/20 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">Medium</span>;
+      default:
+        return <span className="bg-gray-150 text-gray-550 border border-gray-205 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">{priority}</span>;
+    }
+  };
 
-  // Case Priority Breakdown
-  const urgentCount = orders.filter(o => o.priority === "Urgent").length;
-  const highCount = orders.filter(o => o.priority === "High").length;
-  const mediumCount = orders.filter(o => o.priority === "Medium").length;
-  const lowCount = orders.filter(o => o.priority === "Low").length;
+  const getStatusDot = (status) => {
+    let color = "bg-gray-400";
+    if (status === "Pending") color = "bg-warning";
+    else if (status === "Accepted") color = "bg-primary";
+    else if (status === "In Progress") color = "bg-purple-500";
+    else if (status === "Completed") color = "bg-success";
+    else if (status === "Rejected") color = "bg-danger";
 
-  const casePriority = [
-    { priority: "Urgent", count: urgentCount, color: "bg-danger" },
-    { priority: "High", count: highCount, color: "bg-warning" },
-    { priority: "Medium", count: mediumCount, color: "bg-primary" },
-    { priority: "Low", count: lowCount, color: "bg-gray-400" }
-  ];
-
-  const totalCountForPct = totalCases || 1;
-  const completedPct = Math.round((completedCases / totalCountForPct) * 100);
-  const inProgressPct = Math.round((inProgressCases / totalCountForPct) * 100);
-  const pendingPct = Math.round((pendingCases / totalCountForPct) * 100);
-  const readyPct = Math.round((readyDispatchCases / totalCountForPct) * 100);
-  const qcPct = Math.round((qcPendingCases / totalCountForPct) * 100);
-
-  const caseStatuses = [
-    { status: "Completed", count: completedCases, percent: completedPct, color: "#22C55E" },
-    { status: "In Progress", count: inProgressCases, percent: inProgressPct, color: "#A855F7" },
-    { status: "Pending Review", count: pendingCases, percent: pendingPct, color: "#F59E0B" },
-    { status: "Ready Dispatch", count: readyDispatchCases, percent: readyPct, color: "#14B8A6" },
-    { status: "QC Pending", count: qcPendingCases, percent: qcPct, color: "#EAB308" }
-  ];
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className={`w-2 h-2 rounded-full ${color}`}></span>
+        <span className="text-xs font-semibold text-gray-700">{status}</span>
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-6 pb-10">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Lab Technician Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Real-time fabrication tracking, analytics, and technician capacity management.</p>
+        <p className="text-sm text-gray-500 mt-1">Real-time fabrication tracking and pending case analytics.</p>
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stats.map((stat, i) => (
           <div 
             key={stat.name}
@@ -124,356 +366,287 @@ export default function LabDashboard() {
         ))}
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 2-Column Dashboard Lists */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
         
-        {/* Daily Production - SVG Column Chart */}
-        <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-extrabold text-gray-900">Daily Production</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Units fabricated in the last 7 days</p>
+        {/* Left Column: Doctor Orders Inbox (8 Cols) */}
+        <div className="xl:col-span-8 bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-gray-100 bg-white flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                📥 Doctor Orders Inbox
+                <span className="px-2 py-0.5 bg-warning/10 text-warning text-xs font-bold rounded-full">{pendingOrders.length} New</span>
+              </h3>
+              <p className="text-xs text-gray-400 mt-0.5">Review and accept incoming dentist requests</p>
+            </div>
           </div>
 
-          <div className="h-48 flex items-end justify-between px-2 pt-6 pb-2">
-            {dailyProduction.map((item, i) => {
-              const maxVal = Math.max(...dailyProduction.map(d => d.value));
-              const percent = (item.value / maxVal) * 100;
-              return (
-                <div key={item.day} className="flex flex-col items-center gap-2 w-full">
-                  <div className="relative w-7 bg-gray-50 rounded-lg h-36 flex items-end overflow-hidden group border border-gray-100">
-                    <div 
-                      style={{ 
-                        height: animate ? `${percent}%` : "0%",
-                        transition: "height 1.2s cubic-bezier(0.16, 1, 0.3, 1)",
-                        transitionDelay: `${i * 100}ms`
-                      }}
-                      className="w-full bg-gradient-to-t from-primary/90 to-primary rounded-md group-hover:opacity-85"
-                    >
-                      <span className="absolute top-2 left-0 right-0 text-center text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                        {item.value}
-                      </span>
+          <div className="divide-y divide-gray-100 overflow-y-auto max-h-[480px]">
+            {pendingOrders.length === 0 ? (
+              <div className="p-8 text-center flex flex-col items-center justify-center text-gray-400 space-y-2">
+                <span className="text-3xl">🎉</span>
+                <p className="text-sm font-semibold">All caught up! No pending doctor orders.</p>
+                <p className="text-xs text-gray-400">Approved orders will automatically flow to your Production Board.</p>
+              </div>
+            ) : (
+              pendingOrders.map((order) => (
+                <div key={order.id} className="p-4 hover:bg-gray-50 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-gray-900">{order.id}</span>
+                      {getPriorityBadge(order.priority)}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-650">
+                      <span className="font-bold flex items-center gap-1"><User className="w-3.5 h-3.5 text-gray-400" /> {order.patient_name || "Walk-in Patient"}</span>
+                      <span className="text-gray-300">•</span>
+                      <span>Dentist: {order.dentist_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                      <span className="bg-gray-100 px-1.5 py-0.5 rounded font-semibold text-gray-600">{order.prosthetic_type}</span>
+                      <span>Material: {order.material || "Zirconia"}</span>
+                      <span>Shade: <span className="font-bold text-amber-800 bg-amber-50 px-1 rounded border border-amber-100">{order.shade || "A2"}</span></span>
+                      <span className="text-gray-300">•</span>
+                      <span className="flex items-center gap-1 font-semibold text-danger"><Calendar className="w-3.5 h-3.5 text-danger" /> Due: {order.due_date}</span>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold text-gray-400">{item.day}</span>
+
+                  <div className="flex items-center gap-2 w-full md:w-auto self-end md:self-center justify-end">
+                    <button 
+                      onClick={() => openRejectModal(order.id)}
+                      className="px-3 py-1.5 text-xs font-bold text-danger bg-danger/5 hover:bg-danger/10 border border-danger/10 rounded-lg cursor-pointer transition-all flex items-center gap-1"
+                    >
+                      <X className="w-3.5 h-3.5" /> Reject
+                    </button>
+                    <button 
+                      onClick={() => handleAcceptOrder(order.id)}
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary/95 rounded-lg cursor-pointer transition-all shadow-sm flex items-center gap-1"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Accept Case
+                    </button>
+                  </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
         </div>
 
-        {/* Case Priority Breakdown - Horizontal Bar Chart */}
-        <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-extrabold text-gray-900">Case Priority Breakdown</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Distribution of active cases by urgency</p>
+        {/* Right Column: Recent Activity Feed (4 Cols) */}
+        <div className="xl:col-span-4 bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-gray-100 bg-white">
+            <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+              ⚡ Recent Activity
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">Real-time case progression logs</p>
           </div>
 
-          <div className="h-48 flex flex-col justify-center space-y-4 pt-4">
-            {casePriority.map((item, i) => {
-              const maxVal = Math.max(...casePriority.map(p => p.count));
-              const percent = (item.count / (maxVal || 1)) * 100;
-              return (
-                <div key={item.priority} className="space-y-1">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-gray-600 font-medium">{item.priority}</span>
-                    <span className="text-gray-900 font-extrabold">{item.count} Cases</span>
+          <div className="divide-y divide-gray-100 overflow-y-auto max-h-[480px]">
+            {activityLogs.length === 0 ? (
+              <div className="p-8 text-center flex flex-col items-center justify-center text-gray-400 space-y-2">
+                <span className="text-3xl font-normal">⏱️</span>
+                <p className="text-sm font-semibold">No recent activity.</p>
+                <p className="text-xs text-gray-400">Activity updates will appear as cases move through stages.</p>
+              </div>
+            ) : (
+              activityLogs.map((log) => (
+                <div key={log.id} className="p-4 hover:bg-gray-50 transition-colors flex gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {getActivityIcon(log.type)}
                   </div>
-                  <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200/50">
-                    <div 
-                      style={{ 
-                        width: animate ? `${percent}%` : "0%",
-                        transition: "width 1.2s cubic-bezier(0.16, 1, 0.3, 1)",
-                        transitionDelay: `${i * 100}ms`
-                      }}
-                      className={`${item.color} h-full rounded-full`}
-                    ></div>
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <p className="text-xs text-gray-700 leading-snug font-semibold">
+                      {log.text}
+                    </p>
+                    <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
+                      <Clock className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{getRelativeTime(log.time)}</span>
+                    </div>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
         </div>
 
-        {/* Case Status Overview - SVG Donut Chart */}
-        <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-extrabold text-gray-900">Case Status</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Distribution of active cases</p>
+      </div>
+
+      {/* Deadlines & Escalations Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* Left Column: Due Today Widget (6 Cols) */}
+        <div className="bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="px-5 py-4 border-b border-gray-100 bg-white flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                📅 Due Today
+                <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs font-bold rounded-full">
+                  {dueTodayOrders.length}
+                </span>
+              </h3>
+              <p className="text-xs text-gray-400 mt-0.5">Lab cases scheduled for completion today</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4 pt-4">
-            {/* SVG Donut */}
-            <div className="relative w-28 h-28 flex-shrink-0">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                {/* Background Ring */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#F1F5F9" strokeWidth="3.2" />
+          <div className="divide-y divide-gray-100 overflow-y-auto max-h-[300px]">
+            {dueTodayOrders.length === 0 ? (
+              <div className="p-8 text-center flex flex-col items-center justify-center text-gray-400 space-y-2">
+                <span className="text-3xl">☕</span>
+                <p className="text-sm font-semibold">No cases due today!</p>
+                <p className="text-xs text-gray-400">All set for today's deadlines.</p>
+              </div>
+            ) : (
+              dueTodayOrders.map((order) => (
+                <div key={order.id} className="p-4 hover:bg-gray-50 transition-colors flex justify-between items-center">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-gray-900">{order.id}</span>
+                      {getPriorityBadge(order.priority)}
+                    </div>
+                    <div className="text-xs text-gray-650 font-medium">
+                      Patient: {order.patient_name || "Walk-in Patient"}
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      Type: {order.prosthetic_type} • Material: {order.material || "Zirconia"}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {getStatusDot(order.status)}
+                    <Link 
+                      href="/labtechnicians/production"
+                      className="px-2.5 py-1 text-[10px] font-bold text-primary hover:text-white hover:bg-primary border border-primary/20 hover:border-transparent rounded transition-all"
+                    >
+                      Track Case
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
-                {/* Segments - stacked dashes */}
-                {totalCases > 0 ? (
-                  <>
-                    {/* Green Segment (Completed) */}
-                    <circle 
-                      cx="18" cy="18" r="15.915" fill="none" stroke="#22C55E" strokeWidth="3.2" 
-                      strokeDasharray={animate ? `${completedPct} ${100 - completedPct}` : "0 100"}
-                      strokeDashoffset="0"
-                      style={{ transition: "stroke-dasharray 1.2s ease-out" }}
-                    />
+        {/* Right Column: Overdue Cases Widget (6 Cols) */}
+        <div className="bg-white border border-danger/20 rounded-2xl shadow-sm overflow-hidden flex flex-col bg-danger/[0.01]">
+          <div className="px-5 py-4 border-b border-danger/10 bg-danger/[0.02] flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-extrabold text-danger flex items-center gap-2">
+                ⚠ Overdue Cases
+                <span className="px-2 py-0.5 bg-danger/10 text-danger text-xs font-bold rounded-full animate-pulse">
+                  {overdueOrders.length}
+                </span>
+              </h3>
+              <p className="text-xs text-red-500/80 mt-0.5">Active cases that missed their delivery dates</p>
+            </div>
+          </div>
 
-                    {/* Purple Segment (In Progress) */}
-                    <circle 
-                      cx="18" cy="18" r="15.915" fill="none" stroke="#A855F7" strokeWidth="3.2" 
-                      strokeDasharray={animate ? `${inProgressPct} ${100 - inProgressPct}` : "0 100"}
-                      strokeDashoffset={`-${completedPct}`}
-                      style={{ transition: "stroke-dasharray 1.2s ease-out 0.2s" }}
-                    />
+          <div className="divide-y divide-red-100/50 overflow-y-auto max-h-[300px]">
+            {overdueOrders.length === 0 ? (
+              <div className="p-8 text-center flex flex-col items-center justify-center text-gray-400 space-y-2">
+                <span className="text-3xl">🎉</span>
+                <p className="text-sm font-semibold text-gray-500">No overdue cases!</p>
+                <p className="text-xs text-gray-400">Excellent pace! Everything is on schedule.</p>
+              </div>
+            ) : (
+              overdueOrders.map((order) => (
+                <div key={order.id} className="p-4 hover:bg-danger/[0.02] transition-colors flex justify-between items-center">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-gray-900">{order.id}</span>
+                      {getPriorityBadge(order.priority)}
+                      <span className="bg-danger/10 text-danger border border-danger/20 text-[9px] px-1.5 py-0.5 rounded font-bold">
+                        {order.daysLate} day{order.daysLate !== 1 ? "s" : ""} late
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-650 font-medium">
+                      Patient: {order.patient_name || "Walk-in Patient"}
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      Due Date: <span className="font-semibold text-danger">{order.due_date}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {getStatusDot(order.status)}
+                    <Link 
+                      href="/labtechnicians/production"
+                      className="px-2.5 py-1 text-[10px] font-bold text-danger hover:text-white hover:bg-danger border border-danger/20 hover:border-transparent rounded transition-all"
+                    >
+                      Escalate
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
-                    {/* Amber Segment (Pending Review) */}
-                    <circle 
-                      cx="18" cy="18" r="15.915" fill="none" stroke="#F59E0B" strokeWidth="3.2" 
-                      strokeDasharray={animate ? `${pendingPct} ${100 - pendingPct}` : "0 100"}
-                      strokeDashoffset={`-${completedPct + inProgressPct}`}
-                      style={{ transition: "stroke-dasharray 1.2s ease-out 0.4s" }}
-                    />
+      </div>
 
-                    {/* Teal Segment (Ready Dispatch) */}
-                    <circle 
-                      cx="18" cy="18" r="15.915" fill="none" stroke="#14B8A6" strokeWidth="3.2" 
-                      strokeDasharray={animate ? `${readyPct} ${100 - readyPct}` : "0 100"}
-                      strokeDashoffset={`-${completedPct + inProgressPct + pendingPct}`}
-                      style={{ transition: "stroke-dasharray 1.2s ease-out 0.6s" }}
-                    />
-
-                    {/* Yellow Segment (QC Pending) */}
-                    <circle 
-                      cx="18" cy="18" r="15.915" fill="none" stroke="#EAB308" strokeWidth="3.2" 
-                      strokeDasharray={animate ? `${qcPct} ${100 - qcPct}` : "0 100"}
-                      strokeDashoffset={`-${completedPct + inProgressPct + pendingPct + readyPct}`}
-                      style={{ transition: "stroke-dasharray 1.2s ease-out 0.8s" }}
-                    />
-                  </>
-                ) : (
-                  /* Gray default ring if no orders */
-                  <circle cx="18" cy="18" r="15.915" fill="none" stroke="#CBD5E1" strokeWidth="3.2" />
-                )}
-              </svg>
-              {/* Inner Circle Counter */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-black text-gray-900">{totalCases}</span>
-                <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
+      {/* Reject Modal */}
+      {isRejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white border border-gray-150 rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4 relative animate-in fade-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => setIsRejectModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-650 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-danger/10 text-danger flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5" />
+              </span>
+              <div>
+                <h3 className="text-base font-extrabold text-gray-900">Reject Case {rejectTargetId}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">This will send a notification back to the ordering dentist.</p>
               </div>
             </div>
 
-            {/* Legend */}
-            <div className="flex-1 space-y-1.5">
-              {caseStatuses.map((c) => (
-                <div key={c.status} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }}></span>
-                    <span className="text-gray-500 font-semibold truncate max-w-[80px]">{c.status}</span>
-                  </div>
-                  <span className="font-bold text-gray-800">{c.percent}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-  // Technician Performance (horizontal bars)
-  const technicianPerformance = [
-    { name: "Alen Joseph", completed: 28, load: 85, avatar: "AJ" },
-    { name: "Sneha Nair", completed: 22, load: 70, avatar: "SN" },
-    { name: "Rahul Sharma", completed: 14, load: 45, avatar: "RS" },
-    { name: "Elizabeth Rose", completed: 6, load: 20, avatar: "ER" }
-  ];
-
-  return (
-    <div className="space-y-6 pb-10">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Lab Technician Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Real-time fabrication tracking, analytics, and technician capacity management.</p>
-      </div>
-
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-        {stats.map((stat, i) => (
-          <div 
-            key={stat.name}
-            style={{ transitionDelay: `${i * 75}ms` }}
-            className={`bg-white rounded-2xl p-4 shadow-sm border border-gray-150 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all duration-500 ${
-              animate ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${stat.color}`}>
-                <stat.icon className="w-5 h-5" />
-              </span>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Active
-              </span>
-            </div>
-
-            <div className="mt-4">
-              <p className="text-xs text-gray-400 font-bold truncate uppercase tracking-wider">{stat.name}</p>
-              <h3 className="text-2xl font-black text-gray-900 mt-0.5">{stat.value}</h3>
-            </div>
-
-            <div className="mt-2 text-[10px] font-bold text-gray-500 flex items-center gap-1 border-t border-gray-100 pt-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
-              {stat.change}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Daily Production - SVG Column Chart */}
-        <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-extrabold text-gray-900">Daily Production</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Units fabricated in the last 7 days</p>
-          </div>
-
-          <div className="h-48 flex items-end justify-between px-2 pt-6 pb-2">
-            {dailyProduction.map((item, i) => {
-              const maxVal = Math.max(...dailyProduction.map(d => d.value));
-              const percent = (item.value / maxVal) * 100;
-              return (
-                <div key={item.day} className="flex flex-col items-center gap-2 w-full">
-                  <div className="relative w-7 bg-gray-50 rounded-lg h-36 flex items-end overflow-hidden group border border-gray-100">
-                    <div 
-                      style={{ 
-                        height: animate ? `${percent}%` : "0%",
-                        transition: "height 1.2s cubic-bezier(0.16, 1, 0.3, 1)",
-                        transitionDelay: `${i * 100}ms`
-                      }}
-                      className="w-full bg-gradient-to-t from-primary/90 to-primary rounded-md group-hover:opacity-85"
-                    >
-                      <span className="absolute top-2 left-0 right-0 text-center text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                        {item.value}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold text-gray-400">{item.day}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Case Priority Breakdown - Horizontal Bar Chart */}
-        <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-extrabold text-gray-900">Case Priority Breakdown</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Distribution of active cases by urgency</p>
-          </div>
-
-          <div className="h-48 flex flex-col justify-center space-y-4 pt-4">
-            {casePriority.map((item, i) => {
-              const maxVal = Math.max(...casePriority.map(p => p.count));
-              const percent = (item.count / maxVal) * 100;
-              return (
-                <div key={item.priority} className="space-y-1">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-gray-600 font-medium">{item.priority}</span>
-                    <span className="text-gray-900 font-extrabold">{item.count} Cases</span>
-                  </div>
-                  <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200/50">
-                    <div 
-                      style={{ 
-                        width: animate ? `${percent}%` : "0%",
-                        transition: "width 1.2s cubic-bezier(0.16, 1, 0.3, 1)",
-                        transitionDelay: `${i * 100}ms`
-                      }}
-                      className={`${item.color} h-full rounded-full`}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Case Status Overview - SVG Donut Chart */}
-        <div className="bg-white rounded-2xl border border-gray-150 p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-extrabold text-gray-900">Case Status</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Distribution of active cases</p>
-          </div>
-
-          <div className="flex items-center gap-4 pt-4">
-            {/* SVG Donut */}
-            <div className="relative w-28 h-28 flex-shrink-0">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                {/* Background Ring */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#F1F5F9" strokeWidth="3.2" />
-
-                {/* Segments - stacked dashes */}
-                {/* Green Segment (Completed: 49%) */}
-                <circle 
-                  cx="18" cy="18" r="15.915" fill="none" stroke="#22C55E" strokeWidth="3.2" 
-                  strokeDasharray={animate ? "49 51" : "0 100"}
-                  strokeDashoffset="0"
-                  style={{ transition: "stroke-dasharray 1.2s ease-out" }}
+            <form onSubmit={handleRejectOrderSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-450 uppercase tracking-wider">Reason for Rejection</label>
+                <textarea
+                  rows={4}
+                  required
+                  placeholder="Explain why this impression or prescription cannot be fabricated (e.g. poor scan definition, shade query)..."
+                  value={rejectReasonText}
+                  onChange={(e) => setRejectReasonText(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-danger/20 focus:border-danger text-gray-800 placeholder-gray-400 leading-relaxed"
                 />
-
-                {/* Purple Segment (In Progress: 24%) */}
-                <circle 
-                  cx="18" cy="18" r="15.915" fill="none" stroke="#A855F7" strokeWidth="3.2" 
-                  strokeDasharray={animate ? "24 76" : "0 100"}
-                  strokeDashoffset="-49"
-                  style={{ transition: "stroke-dasharray 1.2s ease-out 0.2s" }}
-                />
-
-                {/* Amber Segment (Pending Review: 13%) */}
-                <circle 
-                  cx="18" cy="18" r="15.915" fill="none" stroke="#F59E0B" strokeWidth="3.2" 
-                  strokeDasharray={animate ? "13 87" : "0 100"}
-                  strokeDashoffset="-73"
-                  style={{ transition: "stroke-dasharray 1.2s ease-out 0.4s" }}
-                />
-
-                {/* Teal Segment (Ready Dispatch: 9%) */}
-                <circle 
-                  cx="18" cy="18" r="15.915" fill="none" stroke="#14B8A6" strokeWidth="3.2" 
-                  strokeDasharray={animate ? "9 91" : "0 100"}
-                  strokeDashoffset="-86"
-                  style={{ transition: "stroke-dasharray 1.2s ease-out 0.6s" }}
-                />
-
-                {/* Yellow Segment (QC Pending: 5%) */}
-                <circle 
-                  cx="18" cy="18" r="15.915" fill="none" stroke="#EAB308" strokeWidth="3.2" 
-                  strokeDasharray={animate ? "5 95" : "0 100"}
-                  strokeDashoffset="-95"
-                  style={{ transition: "stroke-dasharray 1.2s ease-out 0.8s" }}
-                />
-              </svg>
-              {/* Inner Circle Counter */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-black text-gray-900">142</span>
-                <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
               </div>
-            </div>
 
-            {/* Legend */}
-            <div className="flex-1 space-y-1.5">
-              {caseStatuses.map((c) => (
-                <div key={c.status} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }}></span>
-                    <span className="text-gray-500 font-semibold truncate max-w-[80px]">{c.status}</span>
-                  </div>
-                  <span className="font-bold text-gray-800">{c.percent}%</span>
-                </div>
-              ))}
-            </div>
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsRejectModalOpen(false)}
+                  className="px-4 py-2 border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-bold text-gray-700 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-danger hover:bg-danger/90 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-sm"
+                >
+                  Submit Rejection
+                </button>
+              </div>
+            </form>
           </div>
         </div>
+      )}
 
-      </div>
+      {/* Toast Notifier */}
+      {toast.show && (
+        <div className="fixed bottom-5 right-5 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className={`px-4 py-3 rounded-xl shadow-lg border text-sm font-bold flex items-center gap-2 ${
+            toast.type === "error" 
+              ? "bg-danger/5 border-danger/25 text-danger" 
+              : "bg-success/5 border-success/25 text-success"
+          }`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+            {toast.message}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+

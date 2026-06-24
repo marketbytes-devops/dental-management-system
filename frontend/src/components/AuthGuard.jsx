@@ -52,8 +52,8 @@ export default function AuthGuard({ children, allowedRoles = [], type = "staff" 
 
       try {
         const endpoint = type === "patient" 
-          ? "http://localhost:8000/patient/profile" 
-          : "http://localhost:8000/auth/profile";
+          ? "http://127.0.0.1:8000/patient/profile" 
+          : "http://127.0.0.1:8000/auth/profile";
 
         const res = await fetch(endpoint, {
           method: "GET",

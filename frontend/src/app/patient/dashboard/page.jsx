@@ -23,7 +23,7 @@ export default function PatientDashboardPage() {
 
       try {
         // Fetch patient profile
-        const profileRes = await fetch("http://localhost:8000/patient/profile", {
+        const profileRes = await fetch("http://127.0.0.1:8000/patient/profile", {
           headers: {
             "Authorization": `Bearer ${token}`
           }
@@ -35,7 +35,7 @@ export default function PatientDashboardPage() {
         setProfile(profileData);
 
         // Fetch patient appointments
-        const apptsRes = await fetch(`http://localhost:8000/frontdesk/appointments/patient/${profileData.id}`);
+        const apptsRes = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/patient/${profileData.id}`);
         if (apptsRes.ok) {
           const apptsData = await apptsRes.json();
           setAppointments(apptsData.map(appt => ({

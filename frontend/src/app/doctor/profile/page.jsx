@@ -37,7 +37,7 @@ export default function DoctorProfilePage() {
   const fetchProfile = async () => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/auth/profile", {
+      const response = await fetch("http://127.0.0.1:8000/auth/profile", {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
 
@@ -97,7 +97,7 @@ export default function DoctorProfilePage() {
         board: updatedData.credentials?.board || null
       };
 
-      const response = await fetch("http://localhost:8000/auth/profile", {
+      const response = await fetch("http://127.0.0.1:8000/auth/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

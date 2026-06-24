@@ -11,13 +11,13 @@ export default function ReceptionistDashboard() {
   // Fetch today's appointments and the live queue from backend
   const fetchDashboardData = async () => {
     try {
-      const apptsRes = await fetch("http://localhost:8000/frontdesk/appointments/today");
+      const apptsRes = await fetch("http://127.0.0.1:8000/frontdesk/appointments/today");
       if (apptsRes.ok) {
         const apptsData = await apptsRes.json();
         setAppointments(apptsData);
       }
 
-      const queueRes = await fetch("http://localhost:8000/frontdesk/queue");
+      const queueRes = await fetch("http://127.0.0.1:8000/frontdesk/queue");
       if (queueRes.ok) {
         const queueData = await queueRes.json();
         setQueue(queueData);
@@ -40,7 +40,7 @@ export default function ReceptionistDashboard() {
     }
     try {
       // Complete or Cancel the appointment to remove from queue
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
+      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "Completed" })

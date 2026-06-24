@@ -36,7 +36,7 @@ export default function ReceptionistDoctors() {
   const fetchDoctors = async () => {
     try {
       const token = localStorage.getItem("staff_jwt_token");
-      const res = await fetch("http://localhost:8000/auth/doctors", {
+      const res = await fetch("http://127.0.0.1:8000/auth/doctors", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -49,6 +49,24 @@ export default function ReceptionistDoctors() {
 
   useEffect(() => { fetchDoctors(); }, []);
 
+  const handleToggleStatus = async (id) => {
+    try {
+      const token = localStorage.getItem("staff_jwt_token");
+      const res = await fetch(`http://127.0.0.1:8000/auth/doctors/${id}/status`, {
+        method: "PUT",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to cycle status.");
+      const updated = await res.json();
+      setDoctors(prev => prev.map(d => d.id === id
+        ? { ...d, status: updated.status, slots: updated.status === "Off Duty" ? [] : d.slots }
+        : d
+      ));
+      fetchDoctors();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const count = (key) => key === "all"
     ? doctors.length

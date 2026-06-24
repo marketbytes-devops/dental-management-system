@@ -148,7 +148,6 @@ export default function ReceptionistDoctors() {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleToggleStatus(d.id)}
                     className={`px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer transition-opacity hover:opacity-75 ${s.pill}`}
                   >
                     {s.label}

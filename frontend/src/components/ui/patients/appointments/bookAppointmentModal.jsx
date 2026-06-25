@@ -43,30 +43,17 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("patient_jwt_token") : null;
-        const response = await fetch("http://localhost:8000/auth/doctors", {
-          headers: token ? { "Authorization": `Bearer ${token}` } : {}
-        });
+        const response = await fetch("http://localhost:8000/patient/doctors-list");
         if (response.ok) {
           const data = await response.json();
           setDoctors(data);
         } else {
-          // Fallback to static doctors list if API fails
-          setDoctors([
-            { id: "D01", name: "Dr. Anoop Nair", specialty: "Endodontist", status: "On Duty" },
-            { id: "D02", name: "Dr. Priya Sharma", specialty: "Orthodontist", status: "On Duty" },
-            { id: "D03", name: "Dr. Rajan Mehta", specialty: "Periodontist", status: "On Duty" },
-            { id: "D04", name: "Dr. Sunita Pillai", specialty: "Oral Surgeon", status: "On Duty" },
-          ]);
+          console.error("Failed to fetch doctors, status:", response.status);
+          setDoctors([]);
         }
       } catch (e) {
         console.error("Failed to fetch doctors:", e);
-        setDoctors([
-          { id: "D01", name: "Dr. Anoop Nair", specialty: "Endodontist", status: "On Duty" },
-          { id: "D02", name: "Dr. Priya Sharma", specialty: "Orthodontist", status: "On Duty" },
-          { id: "D03", name: "Dr. Rajan Mehta", specialty: "Periodontist", status: "On Duty" },
-          { id: "D04", name: "Dr. Sunita Pillai", specialty: "Oral Surgeon", status: "On Duty" },
-        ]);
+        setDoctors([]);
       }
     };
     fetchDoctors();

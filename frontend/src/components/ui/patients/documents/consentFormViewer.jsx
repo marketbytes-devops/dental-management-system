@@ -35,47 +35,28 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
         {/* Scrollable Form Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-6 text-sm text-gray-600 leading-relaxed">
           <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
-            <h4 className="font-bold text-gray-800 uppercase tracking-wider text-xs">Patient & Procedure Information</h4>
+            <h4 className="font-bold text-gray-800 uppercase tracking-wider text-xs">Document Information</h4>
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div>
-                <span className="text-gray-400 block font-medium">Patient Name</span>
-                <span className="text-gray-800 font-semibold">Rahul Kumar</span>
+                <span className="text-gray-400 block font-medium">Document ID</span>
+                <span className="text-gray-800 font-semibold">{doc.id || "N/A"}</span>
               </div>
               <div>
-                <span className="text-gray-400 block font-medium">Patient ID</span>
-                <span className="text-gray-800 font-semibold">PT-10042</span>
-              </div>
-              <div>
-                <span className="text-gray-400 block font-medium">Treatment / Procedure</span>
-                <span className="text-gray-800 font-semibold">Root Canal Treatment (Endodontic therapy)</span>
-              </div>
-              <div>
-                <span className="text-gray-400 block font-medium">Clinician</span>
-                <span className="text-gray-800 font-semibold">Dr. Anoop Nair</span>
+                <span className="text-gray-400 block font-medium">Title</span>
+                <span className="text-gray-800 font-semibold">{doc.name || "Consent Form"}</span>
               </div>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <h4 className="font-bold text-gray-800">1. Nature of the Procedure</h4>
-            <p>
-              I hereby authorize Dr. Anoop Nair to perform a Root Canal Treatment on the designated tooth/teeth. This procedure involves removing infected or damaged pulp tissue from inside the root canals of the tooth, cleaning and shaping the canals, and sealing them with a biocompatible filling material.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <h4 className="font-bold text-gray-800">2. Risks and Complications</h4>
-            <p>
-              While endodontic therapy has a very high success rate, I understand that risks include, but are not limited to: post-operative pain or swelling, instrument fracture inside the root canal, root perforation, or failure of the treatment requiring extraction or root-end surgery.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <h4 className="font-bold text-gray-800">3. Acknowledgment & Consent</h4>
-            <p>
-              I understand the treatment details, alternatives, risks, and estimated costs. I have had the opportunity to ask questions, and they have been answered to my satisfaction. I understand that dentistry is not an exact science and that no guarantees have been made regarding the outcome.
-            </p>
-          </div>
+          {doc.content ? (
+            <div className="space-y-3 whitespace-pre-wrap">
+              <p>{doc.content}</p>
+            </div>
+          ) : (
+            <div className="space-y-3 text-gray-500 italic">
+              <p>Consent document content is not available.</p>
+            </div>
+          )}
 
           {/* Signature Selection Tab */}
           <div className="border-t border-gray-100 pt-6 space-y-4">

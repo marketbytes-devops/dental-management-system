@@ -1,26 +1,102 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Coins, CreditCard, Receipt } from "lucide-react";
 
-const INITIAL_INVOICES = [
-  { id: "INV-2026-041", caseId: "CASE-2026-001", patient: "Aditya Verma", dentist: "Dr. Anoop Nair", clinic: "SmileCare Central", amount: 4500, status: "Paid", date: "2026-06-10", items: [{ name: "Zirconia Crown (Ultra-Translucent)", qty: 1, rate: 3500 }, { name: "Laboratory Model Fabrication", qty: 1, rate: 1000 }] },
-  { id: "INV-2026-042", caseId: "CASE-2026-002", patient: "Meera Nair", dentist: "Dr. Sarah Smith", clinic: "SmileCare Central", amount: 8200, status: "Unpaid", date: "2026-06-09", items: [{ name: "E-Max Lithium Disilicate Bridge", qty: 3, rate: 2400 }, { name: "Shade Customization Service", qty: 1, rate: 1000 }] },
-  { id: "INV-2026-043", caseId: "CASE-2026-003", patient: "Rajesh Kannan", dentist: "Dr. Anoop Nair", clinic: "SmileCare Central", amount: 6500, status: "Paid", date: "2026-06-08", items: [{ name: "Screw-Retained Implant Crown", qty: 1, rate: 5500 }, { name: "Titanium Base Fitting", qty: 1, rate: 1000 }] },
-  { id: "INV-2026-044", caseId: "CASE-2026-005", patient: "Vikram Malhotra", dentist: "Dr. Anoop Nair", clinic: "SmileCare Orthodontics", amount: 12500, status: "Overdue", date: "2026-05-25", items: [{ name: "Complete Upper/Lower Denture", qty: 1, rate: 11500 }, { name: "Adjustable Articulation Setup", qty: 1, rate: 1000 }] }
-];
-
 export default function LabInvoices() {
-  const [invoices, setInvoices] = useState(INITIAL_INVOICES);
-  const [selectedInvId, setSelectedInvId] = useState("INV-2026-041");
+  const [invoices, setInvoices] = useState([]);
+  const [selectedInvId, setSelectedInvId] = useState("");
   const [toast, setToast] = useState({ show: false, message: "" });
+
+  const fetchInvoices = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/lab/orders", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mapped = data.map(o => {
+          const suffix = o.id.split("-")[2] || "000";
+          const invId = `INV-2026-${suffix}`;
+          
+          let rate = 5000;
+          let label = "Dental Prosthetic Fabrication";
+          const typeUpper = (o.prosthetic_type || "").toUpperCase();
+          if (typeUpper.includes("CROWN")) {
+            rate = 3500;
+            label = `${o.prosthetic_type} (${o.material || 'Zirconia'})`;
+          } else if (typeUpper.includes("BRIDGE")) {
+            rate = 7200;
+            label = `${o.prosthetic_type} (${o.material || 'E-Max'})`;
+          } else if (typeUpper.includes("IMPLANT")) {
+            rate = 5500;
+            label = `${o.prosthetic_type} (${o.material || 'Screw-Retained'})`;
+          } else if (typeUpper.includes("DENTURE")) {
+            rate = 11500;
+            label = `${o.prosthetic_type} (${o.material || 'Acrylic'})`;
+          }
+          
+          const items = [
+            { name: label, qty: 1, rate: rate },
+            { name: "Laboratory Setup Fee", qty: 1, rate: 1000 }
+          ];
+          const amount = rate + 1000;
+          
+          let invStatus = "Unpaid";
+          if (o.status === "Completed" || o.status === "Delivered") {
+            invStatus = "Paid";
+          } else if (o.status === "Rejected") {
+            invStatus = "Overdue";
+          }
+          
+          return {
+            id: invId,
+            caseId: o.id,
+            patient: o.patient_name || "Walk-in Patient",
+            dentist: o.dentist_name || "Dr. Anoop Nair",
+            clinic: "SmileCare Dental Clinic",
+            amount: amount,
+            status: invStatus,
+            date: o.due_date || "2026-06-15",
+            items: items
+          };
+        });
+        setInvoices(mapped);
+        if (mapped.length > 0) {
+          setSelectedInvId(prev => {
+            if (mapped.some(inv => inv.id === prev)) return prev;
+            return mapped[0].id;
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch invoices:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvoices();
+    const interval = setInterval(fetchInvoices, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const triggerToast = (message) => {
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: "" }), 3000);
   };
 
-  const currentInvoice = invoices.find(inv => inv.id === selectedInvId) || invoices[0];
+  const currentInvoice = invoices.find(inv => inv.id === selectedInvId) || invoices[0] || {
+    id: "N/A",
+    caseId: "N/A",
+    patient: "No Invoice Available",
+    dentist: "N/A",
+    clinic: "N/A",
+    amount: 0,
+    status: "N/A",
+    date: "N/A",
+    items: []
+  };
 
   // Stats calculation
   const totalRevenue = invoices.reduce((acc, inv) => inv.status === "Paid" ? acc + inv.amount : acc, 0);

@@ -69,6 +69,8 @@ export default function MyDocumentLibrary({ documents = [] }) {
                       )}
                       <a
                         href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         target={doc.url !== "#" ? "_blank" : undefined}
                         rel={doc.url !== "#" ? "noopener noreferrer" : undefined}
                         onClick={(e) => {

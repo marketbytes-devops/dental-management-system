@@ -36,8 +36,7 @@ export const myInvoices = [
 export const myDocuments = [
   { id: "DOC-001", name: "Dental X-Ray (Full Mouth)", type: "X-Ray", date: "2026-05-12", url: "#", size: "2.4 MB" },
   { id: "DOC-002", name: "Blood Report (Pre-surgery)", type: "Lab Report", date: "2026-05-10", url: "#", size: "1.1 MB" },
-  { id: "DOC-003", name: "Root Canal Consent Form", type: "Consent Form", date: "2026-06-11", url: "#", size: "450 KB", signed: false },
-  { id: "DOC-004", name: "General Dental Consent Form", type: "Consent Form", date: "2026-05-12", url: "#", size: "430 KB", signed: true },
+  // Consent forms are now fetched dynamically from the backend
 ];
 
 export const myNotifications = [

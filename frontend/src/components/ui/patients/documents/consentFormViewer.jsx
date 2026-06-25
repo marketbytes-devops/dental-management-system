@@ -57,6 +57,30 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
         </div>
 
         {/* Scrollable Form Body */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-6 text-sm text-gray-600 leading-relaxed">
+          <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
+            <h4 className="font-bold text-gray-800 uppercase tracking-wider text-xs">Document Information</h4>
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <span className="text-gray-400 block font-medium">Document ID</span>
+                <span className="text-gray-800 font-semibold">{doc.id || "N/A"}</span>
+              </div>
+              <div>
+                <span className="text-gray-400 block font-medium">Title</span>
+                <span className="text-gray-800 font-semibold">{doc.name || "Consent Form"}</span>
+              </div>
+            </div>
+          </div>
+
+          {doc.content ? (
+            <div className="space-y-3 whitespace-pre-wrap">
+              <p>{doc.content}</p>
+            </div>
+          ) : (
+            <div className="space-y-3 text-gray-500 italic">
+              <p>Consent document content is not available.</p>
+            </div>
+          )}
         <div className="p-6 overflow-y-auto flex-1 space-y-6 text-sm text-gray-600 leading-relaxed text-left">
           <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
             <h4 className="font-bold text-gray-800 uppercase tracking-wider text-[10px]">Form details</h4>

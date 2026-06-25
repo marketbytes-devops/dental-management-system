@@ -2,227 +2,194 @@
 
 import { useState, useEffect } from "react";
 
-const defaultRequests = [
-  {
-    id: "LV-101",
-    userId: "DR-101",
-    staffName: "Dr. Anoop Nair",
-    role: "doctor",
-    type: "Annual Leave",
-    startDate: "2026-03-10",
-    endDate: "2026-03-15",
-    days: 6,
-    reason: "Family function / trip",
-    status: "Approved",
-    submittedAt: "2026-02-25, 10:15 AM",
-    onCallDoctor: ""
-  },
-  {
-    id: "LV-102",
-    userId: "DR-101",
-    staffName: "Dr. Anoop Nair",
-    role: "doctor",
-    type: "Sick Leave",
-    startDate: "2026-06-02",
-    endDate: "2026-06-03",
-    days: 2,
-    reason: "Severe viral fever",
-    status: "Approved",
-    submittedAt: "2026-06-02, 08:30 AM",
-    onCallDoctor: ""
-  },
-  {
-    id: "LV-103",
-    userId: "DR-101",
-    staffName: "Dr. Anoop Nair",
-    role: "doctor",
-    type: "Casual Leave",
-    startDate: "2026-06-25",
-    endDate: "2026-06-25",
-    days: 1,
-    reason: "Personal urgent bank work",
-    status: "Pending",
-    submittedAt: "2026-06-15, 11:00 AM",
-    onCallDoctor: "Dr. Sarah Jenkins"
-  },
-  {
-    id: "LV-104",
-    userId: "LT-1002",
-    staffName: "Alen Joseph",
-    role: "labtechnician",
-    type: "Annual Leave",
-    startDate: "2026-05-12",
-    endDate: "2026-05-16",
-    days: 5,
-    reason: "Personal work",
-    status: "Approved",
-    submittedAt: "2026-05-10, 09:00 AM"
-  },
-  {
-    id: "LV-105",
-    userId: "FD-101",
-    staffName: "Jane Doe",
-    role: "receptionist",
-    type: "Annual Leave",
-    startDate: "2026-02-20",
-    endDate: "2026-02-24",
-    days: 5,
-    reason: "Out of town travel",
-    status: "Approved",
-    submittedAt: "2026-02-15, 03:00 PM"
-  }
-];
-
-const defaultBalances = {
-  "DR-101": {
-    "Annual Leave": { used: 6, total: 20 },
-    "Sick Leave": { used: 2, total: 10 },
-    "Casual Leave": { used: 0, total: 8 },
-    "CME Leave": { used: 0, total: 7 }
-  },
-  "LT-1002": {
-    "Annual Leave": { used: 5, total: 18 },
-    "Sick Leave": { used: 0, total: 10 },
-    "Casual Leave": { used: 0, total: 8 }
-  },
-  "FD-101": {
-    "Annual Leave": { used: 5, total: 18 },
-    "Sick Leave": { used: 0, total: 10 },
-    "Casual Leave": { used: 0, total: 8 }
-  },
-  "FD-102": {
-    "Annual Leave": { used: 0, total: 18 },
-    "Sick Leave": { used: 0, total: 10 },
-    "Casual Leave": { used: 0, total: 8 }
-  }
-};
-
 export default function useLeaveData(userId, role, staffName) {
-  const reqStorageKey = "smilecare_global_leave_requests";
-  const balStorageKey = "smilecare_global_leave_balances";
-
   const [requests, setRequests] = useState([]);
   const [balances, setBalances] = useState({});
+  const [allBalances, setAllBalances] = useState({});
   const [isLoaded, setIsLoaded] = useState(false);
 
+  const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+
+  const fetchLeaveData = async () => {
+    if (!token) return;
+    try {
+      // 1. Fetch my requests
+      const myReqsRes = await fetch("http://localhost:8000/leave/my", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!myReqsRes.ok) throw new Error("Failed to fetch my leave requests");
+      const myReqsData = await myReqsRes.json();
+      
+      // Map backend fields to frontend expected format
+      const mappedMyRequests = myReqsData.map(r => ({
+        id: `LV-${r.id}`,
+        dbId: r.id,
+        userId: `USER-${r.user_id}`,
+        staffName: r.staff_name,
+        role: r.role,
+        type: r.type,
+        startDate: r.start_date,
+        endDate: r.end_date,
+        days: r.days,
+        reason: r.reason,
+        status: r.status,
+        submittedAt: new Date(r.submitted_at).toLocaleString(),
+        onCallDoctor: r.on_call_doctor || ""
+      }));
+
+      // 2. Fetch my balances
+      const balRes = await fetch("http://localhost:8000/leave/balances", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!balRes.ok) throw new Error("Failed to fetch leave balances");
+      const balData = await balRes.json();
+
+      setRequests(mappedMyRequests);
+      setBalances(balData);
+
+      // 3. If admin / manager, fetch all requests and all balances
+      if (role === "admin" || role === "manager") {
+        const allReqsRes = await fetch("http://localhost:8000/leave/requests", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (allReqsRes.ok) {
+          const allReqsData = await allReqsRes.json();
+          const mappedAllRequests = allReqsData.map(r => ({
+            id: `LV-${r.id}`,
+            dbId: r.id,
+            userId: `USER-${r.user_id}`,
+            staffName: r.staff_name,
+            role: r.role,
+            type: r.type,
+            startDate: r.start_date,
+            endDate: r.end_date,
+            days: r.days,
+            reason: r.reason,
+            status: r.status,
+            submittedAt: new Date(r.submitted_at).toLocaleString(),
+            onCallDoctor: r.on_call_doctor || ""
+          }));
+          setRequests(mappedAllRequests);
+        }
+
+        const allBalRes = await fetch("http://localhost:8000/leave/balances/all", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (allBalRes.ok) {
+          const allBalData = await allBalRes.json();
+          setAllBalances(allBalData);
+        }
+      }
+      
+      setIsLoaded(true);
+    } catch (err) {
+      console.error("Error fetching leave data from backend:", err);
+      setIsLoaded(true); // Stop loading state even on error to fallback gracefully
+    }
+  };
+
   useEffect(() => {
-    const savedReqs = localStorage.getItem(reqStorageKey);
-    const savedBals = localStorage.getItem(balStorageKey);
+    fetchLeaveData();
+  }, [userId, role]);
 
-    let finalRequests = defaultRequests;
-    let finalBalances = defaultBalances;
-
-    if (savedReqs) {
-      try {
-        finalRequests = JSON.parse(savedReqs);
-      } catch (e) {
-        console.error("Error parsing requests", e);
+  const applyLeave = async (type, startDate, endDate, reason, onCallDoctor = "") => {
+    try {
+      const response = await fetch("http://localhost:8000/leave/apply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ type, startDate, endDate, reason, onCallDoctor })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        await fetchLeaveData();
+        return { success: true, days: data.days };
+      } else {
+        const errData = await response.json();
+        return { success: false, error: errData.detail || "Failed to apply leave." };
       }
-    } else {
-      localStorage.setItem(reqStorageKey, JSON.stringify(defaultRequests));
+    } catch (err) {
+      return { success: false, error: "Network error occurred." };
     }
+  };
 
-    if (savedBals) {
-      try {
-        finalBalances = JSON.parse(savedBals);
-      } catch (e) {
-        console.error("Error parsing balances", e);
+  const approveLeave = async (id) => {
+    const req = requests.find(r => r.id === id);
+    const dbId = req ? req.dbId : id;
+    try {
+      const response = await fetch(`http://localhost:8000/leave/requests/${dbId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: "Approved" })
+      });
+      if (response.ok) {
+        await fetchLeaveData();
       }
-    } else {
-      localStorage.setItem(balStorageKey, JSON.stringify(defaultBalances));
+    } catch (err) {
+      console.error("Error approving leave:", err);
     }
-
-    setRequests(finalRequests);
-    setBalances(finalBalances);
-    setIsLoaded(true);
-  }, []);
-
-  const syncState = (updatedReqs, updatedBals) => {
-    setRequests(updatedReqs);
-    setBalances(updatedBals);
-    localStorage.setItem(reqStorageKey, JSON.stringify(updatedReqs));
-    localStorage.setItem(balStorageKey, JSON.stringify(updatedBals));
   };
 
-  const applyLeave = (type, startDate, endDate, reason, onCallDoctor = "") => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end - start);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-    const newReq = {
-      id: `LV-${Math.floor(106 + Math.random() * 890)}`,
-      userId,
-      staffName,
-      role,
-      type,
-      startDate,
-      endDate,
-      days: diffDays,
-      reason,
-      status: "Pending",
-      submittedAt: new Date().toLocaleString(),
-      onCallDoctor
-    };
-
-    const updated = [newReq, ...requests];
-    syncState(updated, balances);
-    return { success: true, days: diffDays };
-  };
-
-  const approveLeave = (id) => {
-    const req = requests.find((r) => r.id === id);
-    if (!req || req.status !== "Pending") return;
-
-    const updatedBals = { ...balances };
-    const uId = req.userId;
-    const type = req.type;
-
-    if (updatedBals[uId] && updatedBals[uId][type]) {
-      updatedBals[uId][type] = {
-        ...updatedBals[uId][type],
-        used: Math.min(updatedBals[uId][type].total, updatedBals[uId][type].used + req.days)
-      };
-    }
-
-    const updatedReqs = requests.map((r) => (r.id === id ? { ...r, status: "Approved" } : r));
-    syncState(updatedReqs, updatedBals);
-  };
-
-  const rejectLeave = (id) => {
-    const updatedReqs = requests.map((r) => (r.id === id ? { ...r, status: "Rejected" } : r));
-    syncState(updatedReqs, balances);
-  };
-
-  const cancelLeave = (id) => {
-    const req = requests.find((r) => r.id === id);
-    if (!req) return;
-
-    let updatedBals = { ...balances };
-    // If approved, restore balance
-    if (req.status === "Approved") {
-      const uId = req.userId;
-      const type = req.type;
-      if (updatedBals[uId] && updatedBals[uId][type]) {
-        updatedBals[uId][type] = {
-          ...updatedBals[uId][type],
-          used: Math.max(0, updatedBals[uId][type].used - req.days)
-        };
+  const rejectLeave = async (id) => {
+    const req = requests.find(r => r.id === id);
+    const dbId = req ? req.dbId : id;
+    try {
+      const response = await fetch(`http://localhost:8000/leave/requests/${dbId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: "Rejected" })
+      });
+      if (response.ok) {
+        await fetchLeaveData();
       }
+    } catch (err) {
+      console.error("Error rejecting leave:", err);
     }
-
-    const updatedReqs = requests.filter((r) => r.id !== id);
-    syncState(updatedReqs, updatedBals);
   };
 
-  const resetData = () => {
-    localStorage.removeItem(reqStorageKey);
-    localStorage.removeItem(balStorageKey);
-    syncState(defaultRequests, defaultBalances);
+  const cancelLeave = async (id) => {
+    const req = requests.find(r => r.id === id);
+    const dbId = req ? req.dbId : id;
+    try {
+      const response = await fetch(`http://localhost:8000/leave/requests/${dbId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        await fetchLeaveData();
+      }
+    } catch (err) {
+      console.error("Error cancelling leave:", err);
+    }
   };
 
-  // Get active balances for the current user (fallback to empty object if not loaded yet)
-  const myBalances = balances[userId] || {
+  const resetData = async () => {
+    try {
+      const response = await fetch("http://localhost:8000/leave/reset", {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        await fetchLeaveData();
+      }
+    } catch (err) {
+      console.error("Error resetting data:", err);
+    }
+  };
+
+  const myBalances = balances && Object.keys(balances).length > 0 ? balances : {
     "Annual Leave": { used: 0, total: 18 },
     "Sick Leave": { used: 0, total: 10 },
     "Casual Leave": { used: 0, total: 8 }
@@ -231,7 +198,7 @@ export default function useLeaveData(userId, role, staffName) {
   return {
     requests,
     balances: myBalances,
-    allBalances: balances,
+    allBalances,
     isLoaded,
     applyLeave,
     approveLeave,

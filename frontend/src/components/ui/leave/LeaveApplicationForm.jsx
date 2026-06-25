@@ -25,7 +25,7 @@ export default function LeaveApplicationForm({
   const [reason, setReason] = useState("");
   const [onCallDoctor, setOnCallDoctor] = useState(mockOnCallDoctors[0].name);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
@@ -58,7 +58,7 @@ export default function LeaveApplicationForm({
     }
 
     // Submit
-    const result = onApply(
+    const result = await onApply(
       leaveType,
       startDate,
       endDate,
@@ -66,11 +66,13 @@ export default function LeaveApplicationForm({
       requiresOnCall ? onCallDoctor : ""
     );
 
-    if (result.success) {
+    if (result && result.success) {
       setStartDate("");
       setEndDate("");
       setReason("");
       setSuccessMsg(`Leave request submitted successfully (${diffDays} days). Status: Pending approval.`);
+    } else {
+      setErrorMsg(result?.error || "Failed to submit request.");
     }
   };
 

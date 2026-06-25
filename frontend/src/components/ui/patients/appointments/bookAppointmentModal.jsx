@@ -39,38 +39,72 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [doctors, setDoctors] = useState([]);
+  const [doctorLeaves, setDoctorLeaves] = useState([]);
+
+  useEffect(() => {
+    const fetchDoctorLeaves = async () => {
+      if (!form.doctor) {
+        setDoctorLeaves([]);
+        return;
+      }
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/leave/doctor/leaves?doctor_name=${encodeURIComponent(form.doctor)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDoctorLeaves(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch doctor leaves:", e);
+      }
+    };
+    fetchDoctorLeaves();
+  }, [form.doctor]);
+
+  useEffect(() => {
+    if (form.date && form.doctor && doctorLeaves.length > 0) {
+      const selectedDate = new Date(form.date);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      const isOnLeave = doctorLeaves.some(leave => {
+        const start = new Date(leave.start_date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(leave.end_date);
+        end.setHours(0, 0, 0, 0);
+        return selectedDate >= start && selectedDate <= end;
+      });
+      
+      if (isOnLeave) {
+        alert(`${form.doctor} is on leave on this day. Please select another date.`);
+        setForm(prev => ({ ...prev, date: "" }));
+      }
+    }
+  }, [form.date, doctorLeaves, form.doctor]);
 
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
+        const response = await fetch("http://localhost:8000/patient/doctors-list");
         const token = typeof window !== "undefined" ? localStorage.getItem("patient_jwt_token") : null;
-        const response = await fetch("http://127.0.0.1:8000/auth/doctors", {
+        const url = form.date 
+          ? `http://127.0.0.1:8000/auth/doctors?date=${form.date}` 
+          : "http://127.0.0.1:8000/auth/doctors";
+        const response = await fetch(url, {
           headers: token ? { "Authorization": `Bearer ${token}` } : {}
         });
         if (response.ok) {
           const data = await response.json();
           setDoctors(data);
         } else {
-          // Fallback to static doctors list if API fails
-          setDoctors([
-            { id: "D01", name: "Dr. Anoop Nair", specialty: "Endodontist", status: "On Duty" },
-            { id: "D02", name: "Dr. Priya Sharma", specialty: "Orthodontist", status: "On Duty" },
-            { id: "D03", name: "Dr. Rajan Mehta", specialty: "Periodontist", status: "On Duty" },
-            { id: "D04", name: "Dr. Sunita Pillai", specialty: "Oral Surgeon", status: "On Duty" },
-          ]);
+          console.error("Failed to fetch doctors, status:", response.status);
+          setDoctors([]);
         }
       } catch (e) {
         console.error("Failed to fetch doctors:", e);
-        setDoctors([
-          { id: "D01", name: "Dr. Anoop Nair", specialty: "Endodontist", status: "On Duty" },
-          { id: "D02", name: "Dr. Priya Sharma", specialty: "Orthodontist", status: "On Duty" },
-          { id: "D03", name: "Dr. Rajan Mehta", specialty: "Periodontist", status: "On Duty" },
-          { id: "D04", name: "Dr. Sunita Pillai", specialty: "Oral Surgeon", status: "On Duty" },
-        ]);
+        setDoctors([]);
       }
     };
     fetchDoctors();
-  }, []);
+  }, [form.date]);
 
   const today = new Date().toISOString().split("T")[0];
 

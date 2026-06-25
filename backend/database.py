@@ -23,7 +23,9 @@ if DATABASE_URL:
         # Create a temporary engine with a 5-second timeout to check connection
         temp_engine = create_engine(
             DATABASE_URL, 
-            connect_args={"sslmode": "require", "connect_timeout": 5}
+            connect_args={"sslmode": "require", "connect_timeout": 5},
+            pool_pre_ping=True,
+            pool_recycle=300
         )
         with temp_engine.connect() as conn:
             pass

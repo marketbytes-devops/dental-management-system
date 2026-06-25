@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useLeavePermissions from "./hooks/useLeavePermissions";
 import useLeaveData from "./hooks/useLeaveData";
 import LeaveApplicationForm from "./LeaveApplicationForm";
@@ -35,7 +35,24 @@ const getStaffProfile = (role) => {
 };
 
 export default function LeaveManagement({ role = "doctor" }) {
-  const { userId, staffName } = getStaffProfile(role);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedUser = localStorage.getItem("staff_user");
+      if (savedUser) {
+        try {
+          setCurrentUser(JSON.parse(savedUser));
+        } catch (e) {
+          console.error("Error parsing staff_user", e);
+        }
+      }
+    }
+  }, []);
+
+  const profile = getStaffProfile(role);
+  const userId = currentUser ? `USER-${currentUser.id}` : profile.userId;
+  const staffName = currentUser ? currentUser.name : profile.staffName;
 
   // Load Permissions
   const permissions = useLeavePermissions(role);
@@ -54,7 +71,7 @@ export default function LeaveManagement({ role = "doctor" }) {
   } = useLeaveData(userId, role, staffName);
 
   // Navigation & Simulation State
-  const [activeTab, setActiveTab] = useState("dashboard"); // dashboard | calendar | manager
+  const [activeTab, setActiveTab] = useState(role === "admin" ? "manager" : "dashboard"); // dashboard | calendar | manager
   const [simulateManager, setSimulateManager] = useState(false);
   
   // Feedback states
@@ -104,22 +121,24 @@ export default function LeaveManagement({ role = "doctor" }) {
           </div>
 
           {/* Simulator Manager Switcher */}
-          <button
-            onClick={() => {
-              setSimulateManager(!simulateManager);
-              if (!simulateManager) setActiveTab("manager");
-              else setActiveTab("dashboard");
-            }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer outline-none flex items-center gap-1.5 ${
-              simulateManager 
-                ? "bg-slate-900 text-white border-slate-900" 
-                : "bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200"
-            }`}
-            title="Toggle simulator mode to review and approve/reject leave applications"
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>{simulateManager ? "Exit Manager Mode" : "Manager Simulator"}</span>
-          </button>
+          {role !== "admin" && (
+            <button
+              onClick={() => {
+                setSimulateManager(!simulateManager);
+                if (!simulateManager) setActiveTab("manager");
+                else setActiveTab("dashboard");
+              }}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer outline-none flex items-center gap-1.5 ${
+                simulateManager 
+                  ? "bg-slate-900 text-white border-slate-900" 
+                  : "bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200"
+              }`}
+              title="Toggle simulator mode to review and approve/reject leave applications"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>{simulateManager ? "Exit Manager Mode" : "Manager Simulator"}</span>
+            </button>
+          )}
 
           {/* Reset button */}
           <button
@@ -134,16 +153,18 @@ export default function LeaveManagement({ role = "doctor" }) {
 
       {/* Main Tabs Navigation */}
       <div className="flex border-b border-gray-150 gap-2">
-        <button
-          onClick={() => setActiveTab("dashboard")}
-          className={`px-4 py-2 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer outline-none ${
-            activeTab === "dashboard"
-              ? "border-primary text-primary"
-              : "border-transparent text-gray-505 hover:text-gray-900"
-          }`}
-        >
-          <LayoutDashboard className="w-4 h-4" /> My Dashboard
-        </button>
+        {permissions.canApply && (
+          <button
+            onClick={() => setActiveTab("dashboard")}
+            className={`px-4 py-2 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer outline-none ${
+              activeTab === "dashboard"
+                ? "border-primary text-primary"
+                : "border-transparent text-gray-505 hover:text-gray-900"
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4" /> My Dashboard
+          </button>
+        )}
         <button
           onClick={() => setActiveTab("calendar")}
           className={`px-4 py-2 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer outline-none ${
@@ -256,13 +277,52 @@ export default function LeaveManagement({ role = "doctor" }) {
         )}
 
         {activeTab === "manager" && isManagerMode && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-fade-in">
             {successMsg && (
               <div className="p-3.5 bg-success/10 text-success border border-success/15 rounded-xl text-xs font-semibold flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>{successMsg}</span>
               </div>
             )}
+            
+            {/* Top Full-Width Stats Cards for Admin Manager Hub */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 text-left">
+                <div className="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-success" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Approved Leaves</p>
+                  <p className="text-xl font-black text-gray-900 mt-0.5">
+                    {requests.filter((r) => r.status === "Approved").length}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 text-left">
+                <div className="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5 text-warning animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Awaiting Review</p>
+                  <p className="text-xl font-black text-gray-900 mt-0.5">
+                    {requests.filter((r) => r.status === "Pending").length}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 text-left">
+                <div className="w-10 h-10 rounded-xl bg-danger/10 text-danger flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5 text-danger" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Rejected Requests</p>
+                  <p className="text-xl font-black text-gray-900 mt-0.5">
+                    {requests.filter((r) => r.status === "Rejected").length}
+                  </p>
+                </div>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               <div className="lg:col-span-7">

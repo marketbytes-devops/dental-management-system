@@ -8,6 +8,7 @@ from modules.admin.router import router as admin_router
 from modules.patient.router import router as patient_router
 from modules.frontdesk.router import router as frontdesk_router
 from modules.lab.router import router as lab_router
+from modules.leave.router import router as leave_router
 
 
 from database import Base, engine, SessionLocal
@@ -18,6 +19,7 @@ from modules.frontdesk.communication_models import CommunicationLogModel
 from modules.lab.models import LabOrderModel, LabNotificationModel
 from modules.doctor.models import DoctorModel
 from modules.admin.models import AdminModel
+from modules.leave.models import LeaveRequestModel
 from modules.auth.service import hash_password
 
 
@@ -71,6 +73,7 @@ app.include_router(admin_router)
 app.include_router(patient_router)
 app.include_router(frontdesk_router)
 app.include_router(lab_router)
+app.include_router(leave_router)
 
 
 

@@ -52,6 +52,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Doctor Schedules", href: "/admin/doctor", icon: Stethoscope },
     { name: "Patient Directory", href: "/admin/patients", icon: Users },
     { name: "Inventory", href: "/admin/inventory", icon: ClipboardList },
+    { name: "Leave Management", href: "/admin/leave", icon: Calendar },
     { name: "System Logs", href: "/admin/dashboard", icon: FileEdit }
   ],
   doctor: [
@@ -88,6 +89,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Communications", href: "/frontdesk/receptionist/communication", icon: Phone },
     { name: "Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },
     { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },
+    { name: "Leave Management", href: "/frontdesk/receptionist/leave", icon: Calendar },
     { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },
     { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings }
   ],
@@ -103,6 +105,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Outstanding Dues", href: "/frontdesk/accountant/dues", icon: AlertCircle },
     { name: "Payroll", href: "/frontdesk/accountant/payroll", icon: Banknote },
     { name: "Reports", href: "/frontdesk/accountant/reports", icon: FileText },
+    { name: "Leave Management", href: "/frontdesk/accountant/leave", icon: Calendar },
     { name: "Audit Logs", href: "/frontdesk/accountant/audit", icon: Search },
     { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings }
   ],

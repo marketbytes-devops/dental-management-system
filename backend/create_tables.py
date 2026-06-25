@@ -13,6 +13,7 @@ from modules.frontdesk.communication_models import CommunicationLogModel
 from modules.lab.models import LabOrderModel
 from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
+from modules.leave.models import LeaveRequestModel
 
 def main():
     print("Initializing database tables for all modules...")

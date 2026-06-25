@@ -43,10 +43,9 @@ export default function ReceptionistTreatments() {
                   <td className="py-3.5 px-2 text-gray-500 text-xs">{c.doctor}</td>
                   <td className="py-3.5 px-2 text-gray-650">{c.treatment}</td>
                   <td className="py-3.5 px-2">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                      c.status === "Ongoing" ? "bg-success/10 text-success animate-pulse" :
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${c.status === "Ongoing" ? "bg-success/10 text-success animate-pulse" :
                       c.status === "Pre-Op Setup" ? "bg-primary/10 text-primary" : "bg-warning/10 text-warning"
-                    }`}>
+                      }`}>
                       {c.status}
                     </span>
                   </td>

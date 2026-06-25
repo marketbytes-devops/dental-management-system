@@ -10,6 +10,7 @@ import LabOrderForm from "./LabOrderForm";
 import ClinicalNotes from "./ClinicalNotes";
 import ReferralForm from "./ReferralForm";
 import TimelineHistory from "./TimelineHistory";
+import TreatmentPlanManager from "./TreatmentPlanManager";
 
 // Registry
 import { SPECIALTY_REGISTRY } from "./specialties/specialtyRegistry";
@@ -108,6 +109,9 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
             {/* Inject onSubmit callback to specialty form children */}
             {React.cloneElement(children, { onSubmit: handleSaveSpecialtyLog })}
           </div>
+
+          {/* Patient Treatment Plan Section */}
+          <TreatmentPlanManager patientToken={viewingPatient.token} />
 
           {/* Prescription & Lab Order Forms - Stacked for full width and alignment */}
           <div className="space-y-6">

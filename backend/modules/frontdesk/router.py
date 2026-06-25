@@ -268,10 +268,20 @@ def get_live_queue(db: Session = Depends(get_db)):
     return queue_items
 
 @router.get("/doctors")
-def get_public_doctors(db: Session = Depends(get_db)):
+def get_public_doctors(date: str = None, db: Session = Depends(get_db)):
     all_users = db.query(UserModel).filter(UserModel.status == "Active").all()
     doctors = [u for u in all_users if any(r.lower() == "doctor" for r in (u.roles or []))]
     
+    if date:
+        from modules.leave.models import LeaveRequestModel
+        on_leave_user_ids = db.query(LeaveRequestModel.user_id).filter(
+            LeaveRequestModel.status == "Approved",
+            LeaveRequestModel.start_date <= date,
+            LeaveRequestModel.end_date >= date
+        ).all()
+        on_leave_set = {uid[0] for uid in on_leave_user_ids}
+        doctors = [doc for doc in doctors if doc.id not in on_leave_set]
+        
     result = []
     for doc in doctors:
         specialty = ", ".join(doc.specialties) if doc.specialties else "General Dentistry"

@@ -69,9 +69,13 @@ export default function MyDocumentLibrary({ documents = [] }) {
                       )}
                       <a
                         href={doc.url}
+                        target={doc.url !== "#" ? "_blank" : undefined}
+                        rel={doc.url !== "#" ? "noopener noreferrer" : undefined}
                         onClick={(e) => {
-                          e.preventDefault();
-                          alert(`Downloading "${doc.name}" is not supported in the mock version.`);
+                          if (doc.url === "#") {
+                            e.preventDefault();
+                            alert(`Downloading "${doc.name}" is not supported in the mock version.`);
+                          }
                         }}
                         className="flex items-center gap-1 p-2 text-gray-400 hover:text-primary transition-colors text-xs font-semibold hover:bg-gray-50 rounded-lg border border-gray-150 cursor-pointer"
                         title="Download File"

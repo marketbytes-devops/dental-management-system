@@ -351,8 +351,13 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 
 @router.get("/doctors")
 def get_doctors_roster(db: Session = Depends(get_db)):
+    import datetime
+    from modules.leave.models import LeaveRequestModel
+    
     all_users = db.query(UserModel).all()
     doctors = [u for u in all_users if any(r.lower() == "doctor" for r in u.roles)]
+    
+    today_str = datetime.date.today().isoformat()
     
     roster = []
     for idx, doc in enumerate(doctors):
@@ -362,8 +367,17 @@ def get_doctors_roster(db: Session = Depends(get_db)):
             AppointmentModel.status.in_(["Waiting", "In Chair"])
         ).count()
         
+        has_leave_today = db.query(LeaveRequestModel).filter(
+            LeaveRequestModel.user_id == doc.id,
+            LeaveRequestModel.status == "Approved",
+            LeaveRequestModel.start_date <= today_str,
+            LeaveRequestModel.end_date >= today_str
+        ).first()
+        
         status_map = "On Duty"
-        if doc.status == "Inactive":
+        if has_leave_today:
+            status_map = "On Leave"
+        elif doc.status == "Inactive":
             status_map = "Off Duty"
         elif doc.status == "On Break":
             status_map = "On Break"

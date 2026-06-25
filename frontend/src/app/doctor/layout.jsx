@@ -25,101 +25,12 @@ export default function DoctorLayout({ children }) {
   const pathname = usePathname();
 
   // Master Patient Database (simulated state)
-  const [patients, setPatients] = useState({
-    "#003": {
-      token: "#003",
-      name: "Sneha Joseph",
-      age: 27,
-      gender: "Female",
-      phone: "+91 91234 56789",
-      procedure: "Scaling & Extraction",
-      chiefComplaint: "Mobility in upper molar, general calculus accumulation.",
-      medicalAlerts: ["Bleeding disorder (Mild)"],
-      teethChart: { 18: "restored" },
-      timeline: [
-        { date: "09-06-2026", note: "Diagnostic scaling completed. Cavity check on upper jaw.", type: "Procedure" },
-        { date: "09-06-2026", note: "Prescribed Chlorhexidine mouthwash and Vitamin K supplements.", type: "Prescription", details: "Mouthwash - Morning/Night - 7 Days" }
-      ]
-    },
-    "#004": {
-      token: "#004",
-      name: "Rahul Kumar",
-      age: 32,
-      gender: "Male",
-      phone: "+91 98765 43210",
-      procedure: "Root Canal Treatment",
-      chiefComplaint: "Severe throbbing pain in the upper right back tooth (#16), sensitive to hot & cold.",
-      medicalAlerts: ["Hypertension (BP 140/90)", "Clindamycin Sensitivity"],
-      teethChart: { 16: "active-treatment", 24: "restored" },
-      timeline: [
-        { date: "08-06-2026", note: "Diagnostic digital X-ray completed. Deep dentinal caries reaching pulp on #16.", type: "Diagnostic" },
-        { date: "08-06-2026", note: "Prescribed Ibuprofen 400mg for pain control.", type: "Prescription", details: "Ibuprofen 400mg - Morning/Night - 3 Days" },
-        { date: "09-06-2026", note: "RCT Stage 1 initiated. Pulpectomy completed on #16. Cavity canal disinfected, temporary sealing done.", type: "Procedure" }
-      ]
-    },
-    "#005": {
-      token: "#005",
-      name: "Rohan Varma",
-      age: 28,
-      gender: "Male",
-      phone: "+91 88776 65544",
-      procedure: "Dental Filling",
-      chiefComplaint: "Food lodgement and mild sensitivity in lower left molar (#36).",
-      medicalAlerts: [],
-      teethChart: { 36: "active-treatment" },
-      timeline: [
-        { date: "09-06-2026", note: "Clinical exam shows Class I caries on #36 occlusal surface. Vitality test positive.", type: "Diagnostic" }
-      ]
-    },
-    "#006": {
-      token: "#006",
-      name: "Priya Nair",
-      age: 34,
-      gender: "Female",
-      phone: "+91 77665 54433",
-      procedure: "Scaling & Polishing",
-      chiefComplaint: "Bleeding gums during brushing, yellowish deposits.",
-      medicalAlerts: ["Pregnant (2nd Trimester)"],
-      teethChart: {},
-      timeline: [
-        { date: "10-06-2026", note: "Calculus deposits noted in lower anteriors. Recommended complete scaling.", type: "Diagnostic" }
-      ]
-    },
-    "#007": {
-      token: "#007",
-      name: "Deepak Kurian",
-      age: 45,
-      gender: "Male",
-      phone: "+91 66554 43322",
-      procedure: "Crown Fitting",
-      chiefComplaint: "Need permanent crown on tooth #46 following root canal therapy.",
-      medicalAlerts: ["Penicillin Allergy"],
-      teethChart: { 46: "active-treatment" },
-      timeline: [
-        { date: "01-06-2026", note: "RCT completed. Canal obturation satisfactory.", type: "Procedure" },
-        { date: "05-06-2026", note: "Tooth preparation done on #46. Elastomeric impression taken and sent to Elite Lab.", type: "Lab Order" }
-      ]
-    },
-    "#008": {
-      token: "#008",
-      name: "Meera Pillai",
-      age: 62,
-      gender: "Female",
-      phone: "+91 55443 32211",
-      procedure: "Tooth Extraction",
-      chiefComplaint: "Pain and mobility in lower right third molar (#48).",
-      medicalAlerts: ["Diabetic (Controlled)", "Taking Aspirin 75mg daily"],
-      teethChart: { 48: "active-treatment" },
-      timeline: [
-        { date: "09-06-2026", note: "OPG confirms Grade III mobility and bone loss around root of #48. Extraction advised.", type: "Diagnostic" }
-      ]
-    }
-  });
+  const [patients, setPatients] = useState({});
 
   // State Management
-  const [activePatientToken, setActivePatientToken] = useState("#004");
-  const [viewingPatientToken, setViewingPatientToken] = useState("#004");
-  const [completedPatientHistory, setCompletedPatientHistory] = useState(["#003"]);
+  const [activePatientToken, setActivePatientToken] = useState("");
+  const [viewingPatientToken, setViewingPatientToken] = useState("");
+  const [completedPatientHistory, setCompletedPatientHistory] = useState([]);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [currentDoctorName, setCurrentDoctorName] = useState("Dr. Anoop Nair");
 
@@ -149,6 +60,58 @@ export default function DoctorLayout({ children }) {
   const [notification, setNotification] = useState("");
 
   // Notifications State & Logic (Referrals, etc.)
+  const [notifications, setNotifications] = useState([]);
+
+  const [dbNotifications, setDbNotifications] = useState([]);
+  const allNotifications = [...dbNotifications, ...notifications];
+
+  const fetchLabOrders = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/lab/orders", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mapped = data.map(o => ({
+          id: o.id,
+          patientToken: o.patient_token,
+          item: o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`,
+          status: o.status,
+          labName: o.lab_name || "Apex Dental Lab",
+          eta: o.due_date || "3 Days"
+        }));
+        setLabOrders(mapped);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch lab orders from backend:", err);
+    }
+  };
+
+  const fetchDbNotifications = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      if (!token) return;
+      const response = await fetch("http://localhost:8000/lab/notifications?recipient_role=doctor", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mapped = data.map(n => ({
+          id: n.id,
+          message: n.desc,
+          type: "labs",
+          link: "/doctor/labs",
+          status: n.read ? "read" : "unread",
+          dotColor: n.title.toLowerCase().includes("rejected") ? "red" : "green",
+          timestamp: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          receivedAt: n.created_at,
+          itemId: n.title.split(" ").pop()
+        }));
+        setDbNotifications(mapped);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch doctor notifications from backend:", err);
   const [notifications, setNotifications] = useState([
     {
       id: "notif-1",
@@ -163,7 +126,52 @@ export default function DoctorLayout({ children }) {
       patientId: "#004",
       patientName: "Rahul Kumar"
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchLabOrders();
+    fetchDbNotifications();
+    const interval = setInterval(() => {
+      fetchLabOrders();
+      fetchDbNotifications();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const prevUnreadCountRef = useRef(0);
+  useEffect(() => {
+    const unreadDbNotifs = dbNotifications.filter(n => n.status === "unread");
+    if (unreadDbNotifs.length > prevUnreadCountRef.current) {
+      const latest = unreadDbNotifs[0];
+      if (latest) {
+        setActiveToast({
+          id: latest.id,
+          message: latest.message,
+          type: latest.type,
+          link: latest.link,
+          dotColor: latest.dotColor,
+          timestamp: "Just now"
+        });
+        setToastAnimation("slide-in");
+        
+        if (window.toastTimeout) clearTimeout(window.toastTimeout);
+        if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+
+        window.toastTimeout = setTimeout(() => {
+          setToastAnimation("slide-out");
+          window.toastExitTimeout = setTimeout(() => {
+            setActiveToast(null);
+            setToastAnimation("");
+            setBellAnimating(true);
+            setTimeout(() => {
+              setBellAnimating(false);
+            }, 2400);
+          }, 400);
+        }, 4500);
+      }
+    }
+    prevUnreadCountRef.current = unreadDbNotifs.length;
+  }, [dbNotifications]);
 
   const [dbNotifications, setDbNotifications] = useState([]);
   const allNotifications = [...dbNotifications, ...notifications];
@@ -330,69 +338,9 @@ export default function DoctorLayout({ children }) {
     setNotifications(prev => prev.map(n => ({ ...n, status: "read" })));
   };
 
-  // Trigger a demo notification 6s after layout mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      triggerNotification({
-        message: "Incoming referral from Dr. Sarah Jenkins for patient Rahul Kumar",
-        type: "referral",
-        link: "/doctor/referrals",
-        dotColor: "red",
-        itemId: "REF-201",
-        patientId: "#004",
-        patientName: "Rahul Kumar"
-      });
-    }, 6000);
-    return () => clearTimeout(timer);
-  }, []);
 
   // Referrals database
-  const [referrals, setReferrals] = useState([
-    {
-      id: "REF-201",
-      patientToken: "#004", // Rahul Kumar
-      referredBy: "Dr. Sarah Jenkins",
-      speciality: "Orthodontics",
-      date: "10-06-2026",
-      reason: "Patient needs evaluation for root canal treatment before orthodontic brackets are placed on upper jaw.",
-      clinicalNotes: "Tooth #16 shows deep dentinal caries. General bone density is good.",
-      teethChart: { 16: "active-treatment" },
-      status: "Pending", // Pending | Completed
-      myConsultationNotes: "",
-      myMedications: [],
-      referralType: "Internal"
-    },
-    {
-      id: "REF-202",
-      patientToken: "#006", // Priya Nair
-      referredBy: "Dr. James Kurt",
-      speciality: "Oral Surgery",
-      date: "11-06-2026",
-      reason: "Patient is pregnant (2nd trimester). Needs professional scaling and localized gingival evaluation.",
-      clinicalNotes: "Bleeding gums on brushing. Soft tissue swelling in lower anterior quadrant.",
-      teethChart: {},
-      status: "Pending",
-      myConsultationNotes: "",
-      myMedications: [],
-      referralType: "Internal"
-    },
-    {
-      id: "REF-203",
-      patientToken: "#003", // Sneha Joseph
-      referredBy: "Dr. Anoop Nair",
-      speciality: "Orthodontics",
-      targetDoctor: "Dr. Rajesh Shah",
-      date: "12-06-2026",
-      reason: "Referred outside for specialized lingual orthodontics not available in-house.",
-      clinicalNotes: "Patient prefers lingual brackets.",
-      teethChart: { 18: "restored" },
-      status: "Pending",
-      myConsultationNotes: "",
-      myMedications: [],
-      referralType: "External",
-      externalFacility: "Apex Orthodontic Center"
-    }
-  ]);
+  const [referrals, setReferrals] = useState([]);
 
   // Outgoing referral handler
   const handleReferPatient = (patientToken, doctorNameWithSpeciality, reason, referralType = "Internal", externalFacility = "") => {
@@ -532,7 +480,7 @@ export default function DoctorLayout({ children }) {
         });
       }
     } catch (err) {
-      console.error("Failed to fetch live queue for doctor:", err);
+      console.warn("Failed to fetch live queue for doctor:", err);
     }
   };
 

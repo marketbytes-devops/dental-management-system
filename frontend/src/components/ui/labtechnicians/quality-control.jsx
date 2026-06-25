@@ -1,36 +1,10 @@
 "use client";
 
-import { useState } from "react";
-
-const INITIAL_QC_CASES = [
-  {
-    id: "CASE-2026-009",
-    patient: "George Mathew",
-    dentist: "Dr. Anoop Nair",
-    type: "Bridge (3-Unit)",
-    shade: "A2",
-    material: "PFM (Porcelain Fused to Metal)",
-    inspector: "Sneha Nair",
-    photos: [
-      "https://images.unsplash.com/photo-1579684389782-64d84b5e901a?q=80&w=200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=200&auto=format&fit=crop"
-    ]
-  },
-  {
-    id: "CASE-2026-011",
-    patient: "Adithya Dev",
-    dentist: "Dr. Elizabeth Rose",
-    type: "Crown",
-    shade: "B1",
-    material: "Zirconia (High-Translucent)",
-    inspector: "Sneha Nair",
-    photos: []
-  }
-];
+import { useState, useEffect } from "react";
 
 export default function LabQualityControl() {
-  const [qcCases, setQcCases] = useState(INITIAL_QC_CASES);
-  const [selectedCaseId, setSelectedCaseId] = useState("CASE-2026-009");
+  const [qcCases, setQcCases] = useState([]);
+  const [selectedCaseId, setSelectedCaseId] = useState("");
   
   // Checklist State
   const [checklist, setChecklist] = useState({
@@ -44,12 +18,60 @@ export default function LabQualityControl() {
   const [comments, setComments] = useState("");
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
+  const fetchCases = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/lab/orders", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const filtered = data
+          .filter(o => o.status === "QC Pending")
+          .map(o => ({
+            id: o.id,
+            patient: o.patient_name || "Walk-in Patient",
+            dentist: o.dentist_name || "Dr. Anoop Nair",
+            type: o.prosthetic_type,
+            shade: o.shade || "A2",
+            material: o.material || "Zirconia",
+            inspector: "Sneha Nair",
+            photos: []
+          }));
+        setQcCases(filtered);
+        if (filtered.length > 0) {
+          setSelectedCaseId(prev => {
+            if (filtered.some(c => c.id === prev)) return prev;
+            return filtered[0].id;
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch QC cases:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCases();
+    const interval = setInterval(fetchCases, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const triggerToast = (message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
   };
 
-  const currentCase = qcCases.find(c => c.id === selectedCaseId) || qcCases[0];
+  const currentCase = qcCases.find(c => c.id === selectedCaseId) || qcCases[0] || {
+    id: "N/A",
+    patient: "No Active Case",
+    dentist: "N/A",
+    type: "N/A",
+    shade: "N/A",
+    material: "N/A",
+    inspector: "N/A",
+    photos: []
+  };
 
   // Checklist items configuration
   const checklistItems = [
@@ -64,44 +86,68 @@ export default function LabQualityControl() {
     setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handlePass = () => {
+  const handlePass = async () => {
+    if (currentCase.id === "N/A") return;
     const allChecked = Object.values(checklist).every(v => v === true);
     if (!allChecked) {
       alert("Please check and verify all checklist items before passing the case.");
       return;
     }
-    triggerToast(`Case ${currentCase.id} passed quality inspection successfully!`);
-    removeCurrentCase();
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch(`http://localhost:8000/lab/orders/${currentCase.id}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: "Ready / Shipped" })
+      });
+      if (response.ok) {
+        triggerToast(`Case ${currentCase.id} passed quality inspection successfully!`);
+        setChecklist({ dimensions: false, colorMatch: false, surfaceFinish: false, accuracy: false, materialQuality: false });
+        setComments("");
+        fetchCases();
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to pass inspection.", "error");
+    }
   };
 
-  const handleFail = (rework = false) => {
+  const handleFail = async (rework = false) => {
+    if (currentCase.id === "N/A") return;
     if (comments.trim() === "") {
       alert("Please provide comments explaining the inspection failure / rework instructions.");
       return;
     }
-    const msg = rework 
-      ? `Case ${currentCase.id} rejected and sent back to production for rework.`
-      : `Case ${currentCase.id} failed inspection.`;
-    
-    triggerToast(msg, "error");
-    removeCurrentCase();
-  };
-
-  const removeCurrentCase = () => {
-    const remaining = qcCases.filter(c => c.id !== currentCase.id);
-    setQcCases(remaining);
-    if (remaining.length > 0) {
-      setSelectedCaseId(remaining[0].id);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const targetStatus = rework ? "In Progress" : "Rejected";
+      const response = await fetch(`http://localhost:8000/lab/orders/${currentCase.id}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          status: targetStatus,
+          rejection_reason: comments
+        })
+      });
+      if (response.ok) {
+        const msg = rework 
+          ? `Case ${currentCase.id} rejected and sent back to production for rework.`
+          : `Case ${currentCase.id} failed inspection.`;
+        triggerToast(msg, "error");
+        setChecklist({ dimensions: false, colorMatch: false, surfaceFinish: false, accuracy: false, materialQuality: false });
+        setComments("");
+        fetchCases();
+      }
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to fail inspection.", "error");
     }
-    // Reset inputs
-    setChecklist({
-      dimensions: false,
-      colorMatch: false,
-      surfaceFinish: false,
-      accuracy: false,
-      materialQuality: false
-    });
-    setComments("");
   };
 
   return (

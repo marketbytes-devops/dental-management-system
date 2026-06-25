@@ -16,7 +16,7 @@ export default function PatientAppointmentsPage() {
 
     const fetchPatientAppointments = async (pId) => {
         try {
-            const response = await fetch(`http://localhost:8000/frontdesk/appointments/patient/${pId}`);
+            const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/patient/${pId}`);
             if (response.ok) {
                 const data = await response.json();
                 setAppointments(data.map(appt => ({
@@ -45,7 +45,7 @@ export default function PatientAppointmentsPage() {
 
             try {
                 // Fetch profile to get patient ID
-                const profileRes = await fetch("http://localhost:8000/patient/profile", {
+                const profileRes = await fetch("http://127.0.0.1:8000/patient/profile", {
                     headers: {
                         "Authorization": `Bearer ${token}`
                     }
@@ -73,7 +73,7 @@ export default function PatientAppointmentsPage() {
 
     async function handleReschedule(updated) {
         try {
-            const response = await fetch(`http://localhost:8000/frontdesk/appointments/${updated.id}/status`, {
+            const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${updated.id}/status`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -108,7 +108,7 @@ export default function PatientAppointmentsPage() {
         }
 
         try {
-            const response = await fetch(`http://localhost:8000/frontdesk/appointments/${appointment.id}/status`, {
+            const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${appointment.id}/status`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

@@ -12,24 +12,80 @@ const INITIAL_NOTIFICATIONS = [
 ];
 
 export default function LabNotifications() {
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
   const [activeTab, setActiveTab] = useState("All"); // All, Orders, QC, Dispatch, Billing
+
+  const fetchNotifications = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/lab/notifications?recipient_role=lab+tech", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mapped = data.map(n => ({
+          id: n.id,
+          type: n.type || "Orders",
+          title: n.title,
+          desc: n.desc,
+          read: n.read,
+          date: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }));
+        setNotifications(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch lab technician notifications:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredNotifs = notifications.filter(n => {
     if (activeTab === "All") return true;
     return n.type === activeTab;
   });
 
-  const handleMarkAsRead = (id) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const handleMarkAsRead = async (id) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      await fetch(`http://localhost:8000/lab/notifications/${id}/read`, {
+        method: "PUT",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error("Failed to mark notification read:", err);
+    }
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const handleMarkAllAsRead = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      await fetch("http://localhost:8000/lab/notifications/read-all", {
+        method: "PUT",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error("Failed to mark all notifications read:", err);
+    }
   };
 
-  const handleClearNotification = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const handleClearNotification = async (id) => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      await fetch(`http://localhost:8000/lab/notifications/${id}`, {
+        method: "DELETE",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error("Failed to clear notification:", err);
+    }
   };
 
   const getTypeBadge = (type) => {

@@ -1,72 +1,95 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
 
-const TRACKING_CASES = [
-  {
-    id: "CASE-2026-002",
-    patientName: "Meera Nair",
-    age: 34,
-    gender: "Female",
-    dentistName: "Dr. Sarah Smith",
-    dentistContact: "+91 94477 12345",
-    clinicName: "SmileCare Central",
-    prostheticType: "Bridge (3-Unit)",
-    material: "E-Max Lithium Disilicate",
-    shade: "A1",
-    notes: "Pontic on #24. Gingival characterization required.",
-    dueDate: "2026-06-11",
-    activeStep: 2, // Fabrication
-    timeline: [
-      { name: "Order Received", date: "2026-06-08 09:30 AM", status: "Completed", note: "Impression scanned and verified." },
-      { name: "Design Started", date: "2026-06-09 11:00 AM", status: "Completed", note: "3D CAD model approved by dentist." },
-      { name: "Fabrication", date: "2026-06-10 08:30 AM", status: "In Progress", note: "Milling zirconia coping." },
-      { name: "QC Check", date: "Pending", status: "Upcoming", note: "Dimensional & shade verification." },
-      { name: "Dispatch", date: "Pending", status: "Upcoming", note: "Courier scheduling." }
-    ],
-    xrayUrl: "https://images.unsplash.com/photo-1559757175-5700dde675bc?q=80&w=400&auto=format&fit=crop", // Dental X-ray mock image
-    stlUrl: "",
-    pdfUrl: "presc_meera_nair_bridge.pdf",
-    photos: [
-      "https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1447452001602-7090c7ab2db3?q=80&w=200&auto=format&fit=crop"
-    ]
-  },
-  {
-    id: "CASE-2026-003",
-    patientName: "Rajesh Kannan",
-    age: 45,
-    gender: "Male",
-    dentistName: "Dr. Anoop Nair",
-    dentistContact: "+91 98765 43210",
-    clinicName: "SmileCare Orthodontics",
-    prostheticType: "Implant Crown",
-    material: "Screw-Retained Zirconia",
-    shade: "A3",
-    notes: "Ti-base included. Torque to 35 Ncm during try-in.",
-    dueDate: "2026-06-15",
-    activeStep: 1, // Design Started
-    timeline: [
-      { name: "Order Received", date: "2026-06-09 02:15 PM", status: "Completed", note: "STL file imported." },
-      { name: "Design Started", date: "2026-06-10 10:00 AM", status: "In Progress", note: "Generating CAD crown design." },
-      { name: "Fabrication", date: "Pending", status: "Upcoming", note: "3D metal printing." },
-      { name: "QC Check", date: "Pending", status: "Upcoming", note: "Occlusal alignment test." },
-      { name: "Dispatch", date: "Pending", status: "Upcoming", note: "Delivery preparation." }
-    ],
-    xrayUrl: "https://images.unsplash.com/photo-1579684389782-64d84b5e901a?q=80&w=400&auto=format&fit=crop",
-    stlUrl: "",
-    pdfUrl: "presc_rajesh_kannan_implant.pdf",
-    photos: []
-  }
-];
-
 export default function CaseTracking() {
-  const [cases, setCases] = useState(TRACKING_CASES);
-  const [selectedCaseId, setSelectedCaseId] = useState("CASE-2026-002");
+  const [cases, setCases] = useState([]);
+  const [selectedCaseId, setSelectedCaseId] = useState("");
+
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+        const response = await fetch("http://localhost:8000/lab/orders", {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const mapped = data.map(o => {
+            let activeStep = 0;
+            if (o.status === "Pending") activeStep = 0;
+            else if (o.status === "Accepted") activeStep = 1;
+            else if (o.status === "In Progress") activeStep = 2;
+            else if (o.status === "Completed") activeStep = 4;
+            
+            return {
+              id: o.id,
+              patientName: o.patient_name || "Walk-in Patient",
+              age: 32,
+              gender: "Male",
+              dentistName: o.dentist_name || "Dr. Anoop Nair",
+              dentistContact: o.dentist_contact || "+91 98765 43210",
+              clinicName: "SmileCare Dental Clinic",
+              prostheticType: o.prosthetic_type,
+              material: o.material || "Zirconia",
+              shade: o.shade || "A2",
+              notes: o.notes || "",
+              dueDate: o.due_date || "2026-06-15",
+              activeStep: activeStep,
+              timeline: [
+                { name: "Order Received", date: o.created_at ? new Date(o.created_at).toLocaleString() : "2026-06-10", status: "Completed", note: "Impression scanned and verified." },
+                { name: "Design Started", date: o.status !== "Pending" ? "2026-06-10" : "Pending", status: o.status !== "Pending" ? "Completed" : "Upcoming", note: "3D CAD model approved by dentist." },
+                { name: "Fabrication", date: (o.status === "In Progress" || o.status === "Completed") ? "2026-06-11" : "Pending", status: o.status === "In Progress" ? "In Progress" : (o.status === "Completed" ? "Completed" : "Upcoming"), note: "Milling/3D printing prosthetics." },
+                { name: "QC Check", date: o.status === "Completed" ? "2026-06-12" : "Pending", status: o.status === "Completed" ? "Completed" : "Upcoming", note: "Dimensional & shade verification." },
+                { name: "Dispatch", date: o.status === "Completed" ? "2026-06-13" : "Pending", status: o.status === "Completed" ? "Completed" : "Upcoming", note: "Delivery preparation." }
+              ],
+              xrayUrl: "https://images.unsplash.com/photo-1559757175-5700dde675bc?q=80&w=400&auto=format&fit=crop",
+              stlUrl: "",
+              pdfUrl: `presc_${o.id.toLowerCase()}.pdf`,
+              photos: []
+            };
+          });
+          
+          setCases(mapped);
+          
+          if (mapped.length > 0) {
+            setSelectedCaseId(prev => {
+              if (mapped.some(c => c.id === prev)) return prev;
+              return mapped[0].id;
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch cases for tracking:", err);
+      }
+    };
+    
+    fetchCases();
+    const interval = setInterval(fetchCases, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const [viewerTab, setViewerTab] = useState("STL"); // STL, XRAY, PDF, PHOTOS
 
-  const currentCase = cases.find((c) => c.id === selectedCaseId) || cases[0];
+  const currentCase = cases.find((c) => c.id === selectedCaseId) || cases[0] || {
+    id: "N/A",
+    patientName: "No Active Case",
+    age: 0,
+    gender: "N/A",
+    dentistName: "N/A",
+    dentistContact: "N/A",
+    clinicName: "N/A",
+    prostheticType: "N/A",
+    material: "N/A",
+    shade: "N/A",
+    notes: "",
+    dueDate: "N/A",
+    timeline: [],
+    xrayUrl: "",
+    pdfUrl: "",
+    photos: []
+  };
 
   // STL mock viewer properties
   const [stlRotation, setStlRotation] = useState(45);

@@ -85,7 +85,7 @@ function LoginContent() {
 
     try {
       // Call the unified login endpoint
-      const response = await fetch("http://localhost:8000/auth/login", {
+      const response = await fetch("http://127.0.0.1:8000/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -113,7 +113,7 @@ function LoginContent() {
 
       if (roleType === "patient") {
         // Fetch patient profile details using the JWT token
-        const profileResponse = await fetch("http://localhost:8000/patient/profile", {
+        const profileResponse = await fetch("http://127.0.0.1:8000/patient/profile", {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${jwtToken}`
@@ -137,7 +137,7 @@ function LoginContent() {
         router.push("/patient/dashboard");
       } else {
         // Fetch staff profile details using the JWT token
-        const profileResponse = await fetch("http://localhost:8000/auth/profile", {
+        const profileResponse = await fetch("http://127.0.0.1:8000/auth/profile", {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${jwtToken}`

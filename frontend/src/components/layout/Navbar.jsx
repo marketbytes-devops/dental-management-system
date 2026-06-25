@@ -84,7 +84,7 @@ export default function Navbar() {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
       if (!token) return;
 
-      const response = await fetch("http://localhost:8000/auth/status", {
+      const response = await fetch("http://127.0.0.1:8000/auth/status", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

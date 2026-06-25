@@ -27,7 +27,7 @@ export default function DoctorManagementPage() {
       const headers = token ? { "Authorization": `Bearer ${token}` } : {};
 
       // 1. Fetch users to get profile details
-      const response = await fetch("http://localhost:8000/admin/users", { headers });
+      const response = await fetch("http://127.0.0.1:8000/admin/users", { headers });
       if (!response.ok) throw new Error("Failed to load users.");
       const usersData = await response.json();
       
@@ -39,7 +39,7 @@ export default function DoctorManagementPage() {
       // 2. Fetch doctors roster to get active patient counts
       let rosterData = [];
       try {
-        const rosterResponse = await fetch("http://localhost:8000/admin/doctors", { headers });
+        const rosterResponse = await fetch("http://127.0.0.1:8000/admin/doctors", { headers });
         if (rosterResponse.ok) {
           rosterData = await rosterResponse.json();
         }
@@ -96,7 +96,7 @@ export default function DoctorManagementPage() {
   const toggleStatus = async (id) => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/admin/doctors/${id}/status`, {
+      const response = await fetch(`http://127.0.0.1:8000/admin/doctors/${id}/status`, {
         method: "PUT",
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });

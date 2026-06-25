@@ -108,15 +108,10 @@ export const ROLE_NAV_ITEMS = {
   ],
   "lab tech": [
     { name: "Dashboard", href: "/labtechnicians/dashboard", icon: BarChart3 },
-    { name: "Lab Orders", href: "/labtechnicians/orders", icon: ClipboardList },
-    { name: "Case Tracking", href: "/labtechnicians/case-tracking", icon: Search },
-    { name: "CAD Design", href: "/labtechnicians/cad-design", icon: Laptop },
-    { name: "Production", href: "/labtechnicians/production", icon: Wrench },
-    { name: "Quality Control", href: "/labtechnicians/quality-control", icon: CheckSquare },
-    { name: "Dispatch", href: "/labtechnicians/dispatch", icon: Truck },
-    { name: "Invoices", href: "/labtechnicians/invoices", icon: Receipt },
+    { name: "Production Board", href: "/labtechnicians/production", icon: Wrench },
+    { name: "Orders Directory", href: "/labtechnicians/orders", icon: ClipboardList },
     { name: "Inventory", href: "/labtechnicians/inventory", icon: ClipboardList },
-    { name: "Warranty", href: "/labtechnicians/warranty", icon: ShieldCheck },
+    { name: "Billing & Warranty", href: "/labtechnicians/invoices", icon: Receipt },
     { name: "Notifications", href: "/labtechnicians/notifications", icon: Bell },
     { name: "Leave Management", href: "/labtechnicians/leave", icon: Calendar },
     { name: "Settings", href: "/labtechnicians/settings", icon: Settings }

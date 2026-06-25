@@ -239,29 +239,139 @@ def update_profile(
     return user
 
 
+def match_doctor_appointment(doc_name: str, appt_doc_name: str) -> bool:
+    if not doc_name or not appt_doc_name:
+        return False
+    d_name = doc_name.lower().replace("dr.", "").strip()
+    a_name = appt_doc_name.lower().replace("dr.", "").strip()
+    
+    words_d = set(d_name.split())
+    words_a = set(a_name.split())
+    if words_d & words_a:
+        return True
+    return d_name in a_name or a_name in d_name
+
+
+def build_doctor_slots(db: Session, doc_name: str, doc_status: str, today_appointments) -> list:
+    if doc_status == "Off Duty" or doc_status == "Inactive" or doc_status == "Absent":
+        return []
+        
+    base_slots = [
+        "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+        "12:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM",
+        "04:00 PM", "04:30 PM", "05:00 PM"
+    ]
+    
+    def parse_to_minutes(t_str: str) -> int:
+        try:
+            parts = t_str.strip().upper().split()
+            time_parts = parts[0].split(":")
+            hr = int(time_parts[0])
+            mn = int(time_parts[1]) if len(time_parts) > 1 else 0
+            ampm = parts[1] if len(parts) > 1 else "AM"
+            if ampm == "PM" and hr != 12:
+                hr += 12
+            elif ampm == "AM" and hr == 12:
+                hr = 0
+            return hr * 60 + mn
+        except Exception:
+            return 9999
+            
+    def format_time_str(t_str: str) -> str:
+        try:
+            parts = t_str.strip().upper().split()
+            time_parts = parts[0].split(":")
+            hr = int(time_parts[0])
+            mn = int(time_parts[1]) if len(time_parts) > 1 else 0
+            ampm = parts[1] if len(parts) > 1 else "AM"
+            return f"{hr:02d}:{mn:02d} {ampm}"
+        except Exception:
+            return t_str
+            
+    doc_appts = []
+    for appt in today_appointments:
+        if match_doctor_appointment(doc_name, appt.doctor_name):
+            doc_appts.append(appt)
+            
+    booked_slots = {}
+    for appt in doc_appts:
+        pat_name = "Patient"
+        if appt.patient_id:
+            pat = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+            if pat:
+                pat_name = pat.name
+                
+        time_formatted = format_time_str(appt.appointment_time)
+        minutes = parse_to_minutes(appt.appointment_time)
+        booked_slots[minutes] = f"{time_formatted} (Booked - {pat_name})"
+        
+    final_slots = []
+    used_booked_minutes = set()
+    
+    for b_slot in base_slots:
+        b_min = parse_to_minutes(b_slot)
+        exact_booked_min = None
+        for min_val in booked_slots:
+            if abs(min_val - b_min) < 15:
+                exact_booked_min = min_val
+                break
+                
+        if exact_booked_min is not None:
+            final_slots.append(booked_slots[exact_booked_min])
+            used_booked_minutes.add(exact_booked_min)
+        else:
+            final_slots.append(b_slot)
+            
+    for min_val, display_str in booked_slots.items():
+        if min_val not in used_booked_minutes:
+            final_slots.append(display_str)
+            
+    def slot_sort_key(s_val: str) -> int:
+        t_part = s_val.split("(")[0].strip()
+        return parse_to_minutes(t_part)
+        
+    final_slots.sort(key=slot_sort_key)
+    return final_slots
+
+
 @router.get("/doctors")
 def get_doctors_list(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    import datetime
+    from modules.frontdesk.models import AppointmentModel
+    
     all_users = db.query(UserModel).all()
     doctors = [u for u in all_users if any(r.lower() == "doctor" for r in u.roles)]
     
+    today = datetime.date.today()
+    today_appointments = db.query(AppointmentModel).filter(
+        AppointmentModel.appointment_date == today,
+        AppointmentModel.status != "Cancelled"
+    ).all()
+    
     roster = []
     for idx, doc in enumerate(doctors):
-        status_map = "On Duty"
+        doctor = db.query(DoctorModel).filter(DoctorModel.user_id == doc.id).first()
+        
+        status_map = "Available"
         if doc.status == "Inactive":
             status_map = "Off Duty"
         elif doc.status == "On Break":
             status_map = "On Break"
             
+        slots = build_doctor_slots(db, doc.name, status_map, today_appointments)
+        
         roster.append({
             "id": doc.id,
             "name": doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}",
-            "specialty": ", ".join(doc.specialties) if doc.specialties else "General Dentistry",
-            "operatory": doc.chair_setup or f"Operatory {idx % 6 + 1}",
+            "specialty": doctor.specialty if (doctor and doctor.specialty) else (", ".join(doc.specialties) if doc.specialties else "General Dentistry"),
+            "dept": doctor.chair_setup if (doctor and doctor.chair_setup) else f"Operatory {idx % 6 + 1}",
+            "operatory": doctor.chair_setup if (doctor and doctor.chair_setup) else f"Operatory {idx % 6 + 1}",
             "shift": "09:00 AM - 05:00 PM" if idx % 2 == 0 else "10:00 AM - 06:00 PM",
-            "status": status_map
+            "status": status_map,
+            "slots": slots
         })
         
     return roster

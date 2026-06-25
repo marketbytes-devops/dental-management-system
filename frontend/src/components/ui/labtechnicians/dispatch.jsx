@@ -1,22 +1,76 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, Truck, CheckCircle } from "lucide-react";
 
-const INITIAL_SHIPMENTS = [
-  { id: "TRK-2026-981", caseId: "CASE-2026-005", patient: "Vikram Malhotra", dentist: "Dr. Anoop Nair", courier: "SmileCare Express", dispatchDate: "2026-06-10 10:15 AM", estDelivery: "Today, 03:30 PM", status: "In Transit" },
-  { id: "TRK-2026-982", caseId: "CASE-2026-001", patient: "Aditya Verma", dentist: "Dr. Anoop Nair", courier: "BlueDart", dispatchDate: "Pending Dispatch", estDelivery: "Tomorrow, 02:00 PM", status: "Ready" },
-  { id: "TRK-2026-979", caseId: "CASE-2026-006", patient: "Sneha Thomas", dentist: "Dr. Elizabeth Rose", courier: "SmileCare Express", dispatchDate: "2026-06-08 09:00 AM", estDelivery: "2026-06-08 01:15 PM", status: "Delivered" },
-  { id: "TRK-2026-980", caseId: "CASE-2026-008", patient: "Priyanka Rao", dentist: "Dr. Sarah Smith", courier: "DHL Global", dispatchDate: "2026-06-09 11:30 AM", estDelivery: "2026-06-09 04:00 PM", status: "Delivered" }
-];
-
 export default function LabDispatch() {
-  const [shipments, setShipments] = useState(INITIAL_SHIPMENTS);
-  const [selectedTrackId, setSelectedTrackId] = useState("TRK-2026-981");
+  const [shipments, setShipments] = useState([]);
+  const [selectedTrackId, setSelectedTrackId] = useState("");
 
-  const currentShipment = shipments.find(s => s.id === selectedTrackId) || shipments[0];
+  const fetchShipments = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/lab/orders", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const filtered = data
+          .filter(o => o.status === "Ready / Shipped" || o.status === "Completed" || o.status === "Delivered")
+          .map(o => {
+            const suffix = o.id.split("-")[2] || "000";
+            const trackingId = `TRK-2026-${suffix}`;
+            
+            let status = "Ready";
+            let estDelivery = "Tomorrow, 02:00 PM";
+            let dispatchDate = "Pending Dispatch";
+            if (o.status === "Completed" || o.status === "Delivered") {
+              status = "Delivered";
+              dispatchDate = "2026-06-10 10:15 AM";
+              estDelivery = "2026-06-10 03:30 PM";
+            }
+            
+            return {
+              id: trackingId,
+              caseId: o.id,
+              patient: o.patient_name || "Walk-in Patient",
+              dentist: o.dentist_name || "Dr. Anoop Nair",
+              courier: "SmileCare Express",
+              dispatchDate: dispatchDate,
+              estDelivery: estDelivery,
+              status: status
+            };
+          });
+        setShipments(filtered);
+        if (filtered.length > 0) {
+          setSelectedTrackId(prev => {
+            if (filtered.some(s => s.id === prev)) return prev;
+            return filtered[0].id;
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch shipments:", err);
+    }
+  };
 
-  // Logistics status counters
+  useEffect(() => {
+    fetchShipments();
+    const interval = setInterval(fetchShipments, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const currentShipment = shipments.find(s => s.id === selectedTrackId) || shipments[0] || {
+    id: "N/A",
+    caseId: "N/A",
+    patient: "No Active Shipment",
+    dentist: "N/A",
+    courier: "N/A",
+    dispatchDate: "N/A",
+    estDelivery: "N/A",
+    status: "N/A"
+  };
+
   const readyCount = shipments.filter(s => s.status === "Ready").length;
   const transitCount = shipments.filter(s => s.status === "In Transit").length;
   const deliveredCount = shipments.filter(s => s.status === "Delivered").length;
@@ -118,12 +172,39 @@ export default function LabDispatch() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <button 
-                        onClick={() => setSelectedTrackId(s.id)}
-                        className="px-2.5 py-1 text-[10px] font-bold text-primary bg-primary/5 border border-primary/10 hover:bg-primary hover:text-white rounded-lg transition-colors cursor-pointer"
-                      >
-                        Track
-                      </button>
+                      <div className="flex justify-end gap-1.5">
+                        {s.status === "Ready" && (
+                          <button 
+                            onClick={async () => {
+                              try {
+                                const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+                                const response = await fetch(`http://localhost:8000/lab/orders/${s.caseId}/status`, {
+                                  method: "PUT",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                                  },
+                                  body: JSON.stringify({ status: "Completed" })
+                                });
+                                if (response.ok) {
+                                  fetchShipments();
+                                }
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            }}
+                            className="px-2.5 py-1 text-[10px] font-bold text-success bg-success/5 border border-success/10 hover:bg-success hover:text-white rounded-lg transition-colors cursor-pointer"
+                          >
+                            Dispatch
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => setSelectedTrackId(s.id)}
+                          className="px-2.5 py-1 text-[10px] font-bold text-primary bg-primary/5 border border-primary/10 hover:bg-primary hover:text-white rounded-lg transition-colors cursor-pointer"
+                        >
+                          Track
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

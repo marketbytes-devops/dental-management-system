@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import date
+from datetime import date,timedelta
 from database import get_db
 from .schemas import (
     AppointmentCreate,
@@ -20,6 +20,7 @@ from modules.auth.models import UserModel
 from .service import (
     create_appointment,
     get_today_appointments,
+    get_tomorrow_appointments,
     get_patient_appointments,
     initiate_self_checkin,
     send_checkin_otp,
@@ -44,12 +45,137 @@ def get_todays_appointments(db: Session = Depends(get_db)):
         appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
     return appointments
 
+@router.get("/appointments/tomorrow", response_model=List[AppointmentResponse])
+def get_tomorrows_appointments(db: Session = Depends(get_db)):
+    appointments = get_tomorrow_appointments(db)
+    
+    for appt in appointments:
+        appt.patient = db.query(PatientModel).filter(
+            PatientModel.id == appt.patient_id
+        ).first()
+
+    return appointments
+
 @router.get("/appointments/patient/{patient_id}", response_model=List[AppointmentResponse])
 def get_patient_appointments_route(patient_id: int, db: Session = Depends(get_db)):
     appointments = get_patient_appointments(db, patient_id)
     for appt in appointments:
         appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
     return appointments
+
+
+@router.get("/records")
+def get_patient_records(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    patients = db.query(PatientModel).order_by(PatientModel.name.asc()).all()
+    
+    records_list = []
+    import datetime
+    today = datetime.date.today()
+    
+    for p in patients:
+        age = 30
+        if p.date_of_birth:
+            age = today.year - p.date_of_birth.year - (
+                (today.month, today.day) < (p.date_of_birth.month, p.date_of_birth.day)
+            )
+            
+        latest_appt = db.query(AppointmentModel).filter(
+            AppointmentModel.patient_id == p.id
+        ).order_by(AppointmentModel.appointment_date.desc()).first()
+        
+        diagnosis = "General Oral Examination"
+        last_visit = "N/A"
+        treatment_type = "Consultation"
+        
+        if latest_appt:
+            treatment_type = latest_appt.treatment_type or "Consultation"
+            diagnosis = latest_appt.symptoms or f"Treated for {treatment_type}"
+            last_visit = latest_appt.appointment_date.strftime("%Y-%m-%d")
+            
+        files = []
+        t_type_lower = treatment_type.lower()
+        if "root canal" in t_type_lower:
+            files = [f"XRay_RootCanal_{p.id}.jpg", "PreOp_Notes.pdf"]
+        elif "scaling" in t_type_lower or "cleaning" in t_type_lower:
+            files = ["Intraoral_Scan.jpg"]
+        elif "extraction" in t_type_lower:
+            files = [f"Extraction_XRay_{p.id}.jpg", "PostOp_Care_Instructions.pdf"]
+        elif "filling" in t_type_lower:
+            files = [f"Filling_Restoration_{p.id}.jpg"]
+        elif "ortho" in t_type_lower:
+            files = [f"Cephalometric_Analysis_{p.id}.jpg", "Treatment_Plan.pdf"]
+        else:
+            files = ["Patient_Intake_Form.pdf"]
+            
+        records_list.append({
+            "id": f"REC-{p.id:03d}",
+            "patient_id": p.id,
+            "token": p.token,
+            "name": p.name,
+            "age": age,
+            "diagnosis": diagnosis,
+            "lastVisit": last_visit,
+            "files": files
+        })
+        
+    return records_list
+
+
+@router.get("/reminders")
+def get_reminder_queue(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Return upcoming confirmed/pending appointments as a reminder queue.
+    Marks each reminder as Sent if a communication log already exists for that patient."""
+    import datetime
+    today = datetime.date.today()
+    tomorrow = today + timedelta(days=1)
+
+    # Fetch upcoming appointments for today and tomorrow that still need reminders
+    upcoming = db.query(AppointmentModel).filter(
+        AppointmentModel.appointment_date.in_([today, tomorrow]),
+        AppointmentModel.status.in_(["Confirmed", "Pending"])
+    ).order_by(AppointmentModel.appointment_date.asc(), AppointmentModel.appointment_time.asc()).all()
+
+    reminders = []
+    for appt in upcoming:
+        patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+        if not patient:
+            continue
+
+        # Check if a reminder comm-log was already sent for this patient's upcoming appointment
+        # Look for communication logs sent today for this patient
+        existing_reminder = db.query(CommunicationLogModel).filter(
+            CommunicationLogModel.patient_id == appt.patient_id,
+            CommunicationLogModel.template.in_(["appointment_reminder", "manual_reminder"]),
+        ).order_by(CommunicationLogModel.sent_at.desc()).first()
+
+        status = "Sent" if existing_reminder else "Pending"
+        is_today = appt.appointment_date == today
+
+        reminders.append({
+            "id": appt.id,
+            "patient_id": patient.id,
+            "name": patient.name,
+            "phone": patient.phone,
+            "email": patient.email,
+            "date": appt.appointment_date.strftime("%Y-%m-%d"),
+            "time": appt.appointment_time,
+            "doctor": appt.doctor_name,
+            "treatment": appt.treatment_type,
+            "status": status,
+            "auto": True,
+            "day_label": "Today" if is_today else "Tomorrow",
+            "priority": appt.priority,
+        })
+
+    return reminders
+
+
 
 @router.post("/appointments/{id}/checkin", response_model=AppointmentResponse)
 def self_checkin(id: int, checkin_in: CheckInRequest, db: Session = Depends(get_db)):

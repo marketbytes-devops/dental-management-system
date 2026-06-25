@@ -47,7 +47,47 @@ export default function ReceptionistPatients() {
     "Delhi", "Puducherry"
   ];
   const [doctors, setDoctors] = useState([]);
+  const [doctorLeaves, setDoctorLeaves] = useState([]);
   const treatments = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
+
+  useEffect(() => {
+    const fetchDoctorLeaves = async () => {
+      if (!bookingForm.doctor_name) {
+        setDoctorLeaves([]);
+        return;
+      }
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/leave/doctor/leaves?doctor_name=${encodeURIComponent(bookingForm.doctor_name)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDoctorLeaves(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch doctor leaves:", e);
+      }
+    };
+    fetchDoctorLeaves();
+  }, [bookingForm.doctor_name]);
+
+  useEffect(() => {
+    if (bookingForm.appointment_date && bookingForm.doctor_name && doctorLeaves.length > 0) {
+      const selectedDate = new Date(bookingForm.appointment_date);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      const isOnLeave = doctorLeaves.some(leave => {
+        const start = new Date(leave.start_date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(leave.end_date);
+        end.setHours(0, 0, 0, 0);
+        return selectedDate >= start && selectedDate <= end;
+      });
+      
+      if (isOnLeave) {
+        alert(`${bookingForm.doctor_name} is on leave on this day. Please select another date.`);
+        setBookingForm(prev => ({ ...prev, appointment_date: "" }));
+      }
+    }
+  }, [bookingForm.appointment_date, doctorLeaves, bookingForm.doctor_name]);
 
   // Fetch all patients
   const fetchPatients = async () => {
@@ -57,15 +97,6 @@ export default function ReceptionistPatients() {
       if (response.ok) {
         const data = await response.json();
         setPatients(data);
-      }
-      
-      const doctorsRes = await fetch("http://127.0.0.1:8000/frontdesk/doctors");
-      if (doctorsRes.ok) {
-        const doctorsData = await doctorsRes.json();
-        setDoctors(doctorsData);
-        if (doctorsData.length > 0) {
-          setBookingForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
-        }
       }
     } catch (err) {
       console.error("Error fetching patients:", err);
@@ -77,6 +108,28 @@ export default function ReceptionistPatients() {
   useEffect(() => {
     fetchPatients();
   }, []);
+
+  // Fetch active doctors based on selected date
+  useEffect(() => {
+    const fetchDoctorsForDate = async () => {
+      try {
+        const url = bookingForm.appointment_date
+          ? `http://127.0.0.1:8000/frontdesk/doctors?date=${bookingForm.appointment_date}`
+          : "http://127.0.0.1:8000/frontdesk/doctors";
+        const doctorsRes = await fetch(url);
+        if (doctorsRes.ok) {
+          const doctorsData = await doctorsRes.json();
+          setDoctors(doctorsData);
+          if (doctorsData.length > 0 && !doctorsData.some(d => d.name === bookingForm.doctor_name)) {
+            setBookingForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching doctors for date:", err);
+      }
+    };
+    fetchDoctorsForDate();
+  }, [bookingForm.appointment_date]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

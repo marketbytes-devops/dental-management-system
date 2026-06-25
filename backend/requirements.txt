@@ -19,3 +19,5 @@ python-dotenv==1.0.1
 psycopg2-binary==2.9.12
 bcrypt==5.0.0
 python-jose[cryptography]==3.3.0fpdf2==2.8.4
+python-jose[cryptography]==3.3.0
+fpdf2==2.8.7

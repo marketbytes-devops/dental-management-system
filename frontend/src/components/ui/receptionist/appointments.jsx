@@ -144,6 +144,67 @@ export default function ReceptionistAppointments() {
     directCheckIn: false,
   });
 
+  const [doctors, setDoctors] = useState([]);
+  const [doctorLeaves, setDoctorLeaves] = useState([]);
+  const types = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
+
+  useEffect(() => {
+    const fetchDoctorLeaves = async () => {
+      if (!form.doctor_name) {
+        setDoctorLeaves([]);
+        return;
+      }
+      try {
+        const response = await fetch(`http://127.0.0.1:8000/leave/doctor/leaves?doctor_name=${encodeURIComponent(form.doctor_name)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setDoctorLeaves(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch doctor leaves:", e);
+      }
+    };
+    fetchDoctorLeaves();
+  }, [form.doctor_name]);
+
+  useEffect(() => {
+    if (form.appointment_date && form.doctor_name && doctorLeaves.length > 0) {
+      const selectedDate = new Date(form.appointment_date);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      const isOnLeave = doctorLeaves.some(leave => {
+        const start = new Date(leave.start_date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(leave.end_date);
+        end.setHours(0, 0, 0, 0);
+        return selectedDate >= start && selectedDate <= end;
+      });
+      
+      if (isOnLeave) {
+        alert(`${form.doctor_name} is on leave on this day. Please select another date.`);
+        setForm(prev => ({ ...prev, appointment_date: "" }));
+      }
+    }
+  }, [form.appointment_date, doctorLeaves, form.doctor_name]);
+
+  // Fetch appointments and patients
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      // Fetch today's appointments
+      const apptsRes = await fetch("http://127.0.0.1:8000/frontdesk/appointments/today");
+      if (apptsRes.ok) {
+        const apptsData = await apptsRes.json();
+        setAppointments(apptsData);
+      }
+      // Fetch all patients
+      const patientsRes = await fetch("http://127.0.0.1:8000/patient/all");
+      if (patientsRes.ok) {
+        const patientsData = await patientsRes.json();
+        setPatients(patientsData);
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
   const fetchData = async () => {
     try {
       setIsLoading(true);
@@ -170,6 +231,35 @@ export default function ReceptionistAppointments() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Fetch active doctors based on selected date
+  useEffect(() => {
+    const fetchDoctorsForDate = async () => {
+      try {
+        const url = form.appointment_date
+          ? `http://127.0.0.1:8000/frontdesk/doctors?date=${form.appointment_date}`
+          : "http://127.0.0.1:8000/frontdesk/doctors";
+        const doctorsRes = await fetch(url);
+        if (doctorsRes.ok) {
+          const doctorsData = await doctorsRes.json();
+          setDoctors(doctorsData);
+          if (doctorsData.length > 0 && !doctorsData.some(d => d.name === form.doctor_name)) {
+            setForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching doctors for date:", err);
+      }
+    };
+    fetchDoctorsForDate();
+  }, [form.appointment_date]);
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm(prev => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value
+    }));
+  };
   // patient search dropdown
   const filteredPatients = searchPatient.trim() === "" ? [] : patients.filter((p) =>
     p.name.toLowerCase().includes(searchPatient.toLowerCase()) ||

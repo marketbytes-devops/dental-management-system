@@ -336,14 +336,25 @@ def build_doctor_slots(db: Session, doc_name: str, doc_status: str, today_appoin
 
 @router.get("/doctors")
 def get_doctors_list(
+    date: str = None,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     import datetime
     from modules.frontdesk.models import AppointmentModel
+    from modules.leave.models import LeaveRequestModel
     
     all_users = db.query(UserModel).all()
     doctors = [u for u in all_users if any(r.lower() == "doctor" for r in u.roles)]
+    
+    if date:
+        on_leave_user_ids = db.query(LeaveRequestModel.user_id).filter(
+            LeaveRequestModel.status == "Approved",
+            LeaveRequestModel.start_date <= date,
+            LeaveRequestModel.end_date >= date
+        ).all()
+        on_leave_set = {uid[0] for uid in on_leave_user_ids}
+        doctors = [doc for doc in doctors if doc.id not in on_leave_set]
     
     today = datetime.date.today()
     today_appointments = db.query(AppointmentModel).filter(
@@ -355,8 +366,18 @@ def get_doctors_list(
     for idx, doc in enumerate(doctors):
         doctor = db.query(DoctorModel).filter(DoctorModel.user_id == doc.id).first()
         
+        today_str = today.isoformat()
+        has_leave_today = db.query(LeaveRequestModel).filter(
+            LeaveRequestModel.user_id == doc.id,
+            LeaveRequestModel.status == "Approved",
+            LeaveRequestModel.start_date <= today_str,
+            LeaveRequestModel.end_date >= today_str
+        ).first()
+        
         status_map = "Available"
-        if doc.status == "Inactive":
+        if has_leave_today:
+            status_map = "On Leave"
+        elif doc.status == "Inactive":
             status_map = "Off Duty"
         elif doc.status == "On Break":
             status_map = "On Break"

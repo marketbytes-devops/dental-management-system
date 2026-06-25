@@ -76,6 +76,15 @@ def get_all_patients(db: Session = Depends(get_db)):
     return db.query(PatientModel).order_by(PatientModel.name.asc()).all()
 
 
+@router.get("/token/{token}", response_model=PatientResponse)
+def get_patient_by_token_endpoint(token: str, db: Session = Depends(get_db)):
+    patient = db.query(PatientModel).filter(PatientModel.token == token).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    return patient
+
+
+
 @router.put("/profile", response_model=PatientResponse)
 def update_profile(
     update_in: PatientUpdate,
@@ -138,6 +147,15 @@ def request_consent(
     return new_consent
 
 @router.get("/consents/pending", response_model=List[ConsentResponse])
+import os
+from fastapi.responses import FileResponse
+from sqlalchemy.sql import func
+from shared.utils.pdf import generate_consent_pdf
+from .schemas import ConsentSignRequest, PatientConsentResponse
+from .models import PatientConsentModel
+from modules.treatment_plan.models import TreatmentPlanStepModel
+
+@router.get("/consents/pending", response_model=List[PatientConsentResponse])
 def get_pending_consents(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -154,6 +172,20 @@ def get_pending_consents(
 
 @router.get("/consents/documents", response_model=List[ConsentResponse])
 def get_signed_consents(
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+        
+    return db.query(PatientConsentModel).filter(
+        PatientConsentModel.patient_token == patient.token,
+        PatientConsentModel.status == "PENDING"
+    ).all()
+
+
+@router.get("/consents/documents", response_model=List[PatientConsentResponse])
+def get_signed_documents(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -169,6 +201,20 @@ def get_signed_consents(
 
 @router.post("/consents/{consent_id}/sign", response_model=ConsentResponse)
 def sign_consent(
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+        
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+        
+    return db.query(PatientConsentModel).filter(
+        PatientConsentModel.patient_token == patient.token,
+        PatientConsentModel.status == "SIGNED"
+    ).all()
+
+
+@router.post("/consents/{consent_id}/sign")
+def sign_consent_form(
     consent_id: int,
     req: ConsentSignRequest,
     current_user=Depends(get_current_user),
@@ -220,6 +266,52 @@ def sign_consent(
     db.commit()
     db.refresh(consent)
     return consent
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+        
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+        
+    consent = db.query(PatientConsentModel).filter(
+        PatientConsentModel.id == consent_id,
+        PatientConsentModel.patient_token == patient.token
+    ).first()
+    if not consent:
+        raise HTTPException(status_code=404, detail="Consent request not found")
+        
+    # Update consent status
+    consent.status = "SIGNED"
+    consent.signature_data = req.signature_data
+    consent.signed_at = func.now()
+    
+    # Generate PDF path
+    static_dir = os.path.join(os.getcwd(), "static", "consents")
+    os.makedirs(static_dir, exist_ok=True)
+    pdf_filename = f"consent_{consent.id}.pdf"
+    pdf_path = os.path.join(static_dir, pdf_filename)
+    
+    # Generate PDF
+    generate_consent_pdf(
+        patient_name=patient.name,
+        patient_token=patient.token,
+        title=consent.title,
+        content=consent.content,
+        signature_data=req.signature_data,
+        signature_method=req.method,
+        output_path=pdf_path
+    )
+    
+    consent.pdf_path = f"/patient/consents/{consent.id}/pdf"
+    
+    # Sync status to the treatment plan step
+    step = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.id == consent.step_id).first()
+    if step:
+        step.consent_status = "Given"
+        step.consent_given_at = func.now()
+        
+    db.commit()
+    return {"message": "Consent form signed successfully.", "pdf_url": consent.pdf_path}
+
 
 @router.get("/consents/{consent_id}/pdf")
 def get_consent_pdf(
@@ -248,4 +340,19 @@ def get_consent_pdf(
         filename=os.path.basename(consent.pdf_file_path),
         media_type="application/pdf"
     )
+    db: Session = Depends(get_db)
+):
+    consent = db.query(PatientConsentModel).filter(PatientConsentModel.id == consent_id).first()
+    if not consent or not consent.pdf_path:
+        raise HTTPException(status_code=404, detail="PDF not found")
+        
+    # Reconstruct local path
+    static_dir = os.path.join(os.getcwd(), "static", "consents")
+    pdf_filename = f"consent_{consent.id}.pdf"
+    pdf_path = os.path.join(static_dir, pdf_filename)
+    
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+        
+    return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_filename)
 

@@ -54,5 +54,18 @@ class PatientConsent(Base):
     signing_method = Column(String, nullable=True) # PORTAL, IN_PERSON
     signature_data = Column(String, nullable=True) # Base64 data
     pdf_file_path = Column(String, nullable=True)
+
+class PatientConsentModel(Base):
+    __tablename__ = "patient_consents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_token = Column(String, index=True, nullable=False)
+    treatment_plan_id = Column(Integer, nullable=False)
+    step_id = Column(Integer, nullable=False)
+    title = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    status = Column(String, default="PENDING")  # PENDING, SIGNED, REJECTED
+    signature_data = Column(String, nullable=True)  # Base64 signature image or typed name
+    pdf_path = Column(String, nullable=True)
     signed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

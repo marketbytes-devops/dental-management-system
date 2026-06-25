@@ -85,3 +85,24 @@ class ConsentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ConsentSignRequest(BaseModel):
+    signature_data: str
+    method: str
+
+
+class PatientConsentResponse(BaseModel):
+    id: int
+    patient_token: str
+    treatment_plan_id: int
+    step_id: int
+    title: str
+    content: str
+    status: str
+    signed_at: Optional[datetime] = None
+    created_at: datetime
+    pdf_path: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+

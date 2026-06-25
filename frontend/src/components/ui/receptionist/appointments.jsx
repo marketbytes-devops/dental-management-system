@@ -1,400 +1,439 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Search, UserCheck, AlertTriangle, Clock } from "lucide-react";
+import { CalendarDays, Clock, CheckCircle2, Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+const STATUS_STYLES = {
+  "Checked In": "bg-green-50 text-green-700 border-green-200",
+  Waiting: "bg-green-50 text-green-700 border-green-200",
+  "In Chair": "bg-purple-50 text-purple-700 border-purple-200",
+  Confirmed: "bg-blue-50 text-blue-700 border-blue-200",
+  Pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  "Pending OTP": "bg-yellow-50 text-yellow-700 border-yellow-200",
+  Cancelled: "bg-red-50 text-red-600 border-red-200",
+  Completed: "bg-gray-100 text-gray-500 border-gray-200",
+};
+const statusStyle = (s) => STATUS_STYLES[s] ?? "bg-gray-100 text-gray-500 border-gray-200";
+
+// ── reusable primitives ───────────────────────────────────────────────────────
+function FieldLabel({ children, required }) {
+  return (
+    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+      {children}{required && <span className="text-red-400 ml-0.5">*</span>}
+    </label>
+  );
+}
+
+function Input({ className = "", ...props }) {
+  return (
+    <input
+      {...props}
+      className={
+        "w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-800 " +
+        "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition " +
+        className
+      }
+    />
+  );
+}
+
+function Select({ children, ...props }) {
+  return (
+    <select
+      {...props}
+      className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition appearance-none"
+    >
+      {children}
+    </select>
+  );
+}
+
+// ── appointment table ─────────────────────────────────────────────────────────
+function AppointmentTable({ rows, isLoading, emptyText, onCancel }) {
+  if (isLoading)
+    return (
+      <div className="flex items-center justify-center gap-2 py-20 text-gray-400 text-sm">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+      </div>
+    );
+
+  if (!rows.length)
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-2 text-gray-400">
+        <CalendarDays className="w-9 h-9 opacity-25" />
+        <p className="text-sm font-medium">{emptyText}</p>
+      </div>
+    );
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left min-w-[680px]">
+        <thead>
+          <tr className="bg-gray-50 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+            {["Patient", "Time", "Doctor", "Treatment", "Status", ""].map((h, i) => (
+              <th key={i} className={`px-5 py-3 ${h === "" ? "text-right" : ""}`}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((app) => (
+            <tr key={app.id} className="border-t border-gray-50 hover:bg-gray-50/70 transition-colors">
+              <td className="px-5 py-4">
+                <p className="font-semibold text-sm text-gray-900">{app.patient?.name ?? "Unknown"}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{app.patient?.token} · {app.patient?.phone}</p>
+              </td>
+              <td className="px-5 py-4 text-sm font-mono text-gray-600">{app.appointment_time}</td>
+              <td className="px-5 py-4 text-sm text-gray-600">{app.doctor_name}</td>
+              <td className="px-5 py-4 text-sm text-gray-700">{app.treatment_type}</td>
+              <td className="px-5 py-4">
+                <span className={`inline-block px-2.5 py-1 rounded-full border text-[11px] font-bold uppercase tracking-wide ${statusStyle(app.status)}`}>
+                  {app.status}
+                </span>
+              </td>
+              <td className="px-5 py-4 text-right">
+                {app.status === "In Chair" ? (
+                  <span className="text-xs text-purple-600 font-semibold flex items-center justify-end gap-1">
+                    <Clock className="w-3.5 h-3.5 animate-pulse" /> In Treatment
+                  </span>
+                ) : app.status === "Cancelled" || app.status === "Completed" ? (
+                  <span className="text-xs text-gray-400">{app.status}</span>
+                ) : (
+                  <button
+                    onClick={() => onCancel(app.id, app.patient?.name)}
+                    className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-100 transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── main ──────────────────────────────────────────────────────────────────────
 export default function ReceptionistAppointments() {
   const [appointments, setAppointments] = useState([]);
+  const [tomorrowAppointments, setTomorrowAppointments] = useState([]);
   const [patients, setPatients] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // booking form
   const [searchPatient, setSearchPatient] = useState("");
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [showPatientDropdown, setShowPatientDropdown] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // schedule section
+  const [activeTab, setActiveTab] = useState("today"); // "today" | "tomorrow"
+  const [tableSearch, setTableSearch] = useState("");
+
+  const TODAY = new Date().toISOString().split("T")[0];
+  const TYPES = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
 
   const [form, setForm] = useState({
     appointment_time: "09:00 AM",
-    appointment_date: new Date().toISOString().split("T")[0],
+    appointment_date: TODAY,
     doctor_name: "",
     treatment_type: "Consultation",
     priority: "Routine",
-    directCheckIn: false
+    directCheckIn: false,
   });
 
-  const [doctors, setDoctors] = useState([]);
-  const types = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
-
-  // Fetch appointments and patients
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      // Fetch today's appointments
-      const apptsRes = await fetch("http://127.0.0.1:8000/frontdesk/appointments/today");
-      if (apptsRes.ok) {
-        const apptsData = await apptsRes.json();
-        setAppointments(apptsData);
-      }
-      // Fetch all patients
-      const patientsRes = await fetch("http://127.0.0.1:8000/patient/all");
-      if (patientsRes.ok) {
-        const patientsData = await patientsRes.json();
-        setPatients(patientsData);
-      }
-      // Fetch active doctors
-      const doctorsRes = await fetch("http://127.0.0.1:8000/frontdesk/doctors");
+      const [todayRes, tomorrowRes, patientsRes, doctorsRes] = await Promise.all([
+        fetch("http://localhost:8000/frontdesk/appointments/today"),
+        fetch("http://localhost:8000/frontdesk/appointments/tomorrow"),
+        fetch("http://localhost:8000/patient/all"),
+        fetch("http://localhost:8000/frontdesk/doctors"),
+      ]);
+      if (todayRes.ok) setAppointments(await todayRes.json());
+      if (tomorrowRes.ok) setTomorrowAppointments(await tomorrowRes.json());
+      if (patientsRes.ok) setPatients(await patientsRes.json());
       if (doctorsRes.ok) {
-        const doctorsData = await doctorsRes.json();
-        setDoctors(doctorsData);
-        if (doctorsData.length > 0) {
-          setForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
-        }
+        const d = await doctorsRes.json();
+        setDoctors(d);
+        if (d.length > 0) setForm((f) => ({ ...f, doctor_name: d[0].name }));
       }
-    } catch (err) {
-      console.error("Error fetching data:", err);
+    } catch (e) {
+      console.error(e);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm(prev => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value
-    }));
-  };
+  // patient search dropdown
+  const filteredPatients = searchPatient.trim() === "" ? [] : patients.filter((p) =>
+    p.name.toLowerCase().includes(searchPatient.toLowerCase()) ||
+    p.token.toLowerCase().includes(searchPatient.toLowerCase()) ||
+    p.phone.includes(searchPatient)
+  );
 
-  // Filter patients for dropdown search
-  const filteredPatients = searchPatient.trim() === "" 
-    ? [] 
-    : patients.filter(p => 
-        p.name.toLowerCase().includes(searchPatient.toLowerCase()) || 
-        p.token.toLowerCase().includes(searchPatient.toLowerCase()) ||
-        p.phone.includes(searchPatient)
-      );
+  // table search filter
+  const activeRows = (activeTab === "today" ? appointments : tomorrowAppointments).filter((app) => {
+    const q = tableSearch.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      app.patient?.name?.toLowerCase().includes(q) ||
+      app.patient?.token?.toLowerCase().includes(q) ||
+      app.patient?.phone?.includes(q) ||
+      app.doctor_name?.toLowerCase().includes(q) ||
+      app.treatment_type?.toLowerCase().includes(q) ||
+      app.status?.toLowerCase().includes(q)
+    );
+  });
 
-  const handleSelectPatient = (patient) => {
-    setSelectedPatient(patient);
-    setSearchPatient(`${patient.name} (${patient.token})`);
-    setShowPatientDropdown(false);
-  };
-
-  const handleCancelAppointment = async (id, patientName) => {
-    if (!window.confirm(`Are you sure you want to cancel the appointment for ${patientName}?`)) {
-      return;
-    }
+  const handleCancel = async (id, name) => {
+    if (!window.confirm(`Cancel appointment for ${name}?`)) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/status`, {
+      const res = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Cancelled" })
+        body: JSON.stringify({ status: "Cancelled" }),
       });
-      if (response.ok) {
-        alert("Appointment cancelled successfully.");
-        fetchData();
-      } else {
-        const errData = await response.json();
-        alert(errData.detail || "Failed to cancel appointment.");
-      }
-    } catch (err) {
-      alert("Error cancelling appointment.");
-    }
+      if (res.ok) { alert("Appointment cancelled."); fetchData(); }
+      else { const e = await res.json(); alert(e.detail || "Failed to cancel."); }
+    } catch { alert("Error cancelling appointment."); }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedPatient) {
-      alert("Please select a registered patient.");
-      return;
-    }
-
-    // Validate date and time
-    const todayStr = new Date().toISOString().split("T")[0];
-    if (form.appointment_date < todayStr) {
-      alert("Appointment date cannot be in the past.");
-      return;
-    }
-
+    if (!selectedPatient) { alert("Please select a registered patient."); return; }
+    if (form.appointment_date < TODAY) { alert("Date cannot be in the past."); return; }
     try {
-      const payload = {
-        patient_id: selectedPatient.id,
-        doctor_name: form.doctor_name,
-        appointment_date: form.appointment_date,
-        appointment_time: form.appointment_time,
-        treatment_type: form.treatment_type,
-        status: form.directCheckIn ? "Waiting" : "Confirmed",
-        priority: form.priority
-      };
-
-      const response = await fetch("http://127.0.0.1:8000/frontdesk/appointments", {
+      const res = await fetch("http://localhost:8000/frontdesk/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          patient_id: selectedPatient.id,
+          doctor_name: form.doctor_name,
+          appointment_date: form.appointment_date,
+          appointment_time: form.appointment_time,
+          treatment_type: form.treatment_type,
+          status: form.directCheckIn ? "Waiting" : "Confirmed",
+          priority: form.priority,
+        }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Booking failed.");
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Booking failed.");
-      }
-
-      let successMsg = `Appointment scheduled successfully for ${selectedPatient.name}!`;
-
-      // Direct check-in check
+      let msg = `Appointment booked for ${selectedPatient.name}!`;
       if (form.directCheckIn) {
-        const checkinResponse = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${data.id}/direct-checkin?priority=${form.priority}&doctor_name=${form.doctor_name}`, {
-          method: "POST",
-        });
-        const checkinData = await checkinResponse.json();
-        if (checkinResponse.ok) {
-          successMsg += ` Checked in to wait queue directly. Estimated wait: ${checkinData.wait_time_estimate} mins.`;
-        }
+        const ci = await fetch(
+          `http://localhost:8000/frontdesk/appointments/${data.id}/direct-checkin?priority=${form.priority}&doctor_name=${form.doctor_name}`,
+          { method: "POST" }
+        );
+        const cid = await ci.json();
+        if (ci.ok) msg += ` Checked in. Est. wait: ${cid.wait_time_estimate} mins.`;
       }
-
-      alert(successMsg);
-      
-      // Reset form
+      alert(msg);
       setSelectedPatient(null);
       setSearchPatient("");
-      setForm({
-        appointment_time: "09:00 AM",
-        appointment_date: new Date().toISOString().split("T")[0],
-        doctor_name: doctors.length > 0 ? doctors[0].name : "",
-        treatment_type: "Consultation",
-        priority: "Routine",
-        directCheckIn: false
-      });
-
+      setForm({ appointment_time: "09:00 AM", appointment_date: TODAY, doctor_name: doctors[0]?.name ?? "", treatment_type: "Consultation", priority: "Routine", directCheckIn: false });
       fetchData();
-
-    } catch (err) {
-      alert(err.message || "An error occurred during booking.");
-    }
+    } catch (err) { alert(err.message); }
   };
 
+  const todayCount = appointments.length;
+  const tomorrowCount = tomorrowAppointments.length;
+
   return (
-    <div className="space-y-6 pb-10">
+    <div className="min-h-screen bg-gray-50 p-6 space-y-6">
+
+      {/* header */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Appointment Booking</h1>
-        <p className="text-sm text-gray-500 mt-1">Book new dental appointments for registered patients and review schedules.</p>
+        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Appointment Booking</h1>
+        <p className="text-sm text-gray-500 mt-1">Schedule visits for registered patients and review the daily schedule.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Booking Form (4 cols) */}
-        <form onSubmit={handleSubmit} className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
-          <h3 className="text-base font-extrabold text-gray-900">New Booking Form</h3>
-          
-          <div className="space-y-1 relative">
-            <label className="text-xs font-bold text-gray-500 uppercase">Search Patient *</label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search by ID, Name or Phone..."
-                value={searchPatient}
-                onChange={(e) => {
-                  setSearchPatient(e.target.value);
-                  setShowPatientDropdown(true);
-                  if (selectedPatient) setSelectedPatient(null); // Clear selected if modified
-                }}
-                onFocus={() => setShowPatientDropdown(true)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-              />
-              {selectedPatient && (
-                <span className="absolute right-3 top-2 text-success text-[10px] font-bold flex items-center gap-1">
-                  ✓ Verified
-                </span>
+      {/* ── booking form ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="text-base font-bold text-gray-900">New Appointment</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Fill in the details below to book a visit.</p>
+        </div>
+        <div className="p-6">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+
+            {/* Patient search */}
+            <div className="relative md:col-span-2">
+              <FieldLabel required>Patient</FieldLabel>
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search by name, ID, or phone…"
+                  value={searchPatient}
+                  onChange={(e) => { setSearchPatient(e.target.value); setShowDropdown(true); if (selectedPatient) setSelectedPatient(null); }}
+                  onFocus={() => setShowDropdown(true)}
+                />
+                {selectedPatient && <CheckCircle2 className="absolute right-3 top-2.5 w-4 h-4 text-green-500" />}
+              </div>
+              {showDropdown && searchPatient.trim() !== "" && (
+                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-44 overflow-y-auto">
+                  {filteredPatients.length === 0 ? (
+                    <p className="p-3 text-xs text-gray-400 text-center">No patient found. Register them first.</p>
+                  ) : filteredPatients.map((p) => (
+                    <button key={p.id} type="button"
+                      onClick={() => { setSelectedPatient(p); setSearchPatient(`${p.name} (${p.token})`); setShowDropdown(false); }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-blue-50 flex justify-between items-center gap-2"
+                    >
+                      <div>
+                        <span className="text-sm font-semibold text-gray-900">{p.name}</span>
+                        <span className="text-xs text-gray-400 ml-1">({p.token})</span>
+                      </div>
+                      <span className="text-xs text-gray-400 shrink-0">{p.phone}</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-            {showPatientDropdown && filteredPatients.length > 0 && (
-              <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto mt-1 divide-y divide-gray-50">
-                {filteredPatients.map(p => (
-                  <div
-                    key={p.id}
-                    onClick={() => handleSelectPatient(p)}
-                    className="p-2.5 text-xs text-gray-700 hover:bg-primary/5 cursor-pointer flex justify-between items-center"
-                  >
-                    <div>
-                      <span className="font-bold text-gray-900">{p.name}</span>
-                      <span className="text-gray-400 ml-1">({p.token})</span>
-                    </div>
-                    <div className="text-[10px] text-gray-550">{p.phone}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {showPatientDropdown && searchPatient.trim() !== "" && filteredPatients.length === 0 && !selectedPatient && (
-              <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs text-gray-400 text-center mt-1">
-                No registered patient found. Go to Registrations tab to add them first.
-              </div>
-            )}
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">Date *</label>
-              <input
-                type="date"
-                name="appointment_date"
-                value={form.appointment_date}
-                onChange={handleInputChange}
-                min={new Date().toISOString().split("T")[0]}
-                required
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-              />
+            {/* Date */}
+            <div>
+              <FieldLabel required>Date</FieldLabel>
+              <Input type="date" value={form.appointment_date} min={TODAY} onChange={(e) => setForm((f) => ({ ...f, appointment_date: e.target.value }))} required />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">Time Slot *</label>
-              <input
-                type="text"
-                name="appointment_time"
-                placeholder="e.g. 11:30 AM"
-                value={form.appointment_time}
-                onChange={handleInputChange}
-                required
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">Doctor</label>
-              <select
-                name="doctor_name"
-                value={form.doctor_name}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-              >
-                <option value="">Select a doctor...</option>
-                {doctors.map(d => (
-                  <option key={d.name} value={d.name}>{d.name} — {d.specialty}</option>
-                ))}
-              </select>
+            {/* Time */}
+            <div>
+              <FieldLabel required>Time</FieldLabel>
+              <Input type="text" placeholder="e.g. 11:30 AM" value={form.appointment_time} onChange={(e) => setForm((f) => ({ ...f, appointment_time: e.target.value }))} required />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">Priority</label>
-              <select
-                name="priority"
-                value={form.priority}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-              >
+
+            {/* Doctor */}
+            <div>
+              <FieldLabel>Doctor</FieldLabel>
+              <Select value={form.doctor_name} onChange={(e) => setForm((f) => ({ ...f, doctor_name: e.target.value }))}>
+                <option value="">Select…</option>
+                {doctors.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
+              </Select>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <FieldLabel>Priority</FieldLabel>
+              <Select value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}>
                 <option value="Routine">Routine</option>
                 <option value="Urgent">Urgent</option>
                 <option value="Emergency">Emergency</option>
-              </select>
+              </Select>
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-500 uppercase">Treatment Type</label>
-            <select
-              name="treatment_type"
-              value={form.treatment_type}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-            >
-              {types.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
+            {/* Treatment */}
+            <div>
+              <FieldLabel>Treatment</FieldLabel>
+              <Select value={form.treatment_type} onChange={(e) => setForm((f) => ({ ...f, treatment_type: e.target.value }))}>
+                {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
+            </div>
 
-          <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl p-3">
-            <input
-              type="checkbox"
-              id="directCheckIn"
-              name="directCheckIn"
-              checked={form.directCheckIn}
-              onChange={handleInputChange}
-              className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
-            />
-            <label htmlFor="directCheckIn" className="text-xs font-semibold text-gray-700 cursor-pointer">
-              Direct Check-In (Enter wait queue immediately)
-            </label>
-          </div>
+            {/* Check-in + submit */}
+            <div className="flex flex-col gap-3 justify-end">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={form.directCheckIn}
+                  onChange={(e) => setForm((f) => ({ ...f, directCheckIn: e.target.checked }))}
+                  className="w-4 h-4 accent-blue-600"
+                />
+                <span className="text-sm text-gray-700 font-medium">Direct Check-In</span>
+              </label>
+              <button type="submit"
+                className="py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[.98] text-white text-sm font-bold rounded-xl transition cursor-pointer"
+              >
+                Book Appointment
+              </button>
+            </div>
 
-          <button
-            type="submit"
-            className="w-full py-2 bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer mt-2"
-          >
-            Create Appointment
-          </button>
-        </form>
-
-        {/* Today's Scheduled Appointments List (8 cols) */}
-        <div className="lg:col-span-8 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm">
-          <h3 className="text-base font-extrabold text-gray-900 mb-4">Today's Scheduled Appointments</h3>
-
-          <div className="overflow-x-auto">
-            {isLoading ? (
-              <p className="text-center py-10 text-xs text-gray-400 animate-pulse">Loading appointments...</p>
-            ) : appointments.length === 0 ? (
-              <p className="text-center py-10 text-xs text-gray-400 font-bold">No appointments scheduled for today.</p>
-            ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    <th className="py-3 px-2">Patient</th>
-                    <th className="py-3 px-2">Time Slot</th>
-                    <th className="py-3 px-2">Doctor</th>
-                    <th className="py-3 px-2">Treatment</th>
-                    <th className="py-3 px-2">Status</th>
-                    <th className="py-3 px-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {appointments.map(app => (
-                    <tr key={app.id} className="text-sm text-gray-700 hover:bg-gray-50/50 transition-colors">
-                      <td className="py-3.5 px-2">
-                        <div className="font-semibold text-gray-900">{app.patient?.name || "Unknown Patient"}</div>
-                        <div className="text-[10px] text-gray-400">{app.patient?.token || ""} • {app.patient?.phone || ""}</div>
-                      </td>
-                      <td className="py-3.5 px-2 text-xs font-mono font-bold text-gray-500">
-                        {app.appointment_time}
-                      </td>
-                      <td className="py-3.5 px-2 text-gray-500 text-xs">{app.doctor_name}</td>
-                      <td className="py-3.5 px-2 text-gray-650">{app.treatment_type}</td>
-                      <td className="py-3.5 px-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                          app.status === "Checked In" || app.status === "Waiting" || app.status === "In Chair" ? "bg-success/10 text-success" :
-                          app.status === "Confirmed" ? "bg-primary/10 text-primary" :
-                          app.status === "Pending" || app.status === "Pending OTP" ? "bg-warning/10 text-warning" : 
-                          "bg-danger/10 text-danger"
-                        }`}>
-                          {app.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-2 text-right">
-                        {app.status !== "Cancelled" && app.status !== "Completed" && app.status !== "In Chair" && (
-                          <button
-                            onClick={() => handleCancelAppointment(app.id, app.patient?.name)}
-                            className="px-2.5 py-1 text-xs bg-danger/10 text-danger hover:bg-danger/20 rounded-lg transition-colors font-bold cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                        {(app.status === "Cancelled" || app.status === "Completed") && (
-                          <span className="text-xs text-gray-400 font-semibold">{app.status}</span>
-                        )}
-                        {app.status === "In Chair" && (
-                          <span className="text-xs text-purple-650 font-bold flex items-center justify-end gap-1">
-                            <Clock className="w-3.5 h-3.5 animate-pulse" /> In Treatment
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          </form>
         </div>
       </div>
+
+      {/* ── schedule section ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+
+        {/* card header: title + toggle + search */}
+        <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center gap-3">
+
+          {/* title */}
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-bold text-gray-900">
+              {activeTab === "today" ? "Today's" : "Tomorrow's"} Appointments
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {activeTab === "today" ? todayCount : tomorrowCount} appointment{(activeTab === "today" ? todayCount : tomorrowCount) !== 1 ? "s" : ""}
+              {tableSearch && ` · ${activeRows.length} match${activeRows.length !== 1 ? "es" : ""}`}
+            </p>
+          </div>
+
+          {/* pill toggle */}
+          <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-1 shrink-0">
+            <button
+              onClick={() => { setActiveTab("today"); setTableSearch(""); }}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition cursor-pointer ${activeTab === "today"
+                  ? "bg-white text-blue-700 shadow-sm border border-gray-200"
+                  : "text-gray-500 hover:text-gray-700"
+                }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              Today
+              {todayCount > 0 && (
+                <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === "today" ? "bg-blue-100 text-blue-600" : "bg-gray-200 text-gray-500"}`}>
+                  {todayCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { setActiveTab("tomorrow"); setTableSearch(""); }}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition cursor-pointer ${activeTab === "tomorrow"
+                  ? "bg-white text-blue-700 shadow-sm border border-gray-200"
+                  : "text-gray-500 hover:text-gray-700"
+                }`}
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+              Tomorrow
+              {tomorrowCount > 0 && (
+                <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === "tomorrow" ? "bg-blue-100 text-blue-600" : "bg-gray-200 text-gray-500"}`}>
+                  {tomorrowCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* search */}
+          <div className="relative shrink-0 w-56">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Filter appointments…"
+              value={tableSearch}
+              onChange={(e) => setTableSearch(e.target.value)}
+              className="w-full pl-9 pr-3.5 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition"
+            />
+          </div>
+        </div>
+
+        {/* table */}
+        <div className="p-0">
+          <AppointmentTable
+            rows={activeRows}
+            isLoading={isLoading}
+            emptyText={
+              tableSearch
+                ? `No appointments match "${tableSearch}".`
+                : `No appointments scheduled for ${activeTab === "today" ? "today" : "tomorrow"}.`
+            }
+            onCancel={handleCancel}
+          />
+        </div>
+      </div>
+
     </div>
   );
 }
-

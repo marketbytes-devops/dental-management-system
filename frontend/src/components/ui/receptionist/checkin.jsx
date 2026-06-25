@@ -21,24 +21,24 @@ export default function ReceptionistCheckIn() {
       const headers = token ? { "Authorization": `Bearer ${token}` } : {};
 
       // Fetch today's appointments
-      const apptsRes = await fetch("http://127.0.0.1:8000/frontdesk/appointments/today");
+      const apptsRes = await fetch("http://localhost:8000/frontdesk/appointments/today");
       if (apptsRes.ok) {
         const apptsData = await apptsRes.json();
         setAppointments(apptsData);
-        
+
         const pendingOtp = apptsData.filter(a => a.status === "Pending OTP" || a.otp_status === "Pending" || a.otp_status === "Sent");
         setPendingOtpPatients(pendingOtp);
       }
 
       // Fetch live waiting queue
-      const queueRes = await fetch("http://127.0.0.1:8000/frontdesk/queue");
+      const queueRes = await fetch("http://localhost:8000/frontdesk/queue");
       if (queueRes.ok) {
         const queueData = await queueRes.json();
         setActiveQueue(queueData);
       }
 
       // Fetch live doctors status
-      const doctorsRes = await fetch("http://127.0.0.1:8000/auth/doctors", { headers });
+      const doctorsRes = await fetch("http://localhost:8000/auth/doctors", { headers });
       if (doctorsRes.ok) {
         const doctorsData = await doctorsRes.json();
         setDoctorsList(doctorsData);
@@ -77,7 +77,7 @@ export default function ReceptionistCheckIn() {
     }
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${selectedAppId}/direct-checkin?priority=${priority}&doctor_name=${assignedDoctor}`, {
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${selectedAppId}/direct-checkin?priority=${priority}&doctor_name=${assignedDoctor}`, {
         method: "POST"
       });
       if (response.ok) {
@@ -96,7 +96,7 @@ export default function ReceptionistCheckIn() {
   // Checkout patient
   const handleCheckout = async (id, name) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/status`, {
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "Completed" })
@@ -116,7 +116,7 @@ export default function ReceptionistCheckIn() {
   // Call patient to dental chair
   const handleCallToChair = async (id) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/status`, {
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "In Chair" })
@@ -132,7 +132,7 @@ export default function ReceptionistCheckIn() {
   // Send OTP trigger
   const handleSendOtp = async (id, phone, name) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/send-otp`, {
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/send-otp`, {
         method: "POST"
       });
       if (response.ok) {
@@ -149,7 +149,7 @@ export default function ReceptionistCheckIn() {
   const handleBypassOtp = async (id, name, isEmergency) => {
     try {
       const pLevel = isEmergency ? "Emergency" : "Routine";
-      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/direct-checkin?priority=${pLevel}`, {
+      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/direct-checkin?priority=${pLevel}`, {
         method: "POST"
       });
       if (response.ok) {
@@ -176,7 +176,7 @@ export default function ReceptionistCheckIn() {
         {/* Check In Panel (Manual) */}
         <div className="lg:col-span-6 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
           <h3 className="text-base font-extrabold text-gray-900">Direct Patient Check-In (No OTP Required)</h3>
-          
+
           <form onSubmit={handleCheckIn} className="space-y-4">
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase">Select Arrived Appointment</label>
@@ -223,8 +223,8 @@ export default function ReceptionistCheckIn() {
                   className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
                 >
                   {doctorsList.map(d => (
-                    <option 
-                      key={d.id} 
+                    <option
+                      key={d.id}
                       value={d.name}
                       disabled={d.status === "Off Duty"}
                       className={d.status === "Off Duty" ? "text-gray-400" : ""}
@@ -255,7 +255,7 @@ export default function ReceptionistCheckIn() {
             <h3 className="text-base font-extrabold text-gray-900">App Check-Ins (OTP Verification)</h3>
             <span className="bg-warning/10 text-warning text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Action Required</span>
           </div>
-          
+
           <div className="space-y-3 max-h-[30vh] overflow-y-auto pr-1">
             {pendingOtpPatients.length === 0 ? (
               <p className="text-xs text-gray-400 italic py-4 text-center">No patients waiting for OTP verification.</p>
@@ -275,7 +275,7 @@ export default function ReceptionistCheckIn() {
                         <p className="text-[9px] text-gray-400 mt-1">Appt time: {p.appointment_time}</p>
                       )}
                     </div>
-                    
+
                     <div className="flex gap-2 shrink-0">
                       {isEmergency ? (
                         <button
@@ -339,11 +339,10 @@ export default function ReceptionistCheckIn() {
                       </td>
                       <td className="py-3.5 px-2 text-xs text-gray-550">{q.doctor_name}</td>
                       <td className="py-3.5 px-2">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                          q.priority === "Emergency" ? "bg-danger/10 text-danger animate-pulse border border-danger/20" :
-                          q.priority === "Urgent" ? "bg-warning/10 text-warning border border-warning/20" : 
-                          "bg-success/10 text-success border border-success/20"
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${q.priority === "Emergency" ? "bg-danger/10 text-danger animate-pulse border border-danger/20" :
+                            q.priority === "Urgent" ? "bg-warning/10 text-warning border border-warning/20" :
+                              "bg-success/10 text-success border border-success/20"
+                          }`}>
                           {q.priority}
                         </span>
                       </td>
@@ -351,9 +350,8 @@ export default function ReceptionistCheckIn() {
                         {q.status === "In Chair" ? "N/A" : `${q.wait_time_estimate} mins`}
                       </td>
                       <td className="py-3.5 px-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                          q.status === "In Chair" ? "bg-purple-55 text-purple-650 border-purple-100" : "bg-gray-50 text-gray-550 border-gray-150"
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${q.status === "In Chair" ? "bg-purple-55 text-purple-650 border-purple-100" : "bg-gray-50 text-gray-550 border-gray-150"
+                          }`}>
                           {q.status}
                         </span>
                       </td>

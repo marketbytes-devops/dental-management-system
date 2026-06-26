@@ -41,18 +41,27 @@ class PatientModel(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-
-class PatientConsentModel(Base):
+class PatientConsent(Base):
     __tablename__ = "patient_consents"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_token = Column(String, index=True, nullable=False)
-    treatment_plan_id = Column(Integer, nullable=False)
-    step_id = Column(Integer, nullable=False)
+    patient_id = Column(Integer, index=True, nullable=True)
+    patient_token = Column(String, index=True, nullable=True)
+    doctor_id = Column(Integer, nullable=True)
+    treatment_plan_id = Column(Integer, nullable=True)
+    step_id = Column(Integer, nullable=True)
     title = Column(String, nullable=False)
-    content = Column(String, nullable=False)
-    status = Column(String, default="PENDING")  # PENDING, SIGNED, REJECTED
-    signature_data = Column(String, nullable=True)  # Base64 signature image or typed name
-    pdf_path = Column(String, nullable=True)
+    body_text = Column(String, nullable=True)       # Used by portal consent flow
+    content = Column(String, nullable=True)          # Used by treatment plan consent flow
+    status = Column(String, default="PENDING")       # PENDING, SIGNED, REJECTED
+    signing_method = Column(String, nullable=True)   # PORTAL, IN_PERSON
+    signature_data = Column(String, nullable=True)   # Base64 signature image or typed name
+    pdf_file_path = Column(String, nullable=True)    # PDF path (portal flow)
+    pdf_path = Column(String, nullable=True)         # PDF path (treatment plan flow)
     signed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# Alias for backward compatibility with treatment plan module
+PatientConsentModel = PatientConsent
+

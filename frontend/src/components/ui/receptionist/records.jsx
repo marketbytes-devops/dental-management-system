@@ -1,0 +1,118 @@
+"use client";
+
+import { useState, useEffect } from "react";
+
+export default function ReceptionistRecords() {
+  const [records, setRecords] = useState([]);
+  const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchRecords = async () => {
+    try {
+      setIsLoading(true);
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/frontdesk/records", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error("Failed to fetch EDR records.");
+      const data = await response.json();
+      setRecords(data);
+    } catch (err) {
+      console.error("Error fetching EDR records:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecords();
+  }, []);
+
+  const filteredRecords = records.filter(r => 
+    r.name.toLowerCase().includes(search.toLowerCase()) || 
+    r.id.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6 pb-10">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Patient Electronic Dental Records</h1>
+        <p className="text-sm text-gray-500 mt-1">Review diagnostic histories and archive medical/imaging attachments.</p>
+      </div>
+
+      <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex justify-between items-center gap-4">
+          <h3 className="text-base font-extrabold text-gray-900">EDR Archival Directory</h3>
+          <input
+            type="text"
+            placeholder="Search records by ID or patient..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 w-64"
+          />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <th className="py-3 px-2">Record ID</th>
+                <th className="py-3 px-2">Patient Details</th>
+                <th className="py-3 px-2">Primary Diagnosis</th>
+                <th className="py-3 px-2">Last Visit</th>
+                <th className="py-3 px-2">Attachments</th>
+                <th className="py-3 px-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {isLoading ? (
+                <tr>
+                  <td colSpan="6" className="py-10 text-center text-xs text-gray-450 font-bold animate-pulse">
+                    Loading Patient Electronic Dental Records...
+                  </td>
+                </tr>
+              ) : filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-10 text-center text-xs text-gray-450 font-bold italic">
+                    No EDR records found in registry.
+                  </td>
+                </tr>
+              ) : (
+                filteredRecords.map(r => (
+                  <tr key={r.id} className="text-sm text-gray-700 hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3.5 px-2 font-mono text-xs text-gray-400 font-bold">{r.id}</td>
+                    <td className="py-3.5 px-2">
+                      <div className="font-semibold text-gray-900">{r.name}</div>
+                      <div className="text-[10px] text-gray-400">{r.age} years</div>
+                    </td>
+                    <td className="py-3.5 px-2 text-xs text-gray-650">{r.diagnosis}</td>
+                    <td className="py-3.5 px-2 font-mono text-xs text-gray-500">{r.lastVisit}</td>
+                    <td className="py-3.5 px-2">
+                      {(r.files || []).length === 0 ? (
+                        <span className="text-xs text-gray-400">None</span>
+                      ) : (
+                        <div className="flex flex-col gap-0.5">
+                          {(r.files || []).map((f, idx) => (
+                            <span key={idx} className="text-[10px] text-primary hover:underline cursor-pointer">📂 {f}</span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-2 text-right">
+                      <button
+                        onClick={() => alert(`Opening complete EDR dossier for ${r.name}...`)}
+                        className="px-2.5 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors font-bold cursor-pointer"
+                      >
+                        Open Dossier
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

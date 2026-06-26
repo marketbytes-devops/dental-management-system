@@ -1,0 +1,133 @@
+import {
+  BarChart3,
+  Users,
+  Key,
+  Stethoscope,
+  ConciergeBell,
+  Calendar,
+  UserPlus,
+  CheckSquare,
+  Hourglass,
+  Phone,
+  Bell,
+  FolderOpen,
+  Headphones,
+  Settings,
+  Coins,
+  Receipt,
+  CreditCard,
+  Shield,
+  ShieldCheck,
+  TrendingUp,
+  TrendingDown,
+  Undo2,
+  AlertCircle,
+  Banknote,
+  FileText,
+  Search,
+  Microscope,
+  ClipboardList,
+  Laptop,
+  Wrench,
+  Truck,
+  FileEdit,
+  Home,
+  AlertTriangle,
+  Share2,
+  Pill,
+  Award,
+  ShieldAlert,
+  Scissors,
+  Sparkles,
+  User
+} from "lucide-react";
+
+import ToothIcon from "@/components/ui/shared/ToothIcon";
+
+export const ROLE_NAV_ITEMS = {
+  admin: [
+    { name: "Dashboard", href: "/admin/dashboard", icon: BarChart3 },
+    { name: "User Management", href: "/admin/users", icon: Users },
+    { name: "Role Permissions", href: "/admin/roles", icon: Key },
+    { name: "Doctor Schedules", href: "/admin/doctor", icon: Stethoscope },
+    { name: "Patient Directory", href: "/admin/patients", icon: Users },
+    { name: "Inventory", href: "/admin/inventory", icon: ClipboardList },
+    { name: "Leave Management", href: "/admin/leave", icon: Calendar },
+    { name: "System Logs", href: "/admin/dashboard", icon: FileEdit }
+  ],
+  doctor: [
+    { name: "Dashboard", href: "/doctor/dashboard", icon: Home },
+    {
+      name: "Clinical Workspace",
+      href: "/doctor/workspace",
+      icon: ClipboardList,
+      subItems: [
+        { name: "General Dentistry", href: "/doctor/workspace/general", icon: Stethoscope },
+        { name: "Endodontics", href: "/doctor/workspace/endodontics", icon: Pill },
+        { name: "Orthodontics", href: "/doctor/workspace/orthodontics", icon: Award },
+        { name: "Periodontics", href: "/doctor/workspace/periodontics", icon: ShieldAlert },
+        { name: "Oral Surgery", href: "/doctor/workspace/surgery", icon: Scissors },
+        { name: "Prosthodontics", href: "/doctor/workspace/prosthodontics", icon: Sparkles }
+      ]
+    },
+    { name: "Live Queue", href: "/doctor/queue", icon: Users },
+    { name: "Medical Alerts", href: "/doctor/alerts", icon: AlertTriangle },
+    { name: "Pending Labs", href: "/doctor/labs", icon: Microscope },
+    { name: "Referrals", href: "/doctor/referrals", icon: Share2 },
+    { name: "Notifications", href: "/doctor/notifications", icon: Bell },
+    { name: "Leave Management", href: "/doctor/leave", icon: Calendar },
+    { name: "My Performance", href: "/doctor/performance", icon: TrendingUp },
+    { name: "My Profile", href: "/doctor/profile", icon: User }
+  ],
+  receptionist: [
+    { name: "Dashboard", href: "/frontdesk/receptionist/dashboard", icon: BarChart3 },
+    { name: "Appointments", href: "/frontdesk/receptionist/appointments", icon: Calendar },
+    { name: "Registrations", href: "/frontdesk/receptionist/patients", icon: UserPlus },
+    { name: "Check-In / Check-Out", href: "/frontdesk/receptionist/checkin", icon: CheckSquare },
+    { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: Stethoscope },
+    { name: "Waiting Queue", href: "/frontdesk/receptionist/queue", icon: Hourglass },
+    { name: "Communications", href: "/frontdesk/receptionist/communication", icon: Phone },
+    { name: "Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },
+    { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },
+    { name: "Leave Management", href: "/frontdesk/receptionist/leave", icon: Calendar },
+    { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },
+    { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings }
+  ],
+  accountant: [
+    { name: "Dashboard", href: "/frontdesk/accountant/dashboard", icon: BarChart3 },
+    { name: "Invoices", href: "/frontdesk/accountant/invoices", icon: Receipt },
+    { name: "Payments", href: "/frontdesk/accountant/payments", icon: CreditCard },
+    { name: "Insurance Claims", href: "/frontdesk/accountant/claims", icon: Shield },
+    { name: "Claim Verification", href: "/frontdesk/accountant/claim-verification", icon: ShieldCheck },
+    { name: "Revenue", href: "/frontdesk/accountant/revenue", icon: TrendingUp },
+    { name: "Expenses", href: "/frontdesk/accountant/expenses", icon: TrendingDown },
+    { name: "Refunds", href: "/frontdesk/accountant/refunds", icon: Undo2 },
+    { name: "Outstanding Dues", href: "/frontdesk/accountant/dues", icon: AlertCircle },
+    { name: "Payroll", href: "/frontdesk/accountant/payroll", icon: Banknote },
+    { name: "Reports", href: "/frontdesk/accountant/reports", icon: FileText },
+    { name: "Leave Management", href: "/frontdesk/accountant/leave", icon: Calendar },
+    { name: "Audit Logs", href: "/frontdesk/accountant/audit", icon: Search },
+    { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings }
+  ],
+  "lab tech": [
+    { name: "Dashboard", href: "/labtechnicians/dashboard", icon: BarChart3 },
+    { name: "Production Board", href: "/labtechnicians/production", icon: Wrench },
+    { name: "Orders Directory", href: "/labtechnicians/orders", icon: ClipboardList },
+    { name: "Inventory", href: "/labtechnicians/inventory", icon: ClipboardList },
+    { name: "Billing & Warranty", href: "/labtechnicians/invoices", icon: Receipt },
+    { name: "Notifications", href: "/labtechnicians/notifications", icon: Bell },
+    { name: "Leave Management", href: "/labtechnicians/leave", icon: Calendar },
+    { name: "Settings", href: "/labtechnicians/settings", icon: Settings }
+  ],
+  patient: [
+    { name: "My Dashboard", href: "/patient/dashboard", icon: Home },
+    { name: "My Appointments", href: "/patient/appointments", icon: Calendar },
+    { name: "My Profile", href: "/patient/profile", icon: User },
+    { name: "Self Check-In", href: "/patient/check-in", icon: CheckSquare },
+    { name: "My Documents", href: "/patient/documents", icon: FileText },
+    { name: "My Records", href: "/patient/records", icon: Pill },
+    { name: "My Bills", href: "/patient/billing", icon: CreditCard },
+    { name: "Notifications", href: "/patient/notifications", icon: Bell },
+    { name: "Settings", href: "/patient/settings", icon: Settings }
+  ]
+};

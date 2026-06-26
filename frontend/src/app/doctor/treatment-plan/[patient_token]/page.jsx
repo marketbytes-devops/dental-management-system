@@ -21,6 +21,15 @@ import {
   Map,
   Clock
 } from "lucide-react";
+import { useDoctor } from "@/app/doctor/layout";
+import { 
+  getPatientByToken,
+  getPatientTreatmentPlan, 
+  updateTreatmentPlan, 
+  createTreatmentPlan, 
+  createTreatmentPlanStep, 
+  updateTreatmentPlanStep 
+} from "@/services/api";
 
 const SPECIALTY_CONFIGS = {
   "Endodontics": {
@@ -181,6 +190,7 @@ export default function DoctorTreatmentPlanPage() {
   const params = useParams();
   const router = useRouter();
   const patientToken = params.patient_token;
+  const { enrichPatientTimeline } = useDoctor() || {};
 
   const [doctorSpecialty, setDoctorSpecialty] = useState("General Dentistry");
 
@@ -241,60 +251,42 @@ export default function DoctorTreatmentPlanPage() {
     }
   }, [doctorSpecialty]);
 
-  const getHeaders = () => {
-    const token = localStorage.getItem("staff_jwt_token");
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    };
-  };
-
   const loadData = async () => {
     if (!patientToken) return;
     setLoading(true);
     try {
       // 1. Fetch patient
-      const patRes = await fetch(`http://localhost:8000/patient/token/${encodeURIComponent(patientToken)}`, {
-        headers: getHeaders()
-      });
-      if (patRes.ok) {
-        const patData = await patRes.json();
-        setPatient(patData);
-      }
+      const patData = await getPatientByToken(patientToken);
+      setPatient(patData);
 
       // 2. Fetch plans
-      const planRes = await fetch(`http://localhost:8000/treatment-plan/patient/${encodeURIComponent(patientToken)}`, {
-        headers: getHeaders()
-      });
-      if (planRes.ok) {
-        const planData = await planRes.json();
-        setPlans(planData);
-        
-        // Find Draft or Active plan
-        const draftOrActive = planData.find(p => p.status === "Active") || planData.find(p => p.status === "Draft");
-        if (draftOrActive) {
-          setActivePlan(draftOrActive);
-          setConditions(draftOrActive.current_conditions || "");
-          setDiagnoses(draftOrActive.diagnoses || []);
-          setGoals(draftOrActive.treatment_objectives || []);
-          setDuration(draftOrActive.estimated_duration || "12 months");
-          setCompletion(draftOrActive.expected_completion || "");
-          setNextVisitDate(draftOrActive.next_visit_date || "");
-          setNextVisitProc(draftOrActive.next_visit_procedure || "");
-          setAttachments(draftOrActive.attachments || []);
-          setSteps(draftOrActive.steps || []);
-        } else {
-          setActivePlan(null);
-          setConditions("");
-          setDiagnoses([]);
-          setGoals([]);
-          setDuration("12 months");
-          setCompletion("");
-          setNextVisitDate("");
-          setNextVisitProc("");
-          setAttachments([]);
-          setSteps([]);
-        }
+      const planData = await getPatientTreatmentPlan(patientToken);
+      setPlans(planData);
+      
+      // Find Draft or Active plan
+      const draftOrActive = planData.find(p => p.status === "Active") || planData.find(p => p.status === "Draft");
+      if (draftOrActive) {
+        setActivePlan(draftOrActive);
+        setConditions(draftOrActive.current_conditions || "");
+        setDiagnoses(draftOrActive.diagnoses || []);
+        setGoals(draftOrActive.treatment_objectives || []);
+        setDuration(draftOrActive.estimated_duration || "12 months");
+        setCompletion(draftOrActive.expected_completion || "");
+        setNextVisitDate(draftOrActive.next_visit_date || "");
+        setNextVisitProc(draftOrActive.next_visit_procedure || "");
+        setAttachments(draftOrActive.attachments || []);
+        setSteps(draftOrActive.steps || []);
+      } else {
+        setActivePlan(null);
+        setConditions("");
+        setDiagnoses([]);
+        setGoals([]);
+        setDuration("12 months");
+        setCompletion("");
+        setNextVisitDate("");
+        setNextVisitProc("");
+        setAttachments([]);
+        setSteps([]);
       }
     } catch (err) {
       console.error("Error loading patient treatment details:", err);
@@ -323,36 +315,26 @@ export default function DoctorTreatmentPlanPage() {
     };
 
     try {
-      let res;
       if (activePlan) {
         // Update existing plan
-        res = await fetch(`http://localhost:8000/treatment-plan/${activePlan.id}`, {
-          method: "PUT",
-          headers: getHeaders(),
-          body: JSON.stringify(payload)
-        });
+        await updateTreatmentPlan(activePlan.id, payload);
       } else {
         // Create new plan
-        res = await fetch(`http://localhost:8000/treatment-plan`, {
-          method: "POST",
-          headers: getHeaders(),
-          body: JSON.stringify({
-            ...payload,
-            steps: steps.map((s, idx) => ({ ...s, sequence: idx + 1 }))
-          })
+        await createTreatmentPlan({
+          ...payload,
+          steps: steps.map((s, idx) => ({ ...s, sequence: idx + 1 }))
         });
       }
 
-      if (res.ok) {
-        alert(`Plan successfully saved as ${statusType}!`);
-        loadData();
-      } else {
-        const err = await res.json();
-        alert(err.detail || "Failed to save treatment plan.");
+      alert(`Plan successfully saved as ${statusType}!`);
+      loadData();
+      
+      if (enrichPatientTimeline) {
+        enrichPatientTimeline(patientToken);
       }
     } catch (err) {
       console.error(err);
-      alert("Network error saving treatment plan.");
+      alert(err.response?.data?.detail || "Failed to save treatment plan.");
     }
   };
 
@@ -363,28 +345,24 @@ export default function DoctorTreatmentPlanPage() {
     if (activePlan) {
       // Append step to active plan in DB
       try {
-        const res = await fetch(`http://localhost:8000/treatment-plan/${activePlan.id}/step`, {
-          method: "POST",
-          headers: getHeaders(),
-          body: JSON.stringify(newStep)
+        await createTreatmentPlanStep(activePlan.id, newStep);
+        setNewStep({
+          title: "",
+          details: "",
+          notes: "",
+          cost: 0,
+          requires_consent: false,
+          phase: PHASES[0],
+          sequence: steps.length + 1
         });
-        if (res.ok) {
-          setNewStep({
-            title: "",
-            details: "",
-            notes: "",
-            cost: 0,
-            requires_consent: false,
-            phase: PHASES[0],
-            sequence: steps.length + 1
-          });
-          loadData();
-        } else {
-          const err = await res.json();
-          alert(err.detail || "Failed to append step.");
+        loadData();
+        
+        if (enrichPatientTimeline) {
+          enrichPatientTimeline(patientToken);
         }
       } catch (err) {
         console.error(err);
+        alert(err.response?.data?.detail || "Failed to append step.");
       }
     } else {
       // Local addition for a new draft plan
@@ -409,15 +387,12 @@ export default function DoctorTreatmentPlanPage() {
   // Remove Step (Local / DB)
   const handleRemoveStep = async (stepId) => {
     if (activePlan) {
-      // For simplicity, we can do PUT step with status Cancelled
       try {
-        const res = await fetch(`http://localhost:8000/treatment-plan/step/${stepId}`, {
-          method: "PUT",
-          headers: getHeaders(),
-          body: JSON.stringify({ status: "Cancelled" })
-        });
-        if (res.ok) {
-          loadData();
+        await updateTreatmentPlanStep(stepId, { status: "Cancelled" });
+        loadData();
+        
+        if (enrichPatientTimeline) {
+          enrichPatientTimeline(patientToken);
         }
       } catch (err) {
         console.error(err);
@@ -430,13 +405,11 @@ export default function DoctorTreatmentPlanPage() {
   // Update step status in table
   const handleStepStatusChange = async (stepId, statusVal) => {
     try {
-      const res = await fetch(`http://localhost:8000/treatment-plan/step/${stepId}`, {
-        method: "PUT",
-        headers: getHeaders(),
-        body: JSON.stringify({ status: statusVal })
-      });
-      if (res.ok) {
-        loadData();
+      await updateTreatmentPlanStep(stepId, { status: statusVal });
+      loadData();
+      
+      if (enrichPatientTimeline) {
+        enrichPatientTimeline(patientToken);
       }
     } catch (err) {
       console.error(err);
@@ -445,13 +418,11 @@ export default function DoctorTreatmentPlanPage() {
 
   const handleStepNotesChange = async (stepId, notesVal) => {
     try {
-      const res = await fetch(`http://localhost:8000/treatment-plan/step/${stepId}`, {
-        method: "PUT",
-        headers: getHeaders(),
-        body: JSON.stringify({ notes: notesVal })
-      });
-      if (res.ok) {
-        loadData();
+      await updateTreatmentPlanStep(stepId, { notes: notesVal });
+      loadData();
+      
+      if (enrichPatientTimeline) {
+        enrichPatientTimeline(patientToken);
       }
     } catch (err) {
       console.error(err);

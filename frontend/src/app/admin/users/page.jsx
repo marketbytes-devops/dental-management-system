@@ -3,6 +3,13 @@
 import { useState, useEffect } from "react";
 import CreateUserModal from "@/components/admin/CreateUserModal";
 import { Users, Search, UserPlus } from "lucide-react";
+import {
+  adminGetUsers,
+  adminCreateUser,
+  adminUpdateUser,
+  adminDeleteUser,
+  adminToggleUserStatus,
+} from "@/services/api";
 
 export default function UsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,12 +35,7 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://127.0.0.1:8000/admin/users", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (!response.ok) throw new Error("Failed to load users.");
-      const data = await response.json();
+      const data = await adminGetUsers();
       setUsers(data);
     } catch (err) {
       console.error(err);
@@ -66,26 +68,13 @@ export default function UsersPage() {
     );
 
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://127.0.0.1:8000/admin/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          name: newUser.name,
-          email: newUser.email,
-          password: newUser.password,
-          roles: formattedRoles,
-          specialties: newUser.specialties || []
-        })
+      await adminCreateUser({
+        name: newUser.name,
+        email: newUser.email,
+        password: newUser.password,
+        roles: formattedRoles,
+        specialties: newUser.specialties || []
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to create user.");
-      }
 
       setToastMessage(`User "${newUser.name}" successfully registered!`);
       setTimeout(() => setToastMessage(""), 3000);
@@ -116,20 +105,7 @@ export default function UsersPage() {
         payload.password = updatedUser.password;
       }
 
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://127.0.0.1:8000/admin/users/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to update user.");
-      }
+      await adminUpdateUser(id, payload);
 
       setToastMessage(`User "${updatedUser.name}" successfully updated!`);
       setTimeout(() => setToastMessage(""), 3000);
@@ -145,16 +121,7 @@ export default function UsersPage() {
     }
 
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://127.0.0.1:8000/admin/users/${id}`, {
-        method: "DELETE",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to delete user.");
-      }
+      await adminDeleteUser(id);
 
       setToastMessage(`User "${name}" successfully deleted!`);
       setTimeout(() => setToastMessage(""), 3000);
@@ -177,17 +144,7 @@ export default function UsersPage() {
 
   const toggleStatus = async (id) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://127.0.0.1:8000/admin/users/${id}/status`, {
-        method: "PUT",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to update status.");
-      }
-
+      await adminToggleUserStatus(id);
       fetchUsers();
     } catch (err) {
       alert(err.message || "An error occurred while updating user status.");

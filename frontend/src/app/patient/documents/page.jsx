@@ -5,6 +5,7 @@ import ConsentStatusBanner from "@/components/ui/patients/documents/consentStatu
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import MyDocumentLibrary from "@/components/ui/patients/documents/myDocumentLibrary";
 import { Loader2 } from "lucide-react";
+import { getPendingConsents, getSignedConsents, getConsentPdfUrl } from "@/services/api";
 
 export default function PatientDocumentsPage() {
   const [pendingConsents, setPendingConsents] = useState([]);
@@ -12,34 +13,16 @@ export default function PatientDocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [activeForm, setActiveForm] = useState(null);
 
-  const getHeaders = () => {
-    const token = localStorage.getItem("patient_jwt_token");
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    };
-  };
-
   const loadDocuments = async () => {
     setLoading(true);
     try {
       // 1. Fetch pending
-      const pendingRes = await fetch("http://localhost:8000/patient/consents/pending", {
-        headers: getHeaders()
-      });
-      if (pendingRes.ok) {
-        const pendingData = await pendingRes.json();
-        setPendingConsents(pendingData);
-      }
+      const pendingData = await getPendingConsents();
+      setPendingConsents(pendingData);
 
       // 2. Fetch signed
-      const signedRes = await fetch("http://localhost:8000/patient/consents/documents", {
-        headers: getHeaders()
-      });
-      if (signedRes.ok) {
-        const signedData = await signedRes.json();
-        setSignedConsents(signedData);
-      }
+      const signedData = await getSignedConsents();
+      setSignedConsents(signedData);
     } catch (err) {
       console.error("Error loading patient documents:", err);
     } finally {
@@ -63,6 +46,13 @@ export default function PatientDocumentsPage() {
     }
   };
 
+  const handleSignDocument = (docId) => {
+    const docToSign = pendingConsents.find(c => c.id === docId);
+    if (docToSign) {
+      setActiveForm(docToSign);
+    }
+  };
+
   // Map backend models to expected library schemas
   const mappedDocuments = [
     ...pendingConsents.map(c => ({
@@ -80,7 +70,7 @@ export default function PatientDocumentsPage() {
       name: c.title,
       type: "Consent Form",
       date: new Date(c.signed_at || c.created_at).toLocaleDateString("en-IN"),
-      url: `http://localhost:8000/patient/consents/${c.id}/pdf`,
+      url: getConsentPdfUrl(c.id),
       size: "240 KB",
       signed: true,
       content: c.content
@@ -110,7 +100,7 @@ export default function PatientDocumentsPage() {
 
       {/* Main Document Library */}
       <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
-        <MyDocumentLibrary documents={mappedDocuments} />
+        <MyDocumentLibrary documents={mappedDocuments} onSignDocument={handleSignDocument} />
       </div>
 
       {/* Floating consent signer overlay */}

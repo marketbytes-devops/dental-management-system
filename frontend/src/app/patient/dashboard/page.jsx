@@ -5,6 +5,8 @@ import Link from "next/link";
 import LastVisitSummaryCard from "@/components/ui/patients/dashboard/lastVisitSummaryCard";
 import { Calendar, CreditCard, CheckSquare, Clock, Pill } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
+import { getPatientProfile } from "@/services/api";
+import { getPatientAppointments } from "@/services/api";
 
 export default function PatientDashboardPage() {
   const [profile, setProfile] = useState(null);
@@ -14,40 +16,22 @@ export default function PatientDashboardPage() {
 
   useEffect(() => {
     async function loadDashboard() {
-      const token = localStorage.getItem("patient_jwt_token");
-      if (!token) {
-        setError("Please log in to view dashboard.");
-        setLoading(false);
-        return;
-      }
-
       try {
         // Fetch patient profile
-        const profileRes = await fetch("http://127.0.0.1:8000/patient/profile", {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
-        if (!profileRes.ok) {
-          throw new Error("Failed to load patient profile.");
-        }
-        const profileData = await profileRes.json();
+        const profileData = await getPatientProfile();
         setProfile(profileData);
 
         // Fetch patient appointments
-        const apptsRes = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/patient/${profileData.id}`);
-        if (apptsRes.ok) {
-          const apptsData = await apptsRes.json();
-          setAppointments(apptsData.map(appt => ({
-            id: appt.id,
-            date: appt.appointment_date,
-            time: appt.appointment_time,
-            doctor: appt.doctor_name,
-            treatment: appt.treatment_type,
-            status: appt.status,
-            priority: appt.priority
-          })));
-        }
+        const apptsData = await getPatientAppointments(profileData.id);
+        setAppointments(apptsData.map(appt => ({
+          id: appt.id,
+          date: appt.appointment_date,
+          time: appt.appointment_time,
+          doctor: appt.doctor_name,
+          treatment: appt.treatment_type,
+          status: appt.status,
+          priority: appt.priority
+        })));
       } catch (err) {
         console.error("Dashboard load error:", err);
         setError(err.message || "An error occurred.");

@@ -8,6 +8,7 @@ import InsuranceCard from "@/components/ui/patients/profile/insuranceCard";
 import EditProfileModal from "@/components/ui/patients/profile/editProfileModal";
 import PatientSecurityCard from "@/components/ui/patients/profile/patientSecurityCard";
 import { Pencil } from "lucide-react";
+import { getPatientProfile } from "@/services/api";
 
 export default function ProfilePage() {
   const [patient, setPatient] = useState(null);
@@ -17,49 +18,34 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function fetchProfile() {
-      const token = localStorage.getItem("patient_jwt_token");
-      if (!token) {
-        setError("Please log in to view profile.");
-        setLoading(false);
-        return;
-      }
       try {
-        const response = await fetch("http://127.0.0.1:8000/patient/profile", {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          // Map backend schema to UI format
-          const formatted = {
-            id: data.token,
-            name: data.name,
-            avatar: data.name.charAt(0).toUpperCase(),
-            dob: data.date_of_birth || "Not specified",
-            phone: data.phone,
-            email: data.email,
-            memberSince: data.created_at ? new Date(data.created_at).toLocaleDateString("en-IN", {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            }) : "Recently",
-            registeredVia: "Online Portal",
-            address: [data.address_line1, data.city, data.state, data.pincode].filter(Boolean).join(", ") || "No address provided",
-            insurance: { provider: "Not provided", policyId: "N/A", coverage: 0 },
-            emergencyContact: {
-              name: data.emergency_contact_name || "Not specified",
-              relation: "Contact",
-              phone: data.emergency_contact_phone || "Not specified"
-            },
-          };
-          setPatient(formatted);
-        } else {
-          setError("Failed to load profile details.");
-        }
+        const data = await getPatientProfile();
+        // Map backend schema to UI format
+        const formatted = {
+          id: data.token,
+          name: data.name,
+          avatar: data.name.charAt(0).toUpperCase(),
+          dob: data.date_of_birth || "Not specified",
+          phone: data.phone,
+          email: data.email,
+          memberSince: data.created_at ? new Date(data.created_at).toLocaleDateString("en-IN", {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }) : "Recently",
+          registeredVia: "Online Portal",
+          address: [data.address_line1, data.city, data.state, data.pincode].filter(Boolean).join(", ") || "No address provided",
+          insurance: { provider: "Not provided", policyId: "N/A", coverage: 0 },
+          emergencyContact: {
+            name: data.emergency_contact_name || "Not specified",
+            relation: "Contact",
+            phone: data.emergency_contact_phone || "Not specified"
+          },
+        };
+        setPatient(formatted);
       } catch (err) {
         console.error("Failed to fetch profile:", err);
-        setError("An error occurred loading profile.");
+        setError(err.message || "An error occurred loading profile.");
       } finally {
         setLoading(false);
       }

@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import ConsentStatusBanner from "@/components/ui/patients/documents/consentStatusBanner";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import MyDocumentLibrary from "@/components/ui/patients/documents/myDocumentLibrary";
+
+export default function PatientDocumentsPage() {
+  const [documents, setDocuments] = useState([]);
 import { Loader2 } from "lucide-react";
 import { getPendingConsents, getSignedConsents, getConsentPdfUrl } from "@/services/api";
 
@@ -12,7 +15,107 @@ export default function PatientDocumentsPage() {
   const [signedConsents, setSignedConsents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeForm, setActiveForm] = useState(null);
+  
+  // Use a hardcoded patient_id for now if we don't have auth context. 
+  // Let's assume we use the first patient or we fetch with credentials if they are implemented.
+  // The backend uses get_current_user. Assuming auth is handled by cookies or token in headers.
+  
+  const fetchConsents = async () => {
+    try {
+      const token = localStorage.getItem("token"); // Or however auth is managed
+      const headers = {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      };
+      
+      // Since auth might not be fully wired up for the patient portal in testing,
+      // let's just make the fetch. If it fails, we fall back to empty.
+      
+      const [pendingRes, signedRes] = await Promise.all([
+        fetch("http://localhost:8000/patient/consents/pending", { headers }),
+        fetch("http://localhost:8000/patient/consents/documents", { headers })
+      ]);
+      
+      let allDocs = [];
+      if (pendingRes.ok) {
+        const pending = await pendingRes.json();
+        const mappedPending = pending.map(c => ({
+          id: c.id,
+          name: c.title,
+          type: "Consent Form",
+          size: "N/A",
+          date: new Date(c.created_at).toLocaleDateString(),
+          signed: false,
+          content: c.body_text
+        }));
+        allDocs = [...allDocs, ...mappedPending];
+      }
+      
+      if (signedRes.ok) {
+        const signed = await signedRes.json();
+        const mappedSigned = signed.map(c => ({
+          id: c.id,
+          name: c.title,
+          type: "Consent Form",
+          size: "PDF",
+          date: new Date(c.signed_at).toLocaleDateString(),
+          signed: true,
+          url: `http://localhost:8000/patient/consents/${c.id}/pdf`,
+          content: c.body_text
+        }));
+        allDocs = [...allDocs, ...mappedSigned];
+      }
+      
+      setDocuments(allDocs);
+    } catch (error) {
+      console.error("Error fetching consents:", error);
+    }
+  };
 
+  useEffect(() => {
+    fetchConsents();
+  }, []);
+
+<<<<<<< HEAD
+=======
+  const getHeaders = () => {
+    const token = localStorage.getItem("patient_jwt_token");
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {})
+    };
+  };
+
+  const handleSignComplete = async (docId, signatureDetails) => {
+    try {
+        const token = localStorage.getItem("token");
+        const headers = {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        };
+        
+        const res = await fetch(`http://localhost:8000/patient/consents/${docId}/sign`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                signature_data: signatureDetails.signatureImage,
+                signing_method: "PORTAL"
+            })
+        });
+        
+        if (res.ok) {
+            alert("Consent form signed successfully! It has been stored in your document history.");
+            setActiveForm(null);
+            fetchConsents(); // Refresh list
+        } else {
+            const data = await res.json();
+            alert("Failed to sign: " + data.detail);
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error signing document.");
+    }
+>>>>>>> 44d5d38e03b3f4456bcbb7d624ea7e8af234d868
   const loadDocuments = async () => {
     setLoading(true);
     try {

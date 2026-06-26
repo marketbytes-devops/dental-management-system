@@ -41,6 +41,19 @@ class PatientModel(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+class PatientConsent(Base):
+    __tablename__ = "patient_consents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, index=True, nullable=False)
+    doctor_id = Column(Integer, nullable=True) # Optional since doctor module might handle it differently
+    treatment_plan_id = Column(Integer, nullable=True)
+    title = Column(String, nullable=False)
+    body_text = Column(String, nullable=False)
+    status = Column(String, default="PENDING") # PENDING, SIGNED
+    signing_method = Column(String, nullable=True) # PORTAL, IN_PERSON
+    signature_data = Column(String, nullable=True) # Base64 data
+    pdf_file_path = Column(String, nullable=True)
 
 class PatientConsentModel(Base):
     __tablename__ = "patient_consents"
@@ -55,4 +68,4 @@ class PatientConsentModel(Base):
     signature_data = Column(String, nullable=True)  # Base64 signature image or typed name
     pdf_path = Column(String, nullable=True)
     signed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

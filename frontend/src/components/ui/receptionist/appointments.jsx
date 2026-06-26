@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { CalendarDays, Clock, CheckCircle2, Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { 
+  getDoctorLeaves, 
+  getTodayAppointments, 
+  getTomorrowAppointments, 
+  getAllPatients, 
+  getFrontdeskDoctors, 
+  updateAppointmentStatus, 
+  createAppointment, 
+  directCheckin 
+} from "@/services/api";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const STATUS_STYLES = {
@@ -144,6 +154,7 @@ export default function ReceptionistAppointments() {
     directCheckIn: false,
   });
 
+  const [doctorLeaves, setDoctorLeaves] = useState([]);
 
 
   useEffect(() => {
@@ -153,11 +164,8 @@ export default function ReceptionistAppointments() {
         return;
       }
       try {
-        const response = await fetch(`http://127.0.0.1:8000/leave/doctor/leaves?doctor_name=${encodeURIComponent(form.doctor_name)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setDoctorLeaves(data);
-        }
+        const data = await getDoctorLeaves(form.doctor_name);
+        setDoctorLeaves(data);
       } catch (e) {
         console.error("Failed to fetch doctor leaves:", e);
       }
@@ -186,6 +194,26 @@ export default function ReceptionistAppointments() {
   }, [form.appointment_date, doctorLeaves, form.doctor_name]);
 
   // Fetch appointments and patients
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const [todayData, tomorrowData, patientsData, doctorsData] = await Promise.all([
+        getTodayAppointments(),
+        getTomorrowAppointments(),
+        getAllPatients(),
+        getFrontdeskDoctors(form.appointment_date),
+      ]);
+      setAppointments(todayData);
+      setTomorrowAppointments(tomorrowData);
+      setPatients(patientsData);
+      setDoctors(doctorsData);
+      if (doctorsData.length > 0 && !doctorsData.some(d => d.name === form.doctor_name)) {
+        setForm((f) => ({ ...f, doctor_name: doctorsData[0].name }));
+      }
+    } catch (e) {
+      console.error("Error loading data:", e);
+    } finally {
+      setIsLoading(false);
 const fetchData = async () => {
   try {
     setIsLoading(true);
@@ -211,22 +239,18 @@ const fetchData = async () => {
 };
 
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   // Fetch active doctors based on selected date
   useEffect(() => {
     const fetchDoctorsForDate = async () => {
       try {
-        const url = form.appointment_date
-          ? `http://127.0.0.1:8000/frontdesk/doctors?date=${form.appointment_date}`
-          : "http://127.0.0.1:8000/frontdesk/doctors";
-        const doctorsRes = await fetch(url);
-        if (doctorsRes.ok) {
-          const doctorsData = await doctorsRes.json();
-          setDoctors(doctorsData);
-          if (doctorsData.length > 0 && !doctorsData.some(d => d.name === form.doctor_name)) {
-            setForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
-          }
+        const doctorsData = await getFrontdeskDoctors(form.appointment_date);
+        setDoctors(doctorsData);
+        if (doctorsData.length > 0 && !doctorsData.some(d => d.name === form.doctor_name)) {
+          setForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
         }
       } catch (err) {
         console.error("Error fetching doctors for date:", err);
@@ -266,14 +290,12 @@ const fetchData = async () => {
   const handleCancel = async (id, name) => {
     if (!window.confirm(`Cancel appointment for ${name}?`)) return;
     try {
-      const res = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Cancelled" }),
-      });
-      if (res.ok) { alert("Appointment cancelled."); fetchData(); }
-      else { const e = await res.json(); alert(e.detail || "Failed to cancel."); }
-    } catch { alert("Error cancelling appointment."); }
+      await updateAppointmentStatus(id, { status: "Cancelled" });
+      alert("Appointment cancelled.");
+      fetchData();
+    } catch (err) {
+      alert(err.message || "Failed to cancel.");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -281,37 +303,29 @@ const fetchData = async () => {
     if (!selectedPatient) { alert("Please select a registered patient."); return; }
     if (form.appointment_date < TODAY) { alert("Date cannot be in the past."); return; }
     try {
-      const res = await fetch("http://localhost:8000/frontdesk/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patient_id: selectedPatient.id,
-          doctor_name: form.doctor_name,
-          appointment_date: form.appointment_date,
-          appointment_time: form.appointment_time,
-          treatment_type: form.treatment_type,
-          status: form.directCheckIn ? "Waiting" : "Confirmed",
-          priority: form.priority,
-        }),
+      const data = await createAppointment({
+        patient_id: selectedPatient.id,
+        doctor_name: form.doctor_name,
+        appointment_date: form.appointment_date,
+        appointment_time: form.appointment_time,
+        treatment_type: form.treatment_type,
+        status: form.directCheckIn ? "Waiting" : "Confirmed",
+        priority: form.priority,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Booking failed.");
 
       let msg = `Appointment booked for ${selectedPatient.name}!`;
       if (form.directCheckIn) {
-        const ci = await fetch(
-          `http://localhost:8000/frontdesk/appointments/${data.id}/direct-checkin?priority=${form.priority}&doctor_name=${form.doctor_name}`,
-          { method: "POST" }
-        );
-        const cid = await ci.json();
-        if (ci.ok) msg += ` Checked in. Est. wait: ${cid.wait_time_estimate} mins.`;
+        const checkinData = await directCheckin(data.id, form.priority, form.doctor_name);
+        msg += ` Checked in. Est. wait: ${checkinData.wait_time_estimate} mins.`;
       }
       alert(msg);
       setSelectedPatient(null);
       setSearchPatient("");
       setForm({ appointment_time: "09:00 AM", appointment_date: TODAY, doctor_name: doctors[0]?.name ?? "", treatment_type: "Consultation", priority: "Routine", directCheckIn: false });
       fetchData();
-    } catch (err) { alert(err.message); }
+    } catch (err) {
+      alert(err.message || "Booking failed.");
+    }
   };
 
   const todayCount = appointments.length;

@@ -8,6 +8,7 @@ import DoctorProfileSection from "@/components/ui/doctor/profile/DoctorProfileSe
 import DoctorCredentialsCard from "@/components/ui/doctor/profile/DoctorCredentialsCard";
 import SecuritySettingsCard from "@/components/ui/doctor/profile/SecuritySettingsCard";
 import EditDoctorProfileModal from "@/components/ui/doctor/profile/EditDoctorProfileModal";
+import { getProfile, updateProfile } from "@/services/api";
 
 // Initial Mock Data Fallback
 const INITIAL_DOCTOR = {
@@ -36,23 +37,7 @@ export default function DoctorProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://127.0.0.1:8000/auth/profile", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 404) {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("staff_jwt_token");
-            localStorage.removeItem("staff_user");
-          }
-          router.push("/login");
-          return;
-        }
-        throw new Error("Failed to load profile.");
-      }
-      const user = await response.json();
+      const user = await getProfile();
 
       setDoctor({
         id: `DR-${user.id}`,
@@ -73,6 +58,13 @@ export default function DoctorProfilePage() {
       });
     } catch (err) {
       console.error("Error loading doctor profile:", err);
+      if (err.response?.status === 401 || err.response?.status === 404) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("staff_jwt_token");
+          localStorage.removeItem("staff_user");
+        }
+        router.push("/login");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -84,8 +76,6 @@ export default function DoctorProfilePage() {
 
   const handleSave = async (updatedData) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      
       const payload = {
         name: updatedData.name,
         email: updatedData.email,
@@ -97,21 +87,7 @@ export default function DoctorProfilePage() {
         board: updatedData.credentials?.board || null
       };
 
-      const response = await fetch("http://127.0.0.1:8000/auth/profile", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to update profile.");
-      }
-
-      const updatedUser = await response.json();
+      const updatedUser = await updateProfile(payload);
       
       // Update local storage staff_user
       if (typeof window !== "undefined") {
@@ -139,7 +115,7 @@ export default function DoctorProfilePage() {
       setIsEditing(false);
       alert("Profile updated successfully!");
     } catch (err) {
-      alert(err.message || "An error occurred while updating your profile.");
+      alert(err.response?.data?.detail || err.message || "An error occurred while updating your profile.");
     }
   };
 

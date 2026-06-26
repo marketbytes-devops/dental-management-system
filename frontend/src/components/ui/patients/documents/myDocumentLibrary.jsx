@@ -1,6 +1,6 @@
 import { FileImage, FlaskConical, FileSignature, Folder, Download } from "lucide-react";
 
-export default function MyDocumentLibrary({ documents = [] }) {
+export default function MyDocumentLibrary({ documents = [], onSignDocument }) {
   const getFileIcon = (type) => {
     switch (type) {
       case "X-Ray":
@@ -66,6 +66,31 @@ export default function MyDocumentLibrary({ documents = [] }) {
                         >
                           {doc.signed ? "Signed" : "Unsigned"}
                         </span>
+                      )}
+                      {doc.type === "Consent Form" && !doc.signed ? (
+                        <button
+                          onClick={() => onSignDocument && onSignDocument(doc.id)}
+                          className="flex items-center gap-1 p-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 transition-colors text-xs font-bold rounded-lg border border-amber-300/30 cursor-pointer whitespace-nowrap"
+                          title="Sign Consent Form"
+                        >
+                          <FileSignature className="w-3.5 h-3.5 text-amber-600" /> Review & Sign
+                        </button>
+                      ) : (
+                        <a
+                          href={doc.url}
+                          target={doc.url !== "#" ? "_blank" : undefined}
+                          rel={doc.url !== "#" ? "noopener noreferrer" : undefined}
+                          onClick={(e) => {
+                            if (doc.url === "#") {
+                              e.preventDefault();
+                              alert(`Downloading "${doc.name}" is not supported in the mock version.`);
+                            }
+                          }}
+                          className="flex items-center gap-1 p-2 text-gray-400 hover:text-primary transition-colors text-xs font-semibold hover:bg-gray-50 rounded-lg border border-gray-150 cursor-pointer"
+                          title="Download File"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Download
+                        </a>
                       )}
                       <a
                         href={doc.url}

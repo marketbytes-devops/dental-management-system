@@ -5,6 +5,7 @@ import ConsentStatusBanner from "@/components/ui/patients/documents/consentStatu
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import MyDocumentLibrary from "@/components/ui/patients/documents/myDocumentLibrary";
 import { Loader2 } from "lucide-react";
+import { getPendingConsents, getSignedConsents, getConsentPdfUrl } from "@/services/api";
 
 export default function PatientDocumentsPage() {
   const [pendingConsents, setPendingConsents] = useState([]);
@@ -73,6 +74,12 @@ export default function PatientDocumentsPage() {
       const headers = getHeaders();
 
       // 1. Fetch pending
+      const pendingData = await getPendingConsents();
+      setPendingConsents(pendingData);
+
+      // 2. Fetch signed
+      const signedData = await getSignedConsents();
+      setSignedConsents(signedData);
       const pendingRes = await fetch("http://localhost:8000/patient/consents/pending", {
         headers
       });
@@ -116,6 +123,13 @@ export default function PatientDocumentsPage() {
     }
   };
 
+  const handleSignDocument = (docId) => {
+    const docToSign = pendingConsents.find(c => c.id === docId);
+    if (docToSign) {
+      setActiveForm(docToSign);
+    }
+  };
+
   // Map backend models to expected library schemas
   const mappedDocuments = [
     ...pendingConsents.map(c => ({
@@ -133,7 +147,7 @@ export default function PatientDocumentsPage() {
       name: c.title,
       type: "Consent Form",
       date: new Date(c.signed_at || c.created_at).toLocaleDateString("en-IN"),
-      url: `http://localhost:8000/patient/consents/${c.id}/pdf`,
+      url: getConsentPdfUrl(c.id),
       size: "240 KB",
       signed: true,
       content: c.content
@@ -177,7 +191,7 @@ export default function PatientDocumentsPage() {
 
       {/* Main Document Library */}
       <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
-        <MyDocumentLibrary documents={mappedDocuments} />
+        <MyDocumentLibrary documents={mappedDocuments} onSignDocument={handleSignDocument} />
       </div>
 
       {/* Floating consent signer overlay */}

@@ -13,6 +13,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
+import { login } from "@/services/api";
+import { registerPatient } from "@/services/api";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
 
@@ -122,23 +124,7 @@ export default function RegisterPage() {
         known_allergies: formData.known_allergies.trim() || null,
       };
 
-      const response = await fetch("http://127.0.0.1:8000/patient/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        let errMsg = "Registration failed. Please try again.";
-        if (data.detail) {
-          errMsg = Array.isArray(data.detail)
-            ? data.detail.map((e) => e.msg).join(", ")
-            : data.detail;
-        }
-        throw new Error(errMsg);
-      }
+      const data = await registerPatient(payload);
 
       // Save session info
       localStorage.setItem("patient_token", data.token);
@@ -148,18 +134,11 @@ export default function RegisterPage() {
 
       // Automatically log in to get JWT token
       try {
-        const loginResponse = await fetch("http://127.0.0.1:8000/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: formData.email.trim(),
-            password: formData.password
-          })
+        const loginData = await login({
+          username: formData.email.trim(),
+          password: formData.password
         });
-        if (loginResponse.ok) {
-          const loginData = await loginResponse.json();
-          localStorage.setItem("patient_jwt_token", loginData.access_token);
-        }
+        localStorage.setItem("patient_jwt_token", loginData.access_token);
       } catch (loginErr) {
         console.error("Auto-login failed:", loginErr);
       }

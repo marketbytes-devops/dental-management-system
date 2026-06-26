@@ -45,13 +45,13 @@ export default function LiveQueueTable({
                 </td>
               </tr>
             ) : (
-              queue.map((item) => {
+              queue.map((item, index) => {
                 const pt = patients[item.token];
                 if (!pt) return null;
                 const isWaiting = item.status === "Waiting";
                 const isUrgent = item.priority === "Urgent";
                 return (
-                  <tr key={item.token} className={`hover:bg-gray-50/50 transition-colors ${isUrgent ? "bg-red-50/[0.02]" : ""}`}>
+                  <tr key={item.id || `${item.token}-${index}`} className={`hover:bg-gray-50/50 transition-colors ${isUrgent ? "bg-red-50/[0.02]" : ""}`}>
                     <td className="px-6 py-4">
                       <span className="text-xs font-bold text-gray-900 bg-gray-100 px-2.5 py-1 rounded">
                         {item.token}

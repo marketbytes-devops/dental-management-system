@@ -16,6 +16,8 @@ import {
   Mail
 } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
+import { login, getProfile } from "@/services/api";
+import { getPatientProfile } from "@/services/api";
 
 const dummyCredentials = {
   patient: { identifier: "9876543210", email: "patient@example.com", password: "patient123" }
@@ -85,21 +87,10 @@ function LoginContent() {
 
     try {
       // Call the unified login endpoint
-      const response = await fetch("http://127.0.0.1:8000/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: emailId.trim(),
-          password: password
-        })
+      const tokenData = await login({
+        username: emailId.trim(),
+        password: password
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Invalid credentials.");
-      }
-
-      const tokenData = await response.json();
       const jwtToken = tokenData.access_token;
       const roleType = tokenData.role_type;
 
@@ -112,22 +103,13 @@ function LoginContent() {
       }
 
       if (roleType === "patient") {
-        // Fetch patient profile details using the JWT token
-        const profileResponse = await fetch("http://127.0.0.1:8000/patient/profile", {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${jwtToken}`
-          }
-        });
-
-        if (!profileResponse.ok) {
-          throw new Error("Failed to fetch patient profile.");
-        }
-
-        const patientProfile = await profileResponse.json();
+        // Save token to localStorage first so getPatientProfile interceptor can use it
+        localStorage.setItem("patient_jwt_token", jwtToken);
+        
+        // Fetch patient profile details
+        const patientProfile = await getPatientProfile();
         
         // Save details to localStorage
-        localStorage.setItem("patient_jwt_token", jwtToken);
         localStorage.setItem("patient_token", patientProfile.token);
         localStorage.setItem("patient_name", patientProfile.name);
         localStorage.setItem("patient_phone", patientProfile.phone);
@@ -136,22 +118,13 @@ function LoginContent() {
         setIsSubmitting(false);
         router.push("/patient/dashboard");
       } else {
-        // Fetch staff profile details using the JWT token
-        const profileResponse = await fetch("http://127.0.0.1:8000/auth/profile", {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${jwtToken}`
-          }
-        });
+        // Save token to localStorage first so getProfile interceptor can use it
+        localStorage.setItem("staff_jwt_token", jwtToken);
 
-        if (!profileResponse.ok) {
-          throw new Error("Failed to fetch staff profile.");
-        }
-
-        const staffProfile = await profileResponse.json();
+        // Fetch staff profile details
+        const staffProfile = await getProfile();
 
         // Save details to localStorage
-        localStorage.setItem("staff_jwt_token", jwtToken);
         localStorage.setItem("staff_user", JSON.stringify(staffProfile));
         
         // Determine redirect path based on their roles

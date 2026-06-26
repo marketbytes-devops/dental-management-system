@@ -189,6 +189,11 @@ export const getTodayAppointments = async () => {
   return response.data;
 };
 
+export const getTomorrowAppointments = async () => {
+  const response = await client.get("/frontdesk/appointments/tomorrow");
+  return response.data;
+};
+
 export const getQueue = async () => {
   const response = await client.get("/frontdesk/queue");
   return response.data;

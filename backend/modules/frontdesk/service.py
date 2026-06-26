@@ -129,7 +129,7 @@ def initiate_self_checkin(db: Session, appt_id: int, checkin_in: CheckInRequest)
         )
     
     # Check 30 minutes rule: Patient can check in starting 30 minutes before appointment time
-    appt_datetime = parse_time_str(appt.appointment_time, today)
+    appt_datetime = parse_time_str(appt.appointment_time, today)  # type: ignore[arg-type]
     allowed_start_time = appt_datetime - timedelta(minutes=30)
     current_time = datetime.now()
     
@@ -144,7 +144,7 @@ def initiate_self_checkin(db: Session, appt_id: int, checkin_in: CheckInRequest)
     # Generate 6 digit OTP
     otp_code = str(random.randint(100000, 999999))
     appt.otp = otp_code
-    appt.otp_status = "Pending"
+    appt.otp_status = "Pending" 
     appt.status = "Pending OTP"
     appt.symptoms = checkin_in.symptoms
     if checkin_in.is_emergency:

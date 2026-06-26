@@ -11,7 +11,6 @@ const TIME_SLOTS = [
   "4:00 PM", "4:30 PM", "5:00 PM",
 ];
 
-
 const TREATMENTS = [
   "Routine Check-up",
   "Scaling & Polishing",
@@ -64,7 +63,7 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
     if (form.date && form.doctor && doctorLeaves.length > 0) {
       const selectedDate = new Date(form.date);
       selectedDate.setHours(0, 0, 0, 0);
-      
+
       const isOnLeave = doctorLeaves.some(leave => {
         const start = new Date(leave.start_date);
         start.setHours(0, 0, 0, 0);
@@ -72,7 +71,7 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
         end.setHours(0, 0, 0, 0);
         return selectedDate >= start && selectedDate <= end;
       });
-      
+
       if (isOnLeave) {
         alert(`${form.doctor} is on leave on this day. Please select another date.`);
         setForm(prev => ({ ...prev, date: "" }));
@@ -83,10 +82,9 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const response = await fetch("http://localhost:8000/patient/doctors-list");
         const token = typeof window !== "undefined" ? localStorage.getItem("patient_jwt_token") : null;
-        const url = form.date 
-          ? `http://127.0.0.1:8000/auth/doctors?date=${form.date}` 
+        const url = form.date
+          ? `http://127.0.0.1:8000/auth/doctors?date=${form.date}`
           : "http://127.0.0.1:8000/auth/doctors";
         const response = await fetch(url, {
           headers: token ? { "Authorization": `Bearer ${token}` } : {}
@@ -129,13 +127,12 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
 
     setSubmitting(true);
     try {
-      const selectedDoctorName = form.doctor;
       const response = await fetch("http://127.0.0.1:8000/frontdesk/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           patient_id: patientId,
-          doctor_name: selectedDoctorName,
+          doctor_name: form.doctor,
           appointment_date: form.date,
           appointment_time: form.time,
           treatment_type: form.treatment,
@@ -173,7 +170,6 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   }
 
   return (
-    /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -214,13 +210,12 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
               <select
                 value={form.doctor}
                 onChange={(e) => handleChange("doctor", e.target.value)}
-                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.doctor ? "border-danger/50 bg-danger/5" : "border-gray-200"
-                  }`}
+                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.doctor ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
               >
                 <option value="">Select a doctor…</option>
                 {doctors.map((d) => (
-                  <option 
-                    key={d.id || d.name} 
+                  <option
+                    key={d.id || d.name}
                     value={d.name}
                     disabled={d.status === "Off Duty"}
                     className={d.status === "Off Duty" ? "text-gray-400" : ""}
@@ -240,8 +235,7 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
               <select
                 value={form.treatment}
                 onChange={(e) => handleChange("treatment", e.target.value)}
-                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.treatment ? "border-danger/50 bg-danger/5" : "border-gray-200"
-                  }`}
+                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.treatment ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
               >
                 <option value="">Select treatment…</option>
                 {TREATMENTS.map((t) => (
@@ -253,7 +247,6 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
 
             {/* Date & Time row */}
             <div className="grid grid-cols-2 gap-4">
-              {/* Date */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Date <span className="text-danger">*</span>
@@ -263,13 +256,11 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
                   min={today}
                   value={form.date}
                   onChange={(e) => handleChange("date", e.target.value)}
-                  className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.date ? "border-danger/50 bg-danger/5" : "border-gray-200"
-                    }`}
+                  className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.date ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
                 />
                 {errors.date && <p className="mt-1 text-xs text-danger">{errors.date}</p>}
               </div>
 
-              {/* Time */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Time Slot <span className="text-danger">*</span>
@@ -277,8 +268,7 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
                 <select
                   value={form.time}
                   onChange={(e) => handleChange("time", e.target.value)}
-                  className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.time ? "border-danger/50 bg-danger/5" : "border-gray-200"
-                    }`}
+                  className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.time ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
                 >
                   <option value="">Select time…</option>
                   {TIME_SLOTS.map((t) => (

@@ -4,9 +4,6 @@ import { useState, useEffect } from "react";
 import ConsentStatusBanner from "@/components/ui/patients/documents/consentStatusBanner";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import MyDocumentLibrary from "@/components/ui/patients/documents/myDocumentLibrary";
-
-export default function PatientDocumentsPage() {
-  const [documents, setDocuments] = useState([]);
 import { Loader2 } from "lucide-react";
 
 export default function PatientDocumentsPage() {
@@ -19,62 +16,6 @@ export default function PatientDocumentsPage() {
   // Let's assume we use the first patient or we fetch with credentials if they are implemented.
   // The backend uses get_current_user. Assuming auth is handled by cookies or token in headers.
   
-  const fetchConsents = async () => {
-    try {
-      const token = localStorage.getItem("token"); // Or however auth is managed
-      const headers = {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      };
-      
-      // Since auth might not be fully wired up for the patient portal in testing,
-      // let's just make the fetch. If it fails, we fall back to empty.
-      
-      const [pendingRes, signedRes] = await Promise.all([
-        fetch("http://localhost:8000/patient/consents/pending", { headers }),
-        fetch("http://localhost:8000/patient/consents/documents", { headers })
-      ]);
-      
-      let allDocs = [];
-      if (pendingRes.ok) {
-        const pending = await pendingRes.json();
-        const mappedPending = pending.map(c => ({
-          id: c.id,
-          name: c.title,
-          type: "Consent Form",
-          size: "N/A",
-          date: new Date(c.created_at).toLocaleDateString(),
-          signed: false,
-          content: c.body_text
-        }));
-        allDocs = [...allDocs, ...mappedPending];
-      }
-      
-      if (signedRes.ok) {
-        const signed = await signedRes.json();
-        const mappedSigned = signed.map(c => ({
-          id: c.id,
-          name: c.title,
-          type: "Consent Form",
-          size: "PDF",
-          date: new Date(c.signed_at).toLocaleDateString(),
-          signed: true,
-          url: `http://localhost:8000/patient/consents/${c.id}/pdf`,
-          content: c.body_text
-        }));
-        allDocs = [...allDocs, ...mappedSigned];
-      }
-      
-      setDocuments(allDocs);
-    } catch (error) {
-      console.error("Error fetching consents:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchConsents();
-  }, []);
-
   const getHeaders = () => {
     const token = localStorage.getItem("patient_jwt_token");
     return {
@@ -103,7 +44,7 @@ export default function PatientDocumentsPage() {
         if (res.ok) {
             alert("Consent form signed successfully! It has been stored in your document history.");
             setActiveForm(null);
-            fetchConsents(); // Refresh list
+            loadDocuments(); // Refresh list
         } else {
             const data = await res.json();
             alert("Failed to sign: " + data.detail);
@@ -112,6 +53,8 @@ export default function PatientDocumentsPage() {
         console.error(err);
         alert("Error signing document.");
     }
+  }
+
   const loadDocuments = async () => {
     setLoading(true);
     try {
@@ -142,12 +85,6 @@ export default function PatientDocumentsPage() {
   useEffect(() => {
     loadDocuments();
   }, []);
-
-  const handleSignComplete = (docId) => {
-    setActiveForm(null);
-    loadDocuments();
-    alert("Consent form signed successfully! It has been compiled into a secure PDF document.");
-  };
 
   const handleStartSigning = () => {
     if (pendingConsents.length > 0) {

@@ -144,9 +144,7 @@ export default function ReceptionistAppointments() {
     directCheckIn: false,
   });
 
-  const [doctors, setDoctors] = useState([]);
-  const [doctorLeaves, setDoctorLeaves] = useState([]);
-  const types = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
+
 
   useEffect(() => {
     const fetchDoctorLeaves = async () => {
@@ -188,46 +186,30 @@ export default function ReceptionistAppointments() {
   }, [form.appointment_date, doctorLeaves, form.doctor_name]);
 
   // Fetch appointments and patients
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-      // Fetch today's appointments
-      const apptsRes = await fetch("http://127.0.0.1:8000/frontdesk/appointments/today");
-      if (apptsRes.ok) {
-        const apptsData = await apptsRes.json();
-        setAppointments(apptsData);
-      }
-      // Fetch all patients
-      const patientsRes = await fetch("http://127.0.0.1:8000/patient/all");
-      if (patientsRes.ok) {
-        const patientsData = await patientsRes.json();
-        setPatients(patientsData);
-      }
-    } catch (err) {
-      console.error("Error fetching data:", err);
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-      const [todayRes, tomorrowRes, patientsRes, doctorsRes] = await Promise.all([
-        fetch("http://localhost:8000/frontdesk/appointments/today"),
-        fetch("http://localhost:8000/frontdesk/appointments/tomorrow"),
-        fetch("http://localhost:8000/patient/all"),
-        fetch("http://localhost:8000/frontdesk/doctors"),
-      ]);
-      if (todayRes.ok) setAppointments(await todayRes.json());
-      if (tomorrowRes.ok) setTomorrowAppointments(await tomorrowRes.json());
-      if (patientsRes.ok) setPatients(await patientsRes.json());
-      if (doctorsRes.ok) {
-        const d = await doctorsRes.json();
-        setDoctors(d);
-        if (d.length > 0) setForm((f) => ({ ...f, doctor_name: d[0].name }));
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
+const fetchData = async () => {
+  try {
+    setIsLoading(true);
+    const [todayRes, tomorrowRes, patientsRes, doctorsRes] = await Promise.all([
+      fetch("http://localhost:8000/frontdesk/appointments/today"),
+      fetch("http://localhost:8000/frontdesk/appointments/tomorrow"),
+      fetch("http://localhost:8000/patient/all"),
+      fetch("http://localhost:8000/frontdesk/doctors"),
+    ]);
+    if (todayRes.ok) setAppointments(await todayRes.json());
+    if (tomorrowRes.ok) setTomorrowAppointments(await tomorrowRes.json());
+    if (patientsRes.ok) setPatients(await patientsRes.json());
+    if (doctorsRes.ok) {
+      const d = await doctorsRes.json();
+      setDoctors(d);
+      if (d.length > 0) setForm((f) => ({ ...f, doctor_name: d[0].name }));
     }
-  };
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   useEffect(() => { fetchData(); }, []);
 

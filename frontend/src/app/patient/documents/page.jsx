@@ -4,9 +4,6 @@ import { useState, useEffect } from "react";
 import ConsentStatusBanner from "@/components/ui/patients/documents/consentStatusBanner";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import MyDocumentLibrary from "@/components/ui/patients/documents/myDocumentLibrary";
-
-export default function PatientDocumentsPage() {
-  const [documents, setDocuments] = useState([]);
 import { Loader2 } from "lucide-react";
 
 export default function PatientDocumentsPage() {
@@ -14,66 +11,7 @@ export default function PatientDocumentsPage() {
   const [signedConsents, setSignedConsents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeForm, setActiveForm] = useState(null);
-  
-  // Use a hardcoded patient_id for now if we don't have auth context. 
-  // Let's assume we use the first patient or we fetch with credentials if they are implemented.
-  // The backend uses get_current_user. Assuming auth is handled by cookies or token in headers.
-  
-  const fetchConsents = async () => {
-    try {
-      const token = localStorage.getItem("token"); // Or however auth is managed
-      const headers = {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      };
-      
-      // Since auth might not be fully wired up for the patient portal in testing,
-      // let's just make the fetch. If it fails, we fall back to empty.
-      
-      const [pendingRes, signedRes] = await Promise.all([
-        fetch("http://localhost:8000/patient/consents/pending", { headers }),
-        fetch("http://localhost:8000/patient/consents/documents", { headers })
-      ]);
-      
-      let allDocs = [];
-      if (pendingRes.ok) {
-        const pending = await pendingRes.json();
-        const mappedPending = pending.map(c => ({
-          id: c.id,
-          name: c.title,
-          type: "Consent Form",
-          size: "N/A",
-          date: new Date(c.created_at).toLocaleDateString(),
-          signed: false,
-          content: c.body_text
-        }));
-        allDocs = [...allDocs, ...mappedPending];
-      }
-      
-      if (signedRes.ok) {
-        const signed = await signedRes.json();
-        const mappedSigned = signed.map(c => ({
-          id: c.id,
-          name: c.title,
-          type: "Consent Form",
-          size: "PDF",
-          date: new Date(c.signed_at).toLocaleDateString(),
-          signed: true,
-          url: `http://localhost:8000/patient/consents/${c.id}/pdf`,
-          content: c.body_text
-        }));
-        allDocs = [...allDocs, ...mappedSigned];
-      }
-      
-      setDocuments(allDocs);
-    } catch (error) {
-      console.error("Error fetching consents:", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchConsents();
-  }, []);
+  const [authError, setAuthError] = useState(false);
 
   const getHeaders = () => {
     const token = localStorage.getItem("patient_jwt_token");
@@ -85,7 +23,12 @@ export default function PatientDocumentsPage() {
 
   const handleSignComplete = async (docId, signatureDetails) => {
     try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("patient_jwt_token");
+        if (!token) {
+          alert("Your session has expired. Please log in again.");
+          window.location.href = "/login";
+          return;
+        }
         const headers = {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
@@ -103,7 +46,7 @@ export default function PatientDocumentsPage() {
         if (res.ok) {
             alert("Consent form signed successfully! It has been stored in your document history.");
             setActiveForm(null);
-            fetchConsents(); // Refresh list
+            loadDocuments(); // Refresh list
         } else {
             const data = await res.json();
             alert("Failed to sign: " + data.detail);
@@ -112,28 +55,52 @@ export default function PatientDocumentsPage() {
         console.error(err);
         alert("Error signing document.");
     }
+  }
+
   const loadDocuments = async () => {
     setLoading(true);
+    setAuthError(false);
+
+    const token = localStorage.getItem("patient_jwt_token");
+    if (!token) {
+      // No token at all – skip the network requests to avoid TypeError
+      setAuthError(true);
+      setLoading(false);
+      return;
+    }
+
     try {
+      const headers = getHeaders();
+
       // 1. Fetch pending
       const pendingRes = await fetch("http://localhost:8000/patient/consents/pending", {
-        headers: getHeaders()
+        headers
       });
       if (pendingRes.ok) {
         const pendingData = await pendingRes.json();
         setPendingConsents(pendingData);
+      } else if (pendingRes.status === 401) {
+        setAuthError(true);
+        setLoading(false);
+        return;
       }
 
       // 2. Fetch signed
       const signedRes = await fetch("http://localhost:8000/patient/consents/documents", {
-        headers: getHeaders()
+        headers
       });
       if (signedRes.ok) {
         const signedData = await signedRes.json();
         setSignedConsents(signedData);
+      } else if (signedRes.status === 401) {
+        setAuthError(true);
+        setLoading(false);
+        return;
       }
     } catch (err) {
       console.error("Error loading patient documents:", err);
+      // Network error or CORS block on 401 – treat as auth issue
+      setAuthError(true);
     } finally {
       setLoading(false);
     }
@@ -142,12 +109,6 @@ export default function PatientDocumentsPage() {
   useEffect(() => {
     loadDocuments();
   }, []);
-
-  const handleSignComplete = (docId) => {
-    setActiveForm(null);
-    loadDocuments();
-    alert("Consent form signed successfully! It has been compiled into a secure PDF document.");
-  };
 
   const handleStartSigning = () => {
     if (pendingConsents.length > 0) {
@@ -184,6 +145,20 @@ export default function PatientDocumentsPage() {
       <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
         <span className="text-sm font-semibold text-gray-500">Loading Document History & Disclosures...</span>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
+        <p className="text-gray-600">Please log in to view your documents.</p>
+        <a
+          href="/login"
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Go to Login
+        </a>
       </div>
     );
   }

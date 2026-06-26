@@ -60,7 +60,21 @@ export default function DoctorLayout({ children }) {
   const [notification, setNotification] = useState("");
 
   // Notifications State & Logic (Referrals, etc.)
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState([
+    {
+      id: "notif-1",
+      message: "Incoming orthodontic referral from Dr. Sarah Jenkins for Rahul Kumar",
+      type: "referral",
+      link: "/doctor/referrals",
+      status: "unread",
+      dotColor: "red",
+      timestamp: "10 mins ago",
+      receivedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      itemId: "REF-201",
+      patientId: "#004",
+      patientName: "Rahul Kumar"
+    }
+  ]);
 
   const [dbNotifications, setDbNotifications] = useState([]);
   const allNotifications = [...dbNotifications, ...notifications];
@@ -112,19 +126,6 @@ export default function DoctorLayout({ children }) {
       }
     } catch (err) {
       console.warn("Failed to fetch doctor notifications from backend:", err);
-  const [notifications, setNotifications] = useState([
-    {
-      id: "notif-1",
-      message: "Incoming orthodontic referral from Dr. Sarah Jenkins for Rahul Kumar",
-      type: "referral",
-      link: "/doctor/referrals",
-      status: "unread",
-      dotColor: "red",
-      timestamp: "10 mins ago",
-      receivedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-      itemId: "REF-201",
-      patientId: "#004",
-      patientName: "Rahul Kumar"
     }
   };
 
@@ -137,143 +138,45 @@ export default function DoctorLayout({ children }) {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
-
-  const prevUnreadCountRef = useRef(0);
-  useEffect(() => {
-    const unreadDbNotifs = dbNotifications.filter(n => n.status === "unread");
-    if (unreadDbNotifs.length > prevUnreadCountRef.current) {
-      const latest = unreadDbNotifs[0];
-      if (latest) {
-        setActiveToast({
-          id: latest.id,
-          message: latest.message,
-          type: latest.type,
-          link: latest.link,
-          dotColor: latest.dotColor,
-          timestamp: "Just now"
-        });
-        setToastAnimation("slide-in");
-        
-        if (window.toastTimeout) clearTimeout(window.toastTimeout);
-        if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
-
-        window.toastTimeout = setTimeout(() => {
-          setToastAnimation("slide-out");
-          window.toastExitTimeout = setTimeout(() => {
-            setActiveToast(null);
-            setToastAnimation("");
-            setBellAnimating(true);
-            setTimeout(() => {
-              setBellAnimating(false);
-            }, 2400);
-          }, 400);
-        }, 4500);
-      }
-    }
-    prevUnreadCountRef.current = unreadDbNotifs.length;
-  }, [dbNotifications]);
-
-  const [dbNotifications, setDbNotifications] = useState([]);
-  const allNotifications = [...dbNotifications, ...notifications];
-
-  const fetchLabOrders = async () => {
-    try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mapped = data.map(o => ({
-          id: o.id,
-          patientToken: o.patient_token,
-          item: o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`,
-          status: o.status,
-          labName: o.lab_name || "Apex Dental Lab",
-          eta: o.due_date || "3 Days"
-        }));
-        setLabOrders(mapped);
-      }
-    } catch (err) {
-      console.error("Failed to fetch lab orders from backend:", err);
-    }
-  };
-
-  const fetchDbNotifications = async () => {
-    try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      if (!token) return;
-      const response = await fetch("http://localhost:8000/lab/notifications?recipient_role=doctor", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mapped = data.map(n => ({
-          id: n.id,
-          message: n.desc,
-          type: "labs",
-          link: "/doctor/labs",
-          status: n.read ? "read" : "unread",
-          dotColor: n.title.toLowerCase().includes("rejected") ? "red" : "green",
-          timestamp: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          receivedAt: n.created_at,
-          itemId: n.title.split(" ").pop()
-        }));
-        setDbNotifications(mapped);
-      }
-    } catch (err) {
-      console.error("Failed to fetch doctor notifications from backend:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchLabOrders();
-    fetchDbNotifications();
-    const interval = setInterval(() => {
-      fetchLabOrders();
-      fetchDbNotifications();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const prevUnreadCountRef = useRef(0);
-  useEffect(() => {
-    const unreadDbNotifs = dbNotifications.filter(n => n.status === "unread");
-    if (unreadDbNotifs.length > prevUnreadCountRef.current) {
-      const latest = unreadDbNotifs[0];
-      if (latest) {
-        setActiveToast({
-          id: latest.id,
-          message: latest.message,
-          type: latest.type,
-          link: latest.link,
-          dotColor: latest.dotColor,
-          timestamp: "Just now"
-        });
-        setToastAnimation("slide-in");
-        
-        if (window.toastTimeout) clearTimeout(window.toastTimeout);
-        if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
-
-        window.toastTimeout = setTimeout(() => {
-          setToastAnimation("slide-out");
-          window.toastExitTimeout = setTimeout(() => {
-            setActiveToast(null);
-            setToastAnimation("");
-            setBellAnimating(true);
-            setTimeout(() => {
-              setBellAnimating(false);
-            }, 2400);
-          }, 400);
-        }, 4500);
-      }
-    }
-    prevUnreadCountRef.current = unreadDbNotifs.length;
-  }, [dbNotifications]);
 
   const [activeToast, setActiveToast] = useState(null);
   const [toastAnimation, setToastAnimation] = useState(""); // "slide-in" | "slide-out"
   const [bellAnimating, setBellAnimating] = useState(false);
+
+  const prevUnreadCountRef = useRef(0);
+  useEffect(() => {
+    const unreadDbNotifs = dbNotifications.filter(n => n.status === "unread");
+    if (unreadDbNotifs.length > prevUnreadCountRef.current) {
+      const latest = unreadDbNotifs[0];
+      if (latest) {
+        setActiveToast({
+          id: latest.id,
+          message: latest.message,
+          type: latest.type,
+          link: latest.link,
+          dotColor: latest.dotColor,
+          timestamp: "Just now"
+        });
+        setToastAnimation("slide-in");
+
+        if (window.toastTimeout) clearTimeout(window.toastTimeout);
+        if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+
+        window.toastTimeout = setTimeout(() => {
+          setToastAnimation("slide-out");
+          window.toastExitTimeout = setTimeout(() => {
+            setActiveToast(null);
+            setToastAnimation("");
+            setBellAnimating(true);
+            setTimeout(() => {
+              setBellAnimating(false);
+            }, 2400);
+          }, 400);
+        }, 4500);
+      }
+    }
+    prevUnreadCountRef.current = unreadDbNotifs.length;
+  }, [dbNotifications]);
 
   const triggerNotification = (newNotif) => {
     const notifWithId = {
@@ -338,7 +241,6 @@ export default function DoctorLayout({ children }) {
     setNotifications(prev => prev.map(n => ({ ...n, status: "read" })));
   };
 
-
   // Referrals database
   const [referrals, setReferrals] = useState([]);
 
@@ -364,7 +266,6 @@ export default function DoctorLayout({ children }) {
 
     setReferrals(prev => [newRef, ...prev]);
 
-    // Add event to patient timeline
     const timelineEvent = {
       date: "10-06-2026 (Today)",
       note: `Outbound ${referralType} Referral generated to ${docName}${externalFacility ? ` at ${externalFacility}` : ""} (${docSpec || "Specialist"}). Reason: ${reason}`,
@@ -396,10 +297,8 @@ export default function DoctorLayout({ children }) {
       return ref;
     }));
 
-    // Find the referral to fetch patient info
     const referral = referrals.find(r => r.id === refId);
     if (referral) {
-      // Append to patient timeline
       const timelineEvent = {
         date: "10-06-2026 (Today)",
         note: `Consultation complete by ${currentDoctorName}: ${consultationNotes}`,
@@ -435,18 +334,16 @@ export default function DoctorLayout({ children }) {
       const response = await fetch("http://127.0.0.1:8000/frontdesk/queue");
       if (response.ok) {
         const data = await response.json();
-        
-        // Filter by current doctor's name
+
         const doctorNameLower = currentDoctorName ? currentDoctorName.toLowerCase() : "";
         const doctorNameWithoutTitleLower = currentDoctorName ? currentDoctorName.replace("Dr. ", "").toLowerCase() : "";
-        
+
         const myQueue = data.filter(q => {
           if (!currentDoctorName) return true;
           const qDocLower = q.doctor_name.toLowerCase();
           return qDocLower.includes(doctorNameLower) || qDocLower.includes(doctorNameWithoutTitleLower);
         });
 
-        // Map backend QueueItemResponse to expected frontend state structure
         const mappedQueue = myQueue.map(q => ({
           token: q.token,
           time: q.appointment_time,
@@ -454,10 +351,9 @@ export default function DoctorLayout({ children }) {
           priority: q.priority,
           id: q.id
         }));
-        
+
         setQueue(mappedQueue);
 
-        // Update the patients dictionary dynamically so that clinical sheet and info can be viewed
         setPatients(prev => {
           const updated = { ...prev };
           myQueue.forEach(q => {
@@ -490,7 +386,6 @@ export default function DoctorLayout({ children }) {
     return () => clearInterval(interval);
   }, [currentDoctorName]);
 
-  // Call Patient from table
   const handleCallPatient = async (token) => {
     const p = patients[token];
     if (!p) return;
@@ -520,7 +415,6 @@ export default function DoctorLayout({ children }) {
     router.push("/doctor/workspace");
   };
 
-  // Call Next Patient from Queue
   const handleCallNextPatient = async () => {
     if (queue.length === 0) {
       showNotification("No patients remaining in the waiting queue.");
@@ -552,7 +446,6 @@ export default function DoctorLayout({ children }) {
     router.push("/doctor/workspace");
   };
 
-  // View Previous Completed Patient from History
   const handleViewPreviousPatient = () => {
     if (completedPatientHistory.length === 0) {
       showNotification("No previous patient records available in this session.");
@@ -565,7 +458,6 @@ export default function DoctorLayout({ children }) {
     router.push("/doctor/workspace");
   };
 
-  // Skip Patient
   const handleSkipPatient = async (token) => {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
@@ -584,7 +476,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Token ${token} marked as skipped.`);
   };
 
-  // Requeue Patient
   const handleRequeuePatient = async (token) => {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
@@ -603,7 +494,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Token ${token} returned to waiting status.`);
   };
 
-  // Remove Patient
   const handleRemovePatient = async (token) => {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
@@ -622,7 +512,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Token ${token} removed from queue.`);
   };
 
-  // Simulate an Emergency Check-in with a 5-second delay
   const simulateEmergencyCheckin = () => {
     setHasTriggeredAutoEmergency(true);
     showNotification("🚨 Simulating emergency check-in... Popup warning will trigger in 5 seconds!");
@@ -661,7 +550,6 @@ export default function DoctorLayout({ children }) {
     }, 5000);
   };
 
-  // Mark Lab Order Delivered
   const handleMarkLabDelivered = async (id) => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
@@ -671,9 +559,7 @@ export default function DoctorLayout({ children }) {
           "Content-Type": "application/json",
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({
-          status: "Delivered"
-        })
+        body: JSON.stringify({ status: "Delivered" })
       });
 
       if (!response.ok) {
@@ -688,7 +574,6 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  // Submit Lab Order from form
   const handleSubmitLabOrder = async ({ item, tooth, shade, labName }) => {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
@@ -714,8 +599,7 @@ export default function DoctorLayout({ children }) {
       }
 
       const createdOrder = await response.json();
-      
-      // Add to timeline locally
+
       const newTimelineEvent = {
         date: "10-06-2026 (Today)",
         note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
@@ -739,7 +623,6 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  // Interactive tooth chart select
   const handleToggleToothState = (tooth) => {
     if (!viewingPatient) return;
     const currentStatus = viewingPatient.teethChart[tooth];
@@ -763,7 +646,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Tooth #${tooth} status updated to ${newStatus || "Healthy"}`);
   };
 
-  // Prescription Form Draft management
   const handleAddDraftMedicine = (newItem) => {
     setRxDraft(prev => [...prev, newItem]);
     showNotification(`${newItem.medicine} added to draft.`);
@@ -773,7 +655,6 @@ export default function DoctorLayout({ children }) {
     setRxDraft(prev => prev.filter(m => m.id !== id));
   };
 
-  // Save/Print prescription
   const handleSavePrescription = () => {
     if (rxDraft.length === 0) return;
 
@@ -798,7 +679,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Prescription printed & saved for ${viewingPatient.name}.`);
   };
 
-  // Submit Clinical Diagnosis Note
   const handleSubmitDiagNote = (noteText) => {
     if (!viewingPatient) return;
 
@@ -819,7 +699,6 @@ export default function DoctorLayout({ children }) {
     showNotification("Clinical diagnosis note updated.");
   };
 
-  // Submit Specialty Log (auto-save aware)
   const handleSubmitSpecialtyLog = (noteText, sheetLabel, isAutoSave = false) => {
     if (!viewingPatientToken) return;
 
@@ -863,7 +742,6 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  // Add Chronic Safety Alert Warning
   const handleAddAlert = (alertText) => {
     if (!activePatient) return;
 
@@ -952,8 +830,8 @@ export default function DoctorLayout({ children }) {
 
           {/* Swipeable Notification Toast */}
           {activeToast && (
-            <NotificationToast 
-              toast={activeToast} 
+            <NotificationToast
+              toast={activeToast}
               animation={toastAnimation}
               onDismiss={() => {
                 if (window.toastTimeout) clearTimeout(window.toastTimeout);
@@ -978,8 +856,6 @@ export default function DoctorLayout({ children }) {
               }}
             />
           )}
-
-          {/* Simulator removed */}
 
           {/* Critical Emergency Interruption Modal Popup */}
           <EmergencyPopup

@@ -1,5 +1,5 @@
 # schemas.py - Pydantic request/response models
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime
 
@@ -59,6 +59,9 @@ class PatientResponse(PatientBase):
     class Config:
         from_attributes = True
 
+
+# --- Consent Schemas ---
+
 class ConsentRequest(BaseModel):
     patient_id: int
     doctor_id: Optional[int] = None
@@ -66,43 +69,28 @@ class ConsentRequest(BaseModel):
     title: str
     body_text: str
 
+
 class ConsentSignRequest(BaseModel):
     signature_data: str
-    signing_method: str # 'PORTAL' or 'IN_PERSON'
+    signing_method: str  # 'PORTAL' or 'IN_PERSON'
+
 
 class ConsentResponse(BaseModel):
     id: int
-    patient_id: int
-    doctor_id: Optional[int]
-    treatment_plan_id: Optional[int]
+    patient_id: Optional[int] = None
+    doctor_id: Optional[int] = None
+    treatment_plan_id: Optional[int] = None
+    step_id: Optional[int] = None
     title: str
-    body_text: str
+    body_text: Optional[str] = None
+    content: Optional[str] = None
     status: str
-    signing_method: Optional[str]
-    pdf_file_path: Optional[str]
-    signed_at: Optional[datetime]
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class ConsentSignRequest(BaseModel):
-    signature_data: str
-    method: str
-
-
-class PatientConsentResponse(BaseModel):
-    id: int
-    patient_token: str
-    treatment_plan_id: int
-    step_id: int
-    title: str
-    content: str
-    status: str
+    signing_method: Optional[str] = None
+    signature_data: Optional[str] = None
+    pdf_file_path: Optional[str] = None
+    pdf_path: Optional[str] = None
     signed_at: Optional[datetime] = None
     created_at: datetime
-    pdf_path: Optional[str] = None
 
     class Config:
         from_attributes = True
-

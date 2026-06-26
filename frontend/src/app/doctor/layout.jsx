@@ -113,6 +113,117 @@ export default function DoctorLayout({ children }) {
       setDbNotifications(mapped);
     } catch (err) {
       console.warn("Failed to fetch doctor notifications from backend:", err);
+  const [notifications, setNotifications] = useState([
+    {
+      id: "notif-1",
+      message: "Incoming orthodontic referral from Dr. Sarah Jenkins for Rahul Kumar",
+      type: "referral",
+      link: "/doctor/referrals",
+      status: "unread",
+      dotColor: "red",
+      timestamp: "10 mins ago",
+      receivedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      itemId: "REF-201",
+      patientId: "#004",
+      patientName: "Rahul Kumar"
+    }
+  };
+
+  useEffect(() => {
+    fetchLabOrders();
+    fetchDbNotifications();
+    const interval = setInterval(() => {
+      fetchLabOrders();
+      fetchDbNotifications();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const prevUnreadCountRef = useRef(0);
+  useEffect(() => {
+    const unreadDbNotifs = dbNotifications.filter(n => n.status === "unread");
+    if (unreadDbNotifs.length > prevUnreadCountRef.current) {
+      const latest = unreadDbNotifs[0];
+      if (latest) {
+        setActiveToast({
+          id: latest.id,
+          message: latest.message,
+          type: latest.type,
+          link: latest.link,
+          dotColor: latest.dotColor,
+          timestamp: "Just now"
+        });
+        setToastAnimation("slide-in");
+        
+        if (window.toastTimeout) clearTimeout(window.toastTimeout);
+        if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+
+        window.toastTimeout = setTimeout(() => {
+          setToastAnimation("slide-out");
+          window.toastExitTimeout = setTimeout(() => {
+            setActiveToast(null);
+            setToastAnimation("");
+            setBellAnimating(true);
+            setTimeout(() => {
+              setBellAnimating(false);
+            }, 2400);
+          }, 400);
+        }, 4500);
+      }
+    }
+    prevUnreadCountRef.current = unreadDbNotifs.length;
+  }, [dbNotifications]);
+
+  const [dbNotifications, setDbNotifications] = useState([]);
+  const allNotifications = [...dbNotifications, ...notifications];
+
+  const fetchLabOrders = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/lab/orders", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mapped = data.map(o => ({
+          id: o.id,
+          patientToken: o.patient_token,
+          item: o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`,
+          status: o.status,
+          labName: o.lab_name || "Apex Dental Lab",
+          eta: o.due_date || "3 Days"
+        }));
+        setLabOrders(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch lab orders from backend:", err);
+    }
+  };
+
+  const fetchDbNotifications = async () => {
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      if (!token) return;
+      const response = await fetch("http://localhost:8000/lab/notifications?recipient_role=doctor", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const mapped = data.map(n => ({
+          id: n.id,
+          message: n.desc,
+          type: "labs",
+          link: "/doctor/labs",
+          status: n.read ? "read" : "unread",
+          dotColor: n.title.toLowerCase().includes("rejected") ? "red" : "green",
+          timestamp: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          receivedAt: n.created_at,
+          itemId: n.title.split(" ").pop()
+        }));
+        setDbNotifications(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch doctor notifications from backend:", err);
     }
   };
 

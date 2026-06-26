@@ -26,6 +26,7 @@ if DATABASE_URL:
             connect_args={"sslmode": "require", "connect_timeout": 5},
             pool_pre_ping=True,
             pool_recycle=300
+            connect_args={"sslmode": "require", "connect_timeout": 5}
         )
         with temp_engine.connect() as conn:
             pass

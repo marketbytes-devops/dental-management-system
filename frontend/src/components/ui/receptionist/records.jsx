@@ -1,15 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function ReceptionistRecords() {
-  const [records, setRecords] = useState([
-    { id: "REC-209", name: "Sneha Joseph", age: 27, diagnosis: "Mobility in upper molar", lastVisit: "2026-06-09", files: ["XRay_UpperMolar.jpg", "PreOp_Notes.pdf"] },
-    { id: "REC-210", name: "Rahul Kumar", age: 32, diagnosis: "Caries occlusal #16", lastVisit: "2026-06-08", files: ["Panoramic_Scan.jpg"] },
-    { id: "REC-211", name: "Rohan Varma", age: 28, diagnosis: "Calculus accumulation", lastVisit: "2026-06-09", files: [] },
-  ]);
-
+  const [records, setRecords] = useState([]);
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchRecords = async () => {
+    try {
+      setIsLoading(true);
+      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
+      const response = await fetch("http://localhost:8000/frontdesk/records", {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (!response.ok) throw new Error("Failed to fetch EDR records.");
+      const data = await response.json();
+      setRecords(data);
+    } catch (err) {
+      console.error("Error fetching EDR records:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecords();
+  }, []);
 
   const filteredRecords = records.filter(r => 
     r.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -48,36 +65,50 @@ export default function ReceptionistRecords() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filteredRecords.map(r => (
-                <tr key={r.id} className="text-sm text-gray-700 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-3.5 px-2 font-mono text-xs text-gray-400 font-bold">{r.id}</td>
-                  <td className="py-3.5 px-2">
-                    <div className="font-semibold text-gray-900">{r.name}</div>
-                    <div className="text-[10px] text-gray-400">{r.age} years</div>
-                  </td>
-                  <td className="py-3.5 px-2 text-xs text-gray-650">{r.diagnosis}</td>
-                  <td className="py-3.5 px-2 font-mono text-xs text-gray-500">{r.lastVisit}</td>
-                  <td className="py-3.5 px-2">
-                    {r.files.length === 0 ? (
-                      <span className="text-xs text-gray-400">None</span>
-                    ) : (
-                      <div className="flex flex-col gap-0.5">
-                        {r.files.map((f, idx) => (
-                          <span key={idx} className="text-[10px] text-primary hover:underline cursor-pointer">📂 {f}</span>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-2 text-right">
-                    <button
-                      onClick={() => alert(`Opening complete medical dossier for ${r.name}...`)}
-                      className="px-2.5 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors font-bold cursor-pointer"
-                    >
-                      Open Dossier
-                    </button>
+              {isLoading ? (
+                <tr>
+                  <td colSpan="6" className="py-10 text-center text-xs text-gray-450 font-bold animate-pulse">
+                    Loading Patient Electronic Dental Records...
                   </td>
                 </tr>
-              ))}
+              ) : filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-10 text-center text-xs text-gray-450 font-bold italic">
+                    No EDR records found in registry.
+                  </td>
+                </tr>
+              ) : (
+                filteredRecords.map(r => (
+                  <tr key={r.id} className="text-sm text-gray-700 hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3.5 px-2 font-mono text-xs text-gray-400 font-bold">{r.id}</td>
+                    <td className="py-3.5 px-2">
+                      <div className="font-semibold text-gray-900">{r.name}</div>
+                      <div className="text-[10px] text-gray-400">{r.age} years</div>
+                    </td>
+                    <td className="py-3.5 px-2 text-xs text-gray-650">{r.diagnosis}</td>
+                    <td className="py-3.5 px-2 font-mono text-xs text-gray-500">{r.lastVisit}</td>
+                    <td className="py-3.5 px-2">
+                      {(r.files || []).length === 0 ? (
+                        <span className="text-xs text-gray-400">None</span>
+                      ) : (
+                        <div className="flex flex-col gap-0.5">
+                          {(r.files || []).map((f, idx) => (
+                            <span key={idx} className="text-[10px] text-primary hover:underline cursor-pointer">📂 {f}</span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-2 text-right">
+                      <button
+                        onClick={() => alert(`Opening complete EDR dossier for ${r.name}...`)}
+                        className="px-2.5 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors font-bold cursor-pointer"
+                      >
+                        Open Dossier
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

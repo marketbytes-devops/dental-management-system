@@ -8,6 +8,7 @@ import FrontDeskVerification from "@/components/ui/patients/check-in/frontDeskVe
 import PatientOtpEntry from "@/components/ui/patients/check-in/patientOtpEntry";
 import CheckInStepper from "@/components/ui/patients/check-in/checkInStepper";
 import CheckInConfirmation from "@/components/ui/patients/check-in/checkInConfirmation";
+import client from "@/services/api";
 
 export default function CheckInPage() {
   const [step, setStep] = useState(1); // Steps: 1=Select, 2=Symptoms, 3=Wait for OTP, 4=Enter OTP, 5=Confirmation
@@ -31,15 +32,8 @@ export default function CheckInPage() {
       }
       
       try {
-        const profileRes = await fetch("http://127.0.0.1:8000/patient/profile", {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
-        if (!profileRes.ok) {
-          throw new Error("Failed to load patient profile.");
-        }
-        const profileData = await profileRes.json();
+        const profileRes = await client.get("/patient/profile");
+        const profileData = profileRes.data;
         const pId = profileData.id;
         setPatientId(pId);
         
@@ -89,50 +83,48 @@ export default function CheckInPage() {
 
   const fetchAppointments = async (pId) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/patient/${pId}`);
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Filter for today's appointments in valid states
-        const todayStr = new Date().toISOString().split("T")[0];
-        
-        const formatted = data
-          .filter(appt => appt.appointment_date === todayStr)
-          .map(appt => ({
-            id: appt.id,
-            date: appt.appointment_date,
-            time: appt.appointment_time,
-            doctor: appt.doctor_name,
-            treatment: appt.treatment_type,
-            status: appt.status,
-            otp_status: appt.otp_status,
-            otp: appt.otp,
-            wait_time_estimate: appt.wait_time_estimate,
-            symptoms: appt.symptoms,
-            priority: appt.priority
-          }));
+      const response = await client.get(`/frontdesk/appointments/patient/${pId}`);
+      const data = response.data;
+      
+      // Filter for today's appointments in valid states
+      const todayStr = new Date().toISOString().split("T")[0];
+      
+      const formatted = data
+        .filter(appt => appt.appointment_date === todayStr)
+        .map(appt => ({
+          id: appt.id,
+          date: appt.appointment_date,
+          time: appt.appointment_time,
+          doctor: appt.doctor_name,
+          treatment: appt.treatment_type,
+          status: appt.status,
+          otp_status: appt.otp_status,
+          otp: appt.otp,
+          wait_time_estimate: appt.wait_time_estimate,
+          symptoms: appt.symptoms,
+          priority: appt.priority
+        }));
 
-        setAppointments(formatted);
+      setAppointments(formatted);
 
-        // Check if there is an active check-in flow already in progress
-        const activeAppt = formatted.find(appt => ["Pending OTP", "Waiting"].includes(appt.status));
-        if (activeAppt && !selectedAppt) {
-          setSelectedAppt(activeAppt);
-          setSymptomData({ isEmergency: activeAppt.priority === "Emergency" });
-          
-          if (activeAppt.status === "Pending OTP") {
-            if (activeAppt.otp_status === "Sent") {
-              setStep(4);
-            } else {
-              setStep(3);
-            }
-          } else if (activeAppt.status === "Waiting") {
-            await fetchQueueDetails(activeAppt.id);
-            setStep(5);
+      // Check if there is an active check-in flow already in progress
+      const activeAppt = formatted.find(appt => ["Pending OTP", "Waiting"].includes(appt.status));
+      if (activeAppt && !selectedAppt) {
+        setSelectedAppt(activeAppt);
+        setSymptomData({ isEmergency: activeAppt.priority === "Emergency" });
+        
+        if (activeAppt.status === "Pending OTP") {
+          if (activeAppt.otp_status === "Sent") {
+            setStep(4);
+          } else {
+            setStep(3);
           }
+        } else if (activeAppt.status === "Waiting") {
+          await fetchQueueDetails(activeAppt.id);
+          setStep(5);
         }
-        return formatted;
       }
+      return formatted;
     } catch (err) {
       console.error("Error fetching patient appointments:", err);
     }
@@ -141,17 +133,15 @@ export default function CheckInPage() {
 
   const fetchQueueDetails = async (apptId) => {
     try {
-      const queueRes = await fetch("http://127.0.0.1:8000/frontdesk/queue");
-      if (queueRes.ok) {
-        const queueData = await queueRes.json();
-        const index = queueData.findIndex(q => q.id === apptId);
-        if (index !== -1) {
-          setQueueNo(index + 1);
-          setWaitTime(queueData[index].wait_time_estimate);
-        } else {
-          setQueueNo(null);
-          setWaitTime(null);
-        }
+      const queueRes = await client.get("/frontdesk/queue");
+      const queueData = queueRes.data;
+      const index = queueData.findIndex(q => q.id === apptId);
+      if (index !== -1) {
+        setQueueNo(index + 1);
+        setWaitTime(queueData[index].wait_time_estimate);
+      } else {
+        setQueueNo(null);
+        setWaitTime(null);
       }
     } catch (err) {
       console.error("Error fetching queue details:", err);
@@ -175,21 +165,12 @@ export default function CheckInPage() {
     ].filter(Boolean).join(" | ");
 
     try {
-      const res = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${selectedAppt.id}/checkin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symptoms: symptomString,
-          is_emergency: data.isEmergency
-        })
+      const res = await client.post(`/frontdesk/appointments/${selectedAppt.id}/checkin`, {
+        symptoms: symptomString,
+        is_emergency: data.isEmergency
       });
       
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "Failed to initiate self check-in.");
-      }
-      
-      const updatedAppt = await res.json();
+      const updatedAppt = res.data;
       setSelectedAppt({
         id: updatedAppt.id,
         date: updatedAppt.appointment_date,
@@ -213,26 +194,22 @@ export default function CheckInPage() {
   const handleOtpSentSimulated = async () => {
     try {
       // Simulate receptionist clicking 'Send OTP' from patient's side
-      const res = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${selectedAppt.id}/send-otp`, {
-        method: "POST"
+      const res = await client.post(`/frontdesk/appointments/${selectedAppt.id}/send-otp`);
+      const updatedAppt = res.data;
+      setSelectedAppt({
+        id: updatedAppt.id,
+        date: updatedAppt.appointment_date,
+        time: updatedAppt.appointment_time,
+        doctor: updatedAppt.doctor_name,
+        treatment: updatedAppt.treatment_type,
+        status: updatedAppt.status,
+        otp_status: updatedAppt.otp_status,
+        otp: updatedAppt.otp,
+        wait_time_estimate: updatedAppt.wait_time_estimate,
+        symptoms: updatedAppt.symptoms,
+        priority: updatedAppt.priority
       });
-      if (res.ok) {
-        const updatedAppt = await res.json();
-        setSelectedAppt({
-          id: updatedAppt.id,
-          date: updatedAppt.appointment_date,
-          time: updatedAppt.appointment_time,
-          doctor: updatedAppt.doctor_name,
-          treatment: updatedAppt.treatment_type,
-          status: updatedAppt.status,
-          otp_status: updatedAppt.otp_status,
-          otp: updatedAppt.otp,
-          wait_time_estimate: updatedAppt.wait_time_estimate,
-          symptoms: updatedAppt.symptoms,
-          priority: updatedAppt.priority
-        });
-        setStep(4);
-      }
+      setStep(4);
     } catch (err) {
       console.error("Failed to simulate OTP send:", err);
       setStep(4);
@@ -241,20 +218,11 @@ export default function CheckInPage() {
 
   const handleOtpVerify = async (enteredOtp) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${selectedAppt.id}/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          otp: enteredOtp
-        })
+      const res = await client.post(`/frontdesk/appointments/${selectedAppt.id}/verify-otp`, {
+        otp: enteredOtp
       });
       
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "Invalid verification code.");
-      }
-      
-      const updatedAppt = await res.json();
+      const updatedAppt = res.data;
       setSelectedAppt({
         id: updatedAppt.id,
         date: updatedAppt.appointment_date,

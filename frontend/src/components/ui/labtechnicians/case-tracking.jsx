@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
+import { getLabOrders } from "@/services/api";
 
 export default function CaseTracking() {
   const [cases, setCases] = useState([]);
@@ -10,12 +11,7 @@ export default function CaseTracking() {
   useEffect(() => {
     const fetchCases = async () => {
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-        const response = await fetch("http://localhost:8000/lab/orders", {
-          headers: token ? { "Authorization": `Bearer ${token}` } : {}
-        });
-        if (response.ok) {
-          const data = await response.json();
+        const data = await getLabOrders();
           const mapped = data.map(o => {
             let activeStep = 0;
             if (o.status === "Pending") activeStep = 0;
@@ -59,7 +55,6 @@ export default function CaseTracking() {
               return mapped[0].id;
             });
           }
-        }
       } catch (err) {
         console.error("Failed to fetch cases for tracking:", err);
       }

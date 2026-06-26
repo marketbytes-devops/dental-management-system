@@ -156,6 +156,7 @@ export default function ReceptionistAppointments() {
 
   const [doctorLeaves, setDoctorLeaves] = useState([]);
 
+
   useEffect(() => {
     const fetchDoctorLeaves = async () => {
       if (!form.doctor_name) {
@@ -215,6 +216,7 @@ export default function ReceptionistAppointments() {
       setIsLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchData();

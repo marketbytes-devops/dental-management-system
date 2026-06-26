@@ -159,7 +159,7 @@ export default function DoctorLayout({ children }) {
           timestamp: "Just now"
         });
         setToastAnimation("slide-in");
-        
+
         if (window.toastTimeout) clearTimeout(window.toastTimeout);
         if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
 
@@ -234,7 +234,6 @@ export default function DoctorLayout({ children }) {
     setNotifications(prev => prev.map(n => ({ ...n, status: "read" })));
   };
 
-
   // Referrals database
   const [referrals, setReferrals] = useState([]);
 
@@ -260,7 +259,6 @@ export default function DoctorLayout({ children }) {
 
     setReferrals(prev => [newRef, ...prev]);
 
-    // Add event to patient timeline
     const timelineEvent = {
       date: "10-06-2026 (Today)",
       note: `Outbound ${referralType} Referral generated to ${docName}${externalFacility ? ` at ${externalFacility}` : ""} (${docSpec || "Specialist"}). Reason: ${reason}`,
@@ -292,10 +290,8 @@ export default function DoctorLayout({ children }) {
       return ref;
     }));
 
-    // Find the referral to fetch patient info
     const referral = referrals.find(r => r.id === refId);
     if (referral) {
-      // Append to patient timeline
       const timelineEvent = {
         date: "10-06-2026 (Today)",
         note: `Consultation complete by ${currentDoctorName}: ${consultationNotes}`,
@@ -383,7 +379,6 @@ export default function DoctorLayout({ children }) {
     return () => clearInterval(interval);
   }, [currentDoctorName]);
 
-  // Call Patient from table
   const handleCallPatient = async (token) => {
     const p = patients[token];
     if (!p) return;
@@ -411,7 +406,6 @@ export default function DoctorLayout({ children }) {
     router.push("/doctor/workspace");
   };
 
-  // Call Next Patient from Queue
   const handleCallNextPatient = async () => {
     if (queue.length === 0) {
       showNotification("No patients remaining in the waiting queue.");
@@ -441,7 +435,6 @@ export default function DoctorLayout({ children }) {
     router.push("/doctor/workspace");
   };
 
-  // View Previous Completed Patient from History
   const handleViewPreviousPatient = () => {
     if (completedPatientHistory.length === 0) {
       showNotification("No previous patient records available in this session.");
@@ -454,7 +447,6 @@ export default function DoctorLayout({ children }) {
     router.push("/doctor/workspace");
   };
 
-  // Skip Patient
   const handleSkipPatient = async (token) => {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
@@ -469,7 +461,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Token ${token} marked as skipped.`);
   };
 
-  // Requeue Patient
   const handleRequeuePatient = async (token) => {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
@@ -484,7 +475,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Token ${token} returned to waiting status.`);
   };
 
-  // Remove Patient
   const handleRemovePatient = async (token) => {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
@@ -499,7 +489,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Token ${token} removed from queue.`);
   };
 
-  // Simulate an Emergency Check-in with a 5-second delay
   const simulateEmergencyCheckin = () => {
     setHasTriggeredAutoEmergency(true);
     showNotification("🚨 Simulating emergency check-in... Popup warning will trigger in 5 seconds!");
@@ -538,7 +527,6 @@ export default function DoctorLayout({ children }) {
     }, 5000);
   };
 
-  // Mark Lab Order Delivered
   const handleMarkLabDelivered = async (id) => {
     try {
       await updateLabOrderStatus(id, { status: "Delivered" });
@@ -550,7 +538,6 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  // Submit Lab Order from form
   const handleSubmitLabOrder = async ({ item, tooth, shade, labName }) => {
     try {
       const createdOrder = await createLabOrder({
@@ -563,7 +550,6 @@ export default function DoctorLayout({ children }) {
         notes: `Tooth #${tooth}, Shade ${shade}`
       });
 
-      // Add to timeline locally
       const newTimelineEvent = {
         date: "10-06-2026 (Today)",
         note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
@@ -587,7 +573,6 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  // Interactive tooth chart select
   const handleToggleToothState = (tooth) => {
     if (!viewingPatient) return;
     const currentStatus = viewingPatient.teethChart[tooth];
@@ -611,7 +596,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Tooth #${tooth} status updated to ${newStatus || "Healthy"}`);
   };
 
-  // Prescription Form Draft management
   const handleAddDraftMedicine = (newItem) => {
     setRxDraft(prev => [...prev, newItem]);
     showNotification(`${newItem.medicine} added to draft.`);
@@ -621,7 +605,6 @@ export default function DoctorLayout({ children }) {
     setRxDraft(prev => prev.filter(m => m.id !== id));
   };
 
-  // Save/Print prescription
   const handleSavePrescription = () => {
     if (rxDraft.length === 0) return;
 
@@ -646,7 +629,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Prescription printed & saved for ${viewingPatient.name}.`);
   };
 
-  // Submit Clinical Diagnosis Note
   const handleSubmitDiagNote = (noteText) => {
     if (!viewingPatient) return;
 
@@ -667,7 +649,6 @@ export default function DoctorLayout({ children }) {
     showNotification("Clinical diagnosis note updated.");
   };
 
-  // Submit Specialty Log (auto-save aware)
   const handleSubmitSpecialtyLog = (noteText, sheetLabel, isAutoSave = false) => {
     if (!viewingPatientToken) return;
 
@@ -711,7 +692,6 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  // Add Chronic Safety Alert Warning
   const handleAddAlert = (alertText) => {
     if (!activePatient) return;
 
@@ -933,8 +913,8 @@ export default function DoctorLayout({ children }) {
 
           {/* Swipeable Notification Toast */}
           {activeToast && (
-            <NotificationToast 
-              toast={activeToast} 
+            <NotificationToast
+              toast={activeToast}
               animation={toastAnimation}
               onDismiss={() => {
                 if (window.toastTimeout) clearTimeout(window.toastTimeout);
@@ -959,8 +939,6 @@ export default function DoctorLayout({ children }) {
               }}
             />
           )}
-
-          {/* Simulator removed */}
 
           {/* Critical Emergency Interruption Modal Popup */}
           <EmergencyPopup

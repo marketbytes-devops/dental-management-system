@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Bell, Phone, Mail, RefreshCw, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import client from "@/services/api";
 
 const PRIORITY_STYLE = {
   Emergency: "bg-red-50 text-red-700 border border-red-200",
@@ -20,20 +21,11 @@ export default function ReceptionistReminders() {
   const [sendingId, setSendingId] = useState(null);
   const [search, setSearch] = useState("");
 
-  const token =
-    typeof window !== "undefined"
-      ? localStorage.getItem("staff_jwt_token")
-      : null;
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
   const fetchReminders = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("http://localhost:8000/frontdesk/reminders", {
-        headers,
-      });
-      if (!res.ok) throw new Error("Failed to fetch reminders.");
-      setReminders(await res.json());
+      const res = await client.get("/frontdesk/reminders");
+      setReminders(res.data);
     } catch (err) {
       console.error("Reminders fetch error:", err);
     } finally {
@@ -61,13 +53,7 @@ export default function ReceptionistReminders() {
         sent_by: "Receptionist",
       };
 
-      const res = await fetch("http://localhost:8000/frontdesk/communications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error("Failed to send reminder.");
+      await client.post("/frontdesk/communications", payload);
 
       // Optimistic update
       setReminders((prev) =>

@@ -1,20 +1,42 @@
 # router.py - all /patient/* endpoints
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+import os
+import datetime
 from typing import List
-from database import get_db
 
-from .schemas import PatientCreate, PatientResponse, PatientUpdate, PasswordChangeRequest
-from .models import PatientModel
-from .service import get_patient_by_phone, get_patient_by_email, create_patient, update_patient_profile, change_patient_password
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+
+from database import get_db
 from dependencies import get_current_user
 from modules.doctor.models import DoctorModel
+from shared.utils.pdf_generator import generate_consent_pdf
 
+from .models import PatientConsent, PatientModel
+from .schemas import (
+    ConsentRequest,
+    ConsentResponse,
+    ConsentSignRequest,
+    PasswordChangeRequest,
+    PatientCreate,
+    PatientResponse,
+    PatientUpdate,
+)
+from .service import (
+    change_patient_password,
+    create_patient,
+    get_patient_by_email,
+    get_patient_by_phone,
+    update_patient_profile,
+)
 
 router = APIRouter(prefix="/patient", tags=["patient"])
 
 
-# --- Public endpoint: list available doctors for booking (no auth required) ---
+# ---------------------------------------------------------------------------
+# Public: doctor listing (no auth)
+# ---------------------------------------------------------------------------
+
 @router.get("/doctors-list")
 def get_available_doctors(db: Session = Depends(get_db)):
     """Public endpoint for the patient portal to list doctors for appointment booking."""
@@ -30,46 +52,87 @@ def get_available_doctors(db: Session = Depends(get_db)):
     ]
 
 
+# ---------------------------------------------------------------------------
+# Registration
+# ---------------------------------------------------------------------------
+
 @router.post("/register", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
 def register_patient(patient_in: PatientCreate, db: Session = Depends(get_db)):
-    # Check if phone number is already registered
-    existing_phone = get_patient_by_phone(db, phone=patient_in.phone)
-    if existing_phone:
+    if get_patient_by_phone(db, phone=patient_in.phone):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A patient with this phone number is already registered."
+            detail="A patient with this phone number is already registered.",
         )
-        
-    # Check if email is already registered
-    existing_email = get_patient_by_email(db, email=patient_in.email)
-    if existing_email:
+    if get_patient_by_email(db, email=patient_in.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A patient with this email address is already registered."
+            detail="A patient with this email address is already registered.",
         )
-        
     return create_patient(db, patient_in=patient_in)
 
+
+# ---------------------------------------------------------------------------
+# Profile
+# ---------------------------------------------------------------------------
 
 @router.get("/profile", response_model=PatientResponse)
 def get_profile(
     current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     patient_id = current_user.get("patient_id")
     if not patient_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
-        )
-    
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
     patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
     if not patient:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Patient not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     return patient
+
+
+@router.put("/profile", response_model=PatientResponse)
+def update_profile(
+    update_in: PatientUpdate,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    updated = update_patient_profile(db, patient_id=patient_id, update_in=update_in)
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+    return updated
+
+
+@router.post("/change-password")
+def change_password(
+    req: PasswordChangeRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    success = change_patient_password(
+        db,
+        patient_id=patient_id,
+        current_password=req.current_password,
+        new_password=req.new_password,
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect.",
+        )
+    return {"message": "Password updated successfully."}
+
+
+# ---------------------------------------------------------------------------
+# Staff-only helpers
+# ---------------------------------------------------------------------------
 
 @router.get("/all", response_model=List[PatientResponse])
 def get_all_patients(db: Session = Depends(get_db)):
@@ -84,177 +147,111 @@ def get_patient_by_token_endpoint(token: str, db: Session = Depends(get_db)):
     return patient
 
 
-
-@router.put("/profile", response_model=PatientResponse)
-def update_profile(
-    update_in: PatientUpdate,
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    patient_id = current_user.get("patient_id")
-    if not patient_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-    updated = update_patient_profile(db, patient_id=patient_id, update_in=update_in)
-    if not updated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-    return updated
-
-
-@router.post("/change-password")
-def change_password(
-    req: PasswordChangeRequest,
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    patient_id = current_user.get("patient_id")
-    if not patient_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-    success = change_patient_password(db, patient_id=patient_id, current_password=req.current_password, new_password=req.new_password)
-    if not success:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect.")
-    return {"message": "Password updated successfully."}
-
-
-# --- Consent Endpoints ---
-from .schemas import ConsentRequest, ConsentSignRequest, ConsentResponse
-from .models import PatientConsent
-from shared.utils.pdf_generator import generate_consent_pdf
-import datetime
-import os
-from fastapi.responses import FileResponse
+# ---------------------------------------------------------------------------
+# Consents
+# ---------------------------------------------------------------------------
 
 @router.post("/consents/request", response_model=ConsentResponse)
-def request_consent(
-    req: ConsentRequest,
-    db: Session = Depends(get_db)
-):
-    # Verify patient exists
+def request_consent(req: ConsentRequest, db: Session = Depends(get_db)):
+    """Staff/doctor creates a consent request for a patient."""
     patient = db.query(PatientModel).filter(PatientModel.id == req.patient_id).first()
     if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
-        
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
     new_consent = PatientConsent(
         patient_id=req.patient_id,
         doctor_id=req.doctor_id,
         treatment_plan_id=req.treatment_plan_id,
         title=req.title,
         body_text=req.body_text,
-        status="PENDING"
+        status="PENDING",
     )
     db.add(new_consent)
     db.commit()
     db.refresh(new_consent)
     return new_consent
 
-@router.get("/consents/pending", response_model=List[ConsentResponse])
-import os
-from fastapi.responses import FileResponse
-from sqlalchemy.sql import func
-from shared.utils.pdf import generate_consent_pdf
-from .schemas import ConsentSignRequest, PatientConsentResponse
-from .models import PatientConsentModel
-from modules.treatment_plan.models import TreatmentPlanStepModel
 
-@router.get("/consents/pending", response_model=List[PatientConsentResponse])
+@router.get("/consents/pending", response_model=List[ConsentResponse])
 def get_pending_consents(
     current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
+    """Returns all PENDING consents for the logged-in patient."""
     patient_id = current_user.get("patient_id")
     if not patient_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-    
-    consents = db.query(PatientConsent).filter(
-        PatientConsent.patient_id == patient_id,
-        PatientConsent.status == "PENDING"
-    ).order_by(PatientConsent.created_at.desc()).all()
-    return consents
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    return (
+        db.query(PatientConsent)
+        .filter(PatientConsent.patient_id == patient_id, PatientConsent.status == "PENDING")
+        .order_by(PatientConsent.created_at.desc())
+        .all()
+    )
+
 
 @router.get("/consents/documents", response_model=List[ConsentResponse])
 def get_signed_consents(
-        raise HTTPException(status_code=401, detail="Invalid token payload")
-    
-    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
-        
-    return db.query(PatientConsentModel).filter(
-        PatientConsentModel.patient_token == patient.token,
-        PatientConsentModel.status == "PENDING"
-    ).all()
-
-
-@router.get("/consents/documents", response_model=List[PatientConsentResponse])
-def get_signed_documents(
     current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
+    """Returns all SIGNED consent documents for the logged-in patient."""
     patient_id = current_user.get("patient_id")
     if not patient_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-    
-    consents = db.query(PatientConsent).filter(
-        PatientConsent.patient_id == patient_id,
-        PatientConsent.status == "SIGNED"
-    ).order_by(PatientConsent.signed_at.desc()).all()
-    return consents
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    return (
+        db.query(PatientConsent)
+        .filter(PatientConsent.patient_id == patient_id, PatientConsent.status == "SIGNED")
+        .order_by(PatientConsent.signed_at.desc())
+        .all()
+    )
+
 
 @router.post("/consents/{consent_id}/sign", response_model=ConsentResponse)
 def sign_consent(
-        raise HTTPException(status_code=401, detail="Invalid token payload")
-        
-    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
-        
-    return db.query(PatientConsentModel).filter(
-        PatientConsentModel.patient_token == patient.token,
-        PatientConsentModel.status == "SIGNED"
-    ).all()
-
-
-@router.post("/consents/{consent_id}/sign")
-def sign_consent_form(
     consent_id: int,
     req: ConsentSignRequest,
     current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
+    """
+    Patient signs a consent form, or a Doctor/Admin signs on behalf of a patient (IN_PERSON).
+    """
     patient_id = current_user.get("patient_id")
+    roles = current_user.get("roles", [])
+
     if not patient_id:
-        # Check if requested by admin or doctor (for IN_PERSON)
-        roles = current_user.get("roles", [])
+        # Must be a staff member acting on behalf of the patient
         if "Admin" not in roles and "Doctor" not in roles:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-        
-        # If doctor/admin, we must fetch the consent to verify
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
+
+        # Derive patient_id from the consent record itself
         consent = db.query(PatientConsent).filter(PatientConsent.id == consent_id).first()
         if not consent:
-            raise HTTPException(status_code=404, detail="Consent not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
         patient_id = consent.patient_id
 
-    # Fetch patient name for PDF
     patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
     if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
 
-    consent = db.query(PatientConsent).filter(
-        PatientConsent.id == consent_id,
-        PatientConsent.patient_id == patient_id
-    ).first()
-    
+    consent = (
+        db.query(PatientConsent)
+        .filter(PatientConsent.id == consent_id, PatientConsent.patient_id == patient_id)
+        .first()
+    )
     if not consent:
-        raise HTTPException(status_code=404, detail="Consent not found")
-        
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
     if consent.status == "SIGNED":
-        raise HTTPException(status_code=400, detail="Consent already signed")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Consent already signed")
 
     # Generate PDF
     pdf_path = generate_consent_pdf(
         title=consent.title,
-        body_text=consent.body_text,
+        body_text=consent.body_text or consent.content or "",
         signature_data=req.signature_data,
-        patient_name=patient.name
+        patient_name=patient.name,
     )
 
     consent.status = "SIGNED"
@@ -262,97 +259,40 @@ def sign_consent_form(
     consent.signing_method = req.signing_method
     consent.signed_at = datetime.datetime.now(datetime.timezone.utc)
     consent.pdf_file_path = pdf_path
-    
+
     db.commit()
     db.refresh(consent)
     return consent
-        raise HTTPException(status_code=401, detail="Invalid token payload")
-        
-    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
-        
-    consent = db.query(PatientConsentModel).filter(
-        PatientConsentModel.id == consent_id,
-        PatientConsentModel.patient_token == patient.token
-    ).first()
-    if not consent:
-        raise HTTPException(status_code=404, detail="Consent request not found")
-        
-    # Update consent status
-    consent.status = "SIGNED"
-    consent.signature_data = req.signature_data
-    consent.signed_at = func.now()
-    
-    # Generate PDF path
-    static_dir = os.path.join(os.getcwd(), "static", "consents")
-    os.makedirs(static_dir, exist_ok=True)
-    pdf_filename = f"consent_{consent.id}.pdf"
-    pdf_path = os.path.join(static_dir, pdf_filename)
-    
-    # Generate PDF
-    generate_consent_pdf(
-        patient_name=patient.name,
-        patient_token=patient.token,
-        title=consent.title,
-        content=consent.content,
-        signature_data=req.signature_data,
-        signature_method=req.method,
-        output_path=pdf_path
-    )
-    
-    consent.pdf_path = f"/patient/consents/{consent.id}/pdf"
-    
-    # Sync status to the treatment plan step
-    step = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.id == consent.step_id).first()
-    if step:
-        step.consent_status = "Given"
-        step.consent_given_at = func.now()
-        
-    db.commit()
-    return {"message": "Consent form signed successfully.", "pdf_url": consent.pdf_path}
 
 
 @router.get("/consents/{consent_id}/pdf")
 def get_consent_pdf(
     consent_id: int,
     current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    # Verify access
+    """Serve the signed PDF. Accessible by the owning patient or by Admin/Doctor."""
     patient_id = current_user.get("patient_id")
     roles = current_user.get("roles", [])
-    
+
     consent = db.query(PatientConsent).filter(PatientConsent.id == consent_id).first()
     if not consent:
-        raise HTTPException(status_code=404, detail="Consent not found")
-        
-    if patient_id and consent.patient_id != patient_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-    elif not patient_id and ("Admin" not in roles and "Doctor" not in roles):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
 
-    if not consent.pdf_file_path or not os.path.exists(consent.pdf_file_path):
-        raise HTTPException(status_code=404, detail="PDF file not found")
-        
+    # Authorisation check
+    if patient_id:
+        if consent.patient_id != patient_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    else:
+        if "Admin" not in roles and "Doctor" not in roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    pdf_file = consent.pdf_file_path
+    if not pdf_file or not os.path.exists(pdf_file):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDF file not found")
+
     return FileResponse(
-        path=consent.pdf_file_path,
-        filename=os.path.basename(consent.pdf_file_path),
-        media_type="application/pdf"
+        path=pdf_file,
+        filename=os.path.basename(pdf_file),
+        media_type="application/pdf",
     )
-    db: Session = Depends(get_db)
-):
-    consent = db.query(PatientConsentModel).filter(PatientConsentModel.id == consent_id).first()
-    if not consent or not consent.pdf_path:
-        raise HTTPException(status_code=404, detail="PDF not found")
-        
-    # Reconstruct local path
-    static_dir = os.path.join(os.getcwd(), "static", "consents")
-    pdf_filename = f"consent_{consent.id}.pdf"
-    pdf_path = os.path.join(static_dir, pdf_filename)
-    
-    if not os.path.exists(pdf_path):
-        raise HTTPException(status_code=404, detail="PDF file not found on disk")
-        
-    return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_filename)
-

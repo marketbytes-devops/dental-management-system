@@ -1,6 +1,7 @@
 import { useState } from "react";
 import SignatureCanvas from "./signatureCanvas";
 import { PenTool, Keyboard, Loader2 } from "lucide-react";
+import { signConsentDocument } from "@/services/api";
 
 export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
   const [typedName, setTypedName] = useState("");
@@ -9,31 +10,17 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
 
   const handleSignSubmit = async (signatureData) => {
     setSubmitting(true);
-    const token = localStorage.getItem("patient_jwt_token");
     const sigPayload = {
       signature_data: signatureMode === "type" ? typedName : signatureData,
-      method: signatureMode
+      signing_method: "PORTAL"
     };
 
     try {
-      const response = await fetch(`http://localhost:8000/patient/consents/${doc.id}/sign`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(sigPayload)
-      });
-
-      if (response.ok) {
-        onSignComplete(doc.id);
-      } else {
-        const err = await response.json();
-        alert(err.detail || "Failed to submit signature.");
-      }
+      await signConsentDocument(doc.id, sigPayload);
+      onSignComplete(doc.id);
     } catch (err) {
       console.error("Signature submission error:", err);
-      alert("Connection error during signature submission.");
+      alert(err.message || "Failed to submit signature.");
     } finally {
       setSubmitting(false);
     }
@@ -100,26 +87,19 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
               <button
                 type="button"
                 onClick={() => setSignatureMode("draw")}
-                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                  signatureMode === "draw"
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                }`}
+                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${signatureMode === "draw" ? "border-primary bg-primary/5 text-primary" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
               >
                 <PenTool className="w-4 h-4" /> Draw Signature
               </button>
               <button
                 type="button"
                 onClick={() => setSignatureMode("type")}
-                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                  signatureMode === "type"
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                }`}
+                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${signatureMode === "type" ? "border-primary bg-primary/5 text-primary" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
               >
                 <Keyboard className="w-4 h-4" /> Type Name
               </button>
             </div>
+          </div>
 
             {submitting ? (
               <div className="py-6 flex items-center justify-center gap-2 text-xs text-gray-500">

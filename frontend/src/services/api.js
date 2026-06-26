@@ -18,8 +18,9 @@ client.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {
       let token = null;
-      // Determine which token to use based on the path
-      if (config.url && config.url.includes("/patient")) {
+      // Determine which token to use based on the browser page route rather than backend URL
+      const isPatientPage = window.location.pathname.startsWith("/patient");
+      if (isPatientPage) {
         token = localStorage.getItem("patient_jwt_token");
       } else {
         // Default to staff token, fall back to patient token if staff token doesn't exist
@@ -42,7 +43,10 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.detail || error.message || "An error occurred";
-    return Promise.reject(new Error(message));
+    const errObj = new Error(message);
+    errObj.status = error.response?.status;
+    errObj.response = error.response;
+    return Promise.reject(errObj);
   }
 );
 
@@ -69,6 +73,11 @@ export const updateProfile = async (profileData) => {
 
 export const getAuthStatus = async () => {
   const response = await client.get("/auth/status");
+  return response.data;
+};
+
+export const updateAuthStatus = async (statusData) => {
+  const response = await client.put("/auth/status", statusData);
   return response.data;
 };
 
@@ -128,7 +137,7 @@ export const getPatientProfile = async () => {
 };
 
 export const changePatientPassword = async (passwordData) => {
-  const response = await client.put("/patient/change-password", passwordData);
+  const response = await client.post("/patient/change-password", passwordData);
   return response.data;
 };
 

@@ -100,26 +100,19 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
               <button
                 type="button"
                 onClick={() => setSignatureMode("draw")}
-                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                  signatureMode === "draw"
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                }`}
+                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${signatureMode === "draw" ? "border-primary bg-primary/5 text-primary" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
               >
                 <PenTool className="w-4 h-4" /> Draw Signature
               </button>
               <button
                 type="button"
                 onClick={() => setSignatureMode("type")}
-                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                  signatureMode === "type"
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                }`}
+                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${signatureMode === "type" ? "border-primary bg-primary/5 text-primary" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
               >
                 <Keyboard className="w-4 h-4" /> Type Name
               </button>
             </div>
+          </div>
 
             {submitting ? (
               <div className="py-6 flex items-center justify-center gap-2 text-xs text-gray-500">

@@ -8,6 +8,20 @@ import AuthGuard from "@/components/AuthGuard";
 import EmergencyPopup from "@/components/ui/doctor/workspace/EmergencyPopup";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
 import { Share2, Microscope, AlertTriangle, Bell, X } from "lucide-react";
+import { 
+  getLabOrders, 
+  getLabNotifications, 
+  markNotificationAsRead, 
+  markAllNotificationsAsRead, 
+  updateLabOrderStatus, 
+  createLabOrder,
+  getQueue, 
+  callPatient, 
+  updateAppointmentStatus, 
+  getPatientAppointments,
+  getPatientByToken,
+  getPatientTreatmentPlan
+} from "@/services/api";
 
 // Create context
 const DoctorContext = createContext(null);
@@ -60,58 +74,6 @@ export default function DoctorLayout({ children }) {
   const [notification, setNotification] = useState("");
 
   // Notifications State & Logic (Referrals, etc.)
-  const [notifications, setNotifications] = useState([]);
-
-  const [dbNotifications, setDbNotifications] = useState([]);
-  const allNotifications = [...dbNotifications, ...notifications];
-
-  const fetchLabOrders = async () => {
-    try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mapped = data.map(o => ({
-          id: o.id,
-          patientToken: o.patient_token,
-          item: o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`,
-          status: o.status,
-          labName: o.lab_name || "Apex Dental Lab",
-          eta: o.due_date || "3 Days"
-        }));
-        setLabOrders(mapped);
-      }
-    } catch (err) {
-      console.warn("Failed to fetch lab orders from backend:", err);
-    }
-  };
-
-  const fetchDbNotifications = async () => {
-    try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      if (!token) return;
-      const response = await fetch("http://localhost:8000/lab/notifications?recipient_role=doctor", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mapped = data.map(n => ({
-          id: n.id,
-          message: n.desc,
-          type: "labs",
-          link: "/doctor/labs",
-          status: n.read ? "read" : "unread",
-          dotColor: n.title.toLowerCase().includes("rejected") ? "red" : "green",
-          timestamp: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          receivedAt: n.created_at,
-          itemId: n.title.split(" ").pop()
-        }));
-        setDbNotifications(mapped);
-      }
-    } catch (err) {
-      console.warn("Failed to fetch doctor notifications from backend:", err);
   const [notifications, setNotifications] = useState([
     {
       id: "notif-1",
@@ -126,103 +88,45 @@ export default function DoctorLayout({ children }) {
       patientId: "#004",
       patientName: "Rahul Kumar"
     }
-  };
-
-  useEffect(() => {
-    fetchLabOrders();
-    fetchDbNotifications();
-    const interval = setInterval(() => {
-      fetchLabOrders();
-      fetchDbNotifications();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const prevUnreadCountRef = useRef(0);
-  useEffect(() => {
-    const unreadDbNotifs = dbNotifications.filter(n => n.status === "unread");
-    if (unreadDbNotifs.length > prevUnreadCountRef.current) {
-      const latest = unreadDbNotifs[0];
-      if (latest) {
-        setActiveToast({
-          id: latest.id,
-          message: latest.message,
-          type: latest.type,
-          link: latest.link,
-          dotColor: latest.dotColor,
-          timestamp: "Just now"
-        });
-        setToastAnimation("slide-in");
-        
-        if (window.toastTimeout) clearTimeout(window.toastTimeout);
-        if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
-
-        window.toastTimeout = setTimeout(() => {
-          setToastAnimation("slide-out");
-          window.toastExitTimeout = setTimeout(() => {
-            setActiveToast(null);
-            setToastAnimation("");
-            setBellAnimating(true);
-            setTimeout(() => {
-              setBellAnimating(false);
-            }, 2400);
-          }, 400);
-        }, 4500);
-      }
-    }
-    prevUnreadCountRef.current = unreadDbNotifs.length;
-  }, [dbNotifications]);
+  ]);
 
   const [dbNotifications, setDbNotifications] = useState([]);
   const allNotifications = [...dbNotifications, ...notifications];
 
   const fetchLabOrders = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mapped = data.map(o => ({
-          id: o.id,
-          patientToken: o.patient_token,
-          item: o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`,
-          status: o.status,
-          labName: o.lab_name || "Apex Dental Lab",
-          eta: o.due_date || "3 Days"
-        }));
-        setLabOrders(mapped);
-      }
+      const data = await getLabOrders();
+      const mapped = data.map(o => ({
+        id: o.id,
+        patientToken: o.patient_token,
+        item: o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`,
+        status: o.status,
+        labName: o.lab_name || "Apex Dental Lab",
+        eta: o.due_date || "3 Days"
+      }));
+      setLabOrders(mapped);
     } catch (err) {
-      console.error("Failed to fetch lab orders from backend:", err);
+      console.warn("Failed to fetch lab orders from backend:", err);
     }
   };
 
   const fetchDbNotifications = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      if (!token) return;
-      const response = await fetch("http://localhost:8000/lab/notifications?recipient_role=doctor", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mapped = data.map(n => ({
-          id: n.id,
-          message: n.desc,
-          type: "labs",
-          link: "/doctor/labs",
-          status: n.read ? "read" : "unread",
-          dotColor: n.title.toLowerCase().includes("rejected") ? "red" : "green",
-          timestamp: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          receivedAt: n.created_at,
-          itemId: n.title.split(" ").pop()
-        }));
-        setDbNotifications(mapped);
-      }
+      const data = await getLabNotifications('doctor');
+      const mapped = data.map(n => ({
+        id: n.id,
+        message: n.desc,
+        type: "labs",
+        link: "/doctor/labs",
+        status: n.read ? "read" : "unread",
+        dotColor: n.title.toLowerCase().includes("rejected") ? "red" : "green",
+        timestamp: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        receivedAt: n.created_at,
+        itemId: n.title.split(" ").pop()
+      }));
+      setDbNotifications(mapped);
     } catch (err) {
-      console.error("Failed to fetch doctor notifications from backend:", err);
+      console.warn("Failed to fetch doctor notifications from backend:", err);
     }
   };
 
@@ -235,6 +139,10 @@ export default function DoctorLayout({ children }) {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const [activeToast, setActiveToast] = useState(null);
+  const [toastAnimation, setToastAnimation] = useState(""); // "slide-in" | "slide-out"
+  const [bellAnimating, setBellAnimating] = useState(false);
 
   const prevUnreadCountRef = useRef(0);
   useEffect(() => {
@@ -251,7 +159,7 @@ export default function DoctorLayout({ children }) {
           timestamp: "Just now"
         });
         setToastAnimation("slide-in");
-        
+
         if (window.toastTimeout) clearTimeout(window.toastTimeout);
         if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
 
@@ -270,10 +178,6 @@ export default function DoctorLayout({ children }) {
     }
     prevUnreadCountRef.current = unreadDbNotifs.length;
   }, [dbNotifications]);
-
-  const [activeToast, setActiveToast] = useState(null);
-  const [toastAnimation, setToastAnimation] = useState(""); // "slide-in" | "slide-out"
-  const [bellAnimating, setBellAnimating] = useState(false);
 
   const triggerNotification = (newNotif) => {
     const notifWithId = {
@@ -306,11 +210,7 @@ export default function DoctorLayout({ children }) {
   const markAsRead = async (id) => {
     if (typeof id === "number" || !isNaN(id)) {
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-        await fetch(`http://localhost:8000/lab/notifications/${id}/read`, {
-          method: "PUT",
-          headers: token ? { "Authorization": `Bearer ${token}` } : {}
-        });
+        await markNotificationAsRead(id);
         fetchDbNotifications();
       } catch (err) {
         console.error("Failed to mark notification read in backend:", err);
@@ -326,18 +226,13 @@ export default function DoctorLayout({ children }) {
 
   const markAllAsRead = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      await fetch(`http://localhost:8000/lab/notifications/read-all`, {
-        method: "PUT",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+      await markAllNotificationsAsRead();
       fetchDbNotifications();
     } catch (err) {
       console.error("Failed to mark all notifications as read in backend:", err);
     }
     setNotifications(prev => prev.map(n => ({ ...n, status: "read" })));
   };
-
 
   // Referrals database
   const [referrals, setReferrals] = useState([]);
@@ -364,7 +259,6 @@ export default function DoctorLayout({ children }) {
 
     setReferrals(prev => [newRef, ...prev]);
 
-    // Add event to patient timeline
     const timelineEvent = {
       date: "10-06-2026 (Today)",
       note: `Outbound ${referralType} Referral generated to ${docName}${externalFacility ? ` at ${externalFacility}` : ""} (${docSpec || "Specialist"}). Reason: ${reason}`,
@@ -396,10 +290,8 @@ export default function DoctorLayout({ children }) {
       return ref;
     }));
 
-    // Find the referral to fetch patient info
     const referral = referrals.find(r => r.id === refId);
     if (referral) {
-      // Append to patient timeline
       const timelineEvent = {
         date: "10-06-2026 (Today)",
         note: `Consultation complete by ${currentDoctorName}: ${consultationNotes}`,
@@ -432,21 +324,60 @@ export default function DoctorLayout({ children }) {
 
   const fetchQueue = async () => {
     try {
+      const data = await getQueue();
+      
+      // Filter by current doctor's name
+      const doctorNameLower = currentDoctorName ? currentDoctorName.toLowerCase() : "";
+      const doctorNameWithoutTitleLower = currentDoctorName ? currentDoctorName.replace("Dr. ", "").toLowerCase() : "";
+      
+      const myQueue = data.filter(q => {
+        if (!currentDoctorName) return true;
+        const qDocLower = q.doctor_name.toLowerCase();
+        return qDocLower.includes(doctorNameLower) || qDocLower.includes(doctorNameWithoutTitleLower);
+      });
+
+      // Map backend QueueItemResponse to expected frontend state structure
+      const mappedQueue = myQueue.map(q => ({
+        token: q.token,
+        time: q.appointment_time,
+        status: q.status,
+        priority: q.priority,
+        id: q.id
+      }));
+      
+      setQueue(mappedQueue);
+
+      // Update the patients dictionary dynamically so that clinical sheet and info can be viewed
+      setPatients(prev => {
+        const updated = { ...prev };
+        myQueue.forEach(q => {
+          updated[q.token] = {
+            token: q.token,
+            name: q.patient_name,
+            age: q.age,
+            gender: q.gender,
+            phone: q.patient_phone,
+            procedure: q.procedure || "Consultation",
+            chiefComplaint: q.chief_complaint || "Routine Checkup",
+            medicalAlerts: q.medical_alerts || [],
+            teethChart: prev[q.token]?.teethChart || {},
+            timeline: prev[q.token]?.timeline || [
+              { date: new Date(q.checked_in_at).toLocaleDateString(), note: "Checked in", type: "Check-In" }
+            ]
+          };
       const response = await fetch("http://127.0.0.1:8000/frontdesk/queue");
       if (response.ok) {
         const data = await response.json();
-        
-        // Filter by current doctor's name
+
         const doctorNameLower = currentDoctorName ? currentDoctorName.toLowerCase() : "";
         const doctorNameWithoutTitleLower = currentDoctorName ? currentDoctorName.replace("Dr. ", "").toLowerCase() : "";
-        
+
         const myQueue = data.filter(q => {
           if (!currentDoctorName) return true;
           const qDocLower = q.doctor_name.toLowerCase();
           return qDocLower.includes(doctorNameLower) || qDocLower.includes(doctorNameWithoutTitleLower);
         });
 
-        // Map backend QueueItemResponse to expected frontend state structure
         const mappedQueue = myQueue.map(q => ({
           token: q.token,
           time: q.appointment_time,
@@ -454,10 +385,9 @@ export default function DoctorLayout({ children }) {
           priority: q.priority,
           id: q.id
         }));
-        
+
         setQueue(mappedQueue);
 
-        // Update the patients dictionary dynamically so that clinical sheet and info can be viewed
         setPatients(prev => {
           const updated = { ...prev };
           myQueue.forEach(q => {
@@ -478,7 +408,8 @@ export default function DoctorLayout({ children }) {
           });
           return updated;
         });
-      }
+        return updated;
+      });
     } catch (err) {
       console.warn("Failed to fetch live queue for doctor:", err);
     }
@@ -490,7 +421,6 @@ export default function DoctorLayout({ children }) {
     return () => clearInterval(interval);
   }, [currentDoctorName]);
 
-  // Call Patient from table
   const handleCallPatient = async (token) => {
     const p = patients[token];
     if (!p) return;
@@ -498,9 +428,7 @@ export default function DoctorLayout({ children }) {
     const queueItem = queue.find(item => item.token === token);
     if (queueItem && queueItem.id) {
       try {
-        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${queueItem.id}/call?status_str=In Chair`, {
-          method: "POST"
-        });
+        await callPatient(queueItem.id, "In Chair");
         await fetchQueue();
       } catch (err) {
         console.error("Failed to call patient in backend:", err);
@@ -520,7 +448,6 @@ export default function DoctorLayout({ children }) {
     router.push("/doctor/workspace");
   };
 
-  // Call Next Patient from Queue
   const handleCallNextPatient = async () => {
     if (queue.length === 0) {
       showNotification("No patients remaining in the waiting queue.");
@@ -534,9 +461,7 @@ export default function DoctorLayout({ children }) {
     const nextItem = queue[0];
     if (nextItem && nextItem.id) {
       try {
-        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${nextItem.id}/call?status_str=In Chair`, {
-          method: "POST"
-        });
+        await callPatient(nextItem.id, "In Chair");
         await fetchQueue();
       } catch (err) {
         console.error("Failed to call next patient in backend:", err);
@@ -552,7 +477,6 @@ export default function DoctorLayout({ children }) {
     router.push("/doctor/workspace");
   };
 
-  // View Previous Completed Patient from History
   const handleViewPreviousPatient = () => {
     if (completedPatientHistory.length === 0) {
       showNotification("No previous patient records available in this session.");
@@ -565,16 +489,11 @@ export default function DoctorLayout({ children }) {
     router.push("/doctor/workspace");
   };
 
-  // Skip Patient
   const handleSkipPatient = async (token) => {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
       try {
-        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${queueItem.id}/status`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "Skipped" })
-        });
+        await updateAppointmentStatus(queueItem.id, { status: "Skipped" });
         await fetchQueue();
       } catch (err) {
         console.error("Failed to skip patient:", err);
@@ -584,16 +503,11 @@ export default function DoctorLayout({ children }) {
     showNotification(`Token ${token} marked as skipped.`);
   };
 
-  // Requeue Patient
   const handleRequeuePatient = async (token) => {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
       try {
-        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${queueItem.id}/status`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "Waiting" })
-        });
+        await updateAppointmentStatus(queueItem.id, { status: "Waiting" });
         await fetchQueue();
       } catch (err) {
         console.error("Failed to requeue patient:", err);
@@ -603,16 +517,11 @@ export default function DoctorLayout({ children }) {
     showNotification(`Token ${token} returned to waiting status.`);
   };
 
-  // Remove Patient
   const handleRemovePatient = async (token) => {
     const queueItem = queue.find(q => q.token === token);
     if (queueItem && queueItem.id) {
       try {
-        await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${queueItem.id}/status`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "Completed" })
-        });
+        await updateAppointmentStatus(queueItem.id, { status: "Completed" });
         await fetchQueue();
       } catch (err) {
         console.error("Failed to remove patient:", err);
@@ -622,7 +531,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Token ${token} removed from queue.`);
   };
 
-  // Simulate an Emergency Check-in with a 5-second delay
   const simulateEmergencyCheckin = () => {
     setHasTriggeredAutoEmergency(true);
     showNotification("🚨 Simulating emergency check-in... Popup warning will trigger in 5 seconds!");
@@ -661,9 +569,9 @@ export default function DoctorLayout({ children }) {
     }, 5000);
   };
 
-  // Mark Lab Order Delivered
   const handleMarkLabDelivered = async (id) => {
     try {
+      await updateLabOrderStatus(id, { status: "Delivered" });
       const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
       const response = await fetch(`http://localhost:8000/lab/orders/${id}/status`, {
         method: "PUT",
@@ -671,9 +579,7 @@ export default function DoctorLayout({ children }) {
           "Content-Type": "application/json",
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({
-          status: "Delivered"
-        })
+        body: JSON.stringify({ status: "Delivered" })
       });
 
       if (!response.ok) {
@@ -688,34 +594,25 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  // Submit Lab Order from form
   const handleSubmitLabOrder = async ({ item, tooth, shade, labName }) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          patient_token: viewingPatientToken,
-          prosthetic_type: item,
-          material: `Tooth #${tooth}`,
-          shade: shade,
-          lab_name: labName,
-          due_date: "2026-06-15",
-          notes: `Tooth #${tooth}, Shade ${shade}`
-        })
+      const createdOrder = await createLabOrder({
+        patient_token: viewingPatientToken,
+        prosthetic_type: item,
+        material: `Tooth #${tooth}`,
+        shade: shade,
+        lab_name: labName,
+        due_date: "2026-06-15",
+        notes: `Tooth #${tooth}, Shade ${shade}`
       });
 
+      // Add to timeline locally
       if (!response.ok) {
         throw new Error("Failed to submit lab order to backend");
       }
 
       const createdOrder = await response.json();
-      
-      // Add to timeline locally
+
       const newTimelineEvent = {
         date: "10-06-2026 (Today)",
         note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
@@ -739,7 +636,6 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  // Interactive tooth chart select
   const handleToggleToothState = (tooth) => {
     if (!viewingPatient) return;
     const currentStatus = viewingPatient.teethChart[tooth];
@@ -763,7 +659,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Tooth #${tooth} status updated to ${newStatus || "Healthy"}`);
   };
 
-  // Prescription Form Draft management
   const handleAddDraftMedicine = (newItem) => {
     setRxDraft(prev => [...prev, newItem]);
     showNotification(`${newItem.medicine} added to draft.`);
@@ -773,7 +668,6 @@ export default function DoctorLayout({ children }) {
     setRxDraft(prev => prev.filter(m => m.id !== id));
   };
 
-  // Save/Print prescription
   const handleSavePrescription = () => {
     if (rxDraft.length === 0) return;
 
@@ -798,7 +692,6 @@ export default function DoctorLayout({ children }) {
     showNotification(`Prescription printed & saved for ${viewingPatient.name}.`);
   };
 
-  // Submit Clinical Diagnosis Note
   const handleSubmitDiagNote = (noteText) => {
     if (!viewingPatient) return;
 
@@ -819,7 +712,6 @@ export default function DoctorLayout({ children }) {
     showNotification("Clinical diagnosis note updated.");
   };
 
-  // Submit Specialty Log (auto-save aware)
   const handleSubmitSpecialtyLog = (noteText, sheetLabel, isAutoSave = false) => {
     if (!viewingPatientToken) return;
 
@@ -863,7 +755,6 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  // Add Chronic Safety Alert Warning
   const handleAddAlert = (alertText) => {
     if (!activePatient) return;
 
@@ -877,6 +768,138 @@ export default function DoctorLayout({ children }) {
     showNotification(`Medical alert added to ${activePatient.name}`);
   };
 
+  const enrichPatientTimeline = async (token) => {
+    if (!token) return;
+    try {
+      const patientData = await getPatientByToken(token);
+      if (!patientData || !patientData.id) return;
+      const patientId = patientData.id;
+
+      const [appointmentsData, plansData] = await Promise.all([
+        getPatientAppointments(patientId).catch(err => {
+          console.warn("Failed to fetch appointments:", err);
+          return [];
+        }),
+        getPatientTreatmentPlan(token).catch(err => {
+          console.warn("Failed to fetch treatment plan:", err);
+          return null;
+        })
+      ]);
+
+      const timelineEvents = [];
+
+      if (Array.isArray(appointmentsData)) {
+        appointmentsData.forEach(app => {
+          if (app.status === "Completed") {
+            timelineEvents.push({
+              date: app.appointment_date,
+              note: `Visited for ${app.treatment_type}. Status: Completed`,
+              type: "Procedure"
+            });
+          } else if (app.status !== "Cancelled" && app.status !== "Skipped") {
+            timelineEvents.push({
+              date: app.appointment_date,
+              note: `Scheduled for ${app.treatment_type} (${app.appointment_time})`,
+              type: "Appointment"
+            });
+          }
+        });
+      }
+
+      let plans = [];
+      if (Array.isArray(plansData)) {
+        plans = plansData;
+      } else if (plansData) {
+        plans = [plansData];
+      }
+
+      const activePlan = plans.find(p => p.status === "Active") || plans[0];
+      if (activePlan) {
+        if (activePlan.next_visit_date) {
+          timelineEvents.push({
+            date: activePlan.next_visit_date,
+            note: `Next Planned Visit: ${activePlan.next_visit_procedure || "Consultation"}`,
+            type: "Appointment"
+          });
+        }
+
+        if (Array.isArray(activePlan.steps)) {
+          activePlan.steps.forEach(step => {
+            if (step.consent_status === "Given") {
+              const consentDate = step.consent_given_at 
+                ? new Date(step.consent_given_at).toISOString().split("T")[0] 
+                : new Date(activePlan.created_at || Date.now()).toISOString().split("T")[0];
+              timelineEvents.push({
+                date: consentDate,
+                note: `Signed Consent for: ${step.title}`,
+                type: "Consent"
+              });
+            }
+          });
+        }
+      }
+
+      setPatients(prev => {
+        const existingEvents = prev[token]?.timeline || [];
+        const mergedEvents = [...timelineEvents];
+        existingEvents.forEach(exist => {
+          const isDuplicate = mergedEvents.some(
+            m => m.type === exist.type && m.note === exist.note && m.date === exist.date
+          );
+          if (!isDuplicate) {
+            mergedEvents.push(exist);
+          }
+        });
+
+        const parseDate = (dStr) => {
+          if (!dStr) return new Date(0);
+          const clean = dStr.split(" ")[0];
+          const parts = clean.split("-");
+          if (parts.length === 3) {
+            if (parts[2].length === 4) {
+              return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            } else if (parts[0].length === 4) {
+              return new Date(clean);
+            }
+          }
+          const parsed = new Date(clean);
+          return isNaN(parsed.getTime()) ? new Date(0) : parsed;
+        };
+
+        mergedEvents.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+
+        const patient = prev[token] || {
+          token,
+          name: patientData.name,
+          age: patientData.age,
+          gender: patientData.gender,
+          phone: patientData.phone,
+          procedure: "Consultation",
+          chiefComplaint: "Routine Checkup",
+          medicalAlerts: [],
+          teethChart: {}
+        };
+
+        return {
+          ...prev,
+          [token]: {
+            ...patient,
+            timeline: mergedEvents
+          }
+        };
+      });
+
+    } catch (err) {
+      console.error("Failed to enrich patient timeline:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (viewingPatientToken) {
+      enrichPatientTimeline(viewingPatientToken);
+    }
+  }, [viewingPatientToken]);
+
   return (
     <AuthGuard allowedRoles={["doctor"]} type="staff">
       <DoctorContext.Provider value={{
@@ -885,6 +908,7 @@ export default function DoctorLayout({ children }) {
         setActivePatientToken,
         viewingPatientToken,
         setViewingPatientToken,
+        enrichPatientTimeline,
         completedPatientHistory,
         emergencyAlert,
         setEmergencyAlert,
@@ -952,8 +976,8 @@ export default function DoctorLayout({ children }) {
 
           {/* Swipeable Notification Toast */}
           {activeToast && (
-            <NotificationToast 
-              toast={activeToast} 
+            <NotificationToast
+              toast={activeToast}
               animation={toastAnimation}
               onDismiss={() => {
                 if (window.toastTimeout) clearTimeout(window.toastTimeout);
@@ -978,8 +1002,6 @@ export default function DoctorLayout({ children }) {
               }}
             />
           )}
-
-          {/* Simulator removed */}
 
           {/* Critical Emergency Interruption Modal Popup */}
           <EmergencyPopup

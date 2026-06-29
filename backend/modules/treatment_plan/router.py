@@ -200,6 +200,7 @@ def update_treatment_plan(
             if step.requires_consent and not step.consent_id:
                 # Create a consent request record
                 consent = PatientConsentModel(
+                    patient_id=patient.id if patient else None,
                     patient_token=plan.patient_token,
                     treatment_plan_id=plan.id,
                     step_id=step.id,
@@ -289,6 +290,7 @@ def add_step_to_plan(
         patient_name = patient.name if patient else "Patient"
         
         consent = PatientConsentModel(
+            patient_id=patient.id if patient else None,
             patient_token=plan.patient_token,
             treatment_plan_id=plan.id,
             step_id=step.id,
@@ -337,6 +339,7 @@ def update_step(
                 patient_name = patient.name if patient else "Patient"
                 
                 consent = PatientConsentModel(
+                    patient_id=patient.id if patient else None,
                     patient_token=plan.patient_token,
                     treatment_plan_id=plan.id,
                     step_id=step.id,
@@ -397,6 +400,7 @@ def update_plan_status(
         for step in steps:
             if step.requires_consent and not step.consent_id:
                 consent = PatientConsentModel(
+                    patient_id=patient.id if patient else None,
                     patient_token=plan.patient_token,
                     treatment_plan_id=plan.id,
                     step_id=step.id,

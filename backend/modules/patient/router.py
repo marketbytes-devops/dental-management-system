@@ -182,9 +182,15 @@ def get_pending_consents(
     if not patient_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    patient_token = patient.token if patient else None
+
     return (
         db.query(PatientConsent)
-        .filter(PatientConsent.patient_id == patient_id, PatientConsent.status == "PENDING")
+        .filter(
+            (PatientConsent.patient_id == patient_id) | (PatientConsent.patient_token == patient_token),
+            PatientConsent.status == "PENDING"
+        )
         .order_by(PatientConsent.created_at.desc())
         .all()
     )
@@ -200,9 +206,15 @@ def get_signed_consents(
     if not patient_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    patient_token = patient.token if patient else None
+
     return (
         db.query(PatientConsent)
-        .filter(PatientConsent.patient_id == patient_id, PatientConsent.status == "SIGNED")
+        .filter(
+            (PatientConsent.patient_id == patient_id) | (PatientConsent.patient_token == patient_token),
+            PatientConsent.status == "SIGNED"
+        )
         .order_by(PatientConsent.signed_at.desc())
         .all()
     )

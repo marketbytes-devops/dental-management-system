@@ -103,6 +103,10 @@ function LoginContent() {
       }
 
       if (roleType === "patient") {
+        // Clear staff items to avoid layout/sidebar contamination
+        localStorage.removeItem("staff_jwt_token");
+        localStorage.removeItem("staff_user");
+
         // Save token to localStorage first so getPatientProfile interceptor can use it
         localStorage.setItem("patient_jwt_token", jwtToken);
         
@@ -118,6 +122,14 @@ function LoginContent() {
         setIsSubmitting(false);
         router.push("/patient/dashboard");
       } else {
+        // Clear patient items to avoid layout/sidebar contamination
+        localStorage.removeItem("patient_jwt_token");
+        localStorage.removeItem("patient_token");
+        localStorage.removeItem("patient_name");
+        localStorage.removeItem("patient_phone");
+        localStorage.removeItem("patient_email");
+        localStorage.removeItem("patient_user");
+
         // Save token to localStorage first so getProfile interceptor can use it
         localStorage.setItem("staff_jwt_token", jwtToken);
 

@@ -1,6 +1,6 @@
 import { FileImage, FlaskConical, FileSignature, Folder, Download } from "lucide-react";
 
-export default function MyDocumentLibrary({ documents = [], onSignDocument }) {
+export default function MyDocumentLibrary({ documents = [], onSignDocument, onDownloadDocument }) {
   const getFileIcon = (type) => {
     switch (type) {
       case "X-Ray":
@@ -76,21 +76,19 @@ export default function MyDocumentLibrary({ documents = [], onSignDocument }) {
                           <FileSignature className="w-3.5 h-3.5 text-amber-600" /> Review & Sign
                         </button>
                       ) : (
-                        <a
-                          href={doc.url}
-                          target={doc.url !== "#" ? "_blank" : undefined}
-                          rel={doc.url !== "#" ? "noopener noreferrer" : undefined}
-                          onClick={(e) => {
+                        <button
+                          onClick={() => {
                             if (doc.url === "#") {
-                              e.preventDefault();
                               alert(`Downloading "${doc.name}" is not supported in the mock version.`);
+                            } else if (onDownloadDocument) {
+                              onDownloadDocument(doc);
                             }
                           }}
-                          className="flex items-center gap-1 p-2 text-gray-400 hover:text-primary transition-colors text-xs font-semibold hover:bg-gray-50 rounded-lg border border-gray-150 cursor-pointer"
+                          className="flex items-center gap-1 p-2 text-gray-400 hover:text-primary transition-colors text-xs font-semibold hover:bg-gray-50 rounded-lg border border-gray-150 cursor-pointer bg-transparent"
                           title="Download File"
                         >
                           <Download className="w-3.5 h-3.5" /> Download
-                        </a>
+                        </button>
                       )}
                     </div>
                   </div>

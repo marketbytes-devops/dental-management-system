@@ -5,7 +5,7 @@ import ConsentStatusBanner from "@/components/ui/patients/documents/consentStatu
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import MyDocumentLibrary from "@/components/ui/patients/documents/myDocumentLibrary";
 import { Loader2 } from "lucide-react";
-import { getPendingConsents, getSignedConsents, getConsentPdfUrl } from "@/services/api";
+import { getPendingConsents, getSignedConsents, getConsentPdfUrl, downloadConsentPdf } from "@/services/api";
 
 export default function PatientDocumentsPage() {
   const [pendingConsents, setPendingConsents] = useState([]);
@@ -18,6 +18,24 @@ export default function PatientDocumentsPage() {
     alert("Consent form signed successfully! It has been stored in your document history.");
     setActiveForm(null);
     loadDocuments(); // Refresh list
+  };
+
+  const handleDownloadDocument = async (doc) => {
+    try {
+      const blobData = await downloadConsentPdf(doc.id);
+      const blob = new Blob([blobData], { type: "application/pdf" });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${doc.name.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Failed to download PDF:", err);
+      alert("Failed to download PDF file.");
+    }
   };
 
   const loadDocuments = async () => {
@@ -73,7 +91,7 @@ export default function PatientDocumentsPage() {
       name: c.title,
       type: "Consent Form",
       date: new Date(c.created_at).toLocaleDateString("en-IN"),
-      url: "#",
+      url: getConsentPdfUrl(c.id),
       size: "150 KB",
       signed: false,
       content: c.content
@@ -126,8 +144,12 @@ export default function PatientDocumentsPage() {
       />
 
       {/* Main Document Library */}
-      <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
-        <MyDocumentLibrary documents={mappedDocuments} onSignDocument={handleSignDocument} />
+      <div className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm">
+        <MyDocumentLibrary
+          documents={mappedDocuments}
+          onSignDocument={handleSignDocument}
+          onDownloadDocument={handleDownloadDocument}
+        />
       </div>
 
       {/* Floating consent signer overlay */}

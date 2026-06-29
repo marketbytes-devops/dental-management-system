@@ -21,6 +21,10 @@ from .schemas import (
     PatientCreate,
     PatientResponse,
     PatientUpdate,
+    PrescriptionCreate,
+    PrescriptionResponse,
+    ReferralCreate,
+    ReferralResponse,
 )
 from .service import (
     change_patient_password,
@@ -163,7 +167,7 @@ def request_consent(req: ConsentRequest, db: Session = Depends(get_db)):
         doctor_id=req.doctor_id,
         treatment_plan_id=req.treatment_plan_id,
         title=req.title,
-        body_text=req.body_text,
+        content=req.content,
         status="PENDING",
     )
     db.add(new_consent)
@@ -182,9 +186,15 @@ def get_pending_consents(
     if not patient_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    patient_token = patient.token if patient else None
+
     return (
         db.query(PatientConsent)
-        .filter(PatientConsent.patient_id == patient_id, PatientConsent.status == "PENDING")
+        .filter(
+            (PatientConsent.patient_id == patient_id) | (PatientConsent.patient_token == patient_token),
+            PatientConsent.status == "PENDING"
+        )
         .order_by(PatientConsent.created_at.desc())
         .all()
     )
@@ -200,9 +210,15 @@ def get_signed_consents(
     if not patient_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
 
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    patient_token = patient.token if patient else None
+
     return (
         db.query(PatientConsent)
-        .filter(PatientConsent.patient_id == patient_id, PatientConsent.status == "SIGNED")
+        .filter(
+            (PatientConsent.patient_id == patient_id) | (PatientConsent.patient_token == patient_token),
+            PatientConsent.status == "SIGNED"
+        )
         .order_by(PatientConsent.signed_at.desc())
         .all()
     )
@@ -221,44 +237,58 @@ def sign_consent(
     patient_id = current_user.get("patient_id")
     roles = current_user.get("roles", [])
 
+    consent = db.query(PatientConsent).filter(PatientConsent.id == consent_id).first()
+    if not consent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
+
     if not patient_id:
         # Must be a staff member acting on behalf of the patient
         if "Admin" not in roles and "Doctor" not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
-
-        # Derive patient_id from the consent record itself
-        consent = db.query(PatientConsent).filter(PatientConsent.id == consent_id).first()
-        if not consent:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
-        patient_id = consent.patient_id
+        
+        # Determine patient_id
+        if consent.patient_id:
+            patient_id = consent.patient_id
+        else:
+            patient = db.query(PatientModel).filter(PatientModel.token == consent.patient_token).first()
+            if patient:
+                patient_id = patient.id
 
     patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
 
-    consent = (
-        db.query(PatientConsent)
-        .filter(PatientConsent.id == consent_id, PatientConsent.patient_id == patient_id)
-        .first()
-    )
-    if not consent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
+    # Authorisation check: ensure consent belongs to this patient
+    if consent.patient_id and consent.patient_id != patient.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
+    if consent.patient_token and consent.patient_token != patient.token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
+
     if consent.status == "SIGNED":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Consent already signed")
 
     # Generate PDF
     pdf_path = generate_consent_pdf(
         title=consent.title,
-        body_text=consent.body_text or consent.content or "",
+        body_text=consent.content or "",
         signature_data=req.signature_data,
         patient_name=patient.name,
     )
 
     consent.status = "SIGNED"
+    consent.patient_id = patient.id
     consent.signature_data = req.signature_data
     consent.signing_method = req.signing_method
     consent.signed_at = datetime.datetime.now(datetime.timezone.utc)
     consent.pdf_file_path = pdf_path
+
+    # Update associated treatment plan step if it exists
+    if consent.step_id:
+        from modules.treatment_plan.models import TreatmentPlanStepModel
+        step = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.id == consent.step_id).first()
+        if step:
+            step.consent_status = "Given"
+            step.consent_given_at = consent.signed_at
 
     db.commit()
     db.refresh(consent)
@@ -281,7 +311,9 @@ def get_consent_pdf(
 
     # Authorisation check
     if patient_id:
-        if consent.patient_id != patient_id:
+        patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+        is_owner = (consent.patient_id == patient_id) or (patient and consent.patient_token == patient.token)
+        if not is_owner:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     else:
         if "Admin" not in roles and "Doctor" not in roles:
@@ -296,3 +328,86 @@ def get_consent_pdf(
         filename=os.path.basename(pdf_file),
         media_type="application/pdf",
     )
+
+
+# ---------------------------------------------------------------------------
+# Prescriptions
+# ---------------------------------------------------------------------------
+
+@router.post("/prescriptions", response_model=PrescriptionResponse)
+def create_prescription_route(
+    req: PrescriptionCreate,
+    db: Session = Depends(get_db)
+):
+    from .models import PatientPrescription
+    new_rx = PatientPrescription(
+        patient_token=req.patient_token,
+        doctor_name=req.doctor_name,
+        medications=req.medications
+    )
+    db.add(new_rx)
+    db.commit()
+    db.refresh(new_rx)
+    return new_rx
+
+@router.get("/prescriptions", response_model=List[PrescriptionResponse])
+def get_prescriptions_route(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    from .models import PatientPrescription
+    rx_list = db.query(PatientPrescription).filter(PatientPrescription.patient_token == patient.token).order_by(PatientPrescription.created_at.desc()).all()
+    return rx_list
+
+# ---------------------------------------------------------------------------
+# Referrals
+# ---------------------------------------------------------------------------
+
+@router.post("/referrals", response_model=ReferralResponse)
+def create_referral_route(
+    req: ReferralCreate,
+    db: Session = Depends(get_db)
+):
+    from modules.doctor.models import ReferralModel
+    new_ref = ReferralModel(
+        id=req.id,
+        patient_token=req.patient_token,
+        referred_by=req.referred_by,
+        speciality=req.speciality,
+        target_doctor=req.target_doctor,
+        date=req.date,
+        reason=req.reason,
+        clinical_notes=req.clinical_notes,
+        status="Pending",
+        referral_type=req.referral_type,
+        external_facility=req.external_facility
+    )
+    db.add(new_ref)
+    db.commit()
+    db.refresh(new_ref)
+    return new_ref
+
+@router.get("/referrals", response_model=List[ReferralResponse])
+def get_referrals_route(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    from modules.doctor.models import ReferralModel
+    ref_list = db.query(ReferralModel).filter(ReferralModel.patient_token == patient.token).order_by(ReferralModel.date.desc()).all()
+    return ref_list

@@ -44,7 +44,7 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
         </div>
 
         {/* Scrollable Form Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6 text-sm text-gray-600 leading-relaxed">
+        <div className="p-6 overflow-y-auto flex-1 space-y-6 text-sm text-gray-600 leading-relaxed text-left">
           <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
             <h4 className="font-bold text-gray-800 uppercase tracking-wider text-xs">Document Information</h4>
             <div className="grid grid-cols-2 gap-4 text-xs">
@@ -54,21 +54,11 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
               </div>
               <div>
                 <span className="text-gray-400 block font-medium">Title</span>
-                <span className="text-gray-800 font-semibold">{doc.name || "Consent Form"}</span>
+                <span className="text-gray-800 font-semibold">{doc.name || doc.title || "Consent Form"}</span>
               </div>
             </div>
           </div>
 
-          {doc.content ? (
-            <div className="space-y-3 whitespace-pre-wrap">
-              <p>{doc.content}</p>
-            </div>
-          ) : (
-            <div className="space-y-3 text-gray-500 italic">
-              <p>Consent document content is not available.</p>
-            </div>
-          )}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6 text-sm text-gray-600 leading-relaxed text-left">
           <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
             <h4 className="font-bold text-gray-800 uppercase tracking-wider text-[10px]">Form details</h4>
             <p className="text-xs font-semibold text-gray-700 leading-normal">
@@ -76,9 +66,15 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
             </p>
           </div>
 
-          <div className="space-y-3 font-medium text-gray-705 whitespace-pre-wrap leading-relaxed">
-            {doc.content}
-          </div>
+          {doc.content ? (
+            <div className="space-y-3 font-medium text-gray-705 whitespace-pre-wrap leading-relaxed">
+              {doc.content}
+            </div>
+          ) : (
+            <div className="space-y-3 text-gray-500 italic">
+              <p>Consent document content is not available.</p>
+            </div>
+          )}
 
           {/* Signature Selection Tab */}
           <div className="border-t border-gray-100 pt-6 space-y-4">
@@ -140,7 +136,6 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
             ) : (
               <SignatureCanvas onSave={handleSignSubmit} onCancel={onClose} />
             )}
-          </div>
         </div>
       </div>
     </div>

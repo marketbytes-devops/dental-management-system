@@ -34,13 +34,54 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
     handleSubmitLabOrder,
     handleSubmitDiagNote,
     handleSubmitSpecialtyLog,
-    handleReferPatient
+    handleReferPatient,
+    patients,
+    handleCompleteConsultation
   } = useDoctor();
 
   if (!viewingPatient) {
+    const patientList = Object.values(patients || {});
     return (
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-12 text-center text-gray-400 font-semibold">
-        No active patient session found. Load a patient from the queue.
+      <div className="bg-white border border-gray-150 rounded-3xl shadow-sm p-12 text-center max-w-2xl mx-auto space-y-6 animate-fadeIn my-8 text-left">
+        <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-2xl mx-auto">
+          🏥
+        </div>
+        <div className="space-y-2 text-center">
+          <h3 className="text-xl font-bold text-gray-900">No Patient in Chair</h3>
+          <p className="text-sm text-gray-500 max-w-md mx-auto">
+            Select a patient from the directory below to view their historical clinical sheet or manage their records.
+          </p>
+        </div>
+
+        {patientList.length > 0 ? (
+          <div className="space-y-3">
+            <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Patient Directory</label>
+            <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1">
+              {patientList.map((pt) => (
+                <button
+                  key={pt.token}
+                  onClick={() => setViewingPatientToken(pt.token)}
+                  className="w-full flex items-center justify-between p-3.5 bg-gray-50 hover:bg-primary/5 border border-gray-100 hover:border-primary/20 rounded-xl transition-all cursor-pointer text-left outline-none"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                      {pt.name.charAt(0)}
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-gray-900 block">{pt.name}</span>
+                      <span className="text-[10px] text-gray-500 font-semibold">{pt.gender}, {pt.age} yrs • {pt.token}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    {pt.procedure}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 italic text-center">No patients registered in the directory.</p>
+        )}
       </div>
     );
   }
@@ -85,6 +126,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
         onSimulateEmergency={simulateEmergencyCheckin}
         onReturnToActivePatient={handleReturnToActivePatient}
         onGoBack={handleGoBack}
+        onCompleteConsultation={handleCompleteConsultation}
       />
 
       {/* Tooth Chart Mapping - Full Width (No horizontal scroll on desktop) */}

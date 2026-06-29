@@ -37,6 +37,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
             setCurrentUser(parsed);
 
             const roles = parsed.roles || [];
+            const rawRole = roles.length > 0 ? roles[0] : (parsed.role || "");
             let rawRole = parsed.role || "";
 
             if (!rawRole && roles.length > 0) {
@@ -142,7 +143,8 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
 
   return (
     <div className={`bg-white border-r border-gray-200 flex flex-col h-full shadow-sm transition-all duration-300 relative ${isMinimized ? "w-16" : "w-64"}`}>
-      {/* Floating Toggle Button (visible if minimization handler provided) */}
+
+      {/* Floating Toggle Button */}
       {onToggleMinimize && (
         <button
           onClick={onToggleMinimize}
@@ -262,6 +264,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                 );
               }
 
+              // Leaf nav item (no sub-items)
               const unreadCount = getUnreadCount(item.href);
 
               return (
@@ -319,12 +322,17 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
       {/* Profile Section Footer */}
       <div className={`p-4 border-t border-gray-100 shrink-0 bg-gray-50/50 flex ${isMinimized ? "justify-center" : "items-center"}`}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0" title={currentUser?.name || "User"}>
+          <div
+            className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0"
+            title={currentUser?.name || "User"}
+          >
             {role === "doctor" ? <Stethoscope className="w-5 h-5 text-primary" /> : avatarChar}
           </div>
           {!isMinimized && (
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-bold text-gray-900 truncate">{currentUser?.name || "SmileCare User"}</span>
+              <span className="text-sm font-bold text-gray-900 truncate">
+                {currentUser?.name || "SmileCare User"}
+              </span>
               <span className="text-[10px] text-gray-500 font-semibold truncate">
                 {role === "doctor" && currentUser?.specialties?.length > 0
                   ? `MDS - ${currentUser.specialties.join(", ")}`

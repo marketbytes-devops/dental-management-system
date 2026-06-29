@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Key, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { changePatientPassword } from "@/services/api";
 
 export default function PatientSecurityCard() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -36,30 +37,16 @@ export default function PatientSecurityCard() {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem("patient_jwt_token");
-      const res = await fetch("http://127.0.0.1:8000/patient/change-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          current_password: currentPassword,
-          new_password: newPassword,
-        }),
+      await changePatientPassword({
+        current_password: currentPassword,
+        new_password: newPassword,
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.detail || "Failed to update password.");
-      } else {
-        setSuccess(true);
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-      }
-    } catch {
-      setError("Network error. Please try again.");
+      setSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err) {
+      setError(err.message || "Failed to update password.");
     } finally {
       setLoading(false);
     }

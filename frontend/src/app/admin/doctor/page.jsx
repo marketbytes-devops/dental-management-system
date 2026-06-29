@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment } from "react";
 import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw } from "lucide-react";
+import client from "@/services/api";
 
 export default function DoctorManagementPage() {
   const initialDoctors = [
@@ -23,13 +24,9 @@ export default function DoctorManagementPage() {
   const fetchDoctors = async () => {
     setLoading(true);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const headers = token ? { "Authorization": `Bearer ${token}` } : {};
-
       // 1. Fetch users to get profile details
-      const response = await fetch("http://127.0.0.1:8000/admin/users", { headers });
-      if (!response.ok) throw new Error("Failed to load users.");
-      const usersData = await response.json();
+      const response = await client.get("/admin/users");
+      const usersData = response.data;
       
       // Filter users who have the "Doctor" role
       const doctorUsers = usersData.filter(user => 
@@ -39,10 +36,8 @@ export default function DoctorManagementPage() {
       // 2. Fetch doctors roster to get active patient counts
       let rosterData = [];
       try {
-        const rosterResponse = await fetch("http://127.0.0.1:8000/admin/doctors", { headers });
-        if (rosterResponse.ok) {
-          rosterData = await rosterResponse.json();
-        }
+        const rosterResponse = await client.get("/admin/doctors");
+        rosterData = rosterResponse.data;
       } catch (err) {
         console.error("Failed to load doctor roster stats:", err);
       }
@@ -80,7 +75,7 @@ export default function DoctorManagementPage() {
       
       setDoctors(mappedDoctors);
     } catch (err) {
-      console.error("Error loading doctors, falling back to dummy data:", err);
+      console.warn("Error loading doctors, falling back to dummy data:", err);
       setDoctors(initialDoctors);
     } finally {
       setLoading(false);
@@ -95,13 +90,8 @@ export default function DoctorManagementPage() {
 
   const toggleStatus = async (id) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://127.0.0.1:8000/admin/doctors/${id}/status`, {
-        method: "PUT",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (!response.ok) throw new Error("Failed to toggle doctor status.");
-      const updated = await response.json();
+      const response = await client.put(`/admin/doctors/${id}/status`);
+      const updated = response.data;
       setDoctors(prev => prev.map(doc => {
         if (doc.id === id) {
           return { ...doc, status: updated.status };
@@ -109,7 +99,7 @@ export default function DoctorManagementPage() {
         return doc;
       }));
     } catch (err) {
-      console.error("Failed to toggle doctor status, cycling locally:", err);
+      console.warn("Failed to toggle doctor status, cycling locally:", err);
       // Local fallback cycling
       setDoctors(prev => prev.map(doc => {
         if (doc.id === id) {

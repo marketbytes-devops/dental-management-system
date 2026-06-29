@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Bell, HelpCircle, Sparkles, Share2, Microscope, AlertTriangle } from "lucide-react";
 import { useDoctor } from "@/app/doctor/layout";
+import { updateAuthStatus } from "@/services/api";
 
 export default function Navbar() {
   const [role, setRole] = useState("");
@@ -81,21 +82,7 @@ export default function Navbar() {
 
   const handleStatusChange = async (newStatus) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      if (!token) return;
-
-      const response = await fetch("http://127.0.0.1:8000/auth/status", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (!response.ok) throw new Error("Failed to update status");
-
-      const data = await response.json();
+      const data = await updateAuthStatus({ status: newStatus });
       setCurrentStatus(data.status);
       setShowStatusDropdown(false);
 

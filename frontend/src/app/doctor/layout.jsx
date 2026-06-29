@@ -414,6 +414,13 @@ export default function DoctorLayout({ children }) {
         console.warn("Failed to fetch live queue for doctor:", err);
       }
     };
+        });
+        return updated;
+      });
+    } catch (err) {
+      console.warn("Failed to fetch live queue for doctor:", err);
+    }
+  };
 
     useEffect(() => {
       fetchQueue();
@@ -605,6 +612,16 @@ export default function DoctorLayout({ children }) {
           due_date: "2026-06-15",
           notes: `Tooth #${tooth}, Shade ${shade}`
         });
+  const handleMarkLabDelivered = async (id) => {
+    try {
+      await updateLabOrderStatus(id, { status: "Delivered" });
+      showNotification(`Lab Case ${id} marked as Delivered.`);
+      fetchLabOrders();
+    } catch (err) {
+      console.error("Error marking lab order delivered:", err);
+      showNotification("Failed to mark lab order as delivered.");
+    }
+  };
 
         // Add to timeline locally
         if (!response.ok) {
@@ -644,6 +661,11 @@ export default function DoctorLayout({ children }) {
       if (!currentStatus) newStatus = "active-treatment";
       else if (currentStatus === "active-treatment") newStatus = "restored";
       else newStatus = "";
+      const newTimelineEvent = {
+        date: "10-06-2026 (Today)",
+        note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
+        type: "Lab Order"
+      };
 
       setPatients(prev => ({
         ...prev,

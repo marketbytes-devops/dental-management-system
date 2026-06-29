@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import MyAppointmentList from "@/components/ui/patients/appointments/myAppointmentList";
 import BookAppointmentModal from "@/components/ui/patients/appointments/bookAppointmentModal";
 import RescheduleModal from "@/components/ui/patients/appointments/rescheduleModal";
 import { Calendar } from "lucide-react";
+import { getPatientProfile, getPatientAppointments, updateAppointmentStatus } from "@/services/api";
 
 export default function PatientAppointmentsPage() {
     const [appointments, setAppointments] = useState([]);
@@ -16,19 +18,16 @@ export default function PatientAppointmentsPage() {
 
     const fetchPatientAppointments = async (pId) => {
         try {
-            const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/patient/${pId}`);
-            if (response.ok) {
-                const data = await response.json();
-                setAppointments(data.map(appt => ({
-                    id: appt.id,
-                    date: appt.appointment_date,
-                    time: appt.appointment_time,
-                    doctor: appt.doctor_name,
-                    treatment: appt.treatment_type,
-                    status: appt.status,
-                    notes: appt.symptoms || "",
-                })));
-            }
+            const data = await getPatientAppointments(pId);
+            setAppointments(data.map(appt => ({
+                id: appt.id,
+                date: appt.appointment_date,
+                time: appt.appointment_time,
+                doctor: appt.doctor_name,
+                treatment: appt.treatment_type,
+                status: appt.status,
+                notes: appt.symptoms || "",
+            })));
         } catch (err) {
             console.error("Error fetching appointments:", err);
         }
@@ -45,15 +44,7 @@ export default function PatientAppointmentsPage() {
 
             try {
                 // Fetch profile to get patient ID
-                const profileRes = await fetch("http://127.0.0.1:8000/patient/profile", {
-                    headers: {
-                        "Authorization": `Bearer ${token}`
-                    }
-                });
-                if (!profileRes.ok) {
-                    throw new Error("Failed to load patient profile.");
-                }
-                const profileData = await profileRes.json();
+                const profileData = await getPatientProfile();
                 setPatientId(profileData.id);
                 await fetchPatientAppointments(profileData.id);
             } catch (err) {
@@ -73,21 +64,11 @@ export default function PatientAppointmentsPage() {
 
     async function handleReschedule(updated) {
         try {
-            const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${updated.id}/status`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    appointment_date: updated.date,
-                    appointment_time: updated.time
-                })
+            const data = await updateAppointmentStatus(updated.id, {
+                appointment_date: updated.date,
+                appointment_time: updated.time
             });
 
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || "Reschedule failed.");
-            }
-
-            const data = await response.json();
             setAppointments((prev) =>
                 prev.map((a) => (a.id === data.id ? { 
                     ...a, 
@@ -108,20 +89,10 @@ export default function PatientAppointmentsPage() {
         }
 
         try {
-            const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${appointment.id}/status`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    status: "Cancelled"
-                })
+            const data = await updateAppointmentStatus(appointment.id, {
+                status: "Cancelled"
             });
 
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || "Cancellation failed.");
-            }
-
-            const data = await response.json();
             setAppointments((prev) =>
                 prev.map((a) => (a.id === data.id ? { ...a, status: "Cancelled" } : a))
             );

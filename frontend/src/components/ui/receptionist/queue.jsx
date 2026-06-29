@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getQueue, updateAppointmentStatus } from "@/services/api";
 
 export default function WaitingQueue() {
   const [activeQueue, setActiveQueue] = useState([]);
@@ -9,25 +10,8 @@ export default function WaitingQueue() {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("staff_jwt_token")
-          : null;
-
-      const headers = token
-        ? { Authorization: `Bearer ${token}` }
-        : {};
-
-      const queueRes = await fetch(
-        "http://localhost:8000/frontdesk/queue",
-        { headers }
-      );
-
-      if (queueRes.ok) {
-        const queueData = await queueRes.json();
-        setActiveQueue(queueData);
-      }
+      const queueData = await getQueue();
+      setActiveQueue(queueData);
     } catch (err) {
       console.error("Error fetching queue:", err);
     } finally {
@@ -38,36 +22,21 @@ export default function WaitingQueue() {
   // Checkout patient
   const handleCheckout = async (id, name) => {
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Completed" })
-      });
-      if (response.ok) {
-        alert(`Patient ${name} checked out. Billing invoice updated.`);
-        fetchData();
-      } else {
-        const err = await response.json();
-        alert(err.detail || "Checkout failed.");
-      }
+      await updateAppointmentStatus(id, { status: "Completed" });
+      alert(`Patient ${name} checked out. Billing invoice updated.`);
+      fetchData();
     } catch (err) {
-      alert("Error checking out patient.");
+      alert("Error checking out patient: " + (err.message || "Checkout failed."));
     }
   };
 
   // Call patient to dental chair
   const handleCallToChair = async (id) => {
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "In Chair" })
-      });
-      if (response.ok) {
-        fetchData();
-      }
+      await updateAppointmentStatus(id, { status: "In Chair" });
+      fetchData();
     } catch (err) {
-      alert("Error calling patient to chair.");
+      alert("Error calling patient to chair: " + (err.message || "Failed."));
     }
   };
 

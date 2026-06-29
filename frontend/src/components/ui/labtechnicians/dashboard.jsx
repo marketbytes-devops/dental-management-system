@@ -13,6 +13,7 @@ import {
   Clock
 } from "lucide-react";
 import Link from "next/link";
+import { getLabOrders, updateLabOrderStatus } from "@/services/api";
 
 export default function LabDashboard() {
   const [animate, setAnimate] = useState(false);
@@ -33,14 +34,8 @@ export default function LabDashboard() {
 
   const fetchOrders = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setOrders(data);
-      }
+      const data = await getLabOrders();
+      setOrders(data);
     } catch (err) {
       console.error("Failed to fetch lab orders for dashboard:", err);
     }
@@ -55,17 +50,7 @@ export default function LabDashboard() {
 
   const handleAcceptOrder = async (orderId) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/lab/orders/${orderId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: "Accepted" })
-      });
-      if (!response.ok) throw new Error("Failed to accept order");
-      
+      await updateLabOrderStatus(orderId, { status: "Accepted" });
       triggerToast(`Case ${orderId} has been accepted successfully.`);
       fetchOrders();
     } catch (err) {
@@ -87,17 +72,7 @@ export default function LabDashboard() {
       return;
     }
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/lab/orders/${rejectTargetId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: "Rejected", rejection_reason: rejectReasonText })
-      });
-      if (!response.ok) throw new Error("Failed to reject order");
-
+      await updateLabOrderStatus(rejectTargetId, { status: "Rejected", rejection_reason: rejectReasonText });
       setIsRejectModalOpen(false);
       triggerToast(`Case ${rejectTargetId} has been rejected.`);
       fetchOrders();

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, CheckCircle2 } from "lucide-react";
+import { getDoctorLeaves, getDoctors, createAppointment } from "@/services/api";
 
 
 const TIME_SLOTS = [
@@ -47,11 +48,8 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
         return;
       }
       try {
-        const response = await fetch(`http://127.0.0.1:8000/leave/doctor/leaves?doctor_name=${encodeURIComponent(form.doctor)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setDoctorLeaves(data);
-        }
+        const data = await getDoctorLeaves(form.doctor);
+        setDoctorLeaves(data);
       } catch (e) {
         console.error("Failed to fetch doctor leaves:", e);
       }
@@ -82,20 +80,8 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("patient_jwt_token") : null;
-        const url = form.date
-          ? `http://127.0.0.1:8000/auth/doctors?date=${form.date}`
-          : "http://127.0.0.1:8000/auth/doctors";
-        const response = await fetch(url, {
-          headers: token ? { "Authorization": `Bearer ${token}` } : {}
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setDoctors(data);
-        } else {
-          console.error("Failed to fetch doctors, status:", response.status);
-          setDoctors([]);
-        }
+        const data = await getDoctors(form.date);
+        setDoctors(data);
       } catch (e) {
         console.error("Failed to fetch doctors:", e);
         setDoctors([]);
@@ -127,27 +113,17 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
 
     setSubmitting(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/frontdesk/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patient_id: patientId,
-          doctor_name: form.doctor,
-          appointment_date: form.date,
-          appointment_time: form.time,
-          treatment_type: form.treatment,
-          status: "Confirmed",
-          priority: "Routine",
-          symptoms: form.notes || null
-        })
+      const data = await createAppointment({
+        patient_id: patientId,
+        doctor_name: form.doctor,
+        appointment_date: form.date,
+        appointment_time: form.time,
+        treatment_type: form.treatment,
+        status: "Confirmed",
+        priority: "Routine",
+        symptoms: form.notes || null
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Booking failed.");
-      }
-
-      const data = await response.json();
       setSubmitting(false);
       setSuccess(true);
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Share2, Globe, Building } from "lucide-react";
+import { getFrontdeskDoctors } from "@/services/api";
 
 
 export default function ReferralForm({ patientToken, onReferPatient }) {
@@ -12,13 +13,10 @@ export default function ReferralForm({ patientToken, onReferPatient }) {
   useEffect(() => {
     async function fetchDoctors() {
       try {
-        const res = await fetch("http://127.0.0.1:8000/frontdesk/doctors");
-        if (res.ok) {
-          const data = await res.json();
-          setClinicDoctors(data);
-          if (data.length > 0) {
-            setSelectedDoctor(`${data[0].name} - ${data[0].specialty}`);
-          }
+        const data = await getFrontdeskDoctors();
+        setClinicDoctors(data);
+        if (data.length > 0) {
+          setSelectedDoctor(`${data[0].name} - ${data[0].specialty}`);
         }
       } catch (err) {
         console.error("Failed to fetch clinic doctors:", err);

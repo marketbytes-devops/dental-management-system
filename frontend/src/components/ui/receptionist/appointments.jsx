@@ -214,29 +214,8 @@ export default function ReceptionistAppointments() {
       console.error("Error loading data:", e);
     } finally {
       setIsLoading(false);
-const fetchData = async () => {
-  try {
-    setIsLoading(true);
-    const [todayRes, tomorrowRes, patientsRes, doctorsRes] = await Promise.all([
-      fetch("http://localhost:8000/frontdesk/appointments/today"),
-      fetch("http://localhost:8000/frontdesk/appointments/tomorrow"),
-      fetch("http://localhost:8000/patient/all"),
-      fetch("http://localhost:8000/frontdesk/doctors"),
-    ]);
-    if (todayRes.ok) setAppointments(await todayRes.json());
-    if (tomorrowRes.ok) setTomorrowAppointments(await tomorrowRes.json());
-    if (patientsRes.ok) setPatients(await patientsRes.json());
-    if (doctorsRes.ok) {
-      const d = await doctorsRes.json();
-      setDoctors(d);
-      if (d.length > 0) setForm((f) => ({ ...f, doctor_name: d[0].name }));
     }
-  } catch (e) {
-    console.error(e);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getLabNotifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification } from "@/services/api";
 
 const INITIAL_NOTIFICATIONS = [
   { id: "NOT-001", type: "Orders", title: "New Lab Order Received", desc: "Case CASE-2026-001 has been registered by Dr. Anoop Nair.", date: "10 mins ago", read: false },
@@ -17,22 +18,16 @@ export default function LabNotifications() {
 
   const fetchNotifications = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/notifications?recipient_role=lab+tech", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mapped = data.map(n => ({
-          id: n.id,
-          type: n.type || "Orders",
-          title: n.title,
-          desc: n.desc,
-          read: n.read,
-          date: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }));
-        setNotifications(mapped);
-      }
+      const data = await getLabNotifications("lab tech");
+      const mapped = data.map(n => ({
+        id: n.id,
+        type: n.type || "Orders",
+        title: n.title,
+        desc: n.desc,
+        read: n.read,
+        date: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }));
+      setNotifications(mapped);
     } catch (err) {
       console.error("Failed to fetch lab technician notifications:", err);
     }
@@ -51,11 +46,7 @@ export default function LabNotifications() {
 
   const handleMarkAsRead = async (id) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      await fetch(`http://localhost:8000/lab/notifications/${id}/read`, {
-        method: "PUT",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+      await markNotificationAsRead(id);
       fetchNotifications();
     } catch (err) {
       console.error("Failed to mark notification read:", err);
@@ -64,11 +55,7 @@ export default function LabNotifications() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      await fetch("http://localhost:8000/lab/notifications/read-all", {
-        method: "PUT",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+      await markAllNotificationsAsRead();
       fetchNotifications();
     } catch (err) {
       console.error("Failed to mark all notifications read:", err);
@@ -77,11 +64,7 @@ export default function LabNotifications() {
 
   const handleClearNotification = async (id) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      await fetch(`http://localhost:8000/lab/notifications/${id}`, {
-        method: "DELETE",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
+      await deleteNotification(id);
       fetchNotifications();
     } catch (err) {
       console.error("Failed to clear notification:", err);

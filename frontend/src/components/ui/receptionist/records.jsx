@@ -24,8 +24,8 @@ export default function ReceptionistRecords() {
     fetchRecords();
   }, []);
 
-  const filteredRecords = records.filter(r => 
-    r.name.toLowerCase().includes(search.toLowerCase()) || 
+  const filteredRecords = records.filter(r =>
+    r.name.toLowerCase().includes(search.toLowerCase()) ||
     r.id.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -99,7 +99,7 @@ export default function ReceptionistRecords() {
                         onClick={() => alert(`Opening complete EDR dossier for ${r.name}...`)}
                         className="px-2.5 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors font-bold cursor-pointer"
                       >
-                        Open Dossier
+                        Open File
                       </button>
                     </td>
                   </tr>

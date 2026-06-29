@@ -38,6 +38,20 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
 
             const roles = parsed.roles || [];
             const rawRole = roles.length > 0 ? roles[0] : (parsed.role || "");
+            let rawRole = parsed.role || "";
+
+            if (!rawRole && roles.length > 0) {
+              if (pathname.startsWith("/frontdesk/accountant")) {
+                rawRole = "accountant";
+              }
+              else if (pathname.startsWith("/frontdesk/receptionist")) {
+                rawRole = "receptionist";
+              }
+              else {
+                rawRole = roles[0];
+              }
+            }
+
 
             const normalizeRole = (r) => {
               if (!r) return "";
@@ -68,6 +82,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
       }, 0);
     }
   }, []);
+
 
   const navItems = ROLE_NAV_ITEMS[role] || [];
 
@@ -118,11 +133,11 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
 
   const roleLabel =
     role === "admin" ? "Admin" :
-    role === "doctor" ? "Doctor" :
-    role === "receptionist" ? "Reception" :
-    role === "accountant" ? "Finance" :
-    role === "lab tech" ? "Lab Tech" :
-    role === "patient" ? "Patient" : "";
+      role === "doctor" ? "Doctor" :
+        role === "receptionist" ? "Reception" :
+          role === "accountant" ? "Finance" :
+            role === "lab tech" ? "Lab Tech" :
+              role === "patient" ? "Patient" : "";
 
   const avatarChar = currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "U";
 
@@ -180,11 +195,10 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                         <Link
                           href={item.subItems[0].href}
                           title={item.name}
-                          className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all group cursor-pointer outline-none ${
-                            isParentActive
-                              ? "bg-primary/10 text-primary"
-                              : "text-gray-700 hover:bg-primary/5 hover:text-primary"
-                          }`}
+                          className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all group cursor-pointer outline-none ${isParentActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-gray-700 hover:bg-primary/5 hover:text-primary"
+                            }`}
                         >
                           <item.icon className="w-5 h-5 shrink-0" />
                         </Link>
@@ -194,11 +208,10 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                         <button
                           type="button"
                           onClick={() => toggleDropdown(item.name)}
-                          className={`flex items-center justify-between w-full px-3 py-2 text-sm font-semibold rounded-lg transition-colors group cursor-pointer outline-none ${
-                            isParentActive
-                              ? "bg-primary/10 text-primary"
-                              : "text-gray-700 hover:bg-primary/5 hover:text-primary"
-                          }`}
+                          className={`flex items-center justify-between w-full px-3 py-2 text-sm font-semibold rounded-lg transition-colors group cursor-pointer outline-none ${isParentActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-gray-700 hover:bg-primary/5 hover:text-primary"
+                            }`}
                         >
                           <div className="flex items-center">
                             <span className="mr-3 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
@@ -207,9 +220,8 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                             {item.name}
                           </div>
                           <svg
-                            className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${
-                              isOpen ? "transform rotate-180" : ""
-                            }`}
+                            className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""
+                              }`}
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -221,9 +233,8 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
 
                         {/* Sub-menu Dropdown List */}
                         <div
-                          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                            isOpen ? "max-h-[350px] opacity-100 mt-1" : "max-h-0 opacity-0 pointer-events-none"
-                          }`}
+                          className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? "max-h-[350px] opacity-100 mt-1" : "max-h-0 opacity-0 pointer-events-none"
+                            }`}
                         >
                           <ul className="pl-4 space-y-1 border-l-2 border-gray-100 ml-5">
                             {item.subItems.map((subItem) => {
@@ -232,11 +243,10 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                                 <li key={subItem.name}>
                                   <Link
                                     href={subItem.href}
-                                    className={`flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors group cursor-pointer outline-none ${
-                                      isSubActive
-                                        ? "bg-primary/5 text-primary"
-                                        : "text-gray-600 hover:bg-primary/5 hover:text-primary"
-                                    }`}
+                                    className={`flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors group cursor-pointer outline-none ${isSubActive
+                                      ? "bg-primary/5 text-primary"
+                                      : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                      }`}
                                   >
                                     <span className="mr-2.5 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
                                       <subItem.icon className="w-4 h-4" />
@@ -263,11 +273,10 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                     <Link
                       href={item.href}
                       title={item.name}
-                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all group cursor-pointer outline-none relative ${
-                        isActive
-                          ? "bg-primary/10 text-primary font-bold"
-                          : "text-gray-700 hover:bg-primary/5 hover:text-primary"
-                      }`}
+                      className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all group cursor-pointer outline-none relative ${isActive
+                        ? "bg-primary/10 text-primary font-bold"
+                        : "text-gray-700 hover:bg-primary/5 hover:text-primary"
+                        }`}
                     >
                       <item.icon className="w-5 h-5 shrink-0" />
                       {unreadCount > 0 && (
@@ -282,11 +291,10 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                   ) : (
                     <Link
                       href={item.href}
-                      className={`flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg transition-colors group cursor-pointer outline-none w-full ${
-                        isActive
-                          ? "bg-primary/10 text-primary font-bold"
-                          : "text-gray-700 hover:bg-primary/5 hover:text-primary"
-                      }`}
+                      className={`flex items-center justify-between px-3 py-2 text-sm font-semibold rounded-lg transition-colors group cursor-pointer outline-none w-full ${isActive
+                        ? "bg-primary/10 text-primary font-bold"
+                        : "text-gray-700 hover:bg-primary/5 hover:text-primary"
+                        }`}
                     >
                       <div className="flex items-center">
                         <span className="mr-3 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
@@ -329,10 +337,10 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                 {role === "doctor" && currentUser?.specialties?.length > 0
                   ? `MDS - ${currentUser.specialties.join(", ")}`
                   : role === "doctor"
-                  ? "Specialist Dentist"
-                  : role === "patient"
-                  ? (currentUser?.token || "Patient Account")
-                  : `${roleLabel} Account`}
+                    ? "Specialist Dentist"
+                    : role === "patient"
+                      ? (currentUser?.token || "Patient Account")
+                      : `${roleLabel} Account`}
               </span>
             </div>
           )}

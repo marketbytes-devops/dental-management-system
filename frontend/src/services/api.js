@@ -18,9 +18,9 @@ client.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {
       let token = null;
-      // Determine which token to use based on the browser page route rather than backend URL
-      const isPatientPage = window.location.pathname.startsWith("/patient");
-      if (isPatientPage) {
+      // Determine which token to use based on the API request URL rather than browser page route
+      const isPatientRequest = config.url && config.url.startsWith("/patient");
+      if (isPatientRequest) {
         token = localStorage.getItem("patient_jwt_token");
       } else {
         // Default to staff token, fall back to patient token if staff token doesn't exist
@@ -169,6 +169,13 @@ export const getPatientByToken = async (token) => {
 export const getConsentPdfUrl = (id) => {
   const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   return `${baseURL}/patient/consents/${id}/pdf`;
+};
+
+export const downloadConsentPdf = async (id) => {
+  const response = await client.get(`/patient/consents/${id}/pdf`, {
+    responseType: "blob"
+  });
+  return response.data;
 };
 
 // ==========================================
@@ -368,5 +375,29 @@ export const updateTreatmentPlanStep = async (stepId, stepData) => {
 
 export const deleteTreatmentPlanStep = async (stepId) => {
   const response = await client.delete(`/treatment-plan/step/${stepId}`);
+  return response.data;
+};
+
+// ==========================================
+// 8. Prescriptions & Referrals API Endpoints
+// ==========================================
+
+export const createPrescription = async (prescriptionData) => {
+  const response = await client.post("/patient/prescriptions", prescriptionData);
+  return response.data;
+};
+
+export const getPatientPrescriptions = async () => {
+  const response = await client.get("/patient/prescriptions");
+  return response.data;
+};
+
+export const createReferral = async (referralData) => {
+  const response = await client.post("/patient/referrals", referralData);
+  return response.data;
+};
+
+export const getPatientReferrals = async () => {
+  const response = await client.get("/patient/referrals");
   return response.data;
 };

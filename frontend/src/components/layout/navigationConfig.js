@@ -93,6 +93,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },
     { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings },
     { name: "My Profile", href: "/frontdesk/receptionist/profile", icon: User }
+
   ],
   accountant: [
     { name: "Dashboard", href: "/frontdesk/accountant/dashboard", icon: BarChart3 },

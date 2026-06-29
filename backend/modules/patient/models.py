@@ -1,5 +1,4 @@
-# models.py - database table definitions
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, JSON
 from sqlalchemy.sql import func
 from database import Base
 
@@ -41,6 +40,7 @@ class PatientModel(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
 class PatientConsent(Base):
     __tablename__ = "patient_consents"
 
@@ -51,17 +51,25 @@ class PatientConsent(Base):
     treatment_plan_id = Column(Integer, nullable=True)
     step_id = Column(Integer, nullable=True)
     title = Column(String, nullable=False)
-    body_text = Column(String, nullable=True)       # Used by portal consent flow
-    content = Column(String, nullable=True)          # Used by treatment plan consent flow
+    content = Column(String, nullable=True)
     status = Column(String, default="PENDING")       # PENDING, SIGNED, REJECTED
     signing_method = Column(String, nullable=True)   # PORTAL, IN_PERSON
     signature_data = Column(String, nullable=True)   # Base64 signature image or typed name
-    pdf_file_path = Column(String, nullable=True)    # PDF path (portal flow)
-    pdf_path = Column(String, nullable=True)         # PDF path (treatment plan flow)
+    pdf_file_path = Column(String, nullable=True)    # PDF path
     signed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class PatientPrescription(Base):
+    __tablename__ = "patient_prescriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_token = Column(String, index=True, nullable=False)
+    doctor_name = Column(String, nullable=False)
+    medications = Column(JSON, nullable=False)  # list of medications
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 # Alias for backward compatibility with treatment plan module
 PatientConsentModel = PatientConsent
-
+PatientPrescriptionModel = PatientPrescription

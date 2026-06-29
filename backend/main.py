@@ -15,10 +15,12 @@ from modules.treatment_plan.router import router as treatment_plan_router
 from database import Base, engine, SessionLocal
 from modules.auth.models import UserModel, StaffProfileModel
 from modules.patient.models import PatientModel, PatientConsentModel
+from modules.auth.models import UserModel
+from modules.patient.models import PatientModel, PatientConsentModel, PatientPrescriptionModel
 from modules.frontdesk.models import AppointmentModel
 from modules.frontdesk.communication_models import CommunicationLogModel
 from modules.lab.models import LabOrderModel, LabNotificationModel
-from modules.doctor.models import DoctorModel
+from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
@@ -37,7 +39,7 @@ try:
             conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR;"))
             conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS patient_id INTEGER;"))
             conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS doctor_id INTEGER;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS body_text VARCHAR;"))
+            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;"))
             conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;"))
             conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;"))
             print("Database migrations applied successfully.")

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
+import client from "@/services/api";
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
@@ -16,15 +17,10 @@ export default function AdminDashboardPage() {
 
   const fetchStats = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://127.0.0.1:8000/admin/dashboard/stats", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (!response.ok) throw new Error("Failed to load dashboard stats.");
-      const data = await response.json();
-      setStats(data);
+      const response = await client.get("/admin/dashboard/stats");
+      setStats(response.data);
     } catch (err) {
-      console.error("Failed to fetch dashboard stats", err);
+      console.warn("Failed to fetch dashboard stats", err);
       // Fallback values if API is not responding
       setStats({
         total_patients: 2543,

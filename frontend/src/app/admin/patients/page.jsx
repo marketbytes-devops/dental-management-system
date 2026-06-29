@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Users, Search, X, History, CreditCard, User, Activity, AlertTriangle, FileText, IndianRupee } from "lucide-react";
+import client from "@/services/api";
 
 export default function GlobalPatientDirectoryPage() {
 
@@ -15,16 +16,11 @@ export default function GlobalPatientDirectoryPage() {
   const fetchPatients = async () => {
     setLoading(true);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://127.0.0.1:8000/admin/patients", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (!response.ok) throw new Error("Failed to load patient directory.");
-      const data = await response.json();
-      setPatients(data);
+      const response = await client.get("/admin/patients");
+      setPatients(response.data);
     } catch (err) {
-      console.error("Failed to fetch patients, using fallback data:", err);
-      setPatients(initialPatients);
+      console.warn("Failed to fetch patients, using fallback data:", err);
+      setPatients([]);
     } finally {
       setLoading(false);
     }

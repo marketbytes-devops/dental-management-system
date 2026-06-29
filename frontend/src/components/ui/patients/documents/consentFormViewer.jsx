@@ -1,6 +1,7 @@
 import { useState } from "react";
 import SignatureCanvas from "./signatureCanvas";
 import { PenTool, Keyboard, Loader2 } from "lucide-react";
+import { signConsentDocument } from "@/services/api";
 
 export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
   const [typedName, setTypedName] = useState("");
@@ -9,31 +10,17 @@ export default function ConsentFormViewer({ doc, onSignComplete, onClose }) {
 
   const handleSignSubmit = async (signatureData) => {
     setSubmitting(true);
-    const token = localStorage.getItem("patient_jwt_token");
     const sigPayload = {
       signature_data: signatureMode === "type" ? typedName : signatureData,
-      method: signatureMode
+      signing_method: "PORTAL"
     };
 
     try {
-      const response = await fetch(`http://localhost:8000/patient/consents/${doc.id}/sign`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(sigPayload)
-      });
-
-      if (response.ok) {
-        onSignComplete(doc.id);
-      } else {
-        const err = await response.json();
-        alert(err.detail || "Failed to submit signature.");
-      }
+      await signConsentDocument(doc.id, sigPayload);
+      onSignComplete(doc.id);
     } catch (err) {
       console.error("Signature submission error:", err);
-      alert("Connection error during signature submission.");
+      alert(err.message || "Failed to submit signature.");
     } finally {
       setSubmitting(false);
     }

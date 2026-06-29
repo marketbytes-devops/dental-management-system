@@ -38,7 +38,7 @@ export default function UsersPage() {
       const data = await adminGetUsers();
       setUsers(data);
     } catch (err) {
-      console.error(err);
+      console.warn(err);
       // Resilient fallback to localStorage
       if (typeof window !== "undefined") {
         const saved = localStorage.getItem("smilecare_users");

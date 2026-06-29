@@ -474,7 +474,7 @@ def get_global_patient_directory(db: Session = Depends(get_db)):
         for order in lab_orders:
             timeline.append({
                 "date": "Today",
-                "note": f"Lab Order placed: {order.item}. Status: {order.status}.",
+                "note": f"Lab Order placed: {order.prosthetic_type}. Status: {order.status}.",
                 "type": "Lab Order"
             })
             

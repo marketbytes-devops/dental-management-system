@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getDoctors, updateDoctorStatus } from "@/services/api";
 
 const STATUS_MAP = {
   "Available": { key: "available", label: "Available", accent: "bg-green-500", avatar: "bg-green-50 text-green-800", pill: "bg-green-50 text-green-800 border-green-300" },
@@ -35,12 +36,7 @@ export default function ReceptionistDoctors() {
 
   const fetchDoctors = async () => {
     try {
-      const token = localStorage.getItem("staff_jwt_token");
-      const res = await fetch("http://127.0.0.1:8000/auth/doctors", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Failed");
+      const data = await getDoctors();
       setDoctors(data);
     } catch (err) {
       console.error(err);
@@ -51,13 +47,7 @@ export default function ReceptionistDoctors() {
 
   const handleToggleStatus = async (id) => {
     try {
-      const token = localStorage.getItem("staff_jwt_token");
-      const res = await fetch(`http://127.0.0.1:8000/auth/doctors/${id}/status`, {
-        method: "PUT",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error("Failed to cycle status.");
-      const updated = await res.json();
+      const updated = await updateDoctorStatus(id);
       setDoctors(prev => prev.map(d => d.id === id
         ? { ...d, status: updated.status, slots: updated.status === "Off Duty" ? [] : d.slots }
         : d

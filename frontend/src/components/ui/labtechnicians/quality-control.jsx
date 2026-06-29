@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getLabOrders, updateLabOrderStatus } from "@/services/api";
 
 export default function LabQualityControl() {
   const [qcCases, setQcCases] = useState([]);
@@ -20,31 +21,25 @@ export default function LabQualityControl() {
 
   const fetchCases = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const filtered = data
-          .filter(o => o.status === "QC Pending")
-          .map(o => ({
-            id: o.id,
-            patient: o.patient_name || "Walk-in Patient",
-            dentist: o.dentist_name || "Dr. Anoop Nair",
-            type: o.prosthetic_type,
-            shade: o.shade || "A2",
-            material: o.material || "Zirconia",
-            inspector: "Sneha Nair",
-            photos: []
-          }));
-        setQcCases(filtered);
-        if (filtered.length > 0) {
-          setSelectedCaseId(prev => {
-            if (filtered.some(c => c.id === prev)) return prev;
-            return filtered[0].id;
-          });
-        }
+      const data = await getLabOrders();
+      const filtered = data
+        .filter(o => o.status === "QC Pending")
+        .map(o => ({
+          id: o.id,
+          patient: o.patient_name || "Walk-in Patient",
+          dentist: o.dentist_name || "Dr. Anoop Nair",
+          type: o.prosthetic_type,
+          shade: o.shade || "A2",
+          material: o.material || "Zirconia",
+          inspector: "Sneha Nair",
+          photos: []
+        }));
+      setQcCases(filtered);
+      if (filtered.length > 0) {
+        setSelectedCaseId(prev => {
+          if (filtered.some(c => c.id === prev)) return prev;
+          return filtered[0].id;
+        });
       }
     } catch (err) {
       console.error("Failed to fetch QC cases:", err);
@@ -94,21 +89,11 @@ export default function LabQualityControl() {
       return;
     }
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/lab/orders/${currentCase.id}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: "Ready / Shipped" })
-      });
-      if (response.ok) {
-        triggerToast(`Case ${currentCase.id} passed quality inspection successfully!`);
-        setChecklist({ dimensions: false, colorMatch: false, surfaceFinish: false, accuracy: false, materialQuality: false });
-        setComments("");
-        fetchCases();
-      }
+      await updateLabOrderStatus(currentCase.id, { status: "Ready / Shipped" });
+      triggerToast(`Case ${currentCase.id} passed quality inspection successfully!`);
+      setChecklist({ dimensions: false, colorMatch: false, surfaceFinish: false, accuracy: false, materialQuality: false });
+      setComments("");
+      fetchCases();
     } catch (err) {
       console.error(err);
       triggerToast("Failed to pass inspection.", "error");
@@ -122,28 +107,18 @@ export default function LabQualityControl() {
       return;
     }
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
       const targetStatus = rework ? "In Progress" : "Rejected";
-      const response = await fetch(`http://localhost:8000/lab/orders/${currentCase.id}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          status: targetStatus,
-          rejection_reason: comments
-        })
+      await updateLabOrderStatus(currentCase.id, {
+        status: targetStatus,
+        rejection_reason: comments
       });
-      if (response.ok) {
-        const msg = rework 
-          ? `Case ${currentCase.id} rejected and sent back to production for rework.`
-          : `Case ${currentCase.id} failed inspection.`;
-        triggerToast(msg, "error");
-        setChecklist({ dimensions: false, colorMatch: false, surfaceFinish: false, accuracy: false, materialQuality: false });
-        setComments("");
-        fetchCases();
-      }
+      const msg = rework 
+        ? `Case ${currentCase.id} rejected and sent back to production for rework.`
+        : `Case ${currentCase.id} failed inspection.`;
+      triggerToast(msg, "error");
+      setChecklist({ dimensions: false, colorMatch: false, surfaceFinish: false, accuracy: false, materialQuality: false });
+      setComments("");
+      fetchCases();
     } catch (err) {
       console.error(err);
       triggerToast("Failed to fail inspection.", "error");

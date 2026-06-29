@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useState, useContext, createContext } from "react";
+import axios from "axios";
 import { Loader2, Shield, Key, User, Moon, Sun, Monitor } from "lucide-react";
 
 // ---------- Settings Context ----------
@@ -22,13 +23,10 @@ const SettingsProvider = ({ children }) => {
   // Fetch settings from backend (placeholder endpoint)
   const loadSettings = async () => {
     try {
-      const res = await fetch("/api/patient/settings", {
-        credentials: "include"
+      const response = await axios.get("/api/patient/settings", {
+        withCredentials: true
       });
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(prev => ({ ...prev, ...data }));
-      }
+      setSettings(prev => ({ ...prev, ...response.data }));
     } catch (e) {
       console.error("Failed to load settings", e);
     } finally {
@@ -44,11 +42,8 @@ const SettingsProvider = ({ children }) => {
     setSettings(prev => ({ ...prev, ...updates }));
     // Send PATCH to backend (ignore response for now)
     try {
-      await fetch("/api/patient/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(updates)
+      await axios.patch("/api/patient/settings", updates, {
+        withCredentials: true
       });
     } catch (e) {
       console.error("Failed to update settings", e);

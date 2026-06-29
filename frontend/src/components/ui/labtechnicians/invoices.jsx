@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Coins, CreditCard, Receipt } from "lucide-react";
+import { getLabOrders } from "@/services/api";
 
 export default function LabInvoices() {
   const [invoices, setInvoices] = useState([]);
@@ -10,12 +11,7 @@ export default function LabInvoices() {
 
   const fetchInvoices = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
+      const data = await getLabOrders();
         const mapped = data.map(o => {
           const suffix = o.id.split("-")[2] || "000";
           const invId = `INV-2026-${suffix}`;
@@ -69,10 +65,9 @@ export default function LabInvoices() {
             return mapped[0].id;
           });
         }
+      } catch (err) {
+        console.error("Failed to fetch invoices:", err);
       }
-    } catch (err) {
-      console.error("Failed to fetch invoices:", err);
-    }
   };
 
   useEffect(() => {

@@ -14,49 +14,11 @@ export default function PatientDocumentsPage() {
   const [activeForm, setActiveForm] = useState(null);
   const [authError, setAuthError] = useState(false);
 
-  const getHeaders = () => {
-    const token = localStorage.getItem("patient_jwt_token");
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    };
+  const handleSignComplete = async (docId) => {
+    alert("Consent form signed successfully! It has been stored in your document history.");
+    setActiveForm(null);
+    loadDocuments(); // Refresh list
   };
-
-  const handleSignComplete = async (docId, signatureDetails) => {
-    try {
-        const token = localStorage.getItem("patient_jwt_token");
-        if (!token) {
-          alert("Your session has expired. Please log in again.");
-          window.location.href = "/login";
-          return;
-        }
-        const headers = {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        };
-        
-        const res = await fetch(`http://localhost:8000/patient/consents/${docId}/sign`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-                signature_data: signatureDetails.signatureImage,
-                signing_method: "PORTAL"
-            })
-        });
-        
-        if (res.ok) {
-            alert("Consent form signed successfully! It has been stored in your document history.");
-            setActiveForm(null);
-            loadDocuments(); // Refresh list
-        } else {
-            const data = await res.json();
-            alert("Failed to sign: " + data.detail);
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Error signing document.");
-    }
-  }
 
   const loadDocuments = async () => {
     setLoading(true);
@@ -71,8 +33,6 @@ export default function PatientDocumentsPage() {
     }
 
     try {
-      const headers = getHeaders();
-
       // 1. Fetch pending
       const pendingData = await getPendingConsents();
       setPendingConsents(pendingData);
@@ -80,32 +40,8 @@ export default function PatientDocumentsPage() {
       // 2. Fetch signed
       const signedData = await getSignedConsents();
       setSignedConsents(signedData);
-      const pendingRes = await fetch("http://localhost:8000/patient/consents/pending", {
-        headers
-      });
-      if (pendingRes.ok) {
-        const pendingData = await pendingRes.json();
-        setPendingConsents(pendingData);
-      } else if (pendingRes.status === 401) {
-        setAuthError(true);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Fetch signed
-      const signedRes = await fetch("http://localhost:8000/patient/consents/documents", {
-        headers
-      });
-      if (signedRes.ok) {
-        const signedData = await signedRes.json();
-        setSignedConsents(signedData);
-      } else if (signedRes.status === 401) {
-        setAuthError(true);
-        setLoading(false);
-        return;
-      }
     } catch (err) {
-      console.error("Error loading patient documents:", err);
+      console.warn("Error loading patient documents:", err);
       // Network error or CORS block on 401 – treat as auth issue
       setAuthError(true);
     } finally {

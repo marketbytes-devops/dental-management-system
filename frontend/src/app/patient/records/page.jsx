@@ -25,6 +25,7 @@ import ActivePrescriptions from "@/components/ui/patients/records/activePrescrip
 import ReferralCard from "@/components/ui/patients/records/referralCard";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import { myAppointments, myPrescriptions } from "@/data/patientMockData";
+import { getPatientTreatmentPlan, getPendingConsents } from "@/services/api";
 
 
 export default function PatientRecordsPage() {
@@ -37,7 +38,6 @@ export default function PatientRecordsPage() {
   const [activeConsentDoc, setActiveConsentDoc] = useState(null);
 
   const patientToken = typeof window !== "undefined" ? localStorage.getItem("patient_token") : null;
-  const patientJwt = typeof window !== "undefined" ? localStorage.getItem("patient_jwt_token") : null;
 
   const fetchPlans = async () => {
     if (!patientToken) {
@@ -48,18 +48,11 @@ export default function PatientRecordsPage() {
     setPlansLoading(true);
     setPlansError("");
     try {
-      const res = await fetch(`http://localhost:8000/treatment-plan/patient/${encodeURIComponent(patientToken)}`, {
-        headers: patientJwt ? { "Authorization": `Bearer ${patientJwt}` } : {}
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPlans(data);
-      } else {
-        setPlansError("Failed to fetch treatment plans.");
-      }
+      const data = await getPatientTreatmentPlan(patientToken);
+      setPlans(data);
     } catch (err) {
       console.error(err);
-      setPlansError("Connection error. Could not load treatment plans.");
+      setPlansError(err.message || "Connection error. Could not load treatment plans.");
     } finally {
       setPlansLoading(false);
     }
@@ -76,17 +69,12 @@ export default function PatientRecordsPage() {
     if (!consentId) return;
     try {
       // Fetch consent form details
-      const res = await fetch(`http://localhost:8000/patient/consents/pending`, {
-        headers: patientJwt ? { "Authorization": `Bearer ${patientJwt}` } : {}
-      });
-      if (res.ok) {
-        const pendingList = await res.json();
-        const found = pendingList.find(c => c.id === consentId);
-        if (found) {
-          setActiveConsentDoc(found);
-        } else {
-          alert("Consent request is not in PENDING state or was already signed.");
-        }
+      const pendingList = await getPendingConsents();
+      const found = pendingList.find(c => c.id === consentId);
+      if (found) {
+        setActiveConsentDoc(found);
+      } else {
+        alert("Consent request is not in PENDING state or was already signed.");
       }
     } catch (err) {
       console.error("Error launching consent signer:", err);

@@ -24,6 +24,7 @@ import {
   Plus,
   Microscope
 } from "lucide-react";
+import { getLabOrders, updateLabOrderStatus, updateLabOrder } from "@/services/api";
 
 
 
@@ -33,28 +34,22 @@ export default function LabOrders() {
 
   const fetchOrders = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mapped = data.map(o => ({
-          id: o.id,
-          patientName: o.patient_name || "Walk-in Patient",
-          dentistName: o.dentist_name || "Dr. Anoop Nair",
-          dentistContact: o.dentist_contact || "+91 98765 43210",
-          prostheticType: o.prosthetic_type,
-          material: o.material || "Zirconia",
-          shade: o.shade || "A2",
-          priority: o.priority || "Medium",
-          dueDate: o.due_date || "2026-06-15",
-          status: o.status,
-          notes: o.notes || "",
-          rejectionReason: o.rejection_reason || ""
-        }));
-        setOrders(mapped);
-      }
+      const data = await getLabOrders();
+      const mapped = data.map(o => ({
+        id: o.id,
+        patientName: o.patient_name || "Walk-in Patient",
+        dentistName: o.dentist_name || "Dr. Anoop Nair",
+        dentistContact: o.dentist_contact || "+91 98765 43210",
+        prostheticType: o.prosthetic_type,
+        material: o.material || "Zirconia",
+        shade: o.shade || "A2",
+        priority: o.priority || "Medium",
+        dueDate: o.due_date || "2026-06-15",
+        status: o.status,
+        notes: o.notes || "",
+        rejectionReason: o.rejection_reason || ""
+      }));
+      setOrders(mapped);
     } catch (err) {
       console.error("Failed to fetch lab orders:", err);
     }
@@ -124,31 +119,20 @@ export default function LabOrders() {
 
   const updateDbStatus = async (caseId, statusValue, rejectionReason = null) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
       const body = { status: statusValue };
       if (rejectionReason) {
         body.rejection_reason = rejectionReason;
       }
-      const response = await fetch(`http://localhost:8000/lab/orders/${caseId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(body)
-      });
-      if (response.ok) {
-        if (selectedOrder && selectedOrder.id === caseId) {
-          setSelectedOrder(prev => ({
-            ...prev,
-            status: statusValue,
-            rejectionReason: rejectionReason || ""
-          }));
-        }
-        fetchOrders();
-        return true;
+      await updateLabOrderStatus(caseId, body);
+      if (selectedOrder && selectedOrder.id === caseId) {
+        setSelectedOrder(prev => ({
+          ...prev,
+          status: statusValue,
+          rejectionReason: rejectionReason || ""
+        }));
       }
-      return false;
+      fetchOrders();
+      return true;
     } catch (err) {
       console.error(err);
       return false;
@@ -347,17 +331,7 @@ export default function LabOrders() {
 
   const handleAcceptOrder = async (orderId) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/lab/orders/${orderId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: "Accepted" })
-      });
-      if (!response.ok) throw new Error("Failed to accept order");
-      
+      await updateLabOrderStatus(orderId, { status: "Accepted" });
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => ({ ...prev, status: "Accepted" }));
       }
@@ -371,17 +345,7 @@ export default function LabOrders() {
 
   const handleStartProduction = async (orderId) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/lab/orders/${orderId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: "In Progress" })
-      });
-      if (!response.ok) throw new Error("Failed to start production");
-
+      await updateLabOrderStatus(orderId, { status: "In Progress" });
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => ({ ...prev, status: "In Progress" }));
       }
@@ -395,17 +359,7 @@ export default function LabOrders() {
 
   const handleCompleteOrder = async (orderId) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/lab/orders/${orderId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: "Completed" })
-      });
-      if (!response.ok) throw new Error("Failed to complete order");
-
+      await updateLabOrderStatus(orderId, { status: "Completed" });
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => ({ ...prev, status: "Completed" }));
       }
@@ -429,17 +383,7 @@ export default function LabOrders() {
       return;
     }
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/lab/orders/${rejectTargetId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: "Rejected", rejection_reason: rejectReasonText })
-      });
-      if (!response.ok) throw new Error("Failed to reject order");
-
+      await updateLabOrderStatus(rejectTargetId, { status: "Rejected", rejection_reason: rejectReasonText });
       if (selectedOrder && selectedOrder.id === rejectTargetId) {
         setSelectedOrder((prev) => ({
           ...prev,
@@ -472,24 +416,14 @@ export default function LabOrders() {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/lab/orders/${editFormData.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          prosthetic_type: editFormData.prostheticType,
-          material: editFormData.material,
-          shade: editFormData.shade,
-          priority: editFormData.priority,
-          due_date: editFormData.dueDate,
-          notes: editFormData.notes
-        })
+      await updateLabOrder(editFormData.id, {
+        prosthetic_type: editFormData.prostheticType,
+        material: editFormData.material,
+        shade: editFormData.shade,
+        priority: editFormData.priority,
+        due_date: editFormData.dueDate,
+        notes: editFormData.notes
       });
-      if (!response.ok) throw new Error("Failed to edit order specifications");
-
       if (selectedOrder && selectedOrder.id === editFormData.id) {
         setSelectedOrder((prev) => ({
           ...prev,

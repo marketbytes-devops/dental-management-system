@@ -21,6 +21,7 @@ import {
   Truck,
   ArrowRight
 } from "lucide-react";
+import { getLabOrders, updateLabOrderStatus } from "@/services/api";
 
 const COLUMNS = ["New Cases", "Design Complete", "Milling", "Printing", "Finishing", "QC"];
 
@@ -80,31 +81,25 @@ export default function LabProduction() {
 
   const fetchDbCases = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const mapped = data.map(o => ({
-          id: o.id,
-          patient: o.patient_name || "Walk-in Patient",
-          dentist: o.dentist_name || "Dr. Anoop Nair",
-          dentistContact: o.dentist_contact || "+91 98765 43210",
-          type: o.prosthetic_type,
-          material: o.material || "Zirconia",
-          stage: "New Cases",
-          priority: o.priority || "Medium",
-          dueDate: o.due_date || "2026-06-15",
-          tech: "AJ",
-          shade: o.shade || "A2",
-          status: o.status,
-          notes: o.notes || "",
-          createdAt: o.created_at,
-          rejectionReason: o.rejection_reason || ""
-        }));
-        setDbCases(mapped);
-      }
+      const data = await getLabOrders();
+      const mapped = data.map(o => ({
+        id: o.id,
+        patient: o.patient_name || "Walk-in Patient",
+        dentist: o.dentist_name || "Dr. Anoop Nair",
+        dentistContact: o.dentist_contact || "+91 98765 43210",
+        type: o.prosthetic_type,
+        material: o.material || "Zirconia",
+        stage: "New Cases",
+        priority: o.priority || "Medium",
+        dueDate: o.due_date || "2026-06-15",
+        tech: "AJ",
+        shade: o.shade || "A2",
+        status: o.status,
+        notes: o.notes || "",
+        createdAt: o.created_at,
+        rejectionReason: o.rejection_reason || ""
+      }));
+      setDbCases(mapped);
     } catch (err) {
       console.error("Failed to fetch production cases:", err);
     }
@@ -184,24 +179,13 @@ export default function LabProduction() {
 
   const updateDbStatus = async (caseId, statusValue, rejectionReason = null) => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
       const body = { status: statusValue };
       if (rejectionReason) {
         body.rejection_reason = rejectionReason;
       }
-      const response = await fetch(`http://localhost:8000/lab/orders/${caseId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(body)
-      });
-      if (response.ok) {
-        fetchDbCases();
-        return true;
-      }
-      return false;
+      await updateLabOrderStatus(caseId, body);
+      fetchDbCases();
+      return true;
     } catch (err) {
       console.error(err);
       return false;

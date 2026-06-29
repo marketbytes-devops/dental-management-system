@@ -365,48 +365,6 @@ export default function DoctorLayout({ children }) {
               { date: new Date(q.checked_in_at).toLocaleDateString(), note: "Checked in", type: "Check-In" }
             ]
           };
-      const response = await fetch("http://127.0.0.1:8000/frontdesk/queue");
-      if (response.ok) {
-        const data = await response.json();
-
-        const doctorNameLower = currentDoctorName ? currentDoctorName.toLowerCase() : "";
-        const doctorNameWithoutTitleLower = currentDoctorName ? currentDoctorName.replace("Dr. ", "").toLowerCase() : "";
-
-        const myQueue = data.filter(q => {
-          if (!currentDoctorName) return true;
-          const qDocLower = q.doctor_name.toLowerCase();
-          return qDocLower.includes(doctorNameLower) || qDocLower.includes(doctorNameWithoutTitleLower);
-        });
-
-        const mappedQueue = myQueue.map(q => ({
-          token: q.token,
-          time: q.appointment_time,
-          status: q.status,
-          priority: q.priority,
-          id: q.id
-        }));
-
-        setQueue(mappedQueue);
-
-        setPatients(prev => {
-          const updated = { ...prev };
-          myQueue.forEach(q => {
-            updated[q.token] = {
-              token: q.token,
-              name: q.patient_name,
-              age: q.age,
-              gender: q.gender,
-              phone: q.patient_phone,
-              procedure: q.procedure || "Consultation",
-              chiefComplaint: q.chief_complaint || "Routine Checkup",
-              medicalAlerts: q.medical_alerts || [],
-              teethChart: prev[q.token]?.teethChart || {},
-              timeline: prev[q.token]?.timeline || [
-                { date: new Date(q.checked_in_at).toLocaleDateString(), note: "Checked in", type: "Check-In" }
-              ]
-            };
-          });
-          return updated;
         });
         return updated;
       });
@@ -572,20 +530,6 @@ export default function DoctorLayout({ children }) {
   const handleMarkLabDelivered = async (id) => {
     try {
       await updateLabOrderStatus(id, { status: "Delivered" });
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch(`http://localhost:8000/lab/orders/${id}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ status: "Delivered" })
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update status on backend");
-      }
-
       showNotification(`Lab Case ${id} marked as Delivered.`);
       fetchLabOrders();
     } catch (err) {
@@ -605,13 +549,6 @@ export default function DoctorLayout({ children }) {
         due_date: "2026-06-15",
         notes: `Tooth #${tooth}, Shade ${shade}`
       });
-
-      // Add to timeline locally
-      if (!response.ok) {
-        throw new Error("Failed to submit lab order to backend");
-      }
-
-      const createdOrder = await response.json();
 
       const newTimelineEvent = {
         date: "10-06-2026 (Today)",

@@ -11,31 +11,19 @@ import {
   CheckCircle2,
   FileSignature
 } from "lucide-react";
+import { getPatientTreatmentPlan } from "@/services/api";
 
 export default function TreatmentPlanManager({ patientToken }) {
   const router = useRouter();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const getHeaders = () => {
-    const token = localStorage.getItem("staff_jwt_token");
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    };
-  };
-
   const fetchPlans = async () => {
     if (!patientToken) return;
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/treatment-plan/patient/${encodeURIComponent(patientToken)}`, {
-        headers: getHeaders()
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setPlans(data);
-      }
+      const data = await getPatientTreatmentPlan(patientToken);
+      setPlans(data);
     } catch (err) {
       console.error("Error loading plans on summary card:", err);
     } finally {

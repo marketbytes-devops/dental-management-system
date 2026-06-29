@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldAlert, ArrowRight } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
+import { getProfile, getPatientProfile } from "@/services/api";
 
 // Helper to normalize roles
 const normalizeRole = (role) => {
@@ -51,39 +52,9 @@ export default function AuthGuard({ children, allowedRoles = [], type = "staff" 
       }
 
       try {
-        const endpoint = type === "patient" 
-          ? "http://127.0.0.1:8000/patient/profile" 
-          : "http://127.0.0.1:8000/auth/profile";
-
-        const res = await fetch(endpoint, {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
-
-        if (res.status === 401 || res.status === 403) {
-          // Token expired or invalid
-          localStorage.removeItem(tokenKey);
-          if (type === "patient") {
-            localStorage.removeItem("patient_token");
-            localStorage.removeItem("patient_name");
-            localStorage.removeItem("patient_phone");
-            localStorage.removeItem("patient_email");
-          } else {
-            localStorage.removeItem("staff_user");
-          }
-          if (active) {
-            router.push(type === "patient" ? "/login?role=patient" : "/login");
-          }
-          return;
-        }
-
-        if (!res.ok) {
-          throw new Error("Failed validation fetch");
-        }
-
-        const profile = await res.json();
+        const profile = type === "patient" 
+          ? await getPatientProfile() 
+          : await getProfile();
 
         // Save/Sync fresh profile details in localStorage
         if (type === "patient") {
@@ -114,7 +85,24 @@ export default function AuthGuard({ children, allowedRoles = [], type = "staff" 
           }
         }
       } catch (err) {
-        console.error("Auth verification failed, falling back to local cache:", err);
+        if (err.status === 401 || err.status === 403) {
+          // Token expired or invalid
+          localStorage.removeItem(tokenKey);
+          if (type === "patient") {
+            localStorage.removeItem("patient_token");
+            localStorage.removeItem("patient_name");
+            localStorage.removeItem("patient_phone");
+            localStorage.removeItem("patient_email");
+          } else {
+            localStorage.removeItem("staff_user");
+          }
+          if (active) {
+            router.push(type === "patient" ? "/login?role=patient" : "/login");
+          }
+          return;
+        }
+
+        console.warn("Auth verification failed, falling back to local cache:", err);
         // Resilient fallback to cached localStorage credentials if server is down
         const cachedUserStr = localStorage.getItem(type === "patient" ? "patient_name" : "staff_user");
         if (cachedUserStr) {

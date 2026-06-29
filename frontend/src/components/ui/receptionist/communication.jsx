@@ -15,8 +15,7 @@ import {
   Users,
   ChevronDown,
 } from "lucide-react";
-
-const API = "http://127.0.0.1:8000";
+import { getAllPatients, getCommunications, sendCommunication } from "@/services/api";
 
 // Message templates keyed by template name
 const TEMPLATES = {
@@ -49,7 +48,7 @@ const CHANNEL_COLORS = {
 const STATUS_COLORS = {
   Sent: "bg-blue-50 text-blue-600",
   Delivered: "bg-green-50 text-green-600",
-  Opened: "bg-purple-50 text-purple-600",
+  Opened: "bg-purple-50 text-purple-650",
   Failed: "bg-red-50 text-red-600",
 };
 
@@ -75,11 +74,8 @@ export default function ReceptionistCommunication() {
   // Fetch all patients for the patient search
   const fetchPatients = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/patient/all`);
-      if (res.ok) {
-        const data = await res.json();
-        setPatients(data);
-      }
+      const data = await getAllPatients();
+      setPatients(data);
     } catch (err) {
       console.error("Error fetching patients:", err);
     }
@@ -89,11 +85,8 @@ export default function ReceptionistCommunication() {
   const fetchLogs = useCallback(async () => {
     try {
       setIsLoadingLogs(true);
-      const res = await fetch(`${API}/frontdesk/communications`);
-      if (res.ok) {
-        const data = await res.json();
-        setLogs(data);
-      }
+      const data = await getCommunications();
+      setLogs(data);
     } catch (err) {
       console.error("Error fetching communication logs:", err);
     } finally {
@@ -171,16 +164,7 @@ export default function ReceptionistCommunication() {
         sent_by: "Receptionist",
       };
 
-      const res = await fetch(`${API}/frontdesk/communications`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Failed to send.");
-      }
+      await sendCommunication(payload);
 
       showToast(
         `${channel} notification sent to ${selectedPatient.name} successfully!`,

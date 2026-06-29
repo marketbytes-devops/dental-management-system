@@ -564,14 +564,15 @@ export default function DoctorLayout({ children }) {
         type: "Lab Order"
       };
 
-      setPatients(prev => ({
-        ...prev,
-        [viewingPatientToken]: {
-          ...prev[viewingPatientToken],
-          timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
-          teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
-        }
-      }));
+      // Add to timeline locally
+        setPatients(prev => ({
+          ...prev,
+          [viewingPatientToken]: {
+            ...prev[viewingPatientToken],
+            timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
+            teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
+          }
+        }));
 
       showNotification(`Lab order submitted to ${labName}.`);
       fetchLabOrders();

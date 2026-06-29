@@ -90,8 +90,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },
     { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },
     { name: "Leave Management", href: "/frontdesk/receptionist/leave", icon: Calendar },
-    { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },
-    { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings }
+
   ],
   accountant: [
     { name: "Dashboard", href: "/frontdesk/accountant/dashboard", icon: BarChart3 },

@@ -22,11 +22,20 @@ const normalizeRole = (role) => {
 // Helper to get default redirect path based on user roles
 const getDefaultRedirectPath = (roles) => {
   const normalized = roles.map(normalizeRole);
+
   if (normalized.includes("admin")) return "/admin/dashboard";
   if (normalized.includes("doctor")) return "/doctor/dashboard";
   if (normalized.includes("lab tech")) return "/labtechnicians/dashboard";
-  if (normalized.includes("receptionist")) return "/frontdesk";
-  if (normalized.includes("accountant")) return "/frontdesk/accountant/dashboard";
+
+  // prioritize accountant
+  if (normalized.includes("accountant")) {
+    return "/frontdesk/accountant/dashboard";
+  }
+
+  if (normalized.includes("receptionist")) {
+    return "/frontdesk/receptionist/dashboard";
+  }
+
   return "/";
 };
 
@@ -52,8 +61,8 @@ export default function AuthGuard({ children, allowedRoles = [], type = "staff" 
       }
 
       try {
-        const profile = type === "patient" 
-          ? await getPatientProfile() 
+        const profile = type === "patient"
+          ? await getPatientProfile()
           : await getProfile();
 
         // Save/Sync fresh profile details in localStorage

@@ -636,6 +636,7 @@ export default function DoctorLayout({ children }) {
           type: "Lab Order"
         };
 
+      // Add to timeline locally
         setPatients(prev => ({
           ...prev,
           [viewingPatientToken]: {

@@ -667,6 +667,7 @@ const handleToggleToothState = (tooth) => {
     type: "Lab Order"
   };
 
+<<<<<<< HEAD
   setPatients(prev => ({
     ...prev,
     [viewingPatientToken]: {
@@ -674,6 +675,36 @@ const handleToggleToothState = (tooth) => {
       teethChart: {
         ...prev[viewingPatientToken].teethChart,
         [tooth]: newStatus
+=======
+        // Add to timeline locally
+        if (!response.ok) {
+          throw new Error("Failed to submit lab order to backend");
+        }
+
+        const createdOrder = await response.json();
+
+        const newTimelineEvent = {
+          date: "10-06-2026 (Today)",
+          note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
+          type: "Lab Order"
+        };
+
+      // Add to timeline locally
+        setPatients(prev => ({
+          ...prev,
+          [viewingPatientToken]: {
+            ...prev[viewingPatientToken],
+            timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
+            teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
+          }
+        }));
+
+        showNotification(`Lab order submitted to ${labName}.`);
+        fetchLabOrders();
+      } catch (err) {
+        console.error("Error submitting lab order:", err);
+        showNotification("Failed to submit lab order.");
+>>>>>>> cc350a6cbb1d22ee4ecb84a8476831e1637b2f30
       }
     }
   }));

@@ -3,6 +3,55 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+<<<<<<< HEAD
+
+const navItems = [
+  { name: "Dashboard", href: "/admin/dashboard", icon: "📊" },
+  { name: "User Management", href: "/admin/users", icon: "👥" },
+  { name: "Role Permissions", href: "/admin/roles", icon: "🔑" },
+  { name: "System Logs", href: "/admin/logs", icon: "📝" },
+  {
+    name: "Lab Technician",
+    icon: "🔬",
+    subItems: [
+      { name: "Dashboard", href: "/admin/labtechnicians/dashboard", icon: "📊" },
+      { name: "Lab Orders", href: "/admin/labtechnicians/orders", icon: "📋" },
+      { name: "Case Tracking", href: "/admin/labtechnicians/case-tracking", icon: "🔍" },
+      { name: "CAD Design", href: "/admin/labtechnicians/cad-design", icon: "💻" },
+      { name: "Production", href: "/admin/labtechnicians/production", icon: "🏗️" },
+      { name: "Quality Control", href: "/admin/labtechnicians/quality-control", icon: "✅" },
+      { name: "Dispatch", href: "/admin/labtechnicians/dispatch", icon: "🚚" },
+      { name: "Invoices", href: "/admin/labtechnicians/invoices", icon: "💵" },
+      { name: "Warranty", href: "/admin/labtechnicians/warranty", icon: "🛡️" },
+      { name: "Reports", href: "/admin/labtechnicians/reports", icon: "📈" },
+      { name: "Notifications", href: "/admin/labtechnicians/notifications", icon: "🔔" },
+      { name: "Settings", href: "/admin/labtechnicians/settings", icon: "⚙️" },
+    ],
+  },
+];
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const [openDropdowns, setOpenDropdowns] = useState({});
+
+  useEffect(() => {
+    if (pathname) {
+      navItems.forEach((item) => {
+        if (item.subItems) {
+          const hasActiveSub = item.subItems.some((sub) => pathname === sub.href);
+          if (hasActiveSub) {
+            setOpenDropdowns((prev) => ({ ...prev, [item.name]: true }));
+          }
+        }
+      });
+    }
+  }, [pathname]);
+
+  const toggleDropdown = (name) => {
+    setOpenDropdowns((prev) => ({ ...prev, [name]: !prev[name] }));
+  };
+
+=======
 import { ChevronLeft, ChevronRight, Stethoscope } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
 import { ROLE_NAV_ITEMS } from "./navigationConfig";
@@ -126,6 +175,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
 
   const avatarChar = currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "U";
 
+>>>>>>> 092eefe32ff63a058de1c8b027d4bca9ce2bde7a
   return (
     <div className={`bg-white border-r border-gray-200 flex flex-col h-full shadow-sm transition-all duration-300 relative ${isMinimized ? "w-16" : "w-64"}`}>
       {/* Floating Toggle Button (visible if minimization handler provided) */}
@@ -165,15 +215,77 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
             </p>
           )}
           <ul className="space-y-1">
+<<<<<<< HEAD
+            {navItems.map((item) => {
+              const hasSubItems = !!item.subItems;
+              const isOpen = !!openDropdowns[item.name];
+              const isActive =
+                pathname === item.href ||
+                (hasSubItems && item.subItems.some((sub) => pathname === sub.href));
+=======
             {filteredNavItems.map((item) => {
               const hasSubItems = !!item.subItems;
               const isParentActive = hasSubItems && pathname.startsWith(item.href);
               const isActive = !hasSubItems && pathname === item.href;
               const isOpen = !!openDropdowns[item.name];
+>>>>>>> 092eefe32ff63a058de1c8b027d4bca9ce2bde7a
 
               if (hasSubItems) {
                 return (
                   <li key={item.name} className="flex flex-col">
+<<<<<<< HEAD
+                    <button
+                      onClick={() => toggleDropdown(item.name)}
+                      className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors group cursor-pointer outline-none ${
+                        isActive
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-gray-700 hover:bg-primary/5 hover:text-primary"
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <span className="mr-3 text-lg opacity-70 group-hover:opacity-100">{item.icon}</span>
+                        {item.name}
+                      </div>
+                      <svg
+                        className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${
+                          isOpen ? "transform rotate-180" : ""
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    <div
+                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                        isOpen ? "max-h-[500px] opacity-100 mt-1" : "max-h-0 opacity-0 pointer-events-none"
+                      }`}
+                    >
+                      <ul className="pl-4 space-y-1 border-l-2 border-gray-100 ml-5">
+                        {item.subItems.map((subItem) => {
+                          const isSubActive = pathname === subItem.href;
+                          return (
+                            <li key={subItem.name}>
+                              <Link
+                                href={subItem.href}
+                                className={`flex items-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors group ${
+                                  isSubActive
+                                    ? "bg-primary/5 text-primary font-semibold"
+                                    : "text-gray-600 hover:bg-primary/5 hover:text-primary"
+                                }`}
+                              >
+                                <span className="mr-2.5 text-sm opacity-70 group-hover:opacity-100">{subItem.icon}</span>
+                                {subItem.name}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+=======
                     {isMinimized ? (
                       <div className="flex justify-center">
                         <Link
@@ -249,10 +361,26 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                         </div>
                       </>
                     )}
+>>>>>>> 092eefe32ff63a058de1c8b027d4bca9ce2bde7a
                   </li>
                 );
               }
 
+<<<<<<< HEAD
+              return (
+                <li key={item.name}>
+                  <Link
+                    href={item.href}
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors group ${
+                      isActive
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-gray-700 hover:bg-primary/5 hover:text-primary"
+                    }`}
+                  >
+                    <span className="mr-3 text-lg opacity-70 group-hover:opacity-100">{item.icon}</span>
+                    {item.name}
+                  </Link>
+=======
               const unreadCount = getUnreadCount(item.href);
 
               return (
@@ -302,6 +430,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                       )}
                     </Link>
                   )}
+>>>>>>> 092eefe32ff63a058de1c8b027d4bca9ce2bde7a
                 </li>
               );
             })}

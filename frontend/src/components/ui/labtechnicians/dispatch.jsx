@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Package, Truck, CheckCircle } from "lucide-react";
+import { getLabOrders, updateLabOrderStatus } from "@/services/api";
 
 export default function LabDispatch() {
   const [shipments, setShipments] = useState([]);
@@ -9,45 +10,39 @@ export default function LabDispatch() {
 
   const fetchShipments = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/lab/orders", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const filtered = data
-          .filter(o => o.status === "Ready / Shipped" || o.status === "Completed" || o.status === "Delivered")
-          .map(o => {
-            const suffix = o.id.split("-")[2] || "000";
-            const trackingId = `TRK-2026-${suffix}`;
-            
-            let status = "Ready";
-            let estDelivery = "Tomorrow, 02:00 PM";
-            let dispatchDate = "Pending Dispatch";
-            if (o.status === "Completed" || o.status === "Delivered") {
-              status = "Delivered";
-              dispatchDate = "2026-06-10 10:15 AM";
-              estDelivery = "2026-06-10 03:30 PM";
-            }
-            
-            return {
-              id: trackingId,
-              caseId: o.id,
-              patient: o.patient_name || "Walk-in Patient",
-              dentist: o.dentist_name || "Dr. Anoop Nair",
-              courier: "SmileCare Express",
-              dispatchDate: dispatchDate,
-              estDelivery: estDelivery,
-              status: status
-            };
-          });
-        setShipments(filtered);
-        if (filtered.length > 0) {
-          setSelectedTrackId(prev => {
-            if (filtered.some(s => s.id === prev)) return prev;
-            return filtered[0].id;
-          });
-        }
+      const data = await getLabOrders();
+      const filtered = data
+        .filter(o => o.status === "Ready / Shipped" || o.status === "Completed" || o.status === "Delivered")
+        .map(o => {
+          const suffix = o.id.split("-")[2] || "000";
+          const trackingId = `TRK-2026-${suffix}`;
+          
+          let status = "Ready";
+          let estDelivery = "Tomorrow, 02:00 PM";
+          let dispatchDate = "Pending Dispatch";
+          if (o.status === "Completed" || o.status === "Delivered") {
+            status = "Delivered";
+            dispatchDate = "2026-06-10 10:15 AM";
+            estDelivery = "2026-06-10 03:30 PM";
+          }
+          
+          return {
+            id: trackingId,
+            caseId: o.id,
+            patient: o.patient_name || "Walk-in Patient",
+            dentist: o.dentist_name || "Dr. Anoop Nair",
+            courier: "SmileCare Express",
+            dispatchDate: dispatchDate,
+            estDelivery: estDelivery,
+            status: status
+          };
+        });
+      setShipments(filtered);
+      if (filtered.length > 0) {
+        setSelectedTrackId(prev => {
+          if (filtered.some(s => s.id === prev)) return prev;
+          return filtered[0].id;
+        });
       }
     } catch (err) {
       console.error("Failed to fetch shipments:", err);
@@ -177,18 +172,8 @@ export default function LabDispatch() {
                           <button 
                             onClick={async () => {
                               try {
-                                const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-                                const response = await fetch(`http://localhost:8000/lab/orders/${s.caseId}/status`, {
-                                  method: "PUT",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
-                                  },
-                                  body: JSON.stringify({ status: "Completed" })
-                                });
-                                if (response.ok) {
-                                  fetchShipments();
-                                }
+                                await updateLabOrderStatus(s.caseId, { status: "Completed" });
+                                fetchShipments();
                               } catch (err) {
                                 console.error(err);
                               }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import client from "@/services/api";
 
 export default function ReceptionistRecords() {
   const [records, setRecords] = useState([]);
@@ -10,13 +11,8 @@ export default function ReceptionistRecords() {
   const fetchRecords = async () => {
     try {
       setIsLoading(true);
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const response = await fetch("http://localhost:8000/frontdesk/records", {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (!response.ok) throw new Error("Failed to fetch EDR records.");
-      const data = await response.json();
-      setRecords(data);
+      const response = await client.get("/frontdesk/records");
+      setRecords(response.data);
     } catch (err) {
       console.error("Error fetching EDR records:", err);
     } finally {

@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { UserCheck, AlertTriangle, Clock, KeyRound, CheckCircle, Shield } from "lucide-react";
+import { 
+  getTodayAppointments, 
+  getQueue, 
+  getDoctors, 
+  directCheckin, 
+  updateAppointmentStatus, 
+  sendAppointmentOtp 
+} from "@/services/api";
 
 export default function ReceptionistCheckIn() {
   const [appointments, setAppointments] = useState([]);
@@ -17,39 +25,28 @@ export default function ReceptionistCheckIn() {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const token = typeof window !== "undefined" ? localStorage.getItem("staff_jwt_token") : null;
-      const headers = token ? { "Authorization": `Bearer ${token}` } : {};
 
-      // Fetch today's appointments
-      const apptsRes = await fetch("http://localhost:8000/frontdesk/appointments/today");
-      if (apptsRes.ok) {
-        const apptsData = await apptsRes.json();
-        setAppointments(apptsData);
+      // Fetch all required data in parallel using client helpers
+      const [apptsData, queueData, doctorsData] = await Promise.all([
+        getTodayAppointments(),
+        getQueue(),
+        getDoctors()
+      ]);
 
-        const pendingOtp = apptsData.filter(a => a.status === "Pending OTP" || a.otp_status === "Pending" || a.otp_status === "Sent");
-        setPendingOtpPatients(pendingOtp);
-      }
+      setAppointments(apptsData);
+      const pendingOtp = apptsData.filter(a => a.status === "Pending OTP" || a.otp_status === "Pending" || a.otp_status === "Sent");
+      setPendingOtpPatients(pendingOtp);
 
-      // Fetch live waiting queue
-      const queueRes = await fetch("http://localhost:8000/frontdesk/queue");
-      if (queueRes.ok) {
-        const queueData = await queueRes.json();
-        setActiveQueue(queueData);
-      }
+      setActiveQueue(queueData);
 
-      // Fetch live doctors status
-      const doctorsRes = await fetch("http://localhost:8000/auth/doctors", { headers });
-      if (doctorsRes.ok) {
-        const doctorsData = await doctorsRes.json();
-        setDoctorsList(doctorsData);
-        if (doctorsData.length > 0 && !assignedDoctor) {
-          // Default to first active doctor
-          const activeDocs = doctorsData.filter(d => d.status !== "Off Duty");
-          if (activeDocs.length > 0) {
-            setAssignedDoctor(activeDocs[0].name);
-          } else {
-            setAssignedDoctor(doctorsData[0].name);
-          }
+      setDoctorsList(doctorsData);
+      if (doctorsData.length > 0 && !assignedDoctor) {
+        // Default to first active doctor
+        const activeDocs = doctorsData.filter(d => d.status !== "Off Duty");
+        if (activeDocs.length > 0) {
+          setAssignedDoctor(activeDocs[0].name);
+        } else {
+          setAssignedDoctor(doctorsData[0].name);
         }
       }
     } catch (err) {
@@ -77,71 +74,44 @@ export default function ReceptionistCheckIn() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${selectedAppId}/direct-checkin?priority=${priority}&doctor_name=${assignedDoctor}`, {
-        method: "POST"
-      });
-      if (response.ok) {
-        alert("Patient checked in directly. Added to live queue.");
-        setSelectedAppId("");
-        fetchData();
-      } else {
-        const err = await response.json();
-        alert(err.detail || "Direct check-in failed.");
-      }
+      await directCheckin(selectedAppId, priority, assignedDoctor);
+      alert("Patient checked in directly. Added to live queue.");
+      setSelectedAppId("");
+      fetchData();
     } catch (err) {
-      alert("Error checking in patient.");
+      alert("Error checking in patient: " + (err.message || "Direct check-in failed."));
     }
   };
 
   // Checkout patient
   const handleCheckout = async (id, name) => {
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Completed" })
-      });
-      if (response.ok) {
-        alert(`Patient ${name} checked out. Billing invoice updated.`);
-        fetchData();
-      } else {
-        const err = await response.json();
-        alert(err.detail || "Checkout failed.");
-      }
+      await updateAppointmentStatus(id, { status: "Completed" });
+      alert(`Patient ${name} checked out. Billing invoice updated.`);
+      fetchData();
     } catch (err) {
-      alert("Error checking out patient.");
+      alert("Error checking out patient: " + (err.message || "Checkout failed."));
     }
   };
 
   // Call patient to dental chair
   const handleCallToChair = async (id) => {
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "In Chair" })
-      });
-      if (response.ok) {
-        fetchData();
-      }
+      await updateAppointmentStatus(id, { status: "In Chair" });
+      fetchData();
     } catch (err) {
-      alert("Error calling patient to chair.");
+      alert("Error calling patient to chair: " + (err.message || "Failed."));
     }
   };
 
   // Send OTP trigger
   const handleSendOtp = async (id, phone, name) => {
     try {
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/send-otp`, {
-        method: "POST"
-      });
-      if (response.ok) {
-        const data = await response.json();
-        alert(`OTP Code (${data.otp}) sent to registered number (${phone}) for patient ${name}.`);
-        fetchData();
-      }
+      const data = await sendAppointmentOtp(id);
+      alert(`OTP Code (${data.otp}) sent to registered number (${phone}) for patient ${name}.`);
+      fetchData();
     } catch (err) {
-      alert("Error sending OTP.");
+      alert("Error sending OTP: " + (err.message || "Failed."));
     }
   };
 
@@ -149,15 +119,11 @@ export default function ReceptionistCheckIn() {
   const handleBypassOtp = async (id, name, isEmergency) => {
     try {
       const pLevel = isEmergency ? "Emergency" : "Routine";
-      const response = await fetch(`http://localhost:8000/frontdesk/appointments/${id}/direct-checkin?priority=${pLevel}`, {
-        method: "POST"
-      });
-      if (response.ok) {
-        alert(`OTP bypassed for ${name}. Patient entered queue with ${pLevel} priority.`);
-        fetchData();
-      }
+      await directCheckin(id, pLevel);
+      alert(`OTP bypassed for ${name}. Patient entered queue with ${pLevel} priority.`);
+      fetchData();
     } catch (err) {
-      alert("Error bypassing OTP.");
+      alert("Error bypassing OTP: " + (err.message || "Failed."));
     }
   };
 

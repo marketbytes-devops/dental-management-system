@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, CheckSquare, Hourglass, Stethoscope, Users } from "lucide-react";
+import { getTodayAppointments, getQueue, updateAppointmentStatus } from "@/services/api";
 
 export default function ReceptionistDashboard() {
   const [appointments, setAppointments] = useState([]);
@@ -11,17 +12,12 @@ export default function ReceptionistDashboard() {
   // Fetch today's appointments and the live queue from backend
   const fetchDashboardData = async () => {
     try {
-      const apptsRes = await fetch("http://127.0.0.1:8000/frontdesk/appointments/today");
-      if (apptsRes.ok) {
-        const apptsData = await apptsRes.json();
-        setAppointments(apptsData);
-      }
-
-      const queueRes = await fetch("http://127.0.0.1:8000/frontdesk/queue");
-      if (queueRes.ok) {
-        const queueData = await queueRes.json();
-        setQueue(queueData);
-      }
+      const [apptsData, queueData] = await Promise.all([
+        getTodayAppointments(),
+        getQueue()
+      ]);
+      setAppointments(apptsData);
+      setQueue(queueData);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
     }
@@ -40,14 +36,8 @@ export default function ReceptionistDashboard() {
     }
     try {
       // Complete or Cancel the appointment to remove from queue
-      const response = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Completed" })
-      });
-      if (response.ok) {
-        fetchDashboardData();
-      }
+      await updateAppointmentStatus(id, { status: "Completed" });
+      fetchDashboardData();
     } catch (err) {
       console.error("Error removing from queue:", err);
     }

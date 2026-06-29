@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { Search, UserCheck, Calendar, Shield, Clock } from "lucide-react";
+import { 
+  getDoctorLeaves, 
+  getAllPatients, 
+  getFrontdeskDoctors, 
+  registerPatient, 
+  createAppointment, 
+  directCheckin 
+} from "@/services/api";
 
 export default function ReceptionistPatients() {
   const [patients, setPatients] = useState([]);
@@ -57,11 +65,8 @@ export default function ReceptionistPatients() {
         return;
       }
       try {
-        const response = await fetch(`http://127.0.0.1:8000/leave/doctor/leaves?doctor_name=${encodeURIComponent(bookingForm.doctor_name)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setDoctorLeaves(data);
-        }
+        const data = await getDoctorLeaves(bookingForm.doctor_name);
+        setDoctorLeaves(data);
       } catch (e) {
         console.error("Failed to fetch doctor leaves:", e);
       }
@@ -93,11 +98,8 @@ export default function ReceptionistPatients() {
   const fetchPatients = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("http://127.0.0.1:8000/patient/all");
-      if (response.ok) {
-        const data = await response.json();
-        setPatients(data);
-      }
+      const data = await getAllPatients();
+      setPatients(data);
     } catch (err) {
       console.error("Error fetching patients:", err);
     } finally {
@@ -113,16 +115,10 @@ export default function ReceptionistPatients() {
   useEffect(() => {
     const fetchDoctorsForDate = async () => {
       try {
-        const url = bookingForm.appointment_date
-          ? `http://127.0.0.1:8000/frontdesk/doctors?date=${bookingForm.appointment_date}`
-          : "http://127.0.0.1:8000/frontdesk/doctors";
-        const doctorsRes = await fetch(url);
-        if (doctorsRes.ok) {
-          const doctorsData = await doctorsRes.json();
-          setDoctors(doctorsData);
-          if (doctorsData.length > 0 && !doctorsData.some(d => d.name === bookingForm.doctor_name)) {
-            setBookingForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
-          }
+        const doctorsData = await getFrontdeskDoctors(bookingForm.appointment_date);
+        setDoctors(doctorsData);
+        if (doctorsData.length > 0 && !doctorsData.some(d => d.name === bookingForm.doctor_name)) {
+          setBookingForm(prev => ({ ...prev, doctor_name: doctorsData[0].name }));
         }
       } catch (err) {
         console.error("Error fetching doctors for date:", err);
@@ -186,17 +182,7 @@ export default function ReceptionistPatients() {
         known_allergies: form.known_allergies.trim() || null,
       };
 
-      const response = await fetch("http://127.0.0.1:8000/patient/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Registration failed.");
-      }
+      const data = await registerPatient(payload);
 
       // Success
       alert(`Patient ${data.name} registered successfully! ID Token: ${data.token}`);
@@ -253,29 +239,14 @@ export default function ReceptionistPatients() {
         priority: bookingForm.priority
       };
 
-      const response = await fetch("http://127.0.0.1:8000/frontdesk/appointments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Booking failed.");
-      }
+      const data = await createAppointment(payload);
 
       let successMsg = `Appointment scheduled successfully for ${registeredPatient.name}!`;
 
       // If direct check-in requested, call direct-checkin bypass endpoint
       if (bookingForm.directCheckIn) {
-        const checkinResponse = await fetch(`http://127.0.0.1:8000/frontdesk/appointments/${data.id}/direct-checkin?priority=${bookingForm.priority}&doctor_name=${bookingForm.doctor_name}`, {
-          method: "POST",
-        });
-        const checkinData = await checkinResponse.json();
-        if (checkinResponse.ok) {
-          successMsg += ` Patient has been checked in directly to queue. Estimated wait: ${checkinData.wait_time_estimate} mins.`;
-        }
+        const checkinData = await directCheckin(data.id, bookingForm.priority, bookingForm.doctor_name);
+        successMsg += ` Patient has been checked in directly to queue. Estimated wait: ${checkinData.wait_time_estimate} mins.`;
       }
 
       alert(successMsg);

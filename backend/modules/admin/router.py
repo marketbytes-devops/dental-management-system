@@ -306,7 +306,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
                 break
         revenue_today += cost
         
-    realized_revenue = revenue_today if revenue_today > 0 else 45200
+    realized_revenue = revenue_today
     
     # 4. System Alerts
     emergency_count = db.query(AppointmentModel).filter(
@@ -314,7 +314,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         AppointmentModel.priority == "Emergency"
     ).count()
     inactive_users_count = db.query(UserModel).filter(UserModel.status == "Inactive").count()
-    alerts_count = emergency_count + inactive_users_count + 3 # base 3 alerts to match UI default
+    alerts_count = emergency_count + inactive_users_count
     
     # 5. Recent Activity
     recent_users = db.query(UserModel).order_by(UserModel.created_at.desc()).limit(3).all()

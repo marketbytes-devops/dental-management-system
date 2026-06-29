@@ -27,8 +27,7 @@ export default function RolesPermissionsPage() {
     { id: "notes", name: "Clinical Notes", desc: "Add clinical diagnoses and edit interactive tooth charts.", icon: Stethoscope },
     { id: "rx", name: "Prescriptions", desc: "Draft, print, and save medications for active chair patients.", icon: FileText },
     { id: "labs", name: "Lab Orders", desc: "Submit and track restorative orders sent to external milling labs.", icon: Microscope },
-    { id: "billing", name: "Billing & Accountant", desc: "Manage invoices, payments, claims, and financial logs.", icon: Coins },
-    { id: "logs", name: "System Logs", desc: "View server activities, error reports, and audit trails.", icon: FileEdit }
+    { id: "billing", name: "Billing & Accountant", desc: "Manage invoices, payments, claims, and financial logs.", icon: Coins }
   ];
 
   // Default database states for each role
@@ -42,8 +41,7 @@ export default function RolesPermissionsPage() {
         notes: { read: true, write: true, delete: true },
         rx: { read: true, write: true, delete: true },
         labs: { read: true, write: true, delete: true },
-        billing: { read: true, write: true, delete: true },
-        logs: { read: true, write: true, delete: true }
+        billing: { read: true, write: true, delete: true }
       }
     },
     Doctor: {
@@ -55,8 +53,7 @@ export default function RolesPermissionsPage() {
         notes: { read: true, write: true, delete: false },
         rx: { read: true, write: true, delete: false },
         labs: { read: true, write: true, delete: false },
-        billing: { read: true, write: false, delete: false },
-        logs: { read: false, write: false, delete: false }
+        billing: { read: true, write: false, delete: false }
       }
     },
     Receptionist: {
@@ -68,8 +65,7 @@ export default function RolesPermissionsPage() {
         notes: { read: false, write: false, delete: false },
         rx: { read: false, write: false, delete: false },
         labs: { read: false, write: false, delete: false },
-        billing: { read: true, write: true, delete: false },
-        logs: { read: false, write: false, delete: false }
+        billing: { read: true, write: true, delete: false }
       }
     },
     "Lab Tech": {
@@ -81,8 +77,7 @@ export default function RolesPermissionsPage() {
         notes: { read: true, write: false, delete: false },
         rx: { read: false, write: false, delete: false },
         labs: { read: true, write: true, delete: false },
-        billing: { read: false, write: false, delete: false },
-        logs: { read: false, write: false, delete: false }
+        billing: { read: false, write: false, delete: false }
       }
     },
     Accountant: {
@@ -94,8 +89,7 @@ export default function RolesPermissionsPage() {
         notes: { read: false, write: false, delete: false },
         rx: { read: false, write: false, delete: false },
         labs: { read: true, write: false, delete: false },
-        billing: { read: true, write: true, delete: true },
-        logs: { read: true, write: false, delete: false }
+        billing: { read: true, write: true, delete: true }
       }
     }
   };
@@ -108,7 +102,7 @@ export default function RolesPermissionsPage() {
   const getRoleMetrics = (role) => {
     const rolePermissionsObj = rolesData[role].permissions;
     let authorizedCount = 0;
-    const totalCount = modules.length * 3; // 8 modules * 3 permissions (Read, Write, Delete) = 24
+    const totalCount = modules.length * 3; // 7 modules * 3 permissions (Read, Write, Delete) = 21
 
     Object.values(rolePermissionsObj).forEach(perms => {
       if (perms.read) authorizedCount++;

@@ -136,6 +136,11 @@ export const getPatientProfile = async () => {
   return response.data;
 };
 
+export const updatePatientProfile = async (profileData) => {
+  const response = await client.put("/patient/profile", profileData);
+  return response.data;
+};
+
 export const changePatientPassword = async (passwordData) => {
   const response = await client.post("/patient/change-password", passwordData);
   return response.data;

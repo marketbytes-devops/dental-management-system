@@ -10,7 +10,6 @@ export default function DoctorWorkspaceRootPage() {
 
   useEffect(() => {
     if (!viewingPatient) {
-      router.replace("/doctor/dashboard");
       return;
     }
 

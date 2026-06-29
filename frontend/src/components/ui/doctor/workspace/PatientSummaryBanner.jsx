@@ -10,7 +10,8 @@ export default function PatientSummaryBanner({
   onCallNextPatient,
   onSimulateEmergency,
   onReturnToActivePatient,
-  onGoBack
+  onGoBack,
+  onCompleteConsultation
 }) {
   if (!viewingPatient) return null;
 
@@ -44,9 +45,17 @@ export default function PatientSummaryBanner({
               <span>📂</span> View Previous Patient
             </button>
           )}
+          {!isHistorical && (
+            <button
+              onClick={onCompleteConsultation}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-emerald-500/10 cursor-pointer outline-none border-none"
+            >
+              <span>✅</span> Complete Consultation
+            </button>
+          )}
           <button
             onClick={onCallNextPatient}
-            className="px-4 py-2 bg-primary text-white hover:bg-primary/95 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-primary/10 cursor-pointer outline-none"
+            className="px-4 py-2 bg-primary text-white hover:bg-primary/95 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-primary/10 cursor-pointer outline-none border-none"
           >
             <span>📢</span> Call Next Patient
           </button>

@@ -186,35 +186,54 @@ def update_treatment_plan(
         ).update({"status": "Archived"})
         db.commit()
 
+    # Update attending doctor name to the logged in doctor modifying the plan
+    staff = db.query(UserModel).filter(UserModel.id == current_user["user_id"]).first()
+    raw_name = str(staff.name) if (staff and staff.name) else "Doctor"
+    doctor_name = raw_name if raw_name.startswith("Dr. ") else f"Dr. {raw_name}"
+    plan.doctor_name = doctor_name
+
     for key, val in update_data.items():
         setattr(plan, key, val)
     db.commit()
 
-    # If active/finalized, auto-create consent requests for steps requiring consent
+    # If active/finalized, auto-create/update consent requests for steps requiring consent
     if plan.status == "Active":
         patient = db.query(PatientModel).filter(PatientModel.token == plan.patient_token).first()
         patient_name = patient.name if patient else "Patient"
         
         steps = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.plan_id == plan.id).all()
         for step in steps:
-            if step.requires_consent and not step.consent_id:
-                # Create a consent request record
-                consent = PatientConsentModel(
-                    patient_id=patient.id if patient else None,
-                    patient_token=plan.patient_token,
-                    treatment_plan_id=plan.id,
-                    step_id=step.id,
-                    title=f"Consent Form: {step.title}",
-                    content=make_consent_content(patient_name, plan.doctor_name, step.title, step.details),
-                    status="PENDING"
-                )
-                db.add(consent)
-                db.commit()
-                db.refresh(consent)
+            if step.requires_consent:
+                need_new = False
+                new_content = make_consent_content(patient_name, plan.doctor_name, step.title, step.details)
                 
-                step.consent_id = consent.id
-                step.consent_status = "Pending"
-                db.commit()
+                if not step.consent_id:
+                    need_new = True
+                else:
+                    existing = db.query(PatientConsentModel).filter(PatientConsentModel.id == step.consent_id).first()
+                    if not existing:
+                        need_new = True
+                    elif existing.content != new_content:
+                        need_new = True
+
+                if need_new:
+                    # Create a brand new consent request record
+                    consent = PatientConsentModel(
+                        patient_id=patient.id if patient else None,
+                        patient_token=plan.patient_token,
+                        treatment_plan_id=plan.id,
+                        step_id=step.id,
+                        title=f"Consent Form: {step.title}",
+                        content=new_content,
+                        status="PENDING"
+                    )
+                    db.add(consent)
+                    db.commit()
+                    db.refresh(consent)
+                    
+                    step.consent_id = consent.id
+                    step.consent_status = "Pending"
+                    db.commit()
 
     db.refresh(plan)
     plan.steps = db.query(TreatmentPlanStepModel).filter(
@@ -386,7 +405,11 @@ def update_plan_status(
             TreatmentPlanModel.patient_token == plan.patient_token,
             TreatmentPlanModel.status == "Active"
         ).update({"status": "Archived"})
-        db.commit()
+    # Update attending doctor name to the logged in doctor activating the plan
+    staff = db.query(UserModel).filter(UserModel.id == current_user["user_id"]).first()
+    raw_name = str(staff.name) if (staff and staff.name) else "Doctor"
+    doctor_name = raw_name if raw_name.startswith("Dr. ") else f"Dr. {raw_name}"
+    plan.doctor_name = doctor_name
 
     plan.status = status_update.status
     db.commit()
@@ -398,23 +421,36 @@ def update_plan_status(
         
         steps = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.plan_id == plan.id).all()
         for step in steps:
-            if step.requires_consent and not step.consent_id:
-                consent = PatientConsentModel(
-                    patient_id=patient.id if patient else None,
-                    patient_token=plan.patient_token,
-                    treatment_plan_id=plan.id,
-                    step_id=step.id,
-                    title=f"Consent Form: {step.title}",
-                    content=make_consent_content(patient_name, plan.doctor_name, step.title, step.details),
-                    status="PENDING"
-                )
-                db.add(consent)
-                db.commit()
-                db.refresh(consent)
+            if step.requires_consent:
+                need_new = False
+                new_content = make_consent_content(patient_name, plan.doctor_name, step.title, step.details)
                 
-                step.consent_id = consent.id
-                step.consent_status = "Pending"
-                db.commit()
+                if not step.consent_id:
+                    need_new = True
+                else:
+                    existing = db.query(PatientConsentModel).filter(PatientConsentModel.id == step.consent_id).first()
+                    if not existing:
+                        need_new = True
+                    elif existing.content != new_content:
+                        need_new = True
+
+                if need_new:
+                    consent = PatientConsentModel(
+                        patient_id=patient.id if patient else None,
+                        patient_token=plan.patient_token,
+                        treatment_plan_id=plan.id,
+                        step_id=step.id,
+                        title=f"Consent Form: {step.title}",
+                        content=new_content,
+                        status="PENDING"
+                    )
+                    db.add(consent)
+                    db.commit()
+                    db.refresh(consent)
+                    
+                    step.consent_id = consent.id
+                    step.consent_status = "Pending"
+                    db.commit()
 
     db.refresh(plan)
     plan.steps = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.plan_id == plan.id).all()

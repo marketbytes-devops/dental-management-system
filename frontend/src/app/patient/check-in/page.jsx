@@ -90,7 +90,7 @@ export default function CheckInPage() {
       const todayStr = new Date().toISOString().split("T")[0];
       
       const formatted = data
-        .filter(appt => appt.appointment_date === todayStr)
+        .filter(appt => appt.appointment_date === todayStr && !["Completed", "Checked Out", "Cancelled"].includes(appt.status))
         .map(appt => ({
           id: appt.id,
           date: appt.appointment_date,

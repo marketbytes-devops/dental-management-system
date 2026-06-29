@@ -20,7 +20,9 @@ import {
   updateAppointmentStatus,
   getPatientAppointments,
   getPatientByToken,
-  getPatientTreatmentPlan
+  getPatientTreatmentPlan,
+  createPrescription,
+  createReferral
 } from "@/services/api";
 
 // Create context
@@ -43,6 +45,7 @@ export default function DoctorLayout({ children }) {
 
   // State Management
   const [activePatientToken, setActivePatientToken] = useState("");
+  const [activeAppointmentId, setActiveAppointmentId] = useState(null);
   const [viewingPatientToken, setViewingPatientToken] = useState("");
   const [completedPatientHistory, setCompletedPatientHistory] = useState([]);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
@@ -141,7 +144,7 @@ export default function DoctorLayout({ children }) {
   }, []);
 
   const [activeToast, setActiveToast] = useState(null);
-  const [toastAnimation, setToastAnimation] = useState(""); // "slide-in" | "slide-out"
+  const [toastAnimation, setToastAnimation] = useState("");
   const [bellAnimating, setBellAnimating] = useState(false);
 
   const prevUnreadCountRef = useRef(0);
@@ -238,17 +241,21 @@ export default function DoctorLayout({ children }) {
   const [referrals, setReferrals] = useState([]);
 
   // Outgoing referral handler
-  const handleReferPatient = (patientToken, doctorNameWithSpeciality, reason, referralType = "Internal", externalFacility = "") => {
+  const handleReferPatient = async (patientToken, doctorNameWithSpeciality, reason, referralType = "Internal", externalFacility = "") => {
     const [docName, docSpec] = doctorNameWithSpeciality.split(" - ");
+    const refId = `REF-${Math.floor(200 + Math.random() * 800)}`;
+    const refDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+    const clinicNotes = patients[patientToken]?.chiefComplaint || "";
+
     const newRef = {
-      id: `REF-${Math.floor(200 + Math.random() * 800)}`,
+      id: refId,
       patientToken,
       referredBy: currentDoctorName,
       speciality: docSpec || "General Dentistry",
       targetDoctor: docName,
-      date: "12-06-2026 (Today)",
+      date: refDate,
       reason: reason,
-      clinicalNotes: patients[patientToken]?.chiefComplaint || "",
+      clinicalNotes: clinicNotes,
       teethChart: patients[patientToken]?.teethChart || {},
       status: "Pending",
       myConsultationNotes: "",
@@ -257,23 +264,40 @@ export default function DoctorLayout({ children }) {
       externalFacility
     };
 
-    setReferrals(prev => [newRef, ...prev]);
+    try {
+      await createReferral({
+        id: newRef.id,
+        patient_token: newRef.patientToken,
+        referred_by: newRef.referredBy,
+        speciality: newRef.speciality,
+        target_doctor: newRef.targetDoctor,
+        date: newRef.date,
+        reason: newRef.reason,
+        clinical_notes: newRef.clinicalNotes,
+        referral_type: newRef.referralType,
+        external_facility: newRef.externalFacility
+      });
 
-    const timelineEvent = {
-      date: "10-06-2026 (Today)",
-      note: `Outbound ${referralType} Referral generated to ${docName}${externalFacility ? ` at ${externalFacility}` : ""} (${docSpec || "Specialist"}). Reason: ${reason}`,
-      type: "Referral"
-    };
+      setReferrals(prev => [newRef, ...prev]);
 
-    setPatients(prev => ({
-      ...prev,
-      [patientToken]: {
-        ...prev[patientToken],
-        timeline: [timelineEvent, ...prev[patientToken].timeline]
-      }
-    }));
+      const timelineEvent = {
+        date: "10-06-2026 (Today)",
+        note: `Outbound ${referralType} Referral generated to ${docName}${externalFacility ? ` at ${externalFacility}` : ""} (${docSpec || "Specialist"}). Reason: ${reason}`,
+        type: "Referral"
+      };
 
-    showNotification(`Patient referred to ${docName} successfully.`);
+      setPatients(prev => ({
+        ...prev,
+        [patientToken]: {
+          ...prev[patientToken],
+          timeline: [timelineEvent, ...prev[patientToken].timeline]
+        }
+      }));
+      showNotification(`Referral created successfully for patient.`);
+    } catch (err) {
+      console.error("Failed to create referral in database:", err);
+      showNotification("Failed to create referral in database: " + (err.message || ""));
+    }
   };
 
   // Incoming referral response handler
@@ -329,8 +353,8 @@ export default function DoctorLayout({ children }) {
     try {
       const data = await getQueue();
 
-      const doctorNameLower = currentDoctorName?.toLowerCase() ?? "";
-      const doctorNameWithoutTitleLower = currentDoctorName?.replace("Dr. ", "").toLowerCase() ?? "";
+      const doctorNameLower = currentDoctorName ? currentDoctorName.toLowerCase() : "";
+      const doctorNameWithoutTitleLower = currentDoctorName ? currentDoctorName.replace("Dr. ", "").toLowerCase() : "";
 
       const myQueue = data.filter(q => {
         if (!currentDoctorName) return true;
@@ -351,7 +375,6 @@ export default function DoctorLayout({ children }) {
 
       setQueue(mappedQueue);
 
-      // Hydrate the patients dictionary from live queue data
       setPatients(prev => {
         const updated = { ...prev };
         myQueue.forEach(q => {
@@ -366,11 +389,7 @@ export default function DoctorLayout({ children }) {
             medicalAlerts: q.medical_alerts || [],
             teethChart: prev[q.token]?.teethChart || {},
             timeline: prev[q.token]?.timeline || [
-              {
-                date: new Date(q.checked_in_at).toLocaleDateString(),
-                note: "Checked in",
-                type: "Check-In"
-              }
+              { date: new Date(q.checked_in_at).toLocaleDateString(), note: "Checked in", type: "Check-In" }
             ]
           };
         });
@@ -393,6 +412,7 @@ export default function DoctorLayout({ children }) {
 
     const queueItem = queue.find(item => item.token === token);
     if (queueItem && queueItem.id) {
+      setActiveAppointmentId(queueItem.id);
       try {
         await callPatient(queueItem.id, "In Chair");
         await fetchQueue();
@@ -426,6 +446,7 @@ export default function DoctorLayout({ children }) {
 
     const nextItem = queue[0];
     if (nextItem && nextItem.id) {
+      setActiveAppointmentId(nextItem.id);
       try {
         await callPatient(nextItem.id, "In Chair");
         await fetchQueue();
@@ -441,6 +462,33 @@ export default function DoctorLayout({ children }) {
     setRxDraft([]);
     showNotification(`Token ${nextItem.token} called to chair. Clinical sheet loaded.`);
     router.push("/doctor/workspace");
+  };
+
+  const handleCompleteConsultation = async () => {
+    if (!activeAppointmentId) {
+      showNotification("No active appointment found to complete.");
+      return;
+    }
+
+    try {
+      await callPatient(activeAppointmentId, "Completed");
+      showNotification(`Consultation completed for ${patients[activePatientToken]?.name || "patient"}.`);
+      
+      if (activePatientToken && !completedPatientHistory.includes(activePatientToken)) {
+        setCompletedPatientHistory(prev => [...prev, activePatientToken]);
+      }
+
+      setActivePatientToken("");
+      setViewingPatientToken("");
+      setActiveAppointmentId(null);
+      setRxDraft([]);
+      
+      router.push("/doctor/dashboard");
+      await fetchQueue();
+    } catch (err) {
+      console.error("Failed to complete consultation:", err);
+      showNotification("Error completing consultation: " + (err.message || "Failed."));
+    }
   };
 
   const handleViewPreviousPatient = () => {
@@ -564,15 +612,14 @@ export default function DoctorLayout({ children }) {
         type: "Lab Order"
       };
 
-      // Add to timeline locally
-        setPatients(prev => ({
-          ...prev,
-          [viewingPatientToken]: {
-            ...prev[viewingPatientToken],
-            timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
-            teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
-          }
-        }));
+      setPatients(prev => ({
+        ...prev,
+        [viewingPatientToken]: {
+          ...prev[viewingPatientToken],
+          timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
+          teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
+        }
+      }));
 
       showNotification(`Lab order submitted to ${labName}.`);
       fetchLabOrders();
@@ -614,28 +661,39 @@ export default function DoctorLayout({ children }) {
     setRxDraft(prev => prev.filter(m => m.id !== id));
   };
 
-  const handleSavePrescription = () => {
+  const handleSavePrescription = async () => {
     if (rxDraft.length === 0) return;
 
-    const rxText = rxDraft.map(m => `${m.medicine} (${m.schedule} - ${m.timing} for ${m.duration})`).join(" | ");
+    try {
+      await createPrescription({
+        patient_token: viewingPatientToken,
+        doctor_name: currentDoctorName,
+        medications: rxDraft
+      });
 
-    const newTimelineEvent = {
-      date: "10-06-2026 (Today)",
-      note: `Rx Prescription issued: ${rxText}`,
-      type: "Prescription",
-      details: rxDraft
-    };
+      const rxText = rxDraft.map(m => `${m.medicine} (${m.schedule} - ${m.timing} for ${m.duration})`).join(" | ");
 
-    setPatients(prev => ({
-      ...prev,
-      [viewingPatientToken]: {
-        ...prev[viewingPatientToken],
-        timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline]
-      }
-    }));
+      const newTimelineEvent = {
+        date: "10-06-2026 (Today)",
+        note: `Rx Prescription issued: ${rxText}`,
+        type: "Prescription",
+        details: rxDraft
+      };
 
-    setRxDraft([]);
-    showNotification(`Prescription printed & saved for ${viewingPatient.name}.`);
+      setPatients(prev => ({
+        ...prev,
+        [viewingPatientToken]: {
+          ...prev[viewingPatientToken],
+          timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline]
+        }
+      }));
+
+      setRxDraft([]);
+      showNotification(`Prescription printed & saved for ${viewingPatient.name}.`);
+    } catch (err) {
+      console.error("Failed to save prescription to database:", err);
+      showNotification("Failed to save prescription to database: " + (err.message || ""));
+    }
   };
 
   const handleSubmitDiagNote = (noteText) => {
@@ -868,6 +926,7 @@ export default function DoctorLayout({ children }) {
         hasUrgentInQueue,
         handleCallPatient,
         handleCallNextPatient,
+        handleCompleteConsultation,
         handleViewPreviousPatient,
         handleSkipPatient,
         handleRequeuePatient,

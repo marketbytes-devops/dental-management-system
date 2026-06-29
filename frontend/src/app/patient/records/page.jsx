@@ -19,23 +19,27 @@ import {
   Map,
   FileDown
 } from "lucide-react";
-import TreatmentTimeline from "@/components/ui/patients/records/treatmentTimeline";
 import PrescriptionCard from "@/components/ui/patients/records/prescriptionCard";
 import ActivePrescriptions from "@/components/ui/patients/records/activePrescriptions";
 import ReferralCard from "@/components/ui/patients/records/referralCard";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
-import { myAppointments, myPrescriptions } from "@/data/patientMockData";
-import { getPatientTreatmentPlan, getPendingConsents } from "@/services/api";
+import { getPatientTreatmentPlan, getPendingConsents, getPatientPrescriptions, getPatientReferrals } from "@/services/api";
 
 
 export default function PatientRecordsPage() {
-  const [activeTab, setActiveTab] = useState("treatment"); // treatment | treatment-plans | active-rx | all-rx | referrals
+  const [activeTab, setActiveTab] = useState("treatment-plans"); // treatment-plans | active-rx | all-rx | referrals
 
   // Treatment Plans State
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansError, setPlansError] = useState("");
   const [activeConsentDoc, setActiveConsentDoc] = useState(null);
+
+  // Prescriptions & Referrals State
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [prescriptionsLoading, setPrescriptionsLoading] = useState(false);
+  const [referrals, setReferrals] = useState([]);
+  const [referralsLoading, setReferralsLoading] = useState(false);
 
   const patientToken = typeof window !== "undefined" ? localStorage.getItem("patient_token") : null;
 
@@ -58,9 +62,37 @@ export default function PatientRecordsPage() {
     }
   };
 
+  const fetchPrescriptions = async () => {
+    setPrescriptionsLoading(true);
+    try {
+      const data = await getPatientPrescriptions();
+      setPrescriptions(data);
+    } catch (err) {
+      console.error("Error fetching prescriptions:", err);
+    } finally {
+      setPrescriptionsLoading(false);
+    }
+  };
+
+  const fetchReferrals = async () => {
+    setReferralsLoading(true);
+    try {
+      const data = await getPatientReferrals();
+      setReferrals(data);
+    } catch (err) {
+      console.error("Error fetching referrals:", err);
+    } finally {
+      setReferralsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === "treatment-plans") {
       fetchPlans();
+    } else if (activeTab === "active-rx" || activeTab === "all-rx") {
+      fetchPrescriptions();
+    } else if (activeTab === "referrals") {
+      fetchReferrals();
     }
   }, [activeTab, patientToken]);
 
@@ -98,29 +130,43 @@ export default function PatientRecordsPage() {
     return `${bar} ${progress}%`;
   };
 
-  const mockReferral = {
-    id: "REF-091",
-    date: "2026-05-15",
-    specialistName: "Dr. Sandeep Goel",
-    specialty: "Maxillofacial Surgeon",
-    clinicName: "Goel Craniofacial & Dental Implant Center",
-    reason: "Evaluation for surgical extraction of impacted mandibular third molar (tooth #38) due to recurrent pericoronitis.",
-    referredBy: "Dr. Anoop Nair",
-  };
+  // Formats DB medications structure to PrescriptionCard expectation
+  const formattedPrescriptions = prescriptions.flatMap((rxObj) => {
+    const dateStr = rxObj.created_at 
+      ? new Date(rxObj.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+      : "Recent";
+    
+    // Deem active if created within the past 7 days
+    const isRecent = rxObj.created_at 
+      ? (new Date() - new Date(rxObj.created_at)) < (7 * 24 * 60 * 60 * 1000)
+      : true;
+
+    return (rxObj.medications || []).map((med, idx) => ({
+      id: `${rxObj.id}-${idx}`,
+      active: isRecent,
+      drug: med.medicine,
+      date: dateStr,
+      dosage: `${med.schedule} - ${med.timing} for ${med.duration}`,
+      doctor: rxObj.doctor_name
+    }));
+  });
+
+  // Formats DB referrals structure to ReferralCard expectation
+  const formattedReferrals = referrals.map((ref) => ({
+    id: ref.id,
+    date: ref.date,
+    specialistName: ref.target_doctor || "Specialist",
+    specialty: ref.speciality || "Specialty",
+    clinicName: ref.external_facility || "Internal Department",
+    reason: ref.reason,
+    referredBy: ref.referred_by
+  }));
 
   const activePlan = plans.find(p => p.status === "Active");
   const pastPlans = plans.filter(p => p.status !== "Active");
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case "treatment":
-        return (
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6">Treatment Timeline</h3>
-            <TreatmentTimeline appointments={myAppointments} />
-          </div>
-        );
-
       case "treatment-plans":
         if (plansLoading) {
           return (
@@ -320,8 +366,8 @@ export default function PatientRecordsPage() {
                             ))}
                           </div>
                         </div>
-                      );
-                    });
+                        );
+                      });
                     })()}
                   </div>
                 </div>
@@ -376,27 +422,65 @@ export default function PatientRecordsPage() {
         );
 
       case "active-rx":
-        return <ActivePrescriptions prescriptions={myPrescriptions} />;
+        if (prescriptionsLoading) {
+          return (
+            <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <span className="text-sm font-semibold text-gray-500">Loading active prescriptions...</span>
+            </div>
+          );
+        }
+        return <ActivePrescriptions prescriptions={formattedPrescriptions} />;
 
       case "all-rx":
+        if (prescriptionsLoading) {
+          return (
+            <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <span className="text-sm font-semibold text-gray-500">Loading prescription history...</span>
+            </div>
+          );
+        }
         return (
           <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
             <h3 className="text-lg font-bold text-gray-900 mb-6">Prescription History</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myPrescriptions.map((rx) => (
-                <PrescriptionCard key={rx.id} rx={rx} />
-              ))}
-            </div>
+            {formattedPrescriptions.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                {formattedPrescriptions.map((rx) => (
+                  <PrescriptionCard key={rx.id} rx={rx} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-gray-400 text-sm py-8">
+                No prescription history records found.
+              </div>
+            )}
           </div>
         );
 
       case "referrals":
-        return (
-          <div className="space-y-6">
-            <h3 className="text-lg font-bold text-gray-900">Referral Letters</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ReferralCard referral={mockReferral} />
+        if (referralsLoading) {
+          return (
+            <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <span className="text-sm font-semibold text-gray-500">Loading referrals...</span>
             </div>
+          );
+        }
+        return (
+          <div className="space-y-6 text-left">
+            <h3 className="text-lg font-bold text-gray-900">Referral Letters</h3>
+            {formattedReferrals.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {formattedReferrals.map((ref) => (
+                  <ReferralCard key={ref.id} referral={ref} />
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm text-center text-gray-400 text-sm">
+                No active medical referral letters issued.
+              </div>
+            )}
           </div>
         );
 
@@ -414,7 +498,6 @@ export default function PatientRecordsPage() {
       {/* Tabs */}
       <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar gap-6">
         {[
-          { id: "treatment", label: "Treatment Timeline" },
           { id: "treatment-plans", label: "Treatment Plans" },
           { id: "active-rx", label: "Active Prescriptions" },
           { id: "all-rx", label: "Prescription History" },

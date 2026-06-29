@@ -21,18 +21,14 @@ export default function AdminDashboardPage() {
       setStats(response.data);
     } catch (err) {
       console.warn("Failed to fetch dashboard stats", err);
-      // Fallback values if API is not responding
+      // Fallback to empty values if API is not responding
       setStats({
-        total_patients: 2543,
-        total_doctors: 12,
-        active_doctors: 12,
-        revenue_today: 45200,
-        alerts_count: 3,
-        recent_activities: [
-          { type: "user", title: "New User Registered", description: "Dr. Sarah Smith was added to the Orthodontics department.", time: "2 min ago" },
-          { type: "payment", title: "High-Value Payment Received", description: "Invoice #INV-052 paid in full (₹45,000).", time: "1 hr ago" },
-          { type: "user", title: "Role Permissions Updated", description: "Lab Technician permissions modified by Admin.", time: "3 hrs ago" }
-        ]
+        total_patients: 0,
+        total_doctors: 0,
+        active_doctors: 0,
+        revenue_today: 0,
+        alerts_count: 0,
+        recent_activities: []
       });
     } finally {
       setLoading(false);

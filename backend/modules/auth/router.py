@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
-from modules.auth.models import UserModel
+from modules.auth.models import UserModel, StaffProfileModel
 from modules.patient.models import PatientModel
 from modules.doctor.models import DoctorModel
 from modules.auth.schemas import UserLogin, UserResponse, TokenResponse, UserUpdate
@@ -27,25 +27,14 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
                 detail="Invalid credentials. Verify your password."
             )
             
-        is_doctor = any(r.lower() == "doctor" for r in (user.roles or []))
-        if is_doctor:
-            if user.status != "Active":
-                user.status = "Active"
-                db.commit()
-                db.refresh(user)
-                # Also update DoctorModel status
-                doctor = db.query(DoctorModel).filter(DoctorModel.user_id == user.id).first()
-                if doctor:
-                    doctor.status = "Active"
-                    db.commit()
-        else:
-            if user.status != "Active":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="This account has been deactivated. Please contact support."
-                )
+        if user.status != "Active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This account has been deactivated. Please contact support."
+            )
         
         token = create_access_token({
+            "sub": user.username,
             "user_id": user.id,
             "username": user.username,
             "email": user.email,
@@ -79,6 +68,7 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
             )
         
         token = create_access_token({
+            "sub": patient.email,
             "patient_id": patient.id,
             "email": patient.email,
             "roles": ["Patient"],
@@ -134,12 +124,21 @@ def get_profile(
             user.chair_setup = None
             user.board = None
     else:
-        user.dob = None
-        user.phone = None
-        user.address = None
-        user.licence_id = None
-        user.chair_setup = None
-        user.board = None
+        profile = db.query(StaffProfileModel).filter(StaffProfileModel.user_id == user.id).first()
+        if profile:
+            user.dob = profile.dob
+            user.phone = profile.phone
+            user.address = profile.address
+            user.licence_id = profile.licence_id
+            user.chair_setup = profile.chair_setup
+            user.board = profile.board
+        else:
+            user.dob = None
+            user.phone = None
+            user.address = None
+            user.licence_id = None
+            user.chair_setup = None
+            user.board = None
 
     return user
 
@@ -229,12 +228,35 @@ def update_profile(
         user.chair_setup = doctor.chair_setup
         user.board = doctor.board
     else:
-        user.dob = None
-        user.phone = None
-        user.address = None
-        user.licence_id = None
-        user.chair_setup = None
-        user.board = None
+        profile = db.query(StaffProfileModel).filter(StaffProfileModel.user_id == user.id).first()
+        if not profile:
+            profile = StaffProfileModel(user_id=user.id)
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+
+        if profile_data.dob is not None:
+            profile.dob = profile_data.dob
+        if profile_data.phone is not None:
+            profile.phone = profile_data.phone
+        if profile_data.address is not None:
+            profile.address = profile_data.address
+        if profile_data.licence_id is not None:
+            profile.licence_id = profile_data.licence_id
+        if profile_data.chair_setup is not None:
+            profile.chair_setup = profile_data.chair_setup
+        if profile_data.board is not None:
+            profile.board = profile_data.board
+
+        db.commit()
+        db.refresh(profile)
+
+        user.dob = profile.dob
+        user.phone = profile.phone
+        user.address = profile.address
+        user.licence_id = profile.licence_id
+        user.chair_setup = profile.chair_setup
+        user.board = profile.board
 
     return user
 

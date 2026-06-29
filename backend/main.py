@@ -13,7 +13,7 @@ from modules.treatment_plan.router import router as treatment_plan_router
 
 
 from database import Base, engine, SessionLocal
-from modules.auth.models import UserModel
+from modules.auth.models import UserModel, StaffProfileModel
 from modules.patient.models import PatientModel, PatientConsentModel
 from modules.frontdesk.models import AppointmentModel
 from modules.frontdesk.communication_models import CommunicationLogModel

@@ -53,7 +53,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Patient Directory", href: "/admin/patients", icon: Users },
     { name: "Inventory", href: "/admin/inventory", icon: ClipboardList },
     { name: "Leave Management", href: "/admin/leave", icon: Calendar },
-    { name: "System Logs", href: "/admin/dashboard", icon: FileEdit }
+    
   ],
   doctor: [
     { name: "Dashboard", href: "/doctor/dashboard", icon: Home },
@@ -91,7 +91,8 @@ export const ROLE_NAV_ITEMS = {
     { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },
     { name: "Leave Management", href: "/frontdesk/receptionist/leave", icon: Calendar },
     { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },
-    { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings }
+    { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings },
+    { name: "My Profile", href: "/frontdesk/receptionist/profile", icon: User }
   ],
   accountant: [
     { name: "Dashboard", href: "/frontdesk/accountant/dashboard", icon: BarChart3 },
@@ -107,7 +108,8 @@ export const ROLE_NAV_ITEMS = {
     { name: "Reports", href: "/frontdesk/accountant/reports", icon: FileText },
     { name: "Leave Management", href: "/frontdesk/accountant/leave", icon: Calendar },
     { name: "Audit Logs", href: "/frontdesk/accountant/audit", icon: Search },
-    { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings }
+    { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings },
+    { name: "My Profile", href: "/frontdesk/accountant/profile", icon: User }
   ],
   "lab tech": [
     { name: "Dashboard", href: "/labtechnicians/dashboard", icon: BarChart3 },
@@ -117,7 +119,8 @@ export const ROLE_NAV_ITEMS = {
     { name: "Billing & Warranty", href: "/labtechnicians/invoices", icon: Receipt },
     { name: "Notifications", href: "/labtechnicians/notifications", icon: Bell },
     { name: "Leave Management", href: "/labtechnicians/leave", icon: Calendar },
-    { name: "Settings", href: "/labtechnicians/settings", icon: Settings }
+    { name: "Settings", href: "/labtechnicians/settings", icon: Settings },
+    { name: "My Profile", href: "/labtechnicians/profile", icon: User }
   ],
   patient: [
     { name: "My Dashboard", href: "/patient/dashboard", icon: Home },

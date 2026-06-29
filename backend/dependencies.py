@@ -7,15 +7,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
-
-    payload = verify_token(token)
-
-    if not payload:
+    try:
+        payload = verify_token(token)
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
+            detail=str(e)
         )
-
     return payload
 
 

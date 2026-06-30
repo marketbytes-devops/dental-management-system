@@ -434,6 +434,16 @@ export default function DoctorLayout({ children }) {
 
       setQueue(mappedQueue);
 
+      const inChairPatient = myQueue.find(q => q.status === "In Chair");
+      if (inChairPatient) {
+        setActivePatientToken(inChairPatient.token);
+        setActiveAppointmentId(inChairPatient.id);
+        setViewingPatientToken(prev => prev || inChairPatient.token);
+      } else {
+        setActivePatientToken("");
+        setActiveAppointmentId(null);
+      }
+
       setPatients(prev => {
         const updated = { ...prev };
         myQueue.forEach(q => {
@@ -532,7 +542,7 @@ export default function DoctorLayout({ children }) {
     try {
       await callPatient(activeAppointmentId, "Completed");
       showNotification(`Consultation completed for ${patients[activePatientToken]?.name || "patient"}.`);
-      
+
       if (activePatientToken && !completedPatientHistory.includes(activePatientToken)) {
         setCompletedPatientHistory(prev => [...prev, activePatientToken]);
       }
@@ -541,7 +551,7 @@ export default function DoctorLayout({ children }) {
       setViewingPatientToken("");
       setActiveAppointmentId(null);
       setRxDraft([]);
-      
+
       router.push("/doctor/dashboard");
       await fetchQueue();
     } catch (err) {

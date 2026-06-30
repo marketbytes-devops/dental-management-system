@@ -1,5 +1,7 @@
 "use client";
 
+import { X } from "lucide-react";
+
 export default function LiveQueueTable({
   queue = [],
   patients = {},
@@ -102,8 +104,9 @@ export default function LiveQueueTable({
                         <button
                           onClick={() => onRemovePatient(item.token)}
                           className="p-1.5 text-gray-400 hover:text-danger hover:bg-danger/5 rounded-lg cursor-pointer"
+                          title="Remove patient from queue"
                         >
-                          🗑️
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

@@ -1,20 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDoctor } from "@/app/doctor/layout";
 import {
-  Search,
-  Calendar,
-  Filter,
   CheckCircle,
   AlertTriangle,
   Microscope,
   Share2,
   Bell,
-  RotateCcw,
-  Check,
   ExternalLink,
   Inbox
 } from "lucide-react";
@@ -28,12 +22,6 @@ export default function DoctorNotificationsPage() {
     markAllAsRead,
     setViewingPatientToken
   } = useDoctor();
-
-  // Search & Filter State
-  const [patientSearch, setPatientSearch] = useState("");
-  const [filterDate, setFilterDate] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
 
   // Format Date & Time for display: DD-MM-YYYY hh:mm AM/PM
   const formatDateTime = (dateStr) => {
@@ -55,66 +43,11 @@ export default function DoctorNotificationsPage() {
     return `${day}-${month}-${year} ${strTime}`;
   };
 
-  // Check if notification date matches target date (YYYY-MM-DD)
-  const matchesDate = (receivedAtStr, filterDateStr) => {
-    if (!filterDateStr) return true;
-    if (!receivedAtStr) return false;
-
-    // Filter date values are in "YYYY-MM-DD" local time format
-    const receivedDate = new Date(receivedAtStr);
-    
-    // Parse filterDateStr parts in local timezone
-    const [year, month, day] = filterDateStr.split("-").map(Number);
-    
-    return (
-      receivedDate.getFullYear() === year &&
-      (receivedDate.getMonth() + 1) === month &&
-      receivedDate.getDate() === day
-    );
-  };
-
-  // Match patient search query (name or ID)
-  const matchesPatient = (notif, query) => {
-    if (!query) return true;
-    const cleanQuery = query.trim().toLowerCase();
-
-    const pName = notif.patientName ? notif.patientName.toLowerCase() : "";
-    const pId = notif.patientId ? notif.patientId.toLowerCase() : "";
-    const msg = notif.message ? notif.message.toLowerCase() : "";
-
-    return pName.includes(cleanQuery) || pId.includes(cleanQuery) || msg.includes(cleanQuery);
-  };
-
-  // Filtered Notifications
-  const filteredNotifications = notifications.filter((notif) => {
-    // Type Filter
-    if (filterType !== "all" && notif.type !== filterType) return false;
-
-    // Status Filter
-    if (filterStatus !== "all" && notif.status !== filterStatus) return false;
-
-    // Date Filter
-    if (!matchesDate(notif.receivedAt, filterDate)) return false;
-
-    // Patient ID / Name Search
-    if (!matchesPatient(notif, patientSearch)) return false;
-
-    return true;
-  });
-
   // Stats
   const totalCount = notifications.length;
   const unreadCount = notifications.filter((n) => n.status === "unread").length;
   const referralCount = notifications.filter((n) => n.type === "referral").length;
   const labCount = notifications.filter((n) => n.type === "labs").length;
-  const alertCount = notifications.filter((n) => n.type === "alerts").length;
-
-  const handleResetFilters = () => {
-    setPatientSearch("");
-    setFilterDate("");
-    setFilterType("all");
-    setFilterStatus("all");
-  };
 
   const handlePatientFocus = (patientId) => {
     if (!patientId) return;
@@ -123,7 +56,7 @@ export default function DoctorNotificationsPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in text-left">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -131,24 +64,18 @@ export default function DoctorNotificationsPage() {
             <Bell className="w-6 h-6 text-primary" /> Notifications Hub
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Track, filter, and review patient referrals, lab order updates, and safety alerts.
+            Track and review patient referrals, lab order updates, and safety alerts.
           </p>
         </div>
         <div className="flex gap-2">
           {unreadCount > 0 && (
             <button
               onClick={markAllAsRead}
-              className="px-4 py-2 bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer outline-none"
+              className="px-4 py-2 bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer outline-none border-none"
             >
               <CheckCircle className="w-4 h-4" /> Mark All as Read
             </button>
           )}
-          <button
-            onClick={handleResetFilters}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer outline-none"
-          >
-            <RotateCcw className="w-4 h-4" /> Reset Filters
-          </button>
         </div>
       </div>
 
@@ -195,78 +122,16 @@ export default function DoctorNotificationsPage() {
         </div>
       </div>
 
-      {/* Search & Filters Panel */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Patient Search */}
-          <div className="relative flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
-            <Search className="text-gray-400 mr-2 w-4 h-4 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search Patient ID (e.g. #004) or Name..."
-              value={patientSearch}
-              onChange={(e) => setPatientSearch(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-full placeholder:text-gray-400"
-            />
-          </div>
-
-          {/* Date Picker */}
-          <div className="relative flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
-            <Calendar className="text-gray-400 mr-2 w-4 h-4 shrink-0" />
-            <input
-              type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-full text-gray-700 cursor-pointer"
-            />
-          </div>
-
-          {/* Type Filter */}
-          <div className="relative flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
-            <Filter className="text-gray-400 mr-2 w-4 h-4 shrink-0" />
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-full text-gray-700 cursor-pointer"
-            >
-              <option value="all">All Notification Types</option>
-              <option value="referral">Orthodontic Referrals</option>
-              <option value="labs">Lab Case Status</option>
-              <option value="alerts">Safety Alerts</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div className="relative flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
-            <Check className="text-gray-400 mr-2 w-4 h-4 shrink-0" />
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs w-full text-gray-700 cursor-pointer"
-            >
-              <option value="all">All Read Statuses</option>
-              <option value="unread">Unread Notifications</option>
-              <option value="read">Read Notifications</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
       {/* Notifications List */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="p-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
           <h3 className="text-sm font-bold text-gray-900">
-            Notifications List ({filteredNotifications.length})
+            Notifications List ({notifications.length})
           </h3>
-          {filteredNotifications.length > 0 && (
-            <span className="text-[10px] text-gray-400 font-semibold">
-              Showing filtered results
-            </span>
-          )}
         </div>
 
         <div className="divide-y divide-gray-100">
-          {filteredNotifications.map((notif) => {
+          {notifications.map((notif) => {
             const isUnread = notif.status === "unread";
 
             const getIconInfo = () => {
@@ -336,7 +201,7 @@ export default function DoctorNotificationsPage() {
                         <span className="text-[10px] text-gray-400 font-medium">Patient:</span>
                         <button
                           onClick={() => handlePatientFocus(notif.patientId)}
-                          className="bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors text-[10px] font-bold text-gray-700 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer outline-none"
+                          className="bg-gray-100 hover:bg-primary/10 hover:text-primary transition-colors text-[10px] font-bold text-gray-700 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer outline-none border-none"
                           title="Click to view workspace profile"
                         >
                           {notif.patientName} ({notif.patientId})
@@ -350,7 +215,7 @@ export default function DoctorNotificationsPage() {
                 <div className="flex items-center gap-2 md:self-center">
                   <button
                     onClick={() => (isUnread ? markAsRead(notif.id) : markAsUnread(notif.id))}
-                    className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer outline-none border ${
+                    className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer outline-none border border-solid ${
                       isUnread
                         ? "bg-primary text-white border-primary hover:bg-primary/90"
                         : "bg-white text-gray-600 border-gray-250 hover:bg-gray-50"
@@ -373,21 +238,15 @@ export default function DoctorNotificationsPage() {
             );
           })}
 
-          {filteredNotifications.length === 0 && (
+          {notifications.length === 0 && (
             <div className="p-12 text-center flex flex-col items-center justify-center">
               <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 mb-4">
                 <Inbox className="w-8 h-8" />
               </div>
               <h4 className="text-sm font-bold text-gray-900">No Notifications Found</h4>
               <p className="text-xs text-gray-500 max-w-xs mt-1">
-                We couldn't find any notifications matching your filters. Try resetting the search filters.
+                You have no active notifications at this time.
               </p>
-              <button
-                onClick={handleResetFilters}
-                className="mt-4 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 transition-colors cursor-pointer"
-              >
-                Reset Search Filters
-              </button>
             </div>
           )}
         </div>

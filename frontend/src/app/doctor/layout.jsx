@@ -53,6 +53,14 @@ export default function DoctorLayout({ children }) {
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [currentDoctorName, setCurrentDoctorName] = useState("Dr. Anoop Nair");
 
+  const getTodayString = () => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year} (Today)`;
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedUser = localStorage.getItem("staff_user");
@@ -339,7 +347,7 @@ export default function DoctorLayout({ children }) {
       await fetchReferrals();
 
       const timelineEvent = {
-        date: "10-06-2026 (Today)",
+        date: getTodayString(),
         note: `Outbound ${referralType} Referral generated to ${docName}${externalFacility ? ` at ${externalFacility}` : ""} (${docSpec || "Specialist"}). Reason: ${reason}`,
         type: "Referral"
       };
@@ -372,7 +380,7 @@ export default function DoctorLayout({ children }) {
       const referral = referrals.find(r => r.id === refId);
       if (referral) {
         const timelineEvent = {
-          date: "10-06-2026 (Today)",
+          date: getTodayString(),
           note: `Consultation complete by ${currentDoctorName}: ${consultationNotes}`,
           type: "Consultation",
           details: medications
@@ -634,7 +642,7 @@ export default function DoctorLayout({ children }) {
         chiefComplaint: "Acute severe swelling and unbearable pain in lower jaw, feverish.",
         medicalAlerts: ["Cardiac Pacemaker", "Penicillin Allergy"],
         teethChart: { 46: "active-treatment" },
-        timeline: [{ date: "10-06-2026", note: "Emergency check-in. High pain score.", type: "Check-In" }]
+        timeline: [{ date: new Date().toISOString().split("T")[0], note: "Emergency check-in. High pain score.", type: "Check-In" }]
       };
 
       setPatients(prev => ({ ...prev, [newToken]: newPatient }));
@@ -678,7 +686,7 @@ export default function DoctorLayout({ children }) {
       });
 
       const newTimelineEvent = {
-        date: "10-06-2026 (Today)",
+        date: getTodayString(),
         note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
         type: "Lab Order"
       };
@@ -745,7 +753,7 @@ export default function DoctorLayout({ children }) {
       const rxText = rxDraft.map(m => `${m.medicine} (${m.schedule} - ${m.timing} for ${m.duration})`).join(" | ");
 
       const newTimelineEvent = {
-        date: "10-06-2026 (Today)",
+        date: getTodayString(),
         note: `Rx Prescription issued: ${rxText}`,
         type: "Prescription",
         details: rxDraft
@@ -771,7 +779,7 @@ export default function DoctorLayout({ children }) {
     if (!viewingPatient) return;
 
     const newTimelineEvent = {
-      date: "10-06-2026 (Today)",
+      date: getTodayString(),
       note: noteText,
       type: "Clinical Note"
     };
@@ -805,11 +813,11 @@ export default function DoctorLayout({ children }) {
         updatedTimeline[existingEventIndex] = {
           ...updatedTimeline[existingEventIndex],
           note: noteText,
-          date: "10-06-2026 (Today)"
+          date: getTodayString()
         };
       } else {
         const newTimelineEvent = {
-          date: "10-06-2026 (Today)",
+          date: getTodayString(),
           note: noteText,
           type: "Clinical Note"
         };

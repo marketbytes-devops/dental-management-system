@@ -238,6 +238,8 @@ export default function LeaveManagement({ role = "doctor" }) {
                   setErrorMsg={setErrorMsg}
                   successMsg={successMsg}
                   setSuccessMsg={setSuccessMsg}
+                  staffName={staffName}
+                  requests={requests}
                 />
               </div>
               <div className="lg:col-span-7">

@@ -6,8 +6,7 @@ export default function LiveQueueTable({
   onCallPatient,
   onSkipPatient,
   onRequeuePatient,
-  onRemovePatient,
-  onSimulateEmergency
+  onRemovePatient
 }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-fit animate-fade-in">
@@ -16,14 +15,6 @@ export default function LiveQueueTable({
           <h3 className="text-base font-bold text-gray-900">Active Checked-In Patients</h3>
           <p className="text-xs text-gray-505 font-semibold mt-0.5">Call patients into dental chair or load history</p>
         </div>
-        {onSimulateEmergency && (
-          <button
-            onClick={onSimulateEmergency}
-            className="px-3.5 py-2 bg-danger/10 hover:bg-danger/15 text-danger border border-danger/20 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
-          >
-            🚨 Simulate Emergency
-          </button>
-        )}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">

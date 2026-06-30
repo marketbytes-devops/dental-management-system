@@ -176,6 +176,11 @@ export const downloadConsentPdf = async (id) => {
   return response.data;
 };
 
+export const getOralHealthDetails = async () => {
+  const response = await client.get("/patient/oral-health-details");
+  return response.data;
+};
+
 // ==========================================
 // 4. Appointments & Queue API Endpoints
 // ==========================================

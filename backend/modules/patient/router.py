@@ -411,3 +411,156 @@ def get_referrals_route(
     from modules.doctor.models import ReferralModel
     ref_list = db.query(ReferralModel).filter(ReferralModel.patient_token == patient.token).order_by(ReferralModel.date.desc()).all()
     return ref_list
+
+
+@router.get("/oral-health-details")
+def get_oral_health_details(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
+
+    # Find the active treatment plan for this patient
+    active_plan = db.query(TreatmentPlanModel).filter(
+        TreatmentPlanModel.patient_token == patient.token,
+        TreatmentPlanModel.status == "Active"
+    ).order_by(TreatmentPlanModel.created_at.desc()).first()
+
+    if not active_plan:
+        # Fallback to any latest treatment plan (e.g. Draft) if no active one exists
+        active_plan = db.query(TreatmentPlanModel).filter(
+            TreatmentPlanModel.patient_token == patient.token
+        ).order_by(TreatmentPlanModel.created_at.desc()).first()
+
+    base_score = 100
+    diagnoses = []
+    tips = []
+    deductions = []
+    completed_steps = 0
+    total_steps = 0
+    completion_rate = 0.0
+
+    if active_plan:
+        # Parse diagnoses
+        raw_diagnoses = active_plan.diagnoses or []
+        if isinstance(raw_diagnoses, list):
+            diagnoses = raw_diagnoses
+        elif isinstance(raw_diagnoses, str):
+            import json
+            try:
+                diagnoses = json.loads(raw_diagnoses)
+            except Exception:
+                diagnoses = [d.strip() for d in raw_diagnoses.split(",") if d.strip()]
+
+        # Calculate completion rate from steps
+        steps = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.plan_id == active_plan.id).all()
+        total_steps = len(steps)
+        if total_steps > 0:
+            completed_steps = sum(1 for s in steps if s.status == "Completed")
+            completion_rate = completed_steps / total_steps
+
+        # Compute deductions
+        total_deduction = 0
+        for diag in diagnoses:
+            diag_lower = diag.lower()
+            penalty = 0
+            name = diag
+            
+            if any(kw in diag_lower for kw in ["pulpitis", "abscess", "infection", "root canal needed"]):
+                penalty = 20
+                name = "Pulpitis/Infection"
+            elif any(kw in diag_lower for kw in ["periodontitis", "deep pocket", "gum disease"]):
+                penalty = 20
+                name = "Periodontal Disease"
+            elif any(kw in diag_lower for kw in ["caries", "cavity", "decay"]):
+                penalty = 15
+                name = "Active Caries (Decay)"
+            elif any(kw in diag_lower for kw in ["gingivitis", "bleeding gums", "calculus", "plaque"]):
+                penalty = 10
+                name = "Gingivitis/Calculus Deposit"
+            elif any(kw in diag_lower for kw in ["crowding", "malocclusion", "bite", "crossbite", "deep bite"]):
+                penalty = 8
+                name = "Malocclusion/Crowding"
+            elif any(kw in diag_lower for kw in ["missing", "extraction"]):
+                penalty = 5
+                name = "Unreplaced Missing Tooth"
+            elif any(kw in diag_lower for kw in ["impacted", "wisdom"]):
+                penalty = 5
+                name = "Impacted Tooth"
+            else:
+                penalty = 5
+                name = diag
+
+            if penalty > 0:
+                total_deduction += penalty
+                deductions.append({"condition": name, "penalty": penalty})
+
+        # Cap max deduction at 60 points so score doesn't drop below 40
+        if total_deduction > 60:
+            total_deduction = 60
+
+        # Apply progress recovery offset
+        actual_deduction = total_deduction * (1.0 - completion_rate)
+        final_score = int(round(100 - actual_deduction))
+    else:
+        # Default fallback if no treatment plans
+        final_score = 95
+        completion_rate = 1.0
+
+    # Categorize label
+    if final_score >= 80:
+        label = "Excellent" if final_score >= 90 else "Good"
+    elif final_score >= 60:
+        label = "Moderate"
+    else:
+        label = "Needs Attention"
+
+    # Generate personalized tips
+    unique_types = set()
+    for diag in diagnoses:
+        diag_lower = diag.lower()
+        if any(kw in diag_lower for kw in ["caries", "cavity", "decay"]):
+            unique_types.add("caries")
+        if any(kw in diag_lower for kw in ["periodontitis", "gingivitis", "calculus", "plaque", "gum"]):
+            unique_types.add("gum")
+        if any(kw in diag_lower for kw in ["crowding", "bite", "malocclusion"]):
+            unique_types.add("ortho")
+        if any(kw in diag_lower for kw in ["pulpitis", "infection", "abscess"]):
+            unique_types.add("infection")
+
+    if "caries" in unique_types:
+        tips.append("Use fluoride toothpaste and brush twice daily for at least 2 minutes.")
+        tips.append("Limit sugary snacks and sticky beverages between meals to restrict bacterial growth.")
+    if "gum" in unique_types:
+        tips.append("Floss daily to remove plaque from between teeth where toothbrushes can't reach.")
+        tips.append("Consider using an antiseptic mouthwash to reduce plaque-causing bacteria.")
+        tips.append("Attend professional cleaning (scaling and root planing) as scheduled in your treatment plan.")
+    if "ortho" in unique_types:
+        tips.append("Wear orthodontic aligners/retainers exactly as directed by your dentist.")
+        tips.append("Use interdental brushes or floss threaders to clean hard-to-reach areas.")
+    if "infection" in unique_types:
+        tips.append("Avoid chewing hard foods on the affected side until treatment (like a root canal) is completed.")
+        tips.append("Rinse with warm saltwater to alleviate gum discomfort and inflammation.")
+
+    # General tips
+    tips.append("Stay hydrated and rinse your mouth with water after meals to clear food residues.")
+    tips.append("Schedule a routine dental examination and clean-up every 6 months.")
+
+    return {
+        "score": final_score,
+        "label": label,
+        "diagnoses": diagnoses,
+        "deductions": deductions,
+        "tips": tips[:4],  # limit to top 4 tips
+        "completion_rate": completion_rate,
+        "completed_steps": completed_steps,
+        "total_steps": total_steps
+    }

@@ -11,7 +11,7 @@ class AppointmentModel(Base):
     doctor_name = Column(String, nullable=False)
     appointment_date = Column(Date, nullable=False)
     appointment_time = Column(String, nullable=False)
-    treatment_type = Column(String, nullable=False)
+    treatment_type = Column(String, nullable=True)
     status = Column(String, default="Confirmed")  # Confirmed, Pending, Checked In, In Chair, Completed, Cancelled
     priority = Column(String, default="Routine")  # Routine, Urgent, Emergency
     otp = Column(String, nullable=True)

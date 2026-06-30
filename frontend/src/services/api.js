@@ -21,9 +21,8 @@ client.interceptors.request.use(
       // Determine which token to use based on the API request URL rather than browser page route
       const isPatientRequest = config.url && config.url.startsWith("/patient");
       if (isPatientRequest) {
-        token = localStorage.getItem("patient_jwt_token");
+        token = localStorage.getItem("patient_jwt_token") || localStorage.getItem("staff_jwt_token");
       } else {
-        // Default to staff token, fall back to patient token if staff token doesn't exist
         token = localStorage.getItem("staff_jwt_token") || localStorage.getItem("patient_jwt_token");
       }
 
@@ -401,3 +400,14 @@ export const getPatientReferrals = async () => {
   const response = await client.get("/patient/referrals");
   return response.data;
 };
+
+export const getAllReferrals = async () => {
+  const response = await client.get("/patient/referrals/all");
+  return response.data;
+};
+
+export const updateReferral = async (refId, referralData) => {
+  const response = await client.put(`/patient/referrals/${refId}`, referralData);
+  return response.data;
+};
+

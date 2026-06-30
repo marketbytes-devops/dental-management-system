@@ -29,7 +29,8 @@ export default function DoctorReferralsPage() {
     patients,
     notifications = [],
     markAsRead,
-    markAsUnread
+    markAsUnread,
+    currentDoctorName
   } = useDoctor();
 
   const [newlyAddedIds, setNewlyAddedIds] = useState([]);
@@ -77,13 +78,26 @@ export default function DoctorReferralsPage() {
   const [medsList, setMedsList] = useState([]);
   const [currentMed, setCurrentMed] = useState({ name: "", dosage: "", duration: "" });
 
+  const isDoctorMe = (docName) => {
+    if (!docName || !currentDoctorName) return false;
+    const name1 = docName.toLowerCase().replace("dr.", "").trim();
+    const name2 = currentDoctorName.toLowerCase().replace("dr.", "").trim();
+    const words1 = name1.split(/\s+/);
+    const words2 = name2.split(/\s+/);
+    return words1.some(w => words2.includes(w)) || name1.includes(name2) || name2.includes(name1);
+  };
+
   const incomingReferrals = referrals
-    .filter(r => r.referredBy !== "Dr. Anoop Nair")
+    .filter(r => !isDoctorMe(r.referredBy))
+    .filter(r => {
+      if (!r.targetDoctor) return true;
+      return isDoctorMe(r.targetDoctor);
+    })
     .filter(r => filterReferralType === "all" || (r.referralType || "Internal") === filterReferralType)
     .filter(r => {
       const pat = patients[r.patientToken];
-      const nameMatch = pat?.name?.toLowerCase().includes(searchQuery.toLowerCase());
-      const idMatch = r.patientToken?.toLowerCase().includes(searchQuery.toLowerCase());
+      const nameMatch = pat?.name ? pat.name.toLowerCase().includes(searchQuery.toLowerCase()) : false;
+      const idMatch = r.patientToken ? r.patientToken.toLowerCase().includes(searchQuery.toLowerCase()) : false;
       return nameMatch || idMatch;
     })
     .sort((a, b) => {
@@ -93,12 +107,12 @@ export default function DoctorReferralsPage() {
     });
 
   const outgoingReferrals = referrals
-    .filter(r => r.referredBy === "Dr. Anoop Nair")
+    .filter(r => isDoctorMe(r.referredBy))
     .filter(r => filterReferralType === "all" || (r.referralType || "Internal") === filterReferralType)
     .filter(r => {
       const pat = patients[r.patientToken];
-      const nameMatch = pat?.name?.toLowerCase().includes(searchQuery.toLowerCase());
-      const idMatch = r.patientToken?.toLowerCase().includes(searchQuery.toLowerCase());
+      const nameMatch = pat?.name ? pat.name.toLowerCase().includes(searchQuery.toLowerCase()) : false;
+      const idMatch = r.patientToken ? r.patientToken.toLowerCase().includes(searchQuery.toLowerCase()) : false;
       return nameMatch || idMatch;
     })
     .sort((a, b) => {
@@ -350,7 +364,7 @@ export default function DoctorReferralsPage() {
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4.5 space-y-2">
               <div className="flex justify-between items-center text-xs gap-4 flex-wrap">
                 <span className="font-bold text-gray-400 uppercase tracking-wider">
-                  {selectedReferral.referredBy === "Dr. Anoop Nair" ? "My Referral Notes" : "Referring Doctor Notes"}
+                  {selectedReferral.referredBy === currentDoctorName ? "My Referral Notes" : "Referring Doctor Notes"}
                 </span>
                 <span className="font-bold text-slate-800">
                   From: {selectedReferral.referredBy} ({selectedReferral.speciality}) ➜ To: {selectedReferral.targetDoctor || "Me"} {selectedReferral.externalFacility ? `(${selectedReferral.externalFacility})` : ""}
@@ -371,10 +385,10 @@ export default function DoctorReferralsPage() {
                     {upperTeeth.map(tooth => (
                       <div 
                         key={tooth} 
-                        className={`w-7 h-7 rounded border text-[9px] font-bold flex flex-col items-center justify-center ${getToothStyles(selectedReferral.teethChart, tooth)}`}
+                        className={`w-7 h-7 rounded border text-[9px] font-bold flex flex-col items-center justify-center ${getToothStyles(selectedReferral.teethChart || selectedPatient?.teethChart || {}, tooth)}`}
                       >
                         {tooth}
-                        <span className="text-[6px]">{getToothEmoji(selectedReferral.teethChart, tooth)}</span>
+                        <span className="text-[6px]">{getToothEmoji(selectedReferral.teethChart || selectedPatient?.teethChart || {}, tooth)}</span>
                       </div>
                     ))}
                   </div>
@@ -383,10 +397,10 @@ export default function DoctorReferralsPage() {
                     {lowerTeeth.map(tooth => (
                       <div 
                         key={tooth} 
-                        className={`w-7 h-7 rounded border text-[9px] font-bold flex flex-col items-center justify-center ${getToothStyles(selectedReferral.teethChart, tooth)}`}
+                        className={`w-7 h-7 rounded border text-[9px] font-bold flex flex-col items-center justify-center ${getToothStyles(selectedReferral.teethChart || selectedPatient?.teethChart || {}, tooth)}`}
                       >
                         {tooth}
-                        <span className="text-[6px]">{getToothEmoji(selectedReferral.teethChart, tooth)}</span>
+                        <span className="text-[6px]">{getToothEmoji(selectedReferral.teethChart || selectedPatient?.teethChart || {}, tooth)}</span>
                       </div>
                     ))}
                   </div>
@@ -500,7 +514,7 @@ export default function DoctorReferralsPage() {
               /* COMPLETED VIEWS OR OUTGOING LOGS */
               <div className="border-t border-gray-100 pt-5 space-y-4 text-left">
                 <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <ClipboardList className="w-4.5 h-4.5 text-success" /> Completed Consultation Findings
+                  <ClipboardList className="w-4.5 h-4.5 text-success" /> Completed Consultation Findings (Consulted by {selectedReferral.targetDoctor || "Specialist"})
                 </h4>
                 {selectedReferral.status === "Completed" ? (
                   <div className="space-y-4">
@@ -524,7 +538,7 @@ export default function DoctorReferralsPage() {
                   </div>
                 ) : (
                   <div className="text-center py-6 text-gray-400 font-semibold border border-dashed border-gray-200 rounded-xl text-xs">
-                    Pending consultation response by {selectedReferral.referredBy === "Dr. Anoop Nair" ? selectedReferral.targetDoctor : "Dr. Anoop Nair"}.
+                    Pending consultation response by {selectedReferral.referredBy === currentDoctorName ? selectedReferral.targetDoctor : selectedReferral.referredBy}.
                   </div>
                 )}
               </div>

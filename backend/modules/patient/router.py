@@ -25,6 +25,7 @@ from .schemas import (
     PrescriptionResponse,
     ReferralCreate,
     ReferralResponse,
+    ReferralUpdate,
 )
 from .service import (
     change_patient_password,
@@ -411,3 +412,36 @@ def get_referrals_route(
     from modules.doctor.models import ReferralModel
     ref_list = db.query(ReferralModel).filter(ReferralModel.patient_token == patient.token).order_by(ReferralModel.date.desc()).all()
     return ref_list
+
+
+@router.get("/referrals/all", response_model=List[ReferralResponse])
+def get_all_referrals_route(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    from modules.doctor.models import ReferralModel
+    ref_list = db.query(ReferralModel).order_by(ReferralModel.date.desc()).all()
+    return ref_list
+
+
+@router.put("/referrals/{ref_id}", response_model=ReferralResponse)
+def update_referral_route(
+    ref_id: str,
+    req: ReferralUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    from modules.doctor.models import ReferralModel
+    ref = db.query(ReferralModel).filter(ReferralModel.id == ref_id).first()
+    if not ref:
+        raise HTTPException(status_code=404, detail="Referral not found")
+    
+    ref.status = req.status
+    if req.my_consultation_notes is not None:
+        ref.my_consultation_notes = req.my_consultation_notes
+    if req.my_medications is not None:
+        ref.my_medications = req.my_medications
+        
+    db.commit()
+    db.refresh(ref)
+    return ref

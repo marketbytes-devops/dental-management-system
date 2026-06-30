@@ -136,6 +136,14 @@ class ReferralResponse(BaseModel):
     status: str
     referral_type: str
     external_facility: Optional[str] = None
+    my_consultation_notes: Optional[str] = None
+    my_medications: Optional[list] = None
 
     class Config:
         from_attributes = True
+
+
+class ReferralUpdate(BaseModel):
+    status: str
+    my_consultation_notes: Optional[str] = None
+    my_medications: Optional[list] = None

@@ -18,12 +18,10 @@ client.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {
       let token = null;
-      // Determine which token to use based on the API request URL rather than browser page route
       const isPatientRequest = config.url && config.url.startsWith("/patient");
       if (isPatientRequest) {
-        token = localStorage.getItem("patient_jwt_token");
+        token = localStorage.getItem("patient_jwt_token") || localStorage.getItem("staff_jwt_token");
       } else {
-        // Default to staff token, fall back to patient token if staff token doesn't exist
         token = localStorage.getItem("staff_jwt_token") || localStorage.getItem("patient_jwt_token");
       }
 

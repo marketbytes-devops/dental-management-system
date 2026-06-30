@@ -6,10 +6,16 @@ import { useDoctor } from "@/app/doctor/layout";
 
 export default function DoctorWorkspaceRootPage() {
   const router = useRouter();
-  const { viewingPatient } = useDoctor();
+  const { viewingPatient, activePatientToken, setViewingPatientToken } = useDoctor();
 
   useEffect(() => {
     if (!viewingPatient) {
+      if (activePatientToken) {
+        setViewingPatientToken(activePatientToken);
+      } else {
+        // Redirect to general workspace to show the selector if no patient is in chair
+        router.replace("/doctor/workspace/general");
+      }
       return;
     }
 
@@ -26,7 +32,7 @@ export default function DoctorWorkspaceRootPage() {
     } else {
       router.replace("/doctor/workspace/general");
     }
-  }, [viewingPatient?.token, router]);
+  }, [viewingPatient?.token, activePatientToken, router, setViewingPatientToken]);
 
   return (
     <div className="bg-white border border-gray-150 rounded-2xl shadow-sm p-12 text-center text-gray-400 font-semibold animate-pulse">

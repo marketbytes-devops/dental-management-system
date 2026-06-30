@@ -1,5 +1,5 @@
 # main.py - Single entry point, everyone's routers register here
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers from modules
@@ -90,3 +90,43 @@ app.include_router(treatment_plan_router)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the SmileCare Dental CRM backend API"}
+
+
+# ---------------------------------------------------------------------------
+# Public About-Us stats (no authentication required)
+# ---------------------------------------------------------------------------
+
+from sqlalchemy.orm import Session
+from database import get_db
+
+@app.get("/public/about-stats")
+def get_about_stats(db: Session = Depends(get_db)):
+    from modules.auth.models import UserModel
+    from modules.patient.models import PatientModel
+    from modules.doctor.models import DoctorModel
+
+    # Collect all doctor users
+    all_users = db.query(UserModel).all()
+    doctor_users = [u for u in all_users if any(r.lower() == "doctor" for r in (u.roles or []))]
+    total_doctors = len(doctor_users)
+
+    doctors_list = []
+    for u in doctor_users:
+        doc = db.query(DoctorModel).filter(DoctorModel.user_id == u.id).first()
+        specialty = doc.specialty if (doc and doc.specialty) else (", ".join(u.specialties) if u.specialties else "General Dentistry")
+        doctors_list.append({
+            "id": u.id,
+            "name": u.name if u.name.startswith("Dr. ") else f"Dr. {u.name}",
+            "specialty": specialty,
+            "status": u.status,
+        })
+
+    total_patients = db.query(PatientModel).count()
+    total_staff = db.query(UserModel).count()
+
+    return {
+        "total_patients": total_patients,
+        "total_doctors": total_doctors,
+        "total_staff": total_staff,
+        "doctors": doctors_list,
+    }

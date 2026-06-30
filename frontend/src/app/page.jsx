@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PublicFooter from "@/components/layout/PublicFooter";
 import {
   Calendar,
   User,
@@ -92,7 +93,7 @@ export default function Home() {
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
             <a href="#features" className="hover:text-primary transition-colors">Features</a>
-            <a href="#portals" className="hover:text-primary transition-colors">Staff Portals</a>
+            <Link href="/about" className="hover:text-primary transition-colors">About Us</Link>
             <button
               onClick={() => setIsAuthGateOpen(true)}
               className="hover:text-primary transition-colors cursor-pointer"
@@ -186,16 +187,7 @@ export default function Home() {
 
 
 
-      {/* Main Footer */}
-      <footer className="mt-auto bg-slate-900 border-t border-slate-800 text-slate-500 py-10 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <ToothIcon className="w-6 h-6 text-slate-650" />
-            <span className="font-black text-slate-450 tracking-tight">SmileCare Clinic Portal</span>
-          </div>
-          <p className="text-xs font-semibold">© {new Date().getFullYear()} SmileCare Dental Ltd. All rights reserved.</p>
-        </div>
-      </footer>
+      <PublicFooter />
 
       {/* AUTHENTICATION GATE MODAL FOR BOOK APPOINTMENT */}
       {isAuthGateOpen && (

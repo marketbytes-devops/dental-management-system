@@ -118,7 +118,7 @@ export default function Home() {
 
           <div className="space-y-6 text-center flex flex-col items-center">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wide">
-              <Sparkles className="w-3.5 h-3.5" /> Premium Dental Care CRM
+              <p>Premium Dental Care</p>
             </div>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 leading-tight tracking-tight">
@@ -145,21 +145,7 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Quick Metrics */}
-            <div className="grid grid-cols-3 gap-6 border-t border-slate-100 pt-8 max-w-lg">
-              <div>
-                <p className="text-lg font-black text-slate-800">10k+</p>
-                <p className="text-xs text-slate-400 font-semibold mt-0.5">Patients Served</p>
-              </div>
-              <div>
-                <p className="text-lg font-black text-slate-800">99.4%</p>
-                <p className="text-xs text-slate-400 font-semibold mt-0.5">Satisfaction Rating</p>
-              </div>
-              <div>
-                <p className="text-lg font-black text-slate-800">&lt;5 min</p>
-                <p className="text-xs text-slate-400 font-semibold mt-0.5">Lobby Wait Time</p>
-              </div>
-            </div>
+
 
           </div>
 
@@ -198,75 +184,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Portals Selector Area */}
-      <section id="portals" className="py-20 bg-slate-900 px-6 text-white relative">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#0ea5e912_1px,transparent_1px),linear-gradient(to_bottom,#0ea5e912_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
 
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
-
-          <div className="lg:col-span-5 text-left space-y-5">
-            <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
-              One Clinic System. <br />
-              Five Interactive Roles.
-            </h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              SmileCare operates a single unified database. Select your portal type to access your specialized interface. Patients can sign up instantly to review their status.
-            </p>
-            <div className="space-y-3 pt-3">
-              <div className="flex items-center gap-3 text-xs text-slate-300 font-semibold">
-                <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />
-                <span>Zero manual syncing between front desk and chair.</span>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-slate-300 font-semibold">
-                <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />
-                <span>Encrypted medical records database.</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-7 flex justify-center">
-            {/* Role Gateway Container */}
-            <div className="bg-slate-800 border border-slate-700/60 rounded-3xl p-8 shadow-2xl max-w-lg w-full min-h-[420px] flex flex-col justify-between">
-
-              <div className="space-y-6 w-full">
-                <div>
-                  <h3 className="text-xl font-bold text-white">Select Your Portal</h3>
-                  <p className="text-slate-400 text-xs mt-1">Choose your workspace to sign in</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Object.entries(roles).map(([key, role]) => {
-                    const Icon = role.icon;
-                    return (
-                      <Link
-                        key={key}
-                        href={`/login?role=${key}`}
-                        className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-700/60 hover:bg-slate-700/40 text-left transition-all hover:scale-102 group cursor-pointer"
-                      >
-                        <div className="w-9 h-9 rounded-xl bg-slate-700 flex items-center justify-center text-slate-300 group-hover:text-primary group-hover:bg-slate-650 transition-colors shrink-0">
-                          <Icon className="w-4.5 h-4.5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{role.name}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{role.description}</p>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Secure Stamp */}
-              <div className="border-t border-slate-700/60 pt-4 flex items-center gap-2 text-[10px] text-slate-500">
-                <Shield className="w-3.5 h-3.5 text-slate-400" />
-                <span>Protected by SmileCare HIPAA Compliance Standard.</span>
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-      </section>
 
       {/* Main Footer */}
       <footer className="mt-auto bg-slate-900 border-t border-slate-800 text-slate-500 py-10 px-6">

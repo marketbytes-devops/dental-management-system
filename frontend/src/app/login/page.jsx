@@ -3,13 +3,13 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { 
-  User, 
-  Shield, 
-  Microscope, 
-  Lock, 
-  ArrowRight, 
-  ArrowLeft, 
+import {
+  User,
+  Shield,
+  Microscope,
+  Lock,
+  ArrowRight,
+  ArrowLeft,
   Heart,
   Clock,
   Sparkles,
@@ -69,7 +69,7 @@ const roles = {
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const [emailId, setEmailId] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -109,10 +109,10 @@ function LoginContent() {
 
         // Save token to localStorage first so getPatientProfile interceptor can use it
         localStorage.setItem("patient_jwt_token", jwtToken);
-        
+
         // Fetch patient profile details
         const patientProfile = await getPatientProfile();
-        
+
         // Save details to localStorage
         localStorage.setItem("patient_token", patientProfile.token);
         localStorage.setItem("patient_name", patientProfile.name);
@@ -138,10 +138,10 @@ function LoginContent() {
 
         // Save details to localStorage
         localStorage.setItem("staff_user", JSON.stringify(staffProfile));
-        
+
         // Determine redirect path based on their roles
         const userRoles = staffProfile.roles.map(r => r.toLowerCase());
-        
+
         let redirectPath = "/";
         if (userRoles.includes("admin")) {
           redirectPath = "/admin/dashboard";
@@ -169,9 +169,9 @@ function LoginContent() {
       <div className="w-full max-w-xl bg-slate-800/95 border border-slate-700/80 rounded-3xl p-8 shadow-2xl backdrop-blur-md flex flex-col justify-between min-h-[460px] animate-fadeIn">
         <div className="space-y-6 w-full">
           <div className="flex items-center justify-between">
-            <Link 
+            <Link
               href="/"
-              className="flex items-center gap-1 text-slate-450 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+              className="flex items-center gap-1 text-blue-400 hover:text-white text-xs font-bold transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back to Home
             </Link>
@@ -220,11 +220,6 @@ function LoginContent() {
             </button>
           </div>
         </div>
-
-        <div className="border-t border-slate-700/60 pt-4 mt-6 flex items-center gap-2 text-[10px] text-slate-500 justify-center">
-          <Shield className="w-3.5 h-3.5 text-slate-400" />
-          <span>Protected by SmileCare HIPAA Compliance Standard.</span>
-        </div>
       </div>
     );
   }
@@ -233,20 +228,19 @@ function LoginContent() {
     <div className="w-full max-w-lg bg-slate-800/95 border border-slate-700/80 rounded-3xl p-8 shadow-2xl backdrop-blur-md flex flex-col justify-between min-h-[460px] animate-fadeIn">
       <div className="space-y-6 w-full">
         <div className="flex items-center justify-between">
-          <button 
+          <button
             onClick={() => {
               setPortalType(null);
               setEmailId("");
               setPassword("");
               setAuthError("");
             }}
-            className="flex items-center gap-1 text-slate-450 hover:text-white text-xs font-bold transition-colors cursor-pointer bg-transparent border-none outline-none"
+            className="flex items-center gap-1 text-blue-400 hover:text-white text-xs font-bold transition-colors cursor-pointer bg-transparent border-none outline-none"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back to Selection
           </button>
-          <span className={`text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded ${
-            portalType === "patient" ? "bg-sky-500/20 text-sky-400" : "bg-indigo-500/20 text-indigo-400"
-          }`}>
+          <span className={`text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded ${portalType === "patient" ? "bg-orange-500/20 text-orange-400" : "bg-orange-500/20 text-orange-400"
+            }`}>
             {portalType === "patient" ? "Patient" : "Staff"} Portal
           </span>
         </div>
@@ -256,8 +250,8 @@ function LoginContent() {
             <Sparkles className="w-5 h-5 text-primary" /> {portalType === "patient" ? "Patient Login" : "Staff Login"}
           </h3>
           <p className="text-slate-400 text-xs mt-1 font-medium">
-            {portalType === "patient" 
-              ? "Enter your registered email address or phone number to sign in" 
+            {portalType === "patient"
+              ? "Enter your registered email address or phone number to sign in"
               : "Enter your clinic credentials or username to sign in"
             }
           </p>
@@ -270,8 +264,8 @@ function LoginContent() {
             </label>
             <div className="relative flex items-center">
               <Mail className="absolute left-3.5 text-slate-500 w-4 h-4" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 required
                 value={emailId}
                 onChange={(e) => {
@@ -288,8 +282,8 @@ function LoginContent() {
             <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Password</label>
             <div className="relative flex items-center">
               <Lock className="absolute left-3.5 text-slate-500 w-4 h-4" />
-              <input 
-                type="password" 
+              <input
+                type="password"
                 required
                 value={password}
                 onChange={(e) => {
@@ -304,8 +298,8 @@ function LoginContent() {
 
           {authError && <p className="text-danger text-[11px] font-semibold">{authError}</p>}
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isSubmitting}
             className="w-full bg-primary text-white text-xs font-bold py-3 rounded-xl hover:bg-primary/95 transition-all shadow-md shadow-primary/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
@@ -319,7 +313,7 @@ function LoginContent() {
 
         {portalType === "patient" && (
           <div className="text-center pt-1 animate-fadeIn">
-            <Link 
+            <Link
               href="/register"
               className="text-xs text-secondary hover:text-secondary/80 font-bold transition-all cursor-pointer"
             >
@@ -327,11 +321,6 @@ function LoginContent() {
             </Link>
           </div>
         )}
-      </div>
-
-      <div className="border-t border-slate-700/60 pt-4 mt-4 flex items-center gap-2 text-[10px] text-slate-500">
-        <Shield className="w-3.5 h-3.5 text-slate-400" />
-        <span>Protected by SmileCare HIPAA Compliance Standard.</span>
       </div>
     </div>
   );
@@ -350,7 +339,7 @@ export default function LoginPage() {
             <ToothIcon className="w-8 h-8 text-primary" strokeWidth={2.5} />
             <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">SmileCare</span>
           </Link>
-          <Link 
+          <Link
             href="/"
             className="text-slate-450 hover:text-white text-xs font-bold transition-colors cursor-pointer"
           >

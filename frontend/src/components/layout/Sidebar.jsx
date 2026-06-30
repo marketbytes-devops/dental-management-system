@@ -37,7 +37,6 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
             setCurrentUser(parsed);
 
             const roles = parsed.roles || [];
-            const rawRole = roles.length > 0 ? roles[0] : (parsed.role || "");
             let rawRole = parsed.role || "";
 
             if (!rawRole && roles.length > 0) {
@@ -91,8 +90,16 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
     if (role === "doctor" && item.name === "Clinical Workspace" && item.subItems) {
       const userSpecs = currentUser?.specialties || [];
       const filteredSubs = item.subItems.filter(sub => {
-        if (sub.name === "General Dentistry") return true;
-        return userSpecs.some(spec => spec.toLowerCase() === sub.name.toLowerCase());
+        return userSpecs.some(spec => {
+          const sLower = spec.toLowerCase();
+          const subLower = sub.name.toLowerCase();
+          return (
+            sLower.includes(subLower) || 
+            subLower.includes(sLower) ||
+            (subLower === "general dentistry" && (sLower.includes("general") || sLower.includes("dentist"))) ||
+            (subLower === "oral surgery" && (sLower.includes("surgery") || sLower.includes("surgeon")))
+          );
+        });
       });
       return { ...item, subItems: filteredSubs };
     }

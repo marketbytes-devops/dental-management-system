@@ -12,7 +12,7 @@ from modules.lab.schemas import (
     LabOrderResponse,
     LabNotificationResponse
 )
-from modules.patient.models import PatientModel
+from modules.patient.models import PatientModel, PatientNotificationModel
 from modules.doctor.models import DoctorModel
 from modules.auth.models import UserModel
 import random
@@ -143,6 +143,26 @@ def update_lab_order_status(
     )
     db.add(notif)
     db.commit()
+
+    # Trigger patient notification for lab updates
+    if order.patient_token and status_data.status in ["Dispatched", "Delivered", "Ready", "Completed"]:
+        status_map = {
+            "Dispatched": "dispatched",
+            "Delivered": "delivered",
+            "Ready": "ready for fitting",
+            "Completed": "completed"
+        }
+        status_lbl = status_map.get(status_data.status, status_data.status.lower())
+        patient_notif = PatientNotificationModel(
+            patient_token=order.patient_token,
+            sender_role="lab tech",
+            type="lab_delivery",
+            title="Dental Prosthetic Update",
+            message=f"Your custom dental prosthetic ({order.prosthetic_type}) is {status_lbl}.",
+            read=False
+        )
+        db.add(patient_notif)
+        db.commit()
 
     return order
 

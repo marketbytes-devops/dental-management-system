@@ -1,4 +1,4 @@
-export default function HealthScoreCard({ score = 78 }) {
+export default function HealthScoreCard({ score = 78, onClick }) {
   // Determine color based on score
   const color =
     score >= 80 ? "text-success" : score >= 60 ? "text-warning" : "text-danger";
@@ -19,7 +19,10 @@ export default function HealthScoreCard({ score = 78 }) {
   const offset = circumference - (score / 100) * circumference;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-6">
+    <div
+      onClick={onClick}
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-6 cursor-pointer hover:shadow-md hover:border-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+    >
       {/* Circular ring */}
       <div className="relative flex-shrink-0">
         <svg width="96" height="96" className="-rotate-90">

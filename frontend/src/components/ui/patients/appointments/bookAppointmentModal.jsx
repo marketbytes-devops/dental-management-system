@@ -12,22 +12,25 @@ const TIME_SLOTS = [
   "4:00 PM", "4:30 PM", "5:00 PM",
 ];
 
-const TREATMENTS = [
-  "Routine Check-up",
-  "Scaling & Polishing",
-  "Root Canal",
-  "Tooth Extraction",
-  "Dental Filling",
-  "Orthodontic Consultation",
-  "Teeth Whitening",
-  "Crown & Bridge",
-  "Implant Consultation",
-  "Gum Treatment",
+const VISIT_REASONS = [
+  "Consultation",
+  "Follow-up Check-up",
+  "Routine Check-up"
 ];
+
+const SPECIALTY_DESCRIPTIONS = {
+  "General Dentistry": "Focuses on routine cleanings, fillings, checkups, and general oral health maintenance.",
+  "Orthodontics": "Specializes in correcting misaligned teeth, bite problems, braces, and clear aligners.",
+  "Endodontics": "Specializes in root canal treatments and treating issues with the tooth pulp/nerve.",
+  "Periodontics": "Focuses on diagnosing and treating gum diseases, deep scaling, and dental implants.",
+  "Prosthodontics": "Specializes in replacing missing teeth with crowns, bridges, veneers, or dentures.",
+  "Pediatric Dentistry": "Dedicated to the oral health of children from infancy through the teen years.",
+  "Oral Surgery": "Specializes in complex extractions, wisdom teeth removal, and surgical jaw treatments."
+};
 
 const INITIAL_FORM = {
   doctor: "",
-  treatment: "",
+  treatment: "Consultation",
   date: "",
   time: "",
   notes: "",
@@ -92,10 +95,14 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
 
   const today = new Date().toISOString().split("T")[0];
 
+  const selectedDoctorObj = doctors.find((d) => d.name === form.doctor);
+  const selectedDoctorSpecialty = selectedDoctorObj ? selectedDoctorObj.specialty : "";
+  const specialtyDescription = SPECIALTY_DESCRIPTIONS[selectedDoctorSpecialty] || (selectedDoctorSpecialty ? `Provides comprehensive assessment and specialized dental care in ${selectedDoctorSpecialty}.` : "");
+
   function validate() {
     const errs = {};
     if (!form.doctor) errs.doctor = "Please select a doctor.";
-    if (!form.treatment) errs.treatment = "Please select a treatment.";
+    if (!form.treatment) errs.treatment = "Please select a visit reason.";
     if (!form.date) errs.date = "Please pick a date.";
     if (!form.time) errs.time = "Please select a time slot.";
     return errs;
@@ -178,49 +185,6 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-5" noValidate>
 
-            {/* Doctor */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                Doctor <span className="text-danger">*</span>
-              </label>
-              <select
-                value={form.doctor}
-                onChange={(e) => handleChange("doctor", e.target.value)}
-                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.doctor ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
-              >
-                <option value="">Select a doctor…</option>
-                {doctors.map((d) => (
-                  <option
-                    key={d.id || d.name}
-                    value={d.name}
-                    disabled={d.status === "Off Duty"}
-                    className={d.status === "Off Duty" ? "text-gray-400" : ""}
-                  >
-                    {d.name} — {d.specialty} ({d.status === "Off Duty" ? "Off Duty" : d.status === "On Break" ? "On Break" : "Available"})
-                  </option>
-                ))}
-              </select>
-              {errors.doctor && <p className="mt-1 text-xs text-danger">{errors.doctor}</p>}
-            </div>
-
-            {/* Treatment */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                Treatment Type <span className="text-danger">*</span>
-              </label>
-              <select
-                value={form.treatment}
-                onChange={(e) => handleChange("treatment", e.target.value)}
-                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.treatment ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
-              >
-                <option value="">Select treatment…</option>
-                {TREATMENTS.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              {errors.treatment && <p className="mt-1 text-xs text-danger">{errors.treatment}</p>}
-            </div>
-
             {/* Date & Time row */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -231,7 +195,11 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
                   type="date"
                   min={today}
                   value={form.date}
-                  onChange={(e) => handleChange("date", e.target.value)}
+                  onChange={(e) => {
+                    handleChange("date", e.target.value);
+                    // Reset doctor when date changes since doctors list will refresh
+                    handleChange("doctor", "");
+                  }}
                   className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.date ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
                 />
                 {errors.date && <p className="mt-1 text-xs text-danger">{errors.date}</p>}
@@ -253,6 +221,53 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
                 </select>
                 {errors.time && <p className="mt-1 text-xs text-danger">{errors.time}</p>}
               </div>
+            </div>
+
+            {/* Doctor */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                Doctor <span className="text-danger">*</span>
+              </label>
+              {!form.date ? (
+                <p className="text-sm text-gray-500">Pick a date first to view available doctors...</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {doctors.map((d) => (
+                    <button
+                      type="button"
+                      key={d.id || d.name}
+                      onClick={() => handleChange("doctor", d.name)}
+                      disabled={d.status !== "Available"}
+                      className={`w-full p-4 text-left border rounded-xl transition-colors ${form.doctor === d.name ? "border-primary bg-primary/5" : "border-gray-200 bg-white"} ${d.status !== "Available" ? "opacity-50 cursor-not-allowed" : "hover:shadow-lg"}`}
+                    >
+                      <div className="font-semibold">{d.name}</div>
+                      <div className="text-sm text-gray-600">{d.specialty}</div>
+                      <div className="mt-2 text-xs text-primary">
+                        {SPECIALTY_DESCRIPTIONS[d.specialty] || `Provides comprehensive assessment and specialized dental care in ${d.specialty}.`}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">Status: {d.status}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {errors.doctor && <p className="mt-1 text-xs text-danger">{errors.doctor}</p>}
+            </div>
+
+            {/* Visit Reason / Treatment */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                Visit Reason <span className="text-danger">*</span>
+              </label>
+              <select
+                value={form.treatment}
+                onChange={(e) => handleChange("treatment", e.target.value)}
+                className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.treatment ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
+              >
+                {VISIT_REASONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+              {errors.treatment && <p className="mt-1 text-xs text-danger">{errors.treatment}</p>}
             </div>
 
             {/* Notes */}

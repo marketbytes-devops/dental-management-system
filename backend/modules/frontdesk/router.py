@@ -15,7 +15,7 @@ from .schemas import (
 from .models import AppointmentModel
 from .communication_models import CommunicationLogModel
 from .communication_schemas import CommunicationSendRequest, CommunicationLogResponse
-from modules.patient.models import PatientModel
+from modules.patient.models import PatientModel, PatientNotificationModel
 from modules.auth.models import UserModel
 from .service import (
     create_appointment,
@@ -36,6 +36,20 @@ router = APIRouter(prefix="/frontdesk", tags=["frontdesk"])
 def schedule_appointment(appt_in: AppointmentCreate, db: Session = Depends(get_db)):
     appt = create_appointment(db, appt_in=appt_in)
     appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    
+    # Trigger patient notification
+    if appt.patient:
+        notif = PatientNotificationModel(
+            patient_token=appt.patient.token,
+            sender_role="receptionist",
+            type="appointment",
+            title="Appointment Confirmed",
+            message=f"Your appointment with {appt.doctor_name} is scheduled on {appt.appointment_date} at {appt.appointment_time}.",
+            read=False
+        )
+        db.add(notif)
+        db.commit()
+        
     return appt
 
 @router.get("/appointments/today", response_model=List[AppointmentResponse])
@@ -211,6 +225,20 @@ def update_status(id: int, status_in: AppointmentUpdate, db: Session = Depends(g
     from .service import update_appointment
     appt = update_appointment(db, appt_id=id, appt_update=status_in)
     appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    
+    # Trigger patient notification if date/time rescheduled
+    if appt.patient and (status_in.appointment_date or status_in.appointment_time):
+        notif = PatientNotificationModel(
+            patient_token=appt.patient.token,
+            sender_role="receptionist",
+            type="appointment",
+            title="Appointment Updated",
+            message=f"Your appointment with {appt.doctor_name} has been updated to {appt.appointment_date} at {appt.appointment_time}.",
+            read=False
+        )
+        db.add(notif)
+        db.commit()
+        
     return appt
 
 @router.post("/appointments/{id}/call", response_model=AppointmentResponse)
@@ -219,6 +247,47 @@ def call_patient(id: int, status_str: str = "In Chair", db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="Status must be either 'In Chair' or 'Completed' when calling patient.")
     appt = update_appointment_status(db, appt_id=id, status_str=status_str)
     appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    
+    # Trigger accountant billing notification when appointment is Completed
+    if status_str == "Completed" and appt.patient:
+        treatment_costs = {
+            "checkup": 500,
+            "cleaning": 1000,
+            "root canal": 5000,
+            "crown": 8000,
+            "extraction": 1500,
+            "filling": 1200,
+            "consultation": 1500
+        }
+        treatment = (appt.treatment_type or "").lower()
+        cost = 1500  # default fallback
+        for t_type, t_cost in treatment_costs.items():
+            if t_type in treatment:
+                cost = t_cost
+                break
+        
+        notif = PatientNotificationModel(
+            patient_token=appt.patient.token,
+            sender_role="accountant",
+            type="billing",
+            title="New Invoice Generated",
+            message=f"Your treatment '{appt.treatment_type}' is completed. Invoice generated with patient due amount of ₹{cost}.",
+            read=False
+        )
+        db.add(notif)
+        
+        # Trigger consultation completed notification from the doctor
+        notif_consult = PatientNotificationModel(
+            patient_token=appt.patient.token,
+            sender_role="doctor",
+            type="treatment_plan",
+            title="Consultation Completed",
+            message=f"Your consultation for '{appt.treatment_type}' with {appt.doctor_name} has been completed. All updates to your treatment plan are now available in your portal.",
+            read=False
+        )
+        db.add(notif_consult)
+        db.commit()
+        
     return appt
 
 @router.get("/queue", response_model=List[QueueItemResponse])
@@ -329,6 +398,22 @@ def send_communication(
     db.add(log)
     db.commit()
     db.refresh(log)
+
+    # Trigger patient app notification if patient exists
+    if payload.patient_id:
+        patient = db.query(PatientModel).filter(PatientModel.id == payload.patient_id).first()
+        if patient:
+            notif = PatientNotificationModel(
+                patient_token=patient.token,
+                sender_role="receptionist",
+                type="reminders",
+                title="Reminder Notice" if "reminder" in (payload.template or "") else "Clinic Notice",
+                message=payload.message_body,
+                read=False
+            )
+            db.add(notif)
+            db.commit()
+
     return log
 
 

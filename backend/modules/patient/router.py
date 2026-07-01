@@ -12,7 +12,7 @@ from dependencies import get_current_user
 from modules.doctor.models import DoctorModel
 from shared.utils.pdf_generator import generate_consent_pdf
 
-from .models import PatientConsent, PatientModel
+from .models import PatientConsent, PatientModel, PatientNotificationModel, DoctorFeedbackModel
 from .schemas import (
     ConsentRequest,
     ConsentResponse,
@@ -25,6 +25,9 @@ from .schemas import (
     PrescriptionResponse,
     ReferralCreate,
     ReferralResponse,
+    PatientNotificationResponse,
+    DoctorFeedbackCreate,
+    DoctorFeedbackResponse,
 )
 from .service import (
     change_patient_password,
@@ -173,6 +176,17 @@ def request_consent(req: ConsentRequest, db: Session = Depends(get_db)):
     db.add(new_consent)
     db.commit()
     db.refresh(new_consent)
+
+    # Trigger patient notification
+    create_patient_notification(
+        db=db,
+        patient_token=patient.token,
+        sender_role="doctor",
+        type="consent",
+        title="Pending Dental Consent Form",
+        message=f"You have a new consent form '{req.title}' to sign."
+    )
+
     return new_consent
 
 
@@ -563,4 +577,201 @@ def get_oral_health_details(
         "completion_rate": completion_rate,
         "completed_steps": completed_steps,
         "total_steps": total_steps
-    }
+    }
+
+
+# ---------------------------------------------------------------------------
+# Patient Notifications & Doctor Feedback (New)
+# ---------------------------------------------------------------------------
+
+def create_patient_notification(db: Session, patient_token: str, sender_role: str, type: str, title: str, message: str):
+    """Utility function to create a new notification for a patient."""
+    notif = PatientNotificationModel(
+        patient_token=patient_token,
+        sender_role=sender_role,
+        type=type,
+        title=title,
+        message=message,
+        read=False
+    )
+    db.add(notif)
+    db.commit()
+    db.refresh(notif)
+    return notif
+
+
+@router.get("/notifications", response_model=List[PatientNotificationResponse])
+def get_patient_notifications(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    notifs = db.query(PatientNotificationModel).filter(
+        PatientNotificationModel.patient_token == patient.token
+    ).order_by(PatientNotificationModel.created_at.desc()).all()
+
+    return notifs
+
+
+@router.put("/notifications/{notif_id}/read", response_model=PatientNotificationResponse)
+def mark_patient_notif_read(
+    notif_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    notif = db.query(PatientNotificationModel).filter(
+        PatientNotificationModel.id == notif_id,
+        PatientNotificationModel.patient_token == patient.token
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    
+    notif.read = True
+    db.commit()
+    db.refresh(notif)
+    return notif
+
+
+@router.put("/notifications/read-all")
+def mark_all_patient_notifs_read(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    db.query(PatientNotificationModel).filter(
+        PatientNotificationModel.patient_token == patient.token,
+        PatientNotificationModel.read == False
+    ).update({"read": True}, synchronize_session=False)
+    db.commit()
+    return {"detail": "All notifications marked as read"}
+
+
+@router.delete("/notifications/{notif_id}")
+def delete_patient_notif(
+    notif_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    notif = db.query(PatientNotificationModel).filter(
+        PatientNotificationModel.id == notif_id,
+        PatientNotificationModel.patient_token == patient.token
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    
+    db.delete(notif)
+    db.commit()
+    return {"detail": "Notification deleted successfully"}
+
+
+@router.post("/feedback", response_model=DoctorFeedbackResponse)
+def submit_doctor_feedback(
+    req: DoctorFeedbackCreate,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    feedback = DoctorFeedbackModel(
+        patient_token=patient.token,
+        patient_name=patient.name,
+        doctor_name=req.doctor_name,
+        rating=req.rating,
+        feedback_text=req.feedback_text,
+        escalated=True
+    )
+    db.add(feedback)
+    db.commit()
+    db.refresh(feedback)
+    return feedback
+
+
+@router.get("/feedback", response_model=List[DoctorFeedbackResponse])
+def get_all_feedback(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    roles = current_user.get("roles", [])
+
+    if patient_id:
+        patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+        if not patient:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        feedbacks = db.query(DoctorFeedbackModel).filter(
+            DoctorFeedbackModel.patient_token == patient.token
+        ).order_by(DoctorFeedbackModel.created_at.desc()).all()
+    else:
+        # Staff role (Admin or Doctor)
+        if "Admin" not in roles and "Doctor" not in roles and "Receptionist" not in roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        feedbacks = db.query(DoctorFeedbackModel).order_by(DoctorFeedbackModel.created_at.desc()).all()
+    
+    return feedbacks
+
+
+@router.get("/feedback/doctor/{doctor_name}")
+def get_doctor_feedback_summary(
+    doctor_name: str,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    feedbacks = db.query(DoctorFeedbackModel).filter(
+        DoctorFeedbackModel.doctor_name.ilike(f"%{doctor_name}%")
+    ).order_by(DoctorFeedbackModel.created_at.desc()).all()
+
+    ratings = [f.rating for f in feedbacks]
+    avg_rating = sum(ratings) / len(ratings) if ratings else 0.0
+
+    return {
+        "doctor_name": doctor_name,
+        "average_rating": round(avg_rating, 2),
+        "total_reviews": len(feedbacks),
+        "feedbacks": [
+            {
+                "id": f.id,
+                "patient_name": f.patient_name,
+                "rating": f.rating,
+                "feedback_text": f.feedback_text,
+                "created_at": f.created_at.isoformat() if f.created_at else None
+            }
+            for f in feedbacks
+        ]
+    }
+

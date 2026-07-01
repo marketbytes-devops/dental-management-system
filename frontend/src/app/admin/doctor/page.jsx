@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
-import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw } from "lucide-react";
+import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw, Star } from "lucide-react";
 import client from "@/services/api";
 
 export default function DoctorManagementPage() {
@@ -298,6 +298,7 @@ export default function DoctorManagementPage() {
                               <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Address</span>
                               <span className="font-semibold text-gray-800">{doc.address || "Not Specified"}</span>
                             </div>
+                            <DoctorReviewsPanel doctorName={doc.name} />
                           </div>
                         </td>
                       </tr>
@@ -317,6 +318,77 @@ export default function DoctorManagementPage() {
         </div>
 
       </div>
+    </div>
+  );
+}
+
+function DoctorReviewsPanel({ doctorName }) {
+  const [reviews, setReviews] = useState([]);
+  const [stats, setStats] = useState({ average_rating: 0, total_reviews: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const response = await client.get(`/patient/feedback/doctor/${encodeURIComponent(doctorName)}`);
+        const data = response.data;
+        setReviews(data.feedbacks || []);
+        setStats({
+          average_rating: data.average_rating || 0,
+          total_reviews: data.total_reviews || 0
+        });
+      } catch (err) {
+        console.error("Failed to load doctor feedbacks", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStats();
+  }, [doctorName]);
+
+  return (
+    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs md:col-span-3">
+      <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Patient Feedback & Performance (Escalated to Admin)</span>
+      
+      {loading ? (
+        <div className="text-center py-4 text-xs text-gray-400">Loading reviews...</div>
+      ) : reviews.length > 0 ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 bg-amber-50/50 border border-amber-100 p-3 rounded-xl">
+            <span className="text-xs font-bold text-gray-800">Average Rating:</span>
+            <div className="flex items-center text-amber-500 font-bold text-xs">
+              {stats.average_rating}
+              <div className="flex gap-0.5 ml-1.5">
+                {[1,2,3,4,5].map(s => (
+                  <Star key={s} className={`w-3.5 h-3.5 ${s <= stats.average_rating ? "text-amber-400 fill-amber-400" : "text-gray-200"}`} />
+                ))}
+              </div>
+            </div>
+            <span className="text-xs text-gray-500 font-medium">({stats.total_reviews} reviews total)</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[220px] overflow-y-auto mt-2 pr-1">
+            {reviews.map(rev => (
+              <div key={rev.id} className="p-3 bg-gray-50/50 rounded-xl border border-gray-100">
+                <div className="flex justify-between items-start mb-1">
+                  <div>
+                    <span className="font-bold text-gray-800 text-xs block">{rev.patient_name}</span>
+                    <span className="text-[9px] text-gray-400 font-semibold">{rev.created_at ? new Date(rev.created_at).toLocaleDateString() : ""}</span>
+                  </div>
+                  <span className="text-xs text-amber-500 font-bold flex items-center">{rev.rating} ★</span>
+                </div>
+                {rev.feedback_text && (
+                  <p className="text-[11px] text-gray-600 leading-relaxed font-medium mt-1">"{rev.feedback_text}"</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-6 text-gray-400 font-semibold italic text-xs border border-dashed border-gray-150 rounded-xl">
+          No patient feedbacks submitted for {doctorName} yet.
+        </div>
+      )}
     </div>
   );
 }

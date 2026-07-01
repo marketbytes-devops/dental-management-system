@@ -139,3 +139,39 @@ class ReferralResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Patient Notification Schemas ---
+class PatientNotificationResponse(BaseModel):
+    id: int
+    patient_token: str
+    sender_role: str
+    type: str
+    title: str
+    message: str
+    read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- Doctor Feedback Schemas ---
+class DoctorFeedbackCreate(BaseModel):
+    doctor_name: str
+    rating: int
+    feedback_text: Optional[str] = None
+
+
+class DoctorFeedbackResponse(BaseModel):
+    id: int
+    patient_token: str
+    patient_name: str
+    doctor_name: str
+    rating: int
+    feedback_text: Optional[str] = None
+    escalated: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

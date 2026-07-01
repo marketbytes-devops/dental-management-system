@@ -70,6 +70,33 @@ class PatientPrescription(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class PatientNotificationModel(Base):
+    __tablename__ = "patient_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_token = Column(String, index=True, nullable=False)
+    sender_role = Column(String, nullable=False)  # doctor, receptionist, lab tech, accountant
+    type = Column(String, nullable=False)  # consent, treatment_plan, appointment, lab_delivery, billing, feedback
+    title = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class DoctorFeedbackModel(Base):
+    __tablename__ = "doctor_feedbacks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_token = Column(String, index=True, nullable=False)
+    patient_name = Column(String, nullable=False)
+    doctor_name = Column(String, nullable=False)
+    rating = Column(Integer, nullable=False)  # 1 to 5
+    feedback_text = Column(String, nullable=True)
+    escalated = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 # Alias for backward compatibility with treatment plan module
 PatientConsentModel = PatientConsent
 PatientPrescriptionModel = PatientPrescription
+

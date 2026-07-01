@@ -181,6 +181,11 @@ export const getOralHealthDetails = async () => {
   return response.data;
 };
 
+export const getAvailableDoctors = async () => {
+  const response = await client.get("/patient/doctors-list");
+  return response.data;
+};
+
 // ==========================================
 // 4. Appointments & Queue API Endpoints
 // ==========================================
@@ -402,5 +407,45 @@ export const createReferral = async (referralData) => {
 
 export const getPatientReferrals = async () => {
   const response = await client.get("/patient/referrals");
+  return response.data;
+};
+
+
+// ==========================================
+// 9. Patient Notifications & Doctor Feedback (New)
+// ==========================================
+
+export const getPatientNotifications = async () => {
+  const response = await client.get("/patient/notifications");
+  return response.data;
+};
+
+export const markPatientNotificationAsRead = async (id) => {
+  const response = await client.put(`/patient/notifications/${id}/read`);
+  return response.data;
+};
+
+export const markAllPatientNotificationsAsRead = async () => {
+  const response = await client.put("/patient/notifications/read-all");
+  return response.data;
+};
+
+export const deletePatientNotification = async (id) => {
+  const response = await client.delete(`/patient/notifications/${id}`);
+  return response.data;
+};
+
+export const submitDoctorFeedback = async (feedbackData) => {
+  const response = await client.post("/patient/feedback", feedbackData);
+  return response.data;
+};
+
+export const getDoctorFeedbacks = async () => {
+  const response = await client.get("/patient/feedback");
+  return response.data;
+};
+
+export const getDoctorFeedbackStats = async (doctorName) => {
+  const response = await client.get(`/patient/feedback/doctor/${encodeURIComponent(doctorName)}`);
   return response.data;
 };

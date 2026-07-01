@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Bell, HelpCircle, Sparkles, Share2, Microscope, AlertTriangle } from "lucide-react";
+import { Search, Bell, HelpCircle, Sparkles, Share2, Microscope, AlertTriangle, Calendar, CreditCard, ClipboardList, Info } from "lucide-react";
 import { useDoctor } from "@/app/doctor/layout";
-import { updateAuthStatus } from "@/services/api";
+import { updateAuthStatus, getPatientNotifications, markPatientNotificationAsRead } from "@/services/api";
 
 export default function Navbar() {
   const [role, setRole] = useState("");
@@ -12,6 +12,60 @@ export default function Navbar() {
   const [currentStatus, setCurrentStatus] = useState("Active");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [patientNotifications, setPatientNotifications] = useState([]);
+
+  const fetchPatientNotifs = async () => {
+    try {
+      const data = await getPatientNotifications();
+      setPatientNotifications(data);
+    } catch (e) {
+      console.warn("Failed to fetch patient notifications:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (role === "patient") {
+      fetchPatientNotifs();
+      const interval = setInterval(fetchPatientNotifs, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [role]);
+
+  const getPatientNotifLink = (type) => {
+    switch (type) {
+      case "appointment":
+      case "reminders":
+        return "/patient/appointments";
+      case "consent":
+        return "/patient/documents";
+      case "billing":
+        return "/patient/billing";
+      case "treatment_plan":
+        return "/patient/dashboard";
+      case "lab_delivery":
+        return "/patient/records";
+      default:
+        return "/patient/notifications";
+    }
+  };
+
+  const getPatientNotifIcon = (type) => {
+    switch (type) {
+      case "appointment":
+      case "reminders":
+        return <Calendar className="w-3.5 h-3.5 text-primary" />;
+      case "consent":
+        return <ClipboardList className="w-3.5 h-3.5 text-success" />;
+      case "billing":
+        return <CreditCard className="w-3.5 h-3.5 text-danger" />;
+      case "treatment_plan":
+        return <Info className="w-3.5 h-3.5 text-indigo-600" />;
+      case "lab_delivery":
+        return <Microscope className="w-3.5 h-3.5 text-secondary" />;
+      default:
+        return <Bell className="w-3.5 h-3.5 text-gray-400" />;
+    }
+  };
 
   // Safely try-catch calling useDoctor so it doesn't crash when rendered outside DoctorProvider
   let doctorContext = null;
@@ -243,12 +297,20 @@ export default function Navbar() {
               </div>
             )}
           </>
+        ) : role === "patient" ? (
+          <Link 
+            href="/patient/notifications"
+            className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center cursor-pointer outline-none animate-fade-in"
+            title="My Notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {patientNotifications.filter(n => !n.read).length > 0 && (
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-danger rounded-full border border-white animate-pulse" />
+            )}
+          </Link>
         ) : (
           <button className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center">
             <Bell className="w-5 h-5" />
-            {role === "patient" && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-danger rounded-full border-2 border-white"></span>
-            )}
           </button>
         )}
 

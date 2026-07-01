@@ -13,8 +13,8 @@ import {
   Clock,
   LayoutDashboard,
   ShieldCheck,
-  RotateCcw,
   CheckCircle2,
+
   AlertCircle
 } from "lucide-react";
 
@@ -78,12 +78,6 @@ export default function LeaveManagement({ role = "doctor" }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const handleResetData = () => {
-    resetData();
-    setSuccessMsg("Global leave database has been reset to defaults.");
-    setErrorMsg("");
-  };
-
   const handleApply = (type, startDate, endDate, reason, onCallDoctor) => {
     return applyLeave(type, startDate, endDate, reason, onCallDoctor);
   };
@@ -120,15 +114,6 @@ export default function LeaveManagement({ role = "doctor" }) {
               <p className="font-bold text-gray-900">{staffName}</p>
               <p className="text-[10px] text-gray-400 font-semibold">{permissions.label} • {userId}</p>
             </div>
-
-            {/* Reset button */}
-            <button
-              onClick={handleResetData}
-              title="Reset leave database to defaults"
-              className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-xl transition-all cursor-pointer outline-none border border-transparent hover:border-gray-200"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
           </div>
         )}
       </div>

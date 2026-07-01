@@ -410,3 +410,28 @@ export const updateReferral = async (refId, referralData) => {
   return response.data;
 };
 
+// ==========================================
+// 9. Complaints API Endpoints
+// ==========================================
+
+export const submitComplaint = async (complaintData) => {
+  const response = await client.post("/complaints", complaintData);
+  return response.data;
+};
+
+export const getMyComplaints = async () => {
+  const response = await client.get("/complaints/my");
+  return response.data;
+};
+
+export const getAllComplaints = async () => {
+  const response = await client.get("/complaints");
+  return response.data;
+};
+
+export const updateComplaintStatus = async (id, status) => {
+  const response = await client.patch(`/complaints/${id}/status`, { status });
+  return response.data;
+};
+
+

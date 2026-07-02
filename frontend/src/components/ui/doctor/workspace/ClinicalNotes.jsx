@@ -14,7 +14,7 @@ export default function ClinicalNotes({ onSubmitDiagNote }) {
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">✍️ Add Diagnosis Clinical Note</h4>
+      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">Add Diagnosis Clinical Note</h4>
       <form onSubmit={handleSubmit} className="space-y-3">
         <textarea
           rows={3}

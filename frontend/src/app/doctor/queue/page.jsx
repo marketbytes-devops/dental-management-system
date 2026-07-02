@@ -10,8 +10,7 @@ export default function DoctorQueuePage() {
     handleCallPatient,
     handleSkipPatient,
     handleRequeuePatient,
-    handleRemovePatient,
-    simulateEmergencyCheckin
+    handleRemovePatient
   } = useDoctor();
 
   return (
@@ -30,7 +29,6 @@ export default function DoctorQueuePage() {
         onSkipPatient={handleSkipPatient}
         onRequeuePatient={handleRequeuePatient}
         onRemovePatient={handleRemovePatient}
-        onSimulateEmergency={simulateEmergencyCheckin}
       />
     </div>
   );

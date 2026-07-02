@@ -159,7 +159,10 @@ export default function PatientRecordsPage() {
     specialty: ref.speciality || "Specialty",
     clinicName: ref.external_facility || "Internal Department",
     reason: ref.reason,
-    referredBy: ref.referred_by
+    referredBy: ref.referred_by,
+    status: ref.status,
+    consultationNotes: ref.my_consultation_notes || "",
+    medications: ref.my_medications || []
   }));
 
   const activePlan = plans.find(p => p.status === "Active");

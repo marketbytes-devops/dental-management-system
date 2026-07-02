@@ -7,6 +7,11 @@ import OutstandingBanner from "@/components/ui/patients/billing/outstandingBanne
 import MyInvoiceList from "@/components/ui/patients/billing/myInvoiceList";
 import InvoiceDetailCard from "@/components/ui/patients/billing/invoiceDetailCard";
 import PaymentModal from "@/components/ui/patients/billing/paymentModal";
+const initialInvoices = [
+  { id: "INV-089", date: "2026-05-12", treatment: "Scaling & Polishing", gross: 1500, insurancePaid: 1050, patientDue: 450, status: "Paid" },
+  { id: "INV-094", date: "2026-06-15", treatment: "Root Canal Treatment", gross: 8000, insurancePaid: 5600, patientDue: 2400, status: "Pending" },
+  { id: "INV-072", date: "2026-03-20", treatment: "Dental Filling & X-Ray", gross: 2500, insurancePaid: 1750, patientDue: 750, status: "Paid" },
+];
 import { getPatientProfile, getPatientAppointments } from "@/services/api";
 
 export default function PatientBillingPage() {

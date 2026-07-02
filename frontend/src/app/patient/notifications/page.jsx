@@ -6,6 +6,37 @@ import { BookOpen, Sparkles, AlertCircle } from 'lucide-react';
 import NotificationList from '@/components/ui/patients/notifications/NotificationList';
 import PostCareInstructions from '@/components/ui/patients/notifications/PostCareInstructions';
 import FeedbackForm from '@/components/ui/patients/notifications/FeedbackForm';
+const myNotifications = [];
+const postCareInstructions = [
+  {
+    id: "PC-01",
+    treatment: "Root Canal Treatment",
+    date: "2026-06-15",
+    doctor: "Dr. Anoop Nair",
+    guidelines: [
+      "Avoid eating or chewing until the numbness wears off completely.",
+      "Do not chew or bite on the treated tooth until it is fully restored with a crown.",
+      "Take prescribed antibiotics and pain relievers exactly as directed.",
+      "Call the clinic immediately if you experience severe swelling or pain after 48 hours."
+    ]
+  },
+  {
+    id: "PC-02",
+    treatment: "Scaling & Polishing",
+    date: "2026-05-12",
+    doctor: "Dr. Anoop Nair",
+    guidelines: [
+      "Avoid highly colored foods or beverages (coffee, tea, red wine, turmeric) for 48 hours to prevent staining.",
+      "Expect slight tooth sensitivity to hot and cold for a few days.",
+      "Continue regular brushing and flossing, but be gentle around the gums for the first 24 hours."
+    ]
+  }
+];
+
+export const metadata = {
+  title: 'My Notifications | Patient Portal',
+  description: 'View your notifications, reminders, and post-care instructions.',
+};
 import { 
   getPatientNotifications, 
   markPatientNotificationAsRead, 

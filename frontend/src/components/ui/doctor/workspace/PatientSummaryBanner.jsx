@@ -29,7 +29,7 @@ export default function PatientSummaryBanner({
                 Token {viewingPatient.token}
               </span>
             </h2>
-            <p className="text-[10px] text-gray-500 font-semibold mt-0.5">
+            <p className="text-[10px] text-gray-550 font-semibold mt-0.5">
               Age: {viewingPatient.age} • Gender: {viewingPatient.gender} • Phone: {viewingPatient.phone}
             </p>
           </div>
@@ -37,10 +37,16 @@ export default function PatientSummaryBanner({
 
         {/* Workspace Controls */}
         <div className="flex items-center gap-2">
+          <Link
+            href={`/doctor/reports/${encodeURIComponent(viewingPatient.token)}`}
+            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none flex"
+          >
+            <span>📄</span> Reports
+          </Link>
           {completedPatientHistory && completedPatientHistory.length > 0 && (
             <button
               onClick={onViewPreviousPatient}
-              className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
+              className="px-3.5 py-2 bg-white hover:bg-gray-55 text-gray-600 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer outline-none"
             >
               <span>📂</span> View Previous Patient
             </button>
@@ -61,7 +67,7 @@ export default function PatientSummaryBanner({
           </button>
           <button
             onClick={onGoBack}
-            className="px-3 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer outline-none"
+            className="px-3 py-2 bg-white hover:bg-gray-105 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer outline-none"
           >
             <span>←</span> Back
           </button>
@@ -105,7 +111,7 @@ export default function PatientSummaryBanner({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 border border-gray-100 rounded-xl">
           <div>
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Chief Complaint</span>
-            <p className="text-xs font-semibold text-gray-700 mt-1 leading-normal">{viewingPatient.chiefComplaint}</p>
+            <p className="text-xs font-semibold text-gray-755 mt-1 leading-normal">{viewingPatient.chiefComplaint}</p>
           </div>
           <div>
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Planned Procedure</span>

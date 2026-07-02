@@ -34,10 +34,6 @@ export default function DashboardHeader() {
         <h1 className="text-2xl font-bold text-gray-900">{doctorName}'s Workdesk</h1>
         <p className="text-xs text-gray-500 font-semibold mt-1">{specialtyText} • SmileCare Clinic</p>
       </div>
-      <div className="flex gap-2">
-        <span className="w-2.5 h-2.5 rounded-full bg-success animate-pulse self-center"></span>
-        <span className="text-xs font-bold text-success uppercase tracking-wider bg-success/10 px-2.5 py-1 rounded">Live Clinic Sessions</span>
-      </div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ from typing import List
 from database import get_db
 from dependencies import get_current_user
 from modules.auth.models import UserModel
-from modules.patient.models import PatientModel, PatientConsentModel
+from modules.patient.models import PatientModel, PatientConsentModel, PatientNotificationModel
 from .models import TreatmentPlanModel, TreatmentPlanStepModel
 from .schemas import (
     TreatmentPlanCreate,
@@ -235,6 +235,18 @@ def update_treatment_plan(
                     step.consent_status = "Pending"
                     db.commit()
 
+        # Trigger patient notification
+        notif = PatientNotificationModel(
+            patient_token=plan.patient_token,
+            sender_role="doctor",
+            type="treatment_plan",
+            title="Treatment Plan Updated",
+            message=f"Your treatment plan has been updated by {plan.doctor_name}.",
+            read=False
+        )
+        db.add(notif)
+        db.commit()
+
     db.refresh(plan)
     plan.steps = db.query(TreatmentPlanStepModel).filter(
         TreatmentPlanStepModel.plan_id == plan.id
@@ -451,6 +463,18 @@ def update_plan_status(
                     step.consent_id = consent.id
                     step.consent_status = "Pending"
                     db.commit()
+
+        # Trigger patient notification
+        notif = PatientNotificationModel(
+            patient_token=plan.patient_token,
+            sender_role="doctor",
+            type="treatment_plan",
+            title="Treatment Plan Activated",
+            message=f"Your treatment plan has been activated by {plan.doctor_name}.",
+            read=False
+        )
+        db.add(notif)
+        db.commit()
 
     db.refresh(plan)
     plan.steps = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.plan_id == plan.id).all()

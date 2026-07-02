@@ -7,7 +7,7 @@ class AppointmentBase(BaseModel):
     doctor_name: str
     appointment_date: date
     appointment_time: str
-    treatment_type: str
+    treatment_type: Optional[str] = "Consultation"
     status: Optional[str] = "Confirmed"
     priority: Optional[str] = "Routine"
     symptoms: Optional[str] = None

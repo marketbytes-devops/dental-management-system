@@ -1,4 +1,4 @@
-export default function HealthScoreCard({ score = 78 }) {
+export default function HealthScoreCard({ score = 78, lastUpdated, onClick }) {
   // Determine color based on score
   const color =
     score >= 80 ? "text-success" : score >= 60 ? "text-warning" : "text-danger";
@@ -13,13 +13,21 @@ export default function HealthScoreCard({ score = 78 }) {
   const label =
     score >= 80 ? "Excellent" : score >= 60 ? "Moderate" : "Needs Attention";
 
+  // Format date if provided
+  const displayDate = lastUpdated 
+    ? new Date(lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "Recently Updated";
+
   // SVG ring math
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-6">
+    <div
+      onClick={onClick}
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-6 cursor-pointer hover:shadow-md hover:border-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+    >
       {/* Circular ring */}
       <div className="relative flex-shrink-0">
         <svg width="96" height="96" className="-rotate-90">
@@ -61,7 +69,7 @@ export default function HealthScoreCard({ score = 78 }) {
         <span
           className={`inline-block mt-2 text-xs font-semibold px-2.5 py-1 rounded-md ${bgColor} ${color}`}
         >
-          Last updated: May 12, 2026
+          Last updated: {displayDate}
         </span>
         <p className="text-xs text-gray-400 mt-2">
           Based on your last dental examination

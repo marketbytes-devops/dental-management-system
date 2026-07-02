@@ -1,5 +1,5 @@
 # models.py - database table definitions
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, Float
 from sqlalchemy.sql import func
 from database import Base
 
@@ -11,9 +11,17 @@ class LabOrderModel(Base):
     patient_name = Column(String, nullable=True)
     dentist_name = Column(String, nullable=True)
     dentist_contact = Column(String, nullable=True)
-    prosthetic_type = Column(String, nullable=False)
+    
+    # Updated flexible fields
+    order_category = Column(String, default="Prosthetic") # Prosthetic, Blood Work, Diagnostic
+    order_details = Column(JSON, nullable=True) # {material, shade, test_type, results_notes, etc.}
+    result_document_url = Column(String, nullable=True)
+    
+    # Legacy fields (nullable for backwards compatibility)
+    prosthetic_type = Column(String, nullable=True)
     material = Column(String, nullable=True)
     shade = Column(String, nullable=True)
+    
     priority = Column(String, default="Medium")
     status = Column(String, default="Pending")
     notes = Column(String, nullable=True)
@@ -33,3 +41,26 @@ class LabNotificationModel(Base):
     read = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+class InventoryItemModel(Base):
+    __tablename__ = "lab_inventory_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True, nullable=False)
+    category = Column(String, default="Material") # Medicine, Material, Consumable, PPE, Instrument
+    current_stock = Column(Integer, default=0)
+    minimum_stock_alert = Column(Integer, default=10)
+    unit = Column(String, default="pcs")
+    unit_price = Column(Float, nullable=True) # For future billing phase
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class RestockRequestModel(Base):
+    __tablename__ = "lab_restock_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_id = Column(Integer, nullable=True) # Nullable for requesting new items
+    item_name = Column(String, nullable=False)
+    requested_quantity = Column(Integer, nullable=False)
+    status = Column(String, default="Pending") # Pending, Approved, Fulfilled, Rejected
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

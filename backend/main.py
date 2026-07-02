@@ -33,16 +33,20 @@ Base.metadata.create_all(bind=engine)
 # Run schema migrations for missing columns in remote PostgreSQL
 from sqlalchemy import text
 try:
-    with engine.begin() as conn:
-        if not engine.url.drivername.startswith("sqlite"):
-            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS lab_name VARCHAR;"))
-            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS patient_id INTEGER;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS doctor_id INTEGER;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;"))
-            print("Database migrations applied successfully.")
+    if engine is not None:
+        with engine.begin() as conn:
+            if not engine.url.drivername.startswith("sqlite"):
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS lab_name VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS order_category VARCHAR DEFAULT 'Prosthetic';"))
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS order_details JSON;"))
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS result_document_url VARCHAR;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS patient_id INTEGER;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS doctor_id INTEGER;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;"))
+                print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")
 
@@ -113,7 +117,12 @@ def get_about_stats(db: Session = Depends(get_db)):
     doctors_list = []
     for u in doctor_users:
         doc = db.query(DoctorModel).filter(DoctorModel.user_id == u.id).first()
-        specialty = doc.specialty if (doc and doc.specialty) else (", ".join(u.specialties) if u.specialties else "General Dentistry")
+        if doc and doc.specialty:
+            specialty = doc.specialty
+        elif isinstance(u.specialties, list) and u.specialties:
+            specialty = ", ".join(str(s) for s in u.specialties)
+        else:
+            specialty = "General Dentistry"
         doctors_list.append({
             "id": u.id,
             "name": u.name if u.name.startswith("Dr. ") else f"Dr. {u.name}",

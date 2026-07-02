@@ -39,7 +39,8 @@ import {
   ShieldAlert,
   Scissors,
   Sparkles,
-  User
+  User,
+  Package
 } from "lucide-react";
 
 import ToothIcon from "@/components/ui/shared/ToothIcon";
@@ -51,7 +52,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Role Permissions", href: "/admin/roles", icon: Key },
     { name: "Doctor Schedules", href: "/admin/doctor", icon: Stethoscope },
     { name: "Patient Directory", href: "/admin/patients", icon: Users },
-    { name: "Inventory", href: "/admin/inventory", icon: ClipboardList },
+    { name: "Inventory & Restock", href: "/admin/inventory", icon: Package },
     { name: "Leave Management", href: "/admin/leave", icon: Calendar },
     
   ],
@@ -115,8 +116,8 @@ export const ROLE_NAV_ITEMS = {
   "lab tech": [
     { name: "Dashboard", href: "/labtechnicians/dashboard", icon: BarChart3 },
     { name: "Production Board", href: "/labtechnicians/production", icon: Wrench },
-    { name: "Orders Directory", href: "/labtechnicians/orders", icon: ClipboardList },
-    { name: "Inventory", href: "/labtechnicians/inventory", icon: ClipboardList },
+    { name: "Lab Orders", href: "/labtechnicians/orders", icon: Microscope },
+    { name: "Clinical Pharmacy", href: "/labtechnicians/inventory", icon: Package },
     { name: "Billing & Warranty", href: "/labtechnicians/invoices", icon: Receipt },
     { name: "Notifications", href: "/labtechnicians/notifications", icon: Bell },
     { name: "Leave Management", href: "/labtechnicians/leave", icon: Calendar },

@@ -102,10 +102,13 @@ export default function DoctorLayout({ children }) {
       const mapped = data.map(o => ({
         id: o.id,
         patientToken: o.patient_token,
-        item: o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`,
+        item: o.order_category === "Diagnostic" 
+          ? `Diagnostic: ${o.order_details?.test_type || "Lab Work"}` 
+          : (o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`),
         status: o.status,
         labName: o.lab_name || "Apex Dental Lab",
-        eta: o.due_date || "3 Days"
+        eta: o.due_date || "3 Days",
+        resultDocumentUrl: o.result_document_url || null
       }));
       setLabOrders(mapped);
     } catch (err) {
@@ -604,21 +607,43 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  const handleSubmitLabOrder = async ({ item, tooth, shade, labName }) => {
+  const handleSubmitLabOrder = async (orderData) => {
     try {
-      const createdOrder = await createLabOrder({
+      let payload = {
         patient_token: viewingPatientToken,
-        prosthetic_type: item,
-        material: `Tooth #${tooth}`,
-        shade: shade,
-        lab_name: labName,
+        order_category: orderData.order_category,
+        lab_name: orderData.labName,
         due_date: "2026-06-15",
-        notes: `Tooth #${tooth}, Shade ${shade}`
-      });
+        notes: orderData.notes
+      };
+
+      if (orderData.order_category === "Prosthetic") {
+        payload = {
+          ...payload,
+          prosthetic_type: orderData.prosthetic_type,
+          material: orderData.material,
+          shade: orderData.shade,
+        };
+      } else if (orderData.order_category === "Diagnostic") {
+        payload = {
+          ...payload,
+          order_details: orderData.order_details,
+          prosthetic_type: "Diagnostic Test",
+        };
+      }
+
+      const createdOrder = await createLabOrder(payload);
+
+      let eventNote = "";
+      if (orderData.order_category === "Prosthetic") {
+        eventNote = `Ordered ${createdOrder.prosthetic_type} (Tooth #${orderData.tooth}, Shade ${orderData.shade}) from ${orderData.labName}`;
+      } else {
+        eventNote = `Ordered Diagnostic Lab Work: ${orderData.order_details.test_type} from ${orderData.labName}`;
+      }
 
       const newTimelineEvent = {
         date: "10-06-2026 (Today)",
-        note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
+        note: eventNote,
         type: "Lab Order"
       };
 
@@ -627,11 +652,11 @@ export default function DoctorLayout({ children }) {
         [viewingPatientToken]: {
           ...prev[viewingPatientToken],
           timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
-          teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
+          ...(orderData.order_category === "Prosthetic" ? { teethChart: { ...prev[viewingPatientToken].teethChart, [orderData.tooth]: "lab-ordered" } } : {})
         }
       }));
 
-      showNotification(`Lab order submitted to ${labName}.`);
+      showNotification(`Lab order submitted to ${orderData.labName}.`);
       fetchLabOrders();
     } catch (err) {
       console.error("Error submitting lab order:", err);

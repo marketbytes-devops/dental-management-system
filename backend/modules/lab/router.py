@@ -4,13 +4,19 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from database import get_db
 from dependencies import get_current_user
-from modules.lab.models import LabOrderModel, LabNotificationModel
+from modules.lab.models import LabOrderModel, LabNotificationModel, InventoryItemModel, RestockRequestModel
 from modules.lab.schemas import (
     LabOrderCreate,
     LabOrderStatusUpdate,
     LabOrderEdit,
     LabOrderResponse,
-    LabNotificationResponse
+    LabNotificationResponse,
+    InventoryItemCreate,
+    InventoryItemUpdate,
+    InventoryItemResponse,
+    RestockRequestCreate,
+    RestockRequestStatusUpdate,
+    RestockRequestResponse
 )
 from modules.patient.models import PatientModel, PatientNotificationModel
 from modules.doctor.models import DoctorModel
@@ -74,6 +80,8 @@ def create_lab_order(
         patient_name=patient_name,
         dentist_name=dentist_name,
         dentist_contact=dentist_contact,
+        order_category=order_data.order_category,
+        order_details=order_data.order_details,
         prosthetic_type=order_data.prosthetic_type,
         material=order_data.material,
         shade=order_data.shade,
@@ -121,6 +129,9 @@ def update_lab_order_status(
         raise HTTPException(status_code=404, detail="Lab order not found")
 
     order.status = status_data.status
+    if status_data.result_document_url:
+        order.result_document_url = status_data.result_document_url
+        
     if status_data.status == "Rejected":
         order.rejection_reason = status_data.rejection_reason
     else:
@@ -177,6 +188,10 @@ def edit_lab_order(
     if not order:
         raise HTTPException(status_code=404, detail="Lab order not found")
 
+    if edit_data.order_category is not None:
+        order.order_category = edit_data.order_category
+    if edit_data.order_details is not None:
+        order.order_details = edit_data.order_details
     if edit_data.prosthetic_type is not None:
         order.prosthetic_type = edit_data.prosthetic_type
     if edit_data.material is not None:
@@ -241,3 +256,143 @@ def delete_notification(
     db.delete(notif)
     db.commit()
     return {"detail": "Notification deleted successfully"}
+
+# ---------------------------------------------------------
+# Inventory & Restock Endpoints
+# ---------------------------------------------------------
+
+@router.get("/inventory", response_model=List[InventoryItemResponse])
+def get_inventory(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    items = db.query(InventoryItemModel).order_by(InventoryItemModel.name.asc()).all()
+    return items
+
+@router.post("/inventory", response_model=InventoryItemResponse)
+def create_inventory_item(
+    item_data: InventoryItemCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    new_item = InventoryItemModel(
+        name=item_data.name,
+        category=item_data.category,
+        current_stock=item_data.current_stock,
+        minimum_stock_alert=item_data.minimum_stock_alert,
+        unit=item_data.unit,
+        unit_price=item_data.unit_price
+    )
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
+    return new_item
+
+@router.put("/inventory/{item_id}", response_model=InventoryItemResponse)
+def update_inventory_item(
+    item_id: int,
+    item_data: InventoryItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    item = db.query(InventoryItemModel).filter(InventoryItemModel.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    if item_data.name is not None: item.name = item_data.name
+    if item_data.category is not None: item.category = item_data.category
+    if item_data.current_stock is not None: item.current_stock = item_data.current_stock
+    if item_data.minimum_stock_alert is not None: item.minimum_stock_alert = item_data.minimum_stock_alert
+    if item_data.unit is not None: item.unit = item_data.unit
+    if item_data.unit_price is not None: item.unit_price = item_data.unit_price
+
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.get("/restock-requests", response_model=List[RestockRequestResponse])
+def get_restock_requests(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    requests = db.query(RestockRequestModel).order_by(RestockRequestModel.created_at.desc()).all()
+    return requests
+
+@router.post("/restock-requests", response_model=RestockRequestResponse)
+def create_restock_request(
+    request_data: RestockRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    new_request = RestockRequestModel(
+        item_id=request_data.item_id,
+        item_name=request_data.item_name,
+        requested_quantity=request_data.requested_quantity,
+        notes=request_data.notes,
+        status="Pending"
+    )
+    db.add(new_request)
+    db.commit()
+    db.refresh(new_request)
+
+    # Notify admin
+    notif = LabNotificationModel(
+        recipient_role="admin",
+        type="inventory",
+        title="Restock Requested",
+        desc=f"Lab Tech requested {request_data.requested_quantity} of {request_data.item_name}.",
+        read=False
+    )
+    db.add(notif)
+    db.commit()
+
+    return new_request
+
+@router.put("/restock-requests/{req_id}/status", response_model=RestockRequestResponse)
+def update_restock_request_status(
+    req_id: int,
+    status_data: RestockRequestStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    req = db.query(RestockRequestModel).filter(RestockRequestModel.id == req_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    req.status = status_data.status
+    
+    # If fulfilled, update inventory stock automatically
+    if req.status == "Fulfilled":
+        if req.item_id:
+            item = db.query(InventoryItemModel).filter(InventoryItemModel.id == req.item_id).first()
+            if item:
+                item.current_stock += req.requested_quantity
+        else:
+            # Create a new inventory item
+            new_item = InventoryItemModel(
+                name=req.item_name,
+                category="Material",
+                current_stock=req.requested_quantity,
+                minimum_stock_alert=10,
+                unit="pcs",
+                unit_price=0.0
+            )
+            db.add(new_item)
+            db.flush()
+            req.item_id = new_item.id
+            
+    db.commit()
+    db.refresh(req)
+
+    # Notify lab tech
+    notif = LabNotificationModel(
+        recipient_role="lab tech",
+        type="inventory",
+        title=f"Restock Request {req.status}",
+        desc=f"Your restock request for {req.item_name} is marked as {req.status}.",
+        read=False
+    )
+    db.add(notif)
+    db.commit()
+
+    return req

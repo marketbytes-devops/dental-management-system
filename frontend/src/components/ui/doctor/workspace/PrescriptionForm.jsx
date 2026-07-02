@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getLabInventory } from "@/services/api";
 
 export default function PrescriptionForm({
   rxDraft = [],
@@ -10,7 +11,10 @@ export default function PrescriptionForm({
   showNotification
 }) {
   // Local form state
-  const [rxMedicine, setRxMedicine] = useState("Amoxicillin 500mg");
+  const [availableMedicines, setAvailableMedicines] = useState([]);
+  const [rxMedicine, setRxMedicine] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [rxMorning, setRxMorning] = useState(true);
   const [rxNoon, setRxNoon] = useState(false);
   const [rxNight, setRxNight] = useState(true);
@@ -18,9 +22,30 @@ export default function PrescriptionForm({
   const [rxDurationVal, setRxDurationVal] = useState("5");
   const [rxDurationUnit, setRxDurationUnit] = useState("Days");
 
+  // Fetch medicines from the Clinical Pharmacy inventory
+  useEffect(() => {
+    const fetchMedicines = async () => {
+      try {
+        const inventory = await getLabInventory();
+        const medicines = inventory.filter(item => item.category === "Clinical Pharmacy");
+        setAvailableMedicines(medicines);
+        if (medicines.length > 0) {
+          setRxMedicine(medicines[0].name);
+          setSearchQuery(medicines[0].name);
+        }
+      } catch (error) {
+        console.error("Failed to load medicines from inventory:", error);
+      }
+    };
+    fetchMedicines();
+  }, []);
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!rxMedicine) return;
+    if (!rxMedicine) {
+      if (showNotification) showNotification("Please select a medicine.");
+      return;
+    }
 
     const timings = [];
     if (rxMorning) timings.push("Morning 🌅");
@@ -53,19 +78,43 @@ export default function PrescriptionForm({
       <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50/50 border border-gray-100 rounded-xl mb-4">
         <div className="space-y-1 sm:col-span-2">
           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Medicine Name</label>
-          <select
-            value={rxMedicine}
-            onChange={(e) => setRxMedicine(e.target.value)}
-            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none"
-          >
-            <option value="Amoxicillin 500mg">Amoxicillin 500mg</option>
-            <option value="Paracetamol 650mg">Paracetamol 650mg</option>
-            <option value="Ibuprofen 400mg">Ibuprofen 400mg</option>
-            <option value="Clindamycin 300mg">Clindamycin 300mg</option>
-            <option value="Ketorolac DT 10mg">Ketorolac DT 10mg</option>
-            <option value="Moxikind-CV 625">Moxikind-CV 625</option>
-            <option value="Chlorhexidine Mouthwash">Chlorhexidine Mouthwash</option>
-          </select>
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setIsDropdownOpen(true);
+                setRxMedicine(e.target.value); // Keep synced if custom input
+              }}
+              onFocus={() => setIsDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+              placeholder="Search or type medicine name..."
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-primary/50 transition-colors"
+            />
+            {isDropdownOpen && (
+              <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-150 rounded-xl shadow-lg max-h-48 overflow-y-auto text-xs py-1">
+                {availableMedicines
+                  .filter(med => med.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .map(med => (
+                    <li
+                      key={med.id}
+                      onClick={() => {
+                        setRxMedicine(med.name);
+                        setSearchQuery(med.name);
+                        setIsDropdownOpen(false);
+                      }}
+                      className="px-3 py-2 hover:bg-gray-50/80 cursor-pointer font-semibold text-gray-800 transition-colors"
+                    >
+                      {med.name}
+                    </li>
+                  ))}
+                {availableMedicines.filter(med => med.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                  <li className="px-3 py-3 text-gray-400 font-semibold text-center italic">No matches found</li>
+                )}
+              </ul>
+            )}
+          </div>
         </div>
         <div className="space-y-1 sm:col-span-2">
           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Timings</label>

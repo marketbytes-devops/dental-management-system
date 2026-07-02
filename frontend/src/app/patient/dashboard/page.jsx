@@ -98,9 +98,9 @@ export default function PatientDashboardPage() {
     memberSince: profile?.created_at ? new Date(profile.created_at).toISOString().split("T")[0] : "N/A",
     registeredVia: profile?.address_line1 ? "Online" : "Walk-in",
     insurance: { provider: "None", policyId: "N/A", coverage: 0 },
-    emergencyContact: { 
-      name: profile?.emergency_contact_name || "N/A", 
-      phone: profile?.emergency_contact_phone || "N/A" 
+    emergencyContact: {
+      name: profile?.emergency_contact_name || "N/A",
+      phone: profile?.emergency_contact_phone || "N/A"
     },
   };
 
@@ -113,9 +113,9 @@ export default function PatientDashboardPage() {
   // Match medications for last visit
   const lastVisitPrescriptions = lastVisit
     ? prescriptions.filter(rx => {
-        const rxDate = new Date(rx.created_at).toISOString().split("T")[0];
-        return rxDate === lastVisit.date || rx.doctor_name === lastVisit.doctor;
-      })
+      const rxDate = new Date(rx.created_at).toISOString().split("T")[0];
+      return rxDate === lastVisit.date || rx.doctor_name === lastVisit.doctor;
+    })
     : [];
 
   return (
@@ -128,9 +128,11 @@ export default function PatientDashboardPage() {
 
       {/* Row 1 — KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-        <HealthScoreCard score={oralHealthDetails?.score ?? 95} onClick={() => setIsHealthModalOpen(true)} />
-
+        <HealthScoreCard
+          score={oralHealthDetails?.score ?? 95}
+          lastUpdated={oralHealthDetails?.updated_at || profile?.created_at}
+          onClick={() => setIsHealthModalOpen(true)}
+        />
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-secondary/30 transition-colors">
           <div className="absolute top-0 right-0 w-24 h-24 bg-secondary/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
           <div>
@@ -258,7 +260,7 @@ export default function PatientDashboardPage() {
                   <p className="text-xs text-gray-500">Comprehensive health breakdown</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setIsHealthModalOpen(false)}
                 className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
               >
@@ -299,7 +301,7 @@ export default function PatientDashboardPage() {
                       </div>
                     ))}
                     <p className="text-[11px] text-success font-semibold mt-1 flex items-center gap-1">
-                      <CheckCircle className="w-3.5 h-3.5" /> 
+                      <CheckCircle className="w-3.5 h-3.5" />
                       Progress recovery applied: +{Math.round((oralHealthDetails?.completion_rate ?? 0) * 100)}% of penalties restored!
                     </p>
                   </div>
@@ -332,7 +334,7 @@ export default function PatientDashboardPage() {
 
             {/* Modal Footer */}
             <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end">
-              <button 
+              <button
                 onClick={() => setIsHealthModalOpen(false)}
                 className="px-5 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 transition-all shadow-sm"
               >
@@ -358,7 +360,7 @@ export default function PatientDashboardPage() {
                   <p className="text-xs text-gray-500">History and clinical records</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setIsLastVisitModalOpen(false)}
                 className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors"
               >
@@ -444,7 +446,7 @@ export default function PatientDashboardPage() {
 
             {/* Modal Footer */}
             <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end">
-              <button 
+              <button
                 onClick={() => setIsLastVisitModalOpen(false)}
                 className="px-5 py-2 bg-purple-600 text-white text-xs font-bold rounded-xl hover:bg-purple-700 transition-all shadow-sm"
               >

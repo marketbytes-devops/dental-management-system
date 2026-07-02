@@ -575,8 +575,8 @@ def get_oral_health_details(
         "deductions": deductions,
         "tips": tips[:4],  # limit to top 4 tips
         "completion_rate": completion_rate,
-        "completed_steps": completed_steps,
-        "total_steps": total_steps
+        "total_steps": total_steps,
+        "updated_at": active_plan.updated_at.isoformat() if active_plan and active_plan.updated_at else (active_plan.created_at.isoformat() if active_plan else None)
     }
 
 

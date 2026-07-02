@@ -1,4 +1,4 @@
-export default function HealthScoreCard({ score = 78, onClick }) {
+export default function HealthScoreCard({ score = 78, lastUpdated, onClick }) {
   // Determine color based on score
   const color =
     score >= 80 ? "text-success" : score >= 60 ? "text-warning" : "text-danger";
@@ -12,6 +12,11 @@ export default function HealthScoreCard({ score = 78, onClick }) {
     score >= 80 ? "bg-success/10" : score >= 60 ? "bg-warning/10" : "bg-danger/10";
   const label =
     score >= 80 ? "Excellent" : score >= 60 ? "Moderate" : "Needs Attention";
+
+  // Format date if provided
+  const displayDate = lastUpdated 
+    ? new Date(lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "Recently Updated";
 
   // SVG ring math
   const radius = 36;
@@ -64,7 +69,7 @@ export default function HealthScoreCard({ score = 78, onClick }) {
         <span
           className={`inline-block mt-2 text-xs font-semibold px-2.5 py-1 rounded-md ${bgColor} ${color}`}
         >
-          Last updated: May 12, 2026
+          Last updated: {displayDate}
         </span>
         <p className="text-xs text-gray-400 mt-2">
           Based on your last dental examination

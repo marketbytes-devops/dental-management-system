@@ -23,9 +23,9 @@ export default function PrescriptionForm({
     if (!rxMedicine) return;
 
     const timings = [];
-    if (rxMorning) timings.push("Morning 🌅");
-    if (rxNoon) timings.push("Noon ☀️");
-    if (rxNight) timings.push("Night 🌙");
+    if (rxMorning) timings.push("Morning");
+    if (rxNoon) timings.push("Noon");
+    if (rxNight) timings.push("Night");
 
     if (timings.length === 0) {
       if (showNotification) {
@@ -48,7 +48,7 @@ export default function PrescriptionForm({
   return (
     <div className="border border-gray-100 rounded-xl p-5 bg-white shadow-sm shadow-gray-100/40">
       <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-        <span>💊</span> Prescribe Medicines
+        Prescribe Medicines
       </h4>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50/50 border border-gray-100 rounded-xl mb-4">
         <div className="space-y-1 sm:col-span-2">
@@ -72,15 +72,15 @@ export default function PrescriptionForm({
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-1.5">
             <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-755 select-none cursor-pointer whitespace-nowrap">
               <input type="checkbox" checked={rxMorning} onChange={(e) => setRxMorning(e.target.checked)} className="accent-primary w-3.5 h-3.5" />
-              Morning 🌅
+              Morning
             </label>
             <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-755 select-none cursor-pointer whitespace-nowrap">
               <input type="checkbox" checked={rxNoon} onChange={(e) => setRxNoon(e.target.checked)} className="accent-primary w-3.5 h-3.5" />
-              Noon ☀️
+              Noon
             </label>
             <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-755 select-none cursor-pointer whitespace-nowrap">
               <input type="checkbox" checked={rxNight} onChange={(e) => setRxNight(e.target.checked)} className="accent-primary w-3.5 h-3.5" />
-              Night 🌙
+              Night
             </label>
           </div>
         </div>
@@ -211,7 +211,7 @@ export default function PrescriptionForm({
           disabled={rxDraft.length === 0}
           className="px-4 py-2 bg-success text-white font-bold rounded-xl text-xs hover:bg-success/95 transition-all shadow-sm shadow-success/15 disabled:opacity-50 cursor-pointer"
         >
-          🖨️ Save & Print Prescription
+          Save & Print Prescription
         </button>
       </div>
     </div>

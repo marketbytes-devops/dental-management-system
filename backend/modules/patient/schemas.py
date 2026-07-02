@@ -136,11 +136,17 @@ class ReferralResponse(BaseModel):
     status: str
     referral_type: str
     external_facility: Optional[str] = None
+    my_consultation_notes: Optional[str] = None
+    my_medications: Optional[list] = None
 
     class Config:
         from_attributes = True
 
 
+class ReferralUpdate(BaseModel):
+    status: str
+    my_consultation_notes: Optional[str] = None
+    my_medications: Optional[list] = None
 # --- Patient Notification Schemas ---
 class PatientNotificationResponse(BaseModel):
     id: int
@@ -174,4 +180,4 @@ class DoctorFeedbackResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        from_attributes = True
+        from_attributes = True

@@ -22,7 +22,9 @@ import {
   getPatientByToken,
   getPatientTreatmentPlan,
   createPrescription,
-  createReferral
+  createReferral,
+  getAllReferrals,
+  updateReferral
 } from "@/services/api";
 
 // Create context
@@ -51,6 +53,14 @@ export default function DoctorLayout({ children }) {
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [currentDoctorName, setCurrentDoctorName] = useState("Dr. Anoop Nair");
 
+  const getTodayString = () => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year} (Today)`;
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedUser = localStorage.getItem("staff_user");
@@ -77,21 +87,7 @@ export default function DoctorLayout({ children }) {
   const [notification, setNotification] = useState("");
 
   // Notifications State & Logic (Referrals, etc.)
-  const [notifications, setNotifications] = useState([
-    {
-      id: "notif-1",
-      message: "Incoming orthodontic referral from Dr. Sarah Jenkins for Rahul Kumar",
-      type: "referral",
-      link: "/doctor/referrals",
-      status: "unread",
-      dotColor: "red",
-      timestamp: "10 mins ago",
-      receivedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-      itemId: "REF-201",
-      patientId: "#004",
-      patientName: "Rahul Kumar"
-    }
-  ]);
+  const [notifications, setNotifications] = useState([]);
 
   const [dbNotifications, setDbNotifications] = useState([]);
   const allNotifications = [...dbNotifications, ...notifications];
@@ -136,9 +132,11 @@ export default function DoctorLayout({ children }) {
   useEffect(() => {
     fetchLabOrders();
     fetchDbNotifications();
+    fetchReferrals();
     const interval = setInterval(() => {
       fetchLabOrders();
       fetchDbNotifications();
+      fetchReferrals();
     }, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -240,6 +238,74 @@ export default function DoctorLayout({ children }) {
   // Referrals database
   const [referrals, setReferrals] = useState([]);
 
+  // Fetch referrals from database
+  const fetchReferrals = async () => {
+    try {
+      const data = await getAllReferrals();
+      const mapped = data.map(ref => ({
+        id: ref.id,
+        patientToken: ref.patient_token,
+        referredBy: ref.referred_by,
+        speciality: ref.speciality,
+        targetDoctor: ref.target_doctor,
+        date: ref.date,
+        reason: ref.reason,
+        clinicalNotes: ref.clinical_notes || "",
+        teethChart: ref.teethChart || {},
+        status: ref.status,
+        myConsultationNotes: ref.my_consultation_notes || "",
+        myMedications: ref.my_medications || [],
+        referralType: ref.referral_type,
+        externalFacility: ref.external_facility || ""
+      }));
+
+      // Detect new incoming referrals or completed outgoing referrals to trigger local notifications
+      if (referrals.length > 0 && currentDoctorName) {
+        const currentLower = currentDoctorName.toLowerCase().replace("dr.", "").trim();
+        mapped.forEach(newRef => {
+          const isTargeted = newRef.targetDoctor && newRef.targetDoctor.toLowerCase().replace("dr.", "").trim() === currentLower;
+          const isReferredByMe = newRef.referredBy && newRef.referredBy.toLowerCase().replace("dr.", "").trim() === currentLower;
+          const isNew = !referrals.some(r => r.id === newRef.id);
+          const wasPending = referrals.some(r => r.id === newRef.id && r.status === "Pending");
+
+          // 1. Incoming new referral notification
+          if (isTargeted && isNew && newRef.status === "Pending") {
+            triggerNotification({
+              message: `Incoming referral from ${newRef.referredBy} for patient token ${newRef.patientToken}`,
+              type: "referral",
+              link: "/doctor/referrals",
+              dotColor: "blue",
+              itemId: newRef.id,
+              patientId: newRef.patientToken
+            });
+          }
+          // 2. Outgoing completed referral notification
+          else if (isReferredByMe && newRef.status === "Completed" && wasPending) {
+            triggerNotification({
+              message: `Referral consultation completed by ${newRef.targetDoctor || "Specialist"} for patient token ${newRef.patientToken}`,
+              type: "referral",
+              link: "/doctor/referrals",
+              dotColor: "green",
+              itemId: newRef.id,
+              patientId: newRef.patientToken
+            });
+          }
+        });
+      }
+
+      setReferrals(mapped);
+
+      // Enrich patient details for each referral so name, age, and timeline are loaded
+      data.forEach(ref => {
+        if (ref.patient_token) {
+          enrichPatientTimeline(ref.patient_token);
+        }
+      });
+    } catch (err) {
+      console.warn("Failed to fetch referrals from database:", err);
+    }
+  };
+
   // Outgoing referral handler
   const handleReferPatient = async (patientToken, doctorNameWithSpeciality, reason, referralType = "Internal", externalFacility = "") => {
     const [docName, docSpec] = doctorNameWithSpeciality.split(" - ");
@@ -278,10 +344,10 @@ export default function DoctorLayout({ children }) {
         external_facility: newRef.externalFacility
       });
 
-      setReferrals(prev => [newRef, ...prev]);
+      await fetchReferrals();
 
       const timelineEvent = {
-        date: "10-06-2026 (Today)",
+        date: getTodayString(),
         note: `Outbound ${referralType} Referral generated to ${docName}${externalFacility ? ` at ${externalFacility}` : ""} (${docSpec || "Specialist"}). Reason: ${reason}`,
         type: "Referral"
       };
@@ -301,37 +367,38 @@ export default function DoctorLayout({ children }) {
   };
 
   // Incoming referral response handler
-  const handleCompleteReferral = (refId, consultationNotes, medications) => {
-    setReferrals(prev => prev.map(ref => {
-      if (ref.id === refId) {
-        return {
-          ...ref,
-          status: "Completed",
-          myConsultationNotes: consultationNotes,
-          myMedications: medications
+  const handleCompleteReferral = async (refId, consultationNotes, medications) => {
+    try {
+      await updateReferral(refId, {
+        status: "Completed",
+        my_consultation_notes: consultationNotes,
+        my_medications: medications
+      });
+
+      await fetchReferrals();
+
+      const referral = referrals.find(r => r.id === refId);
+      if (referral) {
+        const timelineEvent = {
+          date: getTodayString(),
+          note: `Consultation complete by ${currentDoctorName}: ${consultationNotes}`,
+          type: "Consultation",
+          details: medications
         };
+
+        setPatients(prev => ({
+          ...prev,
+          [referral.patientToken]: {
+            ...prev[referral.patientToken],
+            timeline: [timelineEvent, ...prev[referral.patientToken].timeline]
+          }
+        }));
+
+        showNotification(`Completed consultation for referral ${refId}.`);
       }
-      return ref;
-    }));
-
-    const referral = referrals.find(r => r.id === refId);
-    if (referral) {
-      const timelineEvent = {
-        date: "10-06-2026 (Today)",
-        note: `Consultation complete by ${currentDoctorName}: ${consultationNotes}`,
-        type: "Consultation",
-        details: medications
-      };
-
-      setPatients(prev => ({
-        ...prev,
-        [referral.patientToken]: {
-          ...prev[referral.patientToken],
-          timeline: [timelineEvent, ...prev[referral.patientToken].timeline]
-        }
-      }));
-
-      showNotification(`Completed consultation for referral ${refId}.`);
+    } catch (err) {
+      console.error("Failed to complete referral in database:", err);
+      showNotification("Failed to complete referral: " + (err.message || ""));
     }
   };
 
@@ -560,8 +627,10 @@ export default function DoctorLayout({ children }) {
     showNotification("🚨 Simulating emergency check-in... Popup warning will trigger in 5 seconds!");
 
     setTimeout(() => {
-      const lastTokenNum = parseInt(Object.keys(patients).sort().pop().replace("#", "") || "8");
-      const newToken = `#${String(lastTokenNum + 1).padStart(3, "0")}`;
+      const lastKey = Object.keys(patients).length > 0 ? Object.keys(patients).sort().pop() : "";
+      const cleanedKey = lastKey && lastKey.startsWith("#") ? lastKey.replace("#", "") : "";
+      const lastTokenNum = cleanedKey ? parseInt(cleanedKey) : 8;
+      const newToken = `#${String((isNaN(lastTokenNum) ? 8 : lastTokenNum) + 1).padStart(3, "0")}`;
 
       const newPatient = {
         token: newToken,
@@ -573,7 +642,7 @@ export default function DoctorLayout({ children }) {
         chiefComplaint: "Acute severe swelling and unbearable pain in lower jaw, feverish.",
         medicalAlerts: ["Cardiac Pacemaker", "Penicillin Allergy"],
         teethChart: { 46: "active-treatment" },
-        timeline: [{ date: "10-06-2026", note: "Emergency check-in. High pain score.", type: "Check-In" }]
+        timeline: [{ date: new Date().toISOString().split("T")[0], note: "Emergency check-in. High pain score.", type: "Check-In" }]
       };
 
       setPatients(prev => ({ ...prev, [newToken]: newPatient }));
@@ -617,7 +686,7 @@ export default function DoctorLayout({ children }) {
       });
 
       const newTimelineEvent = {
-        date: "10-06-2026 (Today)",
+        date: getTodayString(),
         note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
         type: "Lab Order"
       };
@@ -684,7 +753,7 @@ export default function DoctorLayout({ children }) {
       const rxText = rxDraft.map(m => `${m.medicine} (${m.schedule} - ${m.timing} for ${m.duration})`).join(" | ");
 
       const newTimelineEvent = {
-        date: "10-06-2026 (Today)",
+        date: getTodayString(),
         note: `Rx Prescription issued: ${rxText}`,
         type: "Prescription",
         details: rxDraft
@@ -710,7 +779,7 @@ export default function DoctorLayout({ children }) {
     if (!viewingPatient) return;
 
     const newTimelineEvent = {
-      date: "10-06-2026 (Today)",
+      date: getTodayString(),
       note: noteText,
       type: "Clinical Note"
     };
@@ -744,11 +813,11 @@ export default function DoctorLayout({ children }) {
         updatedTimeline[existingEventIndex] = {
           ...updatedTimeline[existingEventIndex],
           note: noteText,
-          date: "10-06-2026 (Today)"
+          date: getTodayString()
         };
       } else {
         const newTimelineEvent = {
-          date: "10-06-2026 (Today)",
+          date: getTodayString(),
           note: noteText,
           type: "Clinical Note"
         };
@@ -807,10 +876,10 @@ export default function DoctorLayout({ children }) {
           if (app.status === "Completed") {
             timelineEvents.push({
               date: app.appointment_date,
-              note: `Visited for ${app.treatment_type}. Status: Completed`,
-              type: "Procedure"
+              note: `Treated for ${app.treatment_type} with symptoms "${app.symptoms || 'None'}"`,
+              type: "Treatment"
             });
-          } else if (app.status !== "Cancelled" && app.status !== "Skipped") {
+          } else if (app.status !== "Cancelled") {
             timelineEvents.push({
               date: app.appointment_date,
               note: `Scheduled for ${app.treatment_type} (${app.appointment_time})`,
@@ -819,6 +888,24 @@ export default function DoctorLayout({ children }) {
           }
         });
       }
+
+      // Add patient referrals and consultations to timeline
+      const patientRefs = referrals.filter(r => r.patientToken === token);
+      patientRefs.forEach(ref => {
+        if (ref.status === "Completed") {
+          timelineEvents.push({
+            date: ref.date,
+            note: `Referral Consultation Completed by ${ref.targetDoctor || "Specialist"}: ${ref.myConsultationNotes}`,
+            type: "Consultation"
+          });
+        } else {
+          timelineEvents.push({
+            date: ref.date,
+            note: `Referred to ${ref.targetDoctor || "Specialist"} for: "${ref.reason}"`,
+            type: "Referral"
+          });
+        }
+      });
 
       let plans = [];
       if (Array.isArray(plansData)) {
@@ -912,7 +999,7 @@ export default function DoctorLayout({ children }) {
     if (viewingPatientToken) {
       enrichPatientTimeline(viewingPatientToken);
     }
-  }, [viewingPatientToken]);
+  }, [viewingPatientToken, referrals]);
 
   return (
     <AuthGuard allowedRoles={["doctor"]} type="staff">
@@ -965,7 +1052,8 @@ export default function DoctorLayout({ children }) {
         markAsRead,
         markAsUnread,
         markAllAsRead,
-        setBellAnimating
+        setBellAnimating,
+        currentDoctorName
       }}>
         <div className="flex h-screen bg-background overflow-hidden">
           {/* Sidebar Nav */}

@@ -28,7 +28,8 @@ import {
   updateTreatmentPlan, 
   createTreatmentPlan, 
   createTreatmentPlanStep, 
-  updateTreatmentPlanStep 
+  updateTreatmentPlanStep,
+  downloadConsentPdf
 } from "@/services/api";
 
 const SPECIALTY_CONFIGS = {
@@ -227,6 +228,49 @@ export default function DoctorTreatmentPlanPage() {
   const [nextVisitProc, setNextVisitProc] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [steps, setSteps] = useState([]);
+
+  // Auto calculate future date for expected completion
+  const calculateFutureDate = (val) => {
+    if (!val) return "";
+    const match = val.match(/(\d+)\s*(month|week|day|year)s?/i);
+    if (!match) return "";
+    
+    const num = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    
+    const date = new Date();
+    if (unit.startsWith("month")) {
+      date.setMonth(date.getMonth() + num);
+    } else if (unit.startsWith("year")) {
+      date.setFullYear(date.getFullYear() + num);
+    } else if (unit.startsWith("week")) {
+      date.setDate(date.getDate() + num * 7);
+    } else if (unit.startsWith("day")) {
+      date.setDate(date.getDate() + num);
+    }
+    
+    return date.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  };
+
+  const handleDurationChange = (val) => {
+    setDuration(val);
+    const computed = calculateFutureDate(val);
+    if (computed) {
+      setCompletion(computed);
+    }
+  };
+
+  const handleViewConsentPdf = async (consentId) => {
+    try {
+      const blobData = await downloadConsentPdf(consentId);
+      const blob = new Blob([blobData], { type: "application/pdf" });
+      const viewUrl = window.URL.createObjectURL(blob);
+      window.open(viewUrl, "_blank");
+    } catch (err) {
+      console.error("Failed to load signed PDF:", err);
+      alert("Failed to load signed PDF form. Please try again.");
+    }
+  };
 
   // Form Builders
   const [diagInput, setDiagInput] = useState("");
@@ -721,7 +765,7 @@ export default function DoctorTreatmentPlanPage() {
                   type="text"
                   placeholder="e.g. 18 months"
                   value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
+                  onChange={(e) => handleDurationChange(e.target.value)}
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
@@ -757,59 +801,7 @@ export default function DoctorTreatmentPlanPage() {
             </div>
           </div>
 
-          {/* Attachment Library */}
-          <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-xs font-black text-gray-850 uppercase tracking-wider flex items-center gap-1.5">
-              <Paperclip className="w-4 h-4 text-primary" /> Clinical Attachments & Diagnostic Reports
-            </h3>
-            
-            <div className="flex gap-2 text-xs">
-              <input
-                type="text"
-                placeholder="Attachment Label (e.g. OPG X-Ray)"
-                value={attachInputName}
-                onChange={(e) => setAttachInputName(e.target.value)}
-                className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-              <select
-                value={attachInputType}
-                onChange={(e) => setAttachInputType(e.target.value)}
-                className="bg-gray-50 border border-gray-200 rounded-lg px-2 text-xs font-bold text-gray-600"
-              >
-                <option value="X-Ray">X-Ray</option>
-                <option value="OPG">OPG</option>
-                <option value="CBCT">CBCT</option>
-                <option value="Photo">Photo</option>
-                <option value="PDF">PDF</option>
-              </select>
-              <button
-                type="button"
-                onClick={addAttachment}
-                className="px-4 bg-primary text-white font-bold rounded-lg hover:bg-primary/95 transition-colors cursor-pointer shrink-0"
-              >
-                Add Report
-              </button>
-            </div>
 
-            {attachments.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-2">
-                {attachments.map((file, i) => (
-                  <div key={i} className="flex justify-between items-center p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-medium text-gray-700">
-                    <span className="flex items-center gap-1.5">
-                      <Paperclip className="w-3.5 h-3.5 text-gray-400" />
-                      <strong>📎 {file.name}</strong> ({file.type})
-                    </span>
-                    <button
-                      onClick={() => removeAttachment(i)}
-                      className="text-rose-500 hover:bg-rose-50 p-1 rounded cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* Procedures and Phases Table */}
           <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
@@ -838,7 +830,6 @@ export default function DoctorTreatmentPlanPage() {
                               <th className="p-2.5">Seq</th>
                               <th className="p-2.5">Procedure</th>
                               <th className="p-2.5">Notes</th>
-                              <th className="p-2.5">Cost</th>
                               <th className="p-2.5">Consent</th>
                               <th className="p-2.5 text-right">Action</th>
                             </tr>
@@ -860,13 +851,23 @@ export default function DoctorTreatmentPlanPage() {
                                     className="w-full px-2 py-1 border border-gray-200 rounded text-[11px] focus:outline-none"
                                   />
                                 </td>
-                                <td className="p-2.5 font-semibold">₹{step.cost.toLocaleString()}</td>
                                 <td className="p-2.5">
                                   {step.requires_consent ? (
                                     step.consent_status === "Given" ? (
-                                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1 w-max">
-                                        🟢 Signed
-                                      </span>
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1 w-max">
+                                          🟢 Signed
+                                        </span>
+                                        {step.consent_id && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleViewConsentPdf(step.consent_id)}
+                                            className="text-[10px] font-black text-primary hover:underline flex items-center gap-0.5 w-max bg-transparent border-none cursor-pointer outline-none p-0"
+                                          >
+                                            📄 View Form
+                                          </button>
+                                        )}
+                                      </div>
                                     ) : step.consent_status === "Pending" ? (
                                       <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 flex items-center gap-1 w-max animate-pulse">
                                         🟡 Awaiting
@@ -880,7 +881,7 @@ export default function DoctorTreatmentPlanPage() {
                                     <span className="text-[10px] text-gray-400">None</span>
                                   )}
                                 </td>
-                                <td className="p-2.5 text-right flex items-center justify-end gap-2">
+                                <td className="p-2.5 text-right">
                                   <select
                                     value={step.status}
                                     onChange={(e) => handleStepStatusChange(step.id, e.target.value)}
@@ -892,13 +893,6 @@ export default function DoctorTreatmentPlanPage() {
                                     <option value="Completed">Completed</option>
                                     <option value="Deferred">Deferred</option>
                                   </select>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveStep(step.id)}
-                                    className="text-rose-500 hover:bg-rose-50 p-1 rounded"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -941,14 +935,7 @@ export default function DoctorTreatmentPlanPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <input
-                  type="number"
-                  placeholder="Cost (₹)"
-                  value={newStep.cost || ""}
-                  onChange={(e) => setNewStep({ ...newStep, cost: e.target.value })}
-                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex items-center gap-1.5 bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-650 cursor-pointer select-none">
                   <input
                     type="checkbox"

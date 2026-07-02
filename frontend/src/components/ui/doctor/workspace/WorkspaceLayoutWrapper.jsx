@@ -36,7 +36,8 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
     handleSubmitSpecialtyLog,
     handleReferPatient,
     patients,
-    handleCompleteConsultation
+    handleCompleteConsultation,
+    labOrders
   } = useDoctor();
 
   if (!viewingPatient) {
@@ -127,6 +128,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
         onReturnToActivePatient={handleReturnToActivePatient}
         onGoBack={handleGoBack}
         onCompleteConsultation={handleCompleteConsultation}
+        labOrders={labOrders}
       />
 
       {/* Tooth Chart Mapping - Full Width (No horizontal scroll on desktop) */}

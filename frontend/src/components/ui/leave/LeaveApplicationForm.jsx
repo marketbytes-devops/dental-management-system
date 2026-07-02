@@ -1,14 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, AlertCircle, CheckCircle2 } from "lucide-react";
-
-const mockOnCallDoctors = [
-  { id: "doc-1", name: "Dr. Sarah Jenkins" },
-  { id: "doc-2", name: "Dr. James Kurt" },
-  { id: "doc-3", name: "Dr. Lisa Wong" },
-  { id: "doc-4", name: "Dr. Marcus Vance" }
-];
+import { getDoctors } from "@/services/api";
 
 export default function LeaveApplicationForm({
   balances,
@@ -17,13 +11,80 @@ export default function LeaveApplicationForm({
   errorMsg,
   setErrorMsg,
   successMsg,
-  setSuccessMsg
+  setSuccessMsg,
+  staffName = "",
+  requests = []
 }) {
   const [leaveType, setLeaveType] = useState("Annual Leave");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
-  const [onCallDoctor, setOnCallDoctor] = useState(mockOnCallDoctors[0].name);
+  const [onCallDoctor, setOnCallDoctor] = useState("");
+  const [doctorsList, setDoctorsList] = useState([]);
+
+  useEffect(() => {
+    const fetchDocs = async () => {
+      try {
+        const data = await getDoctors();
+        setDoctorsList(data || []);
+      } catch (err) {
+        console.error("Failed to fetch doctors:", err);
+      }
+    };
+    fetchDocs();
+  }, []);
+
+  // Filter eligible doctors:
+  // 1. Exclude self
+  // 2. Exclude doctors on leave during this duration
+  const getEligibleDoctors = () => {
+    if (!startDate || !endDate) {
+      return doctorsList.filter(doc => {
+        const docNameClean = doc.name.toLowerCase().replace("dr.", "").trim();
+        const currentClean = staffName ? staffName.toLowerCase().replace("dr.", "").trim() : "";
+        return docNameClean !== currentClean;
+      });
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    return doctorsList.filter(doc => {
+      // 1. Exclude self
+      const docNameClean = doc.name.toLowerCase().replace("dr.", "").trim();
+      const currentClean = staffName ? staffName.toLowerCase().replace("dr.", "").trim() : "";
+      if (docNameClean === currentClean) return false;
+
+      // 2. Exclude doctors on leave during this duration
+      const isOnLeave = requests.some(req => {
+        if (req.status !== "Approved") return false;
+        
+        const reqDocClean = req.staffName || req.staff_name || "";
+        const reqDocCleanLower = reqDocClean.toLowerCase().replace("dr.", "").trim();
+        if (reqDocCleanLower !== docNameClean) return false;
+
+        const reqStart = new Date(req.start_date);
+        const reqEnd = new Date(req.end_date);
+
+        return (start <= reqEnd && end >= reqStart);
+      });
+
+      return !isOnLeave;
+    });
+  };
+
+  const eligibleDoctors = getEligibleDoctors();
+
+  useEffect(() => {
+    if (eligibleDoctors.length > 0) {
+      const isStillEligible = eligibleDoctors.some(d => d.name === onCallDoctor);
+      if (!isStillEligible) {
+        setOnCallDoctor(eligibleDoctors[0].name);
+      }
+    } else {
+      setOnCallDoctor("");
+    }
+  }, [startDate, endDate, doctorsList, requests, staffName]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -145,12 +206,17 @@ export default function LeaveApplicationForm({
               value={onCallDoctor}
               onChange={(e) => setOnCallDoctor(e.target.value)}
               className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+              disabled={eligibleDoctors.length === 0}
             >
-              {mockOnCallDoctors.map((doc) => (
-                <option key={doc.id} value={doc.name}>
-                  {doc.name}
-                </option>
-              ))}
+              {eligibleDoctors.length > 0 ? (
+                eligibleDoctors.map((doc) => (
+                  <option key={doc.id} value={doc.name}>
+                    {doc.name} ({doc.specialty})
+                  </option>
+                ))
+              ) : (
+                <option value="">No coverage doctors available</option>
+              )}
             </select>
           </div>
         )}

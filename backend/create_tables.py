@@ -15,6 +15,8 @@ from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
+from modules.complaint.models import ComplaintModel
+
 
 def main():
     print("Initializing database tables for all modules...")

@@ -1,6 +1,7 @@
 # main.py - Single entry point, everyone's routers register here
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # Import routers from modules
 from modules.auth.router import router as auth_router
@@ -34,21 +35,31 @@ from modules.auth.service import hash_password
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-# Run schema migrations for missing columns in remote PostgreSQL
+# Run schema migrations for missing columns – each runs in its own transaction
+# so a "column already exists" error on one never aborts the others.
 from sqlalchemy import text
-try:
-    with engine.begin() as conn:
-        if not engine.url.drivername.startswith("sqlite"):
-            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS lab_name VARCHAR;"))
-            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS patient_id INTEGER;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS doctor_id INTEGER;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;"))
-            conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;"))
-            print("Database migrations applied successfully.")
-except Exception as e:
-    print(f"Error running database migrations: {e}")
+
+def _run_migration(sql: str):
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(sql))
+    except Exception:
+        pass  # column already exists or other benign error
+
+# Profile picture columns (SQLite + PostgreSQL)
+_run_migration("ALTER TABLE users ADD COLUMN profile_picture VARCHAR;")
+_run_migration("ALTER TABLE patients ADD COLUMN profile_picture VARCHAR;")
+
+# PostgreSQL-only migrations (use IF NOT EXISTS so they're idempotent)
+if not engine.url.drivername.startswith("sqlite"):
+    _run_migration("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS lab_name VARCHAR;")
+    _run_migration("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR;")
+    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS patient_id INTEGER;")
+    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS doctor_id INTEGER;")
+    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;")
+    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;")
+    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;")
+    print("Database migrations applied successfully.")
 
 # Seed default admin user if not exists
 db = SessionLocal()
@@ -72,6 +83,8 @@ finally:
     db.close()
 
 app = FastAPI(title="SmileCare Dental Management API", version="1.0.0")
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,

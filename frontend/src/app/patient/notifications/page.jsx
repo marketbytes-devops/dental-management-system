@@ -6,7 +6,15 @@ import { BookOpen, Sparkles, AlertCircle } from 'lucide-react';
 import NotificationList from '@/components/ui/patients/notifications/NotificationList';
 import PostCareInstructions from '@/components/ui/patients/notifications/PostCareInstructions';
 import FeedbackForm from '@/components/ui/patients/notifications/FeedbackForm';
-const myNotifications = [];
+import { 
+  getPatientNotifications, 
+  markPatientNotificationAsRead, 
+  markAllPatientNotificationsAsRead, 
+  deletePatientNotification,
+  getPatientProfile,
+  getPatientTreatmentPlan
+} from '@/services/api';
+
 const postCareInstructions = [
   {
     id: "PC-01",
@@ -33,19 +41,6 @@ const postCareInstructions = [
   }
 ];
 
-export const metadata = {
-  title: 'My Notifications | Patient Portal',
-  description: 'View your notifications, reminders, and post-care instructions.',
-};
-import { 
-  getPatientNotifications, 
-  markPatientNotificationAsRead, 
-  markAllPatientNotificationsAsRead, 
-  deletePatientNotification,
-  getPatientProfile,
-  getPatientTreatmentPlan
-} from '@/services/api';
-
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [activePlans, setActivePlans] = useState([]);
@@ -60,7 +55,6 @@ export default function NotificationsPage() {
       const profile = await getPatientProfile();
       if (profile?.token) {
         const plans = await getPatientTreatmentPlan(profile.token);
-        // Order by updated_at or created_at descending and take the last 2
         const sorted = plans
           .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
           .slice(0, 2);
@@ -75,6 +69,7 @@ export default function NotificationsPage() {
   };
 
   useEffect(() => {
+    document.title = 'My Notifications | Patient Portal';
     loadNotifications();
   }, []);
 
@@ -128,7 +123,7 @@ export default function NotificationsPage() {
         <div className="lg:col-span-2 space-y-6">
             
             {loading ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
+              <div className="bg-white rounded-2xl border border-gray-150 p-12 text-center shadow-sm">
                 <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-3"></div>
                 <p className="text-sm text-gray-500">Loading notifications...</p>
               </div>
@@ -148,7 +143,7 @@ export default function NotificationsPage() {
 
         {/* Right Column: Post Care & Feedback */}
         <div className="space-y-6">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden">
                 <div className="p-5 border-b border-gray-100 bg-gray-50/50">
                     <h2 className="text-base font-semibold text-gray-900">Recent Post-Care Quick View</h2>
                 </div>

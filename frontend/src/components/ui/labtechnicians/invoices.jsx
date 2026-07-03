@@ -12,62 +12,62 @@ export default function LabInvoices() {
   const fetchInvoices = async () => {
     try {
       const data = await getLabOrders();
-        const mapped = data.map(o => {
-          const suffix = o.id.split("-")[2] || "000";
-          const invId = `INV-2026-${suffix}`;
-          
-          let rate = 5000;
-          let label = "Dental Prosthetic Fabrication";
-          const typeUpper = (o.prosthetic_type || "").toUpperCase();
-          if (typeUpper.includes("CROWN")) {
-            rate = 3500;
-            label = `${o.prosthetic_type} (${o.material || 'Zirconia'})`;
-          } else if (typeUpper.includes("BRIDGE")) {
-            rate = 7200;
-            label = `${o.prosthetic_type} (${o.material || 'E-Max'})`;
-          } else if (typeUpper.includes("IMPLANT")) {
-            rate = 5500;
-            label = `${o.prosthetic_type} (${o.material || 'Screw-Retained'})`;
-          } else if (typeUpper.includes("DENTURE")) {
-            rate = 11500;
-            label = `${o.prosthetic_type} (${o.material || 'Acrylic'})`;
-          }
-          
-          const items = [
-            { name: label, qty: 1, rate: rate },
-            { name: "Laboratory Setup Fee", qty: 1, rate: 1000 }
-          ];
-          const amount = rate + 1000;
-          
-          let invStatus = "Unpaid";
-          if (o.status === "Completed" || o.status === "Delivered") {
-            invStatus = "Paid";
-          } else if (o.status === "Rejected") {
-            invStatus = "Overdue";
-          }
-          
-          return {
-            id: invId,
-            caseId: o.id,
-            patient: o.patient_name || "Walk-in Patient",
-            dentist: o.dentist_name || "Dr. Anoop Nair",
-            clinic: "SmileCare Dental Clinic",
-            amount: amount,
-            status: invStatus,
-            date: o.due_date || "2026-06-15",
-            items: items
-          };
-        });
-        setInvoices(mapped);
-        if (mapped.length > 0) {
-          setSelectedInvId(prev => {
-            if (mapped.some(inv => inv.id === prev)) return prev;
-            return mapped[0].id;
-          });
+      const mapped = data.map(o => {
+        const suffix = o.id.split("-")[2] || "000";
+        const invId = `INV-2026-${o.id.replace(/-/g, "")}`;
+
+        let rate = 5000;
+        let label = "Dental Prosthetic Fabrication";
+        const typeUpper = (o.prosthetic_type || "").toUpperCase();
+        if (typeUpper.includes("CROWN")) {
+          rate = 3500;
+          label = `${o.prosthetic_type} (${o.material || 'Zirconia'})`;
+        } else if (typeUpper.includes("BRIDGE")) {
+          rate = 7200;
+          label = `${o.prosthetic_type} (${o.material || 'E-Max'})`;
+        } else if (typeUpper.includes("IMPLANT")) {
+          rate = 5500;
+          label = `${o.prosthetic_type} (${o.material || 'Screw-Retained'})`;
+        } else if (typeUpper.includes("DENTURE")) {
+          rate = 11500;
+          label = `${o.prosthetic_type} (${o.material || 'Acrylic'})`;
         }
-      } catch (err) {
-        console.error("Failed to fetch invoices:", err);
+
+        const items = [
+          { name: label, qty: 1, rate: rate },
+          { name: "Laboratory Setup Fee", qty: 1, rate: 1000 }
+        ];
+        const amount = rate + 1000;
+
+        let invStatus = "Unpaid";
+        if (o.status === "Completed" || o.status === "Delivered") {
+          invStatus = "Paid";
+        } else if (o.status === "Rejected") {
+          invStatus = "Overdue";
+        }
+
+        return {
+          id: invId,
+          caseId: o.id,
+          patient: o.patient_name || "Walk-in Patient",
+          dentist: o.dentist_name || "Dr. Anoop Nair",
+          clinic: "SmileCare Dental Clinic",
+          amount: amount,
+          status: invStatus,
+          date: o.due_date || "2026-06-15",
+          items: items
+        };
+      });
+      setInvoices(mapped);
+      if (mapped.length > 0) {
+        setSelectedInvId(prev => {
+          if (mapped.some(inv => inv.id === prev)) return prev;
+          return mapped[0].id;
+        });
       }
+    } catch (err) {
+      console.error("Failed to fetch invoices:", err);
+    }
   };
 
   useEffect(() => {
@@ -169,7 +169,7 @@ export default function LabInvoices() {
 
       {/* Main Content Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        
+
         {/* Left: Invoices list (7 cols) */}
         <div className="lg:col-span-7 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex flex-col justify-between overflow-x-auto">
           <div className="space-y-4">
@@ -191,12 +191,11 @@ export default function LabInvoices() {
               </thead>
               <tbody className="divide-y divide-gray-100 text-sm">
                 {invoices.map((inv) => (
-                  <tr 
-                    key={inv.id} 
+                  <tr
+                    key={inv.id}
                     onClick={() => setSelectedInvId(inv.id)}
-                    className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
-                      selectedInvId === inv.id ? "bg-primary/5" : ""
-                    }`}
+                    className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${selectedInvId === inv.id ? "bg-primary/5" : ""
+                      }`}
                   >
                     <td className="px-4 py-3 font-bold text-gray-900">{inv.id}</td>
                     <td className="px-4 py-3 text-gray-655">
@@ -214,7 +213,7 @@ export default function LabInvoices() {
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-1.5">
-                        <button 
+                        <button
                           onClick={() => setSelectedInvId(inv.id)}
                           className="px-2 py-1 text-[10px] font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                         >
@@ -295,13 +294,13 @@ export default function LabInvoices() {
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-6 border-t border-gray-100 bg-white">
-            <button 
+            <button
               onClick={handleDownloadPDF}
               className="flex-1 py-2.5 bg-primary text-white font-extrabold rounded-xl text-xs shadow-sm shadow-primary/35 hover:bg-primary/90 transition-colors cursor-pointer"
             >
               📥 Download PDF
             </button>
-            <button 
+            <button
               onClick={handleSendInvoice}
               className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-750 font-extrabold rounded-xl text-xs hover:bg-gray-50 transition-colors cursor-pointer"
             >

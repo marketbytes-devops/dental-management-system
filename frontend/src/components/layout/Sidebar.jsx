@@ -29,6 +29,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
       const patientUser = localStorage.getItem("patient_user");
       const patientName = localStorage.getItem("patient_name");
       const patientToken = localStorage.getItem("patient_token");
+      const patientProfilePic = localStorage.getItem("patient_profile_picture");
 
       setTimeout(() => {
         if (staffUser) {
@@ -72,7 +73,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
           try {
             const name = patientName || (patientUser ? JSON.parse(patientUser).name : "Patient");
             const token = patientToken || "PT-XXXXX";
-            setCurrentUser({ name, token });
+            setCurrentUser({ name, token, profile_picture: patientProfilePic });
             setRole("patient");
           } catch (e) {
             console.error("Failed to set patient user info", e);
@@ -324,10 +325,20 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
       <div className={`p-4 border-t border-gray-100 shrink-0 bg-gray-50/50 flex ${isMinimized ? "justify-center" : "items-center"}`}>
         <div className="flex items-center gap-3 min-w-0">
           <div
-            className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0"
+            className="w-9 h-9 rounded-xl overflow-hidden bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0 border border-gray-100"
             title={currentUser?.name || "User"}
           >
-            {role === "doctor" ? <Stethoscope className="w-5 h-5 text-primary" /> : avatarChar}
+            {currentUser?.profile_picture ? (
+              <img 
+                src={currentUser.profile_picture.startsWith("http") ? currentUser.profile_picture : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${currentUser.profile_picture}`} 
+                alt={currentUser.name} 
+                className="w-full h-full object-cover"
+              />
+            ) : role === "doctor" ? (
+              <Stethoscope className="w-5 h-5 text-primary" />
+            ) : (
+              avatarChar
+            )}
           </div>
           {!isMinimized && (
             <div className="flex flex-col min-w-0">

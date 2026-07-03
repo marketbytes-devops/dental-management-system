@@ -69,6 +69,15 @@ export const updateProfile = async (profileData) => {
   return response.data;
 };
 
+export const uploadProfilePicture = async (formData) => {
+  const response = await client.post("/auth/profile/picture", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
 export const getAuthStatus = async () => {
   const response = await client.get("/auth/status");
   return response.data;
@@ -136,6 +145,15 @@ export const getPatientProfile = async () => {
 
 export const updatePatientProfile = async (profileData) => {
   const response = await client.put("/patient/profile", profileData);
+  return response.data;
+};
+
+export const uploadPatientProfilePicture = async (formData) => {
+  const response = await client.post("/patient/profile/picture", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return response.data;
 };
 

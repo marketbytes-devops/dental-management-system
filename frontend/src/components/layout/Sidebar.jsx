@@ -291,9 +291,6 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                           {unreadCount}
                         </span>
                       )}
-                      {item.name === "Notifications" && role === "patient" && (
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger border border-white" />
-                      )}
                     </Link>
                   ) : (
                     <Link
@@ -313,9 +310,6 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                         <span className="bg-danger text-white text-[10px] font-black px-2 py-0.5 rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
                           {unreadCount}
                         </span>
-                      )}
-                      {item.name === "Notifications" && role === "patient" && (
-                        <span className="ml-auto w-2 h-2 rounded-full bg-danger" />
                       )}
                     </Link>
                   )}

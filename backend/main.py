@@ -18,7 +18,7 @@ from database import Base, engine, SessionLocal
 from modules.auth.models import UserModel, StaffProfileModel
 from modules.patient.models import PatientModel, PatientConsentModel
 from modules.auth.models import UserModel
-from modules.patient.models import PatientModel, PatientConsentModel, PatientPrescriptionModel
+from modules.patient.models import PatientModel, PatientConsentModel, PatientPrescriptionModel, PatientNotificationModel, DoctorFeedbackModel
 from modules.frontdesk.models import AppointmentModel
 from modules.frontdesk.communication_models import CommunicationLogModel
 from modules.lab.models import LabOrderModel, LabNotificationModel, LabVendorModel, LabOrderCommentModel, LabAuditTrailModel

@@ -98,8 +98,8 @@ export default function DoctorLayout({ children }) {
       const mapped = data.map(o => ({
         id: o.id,
         patientToken: o.patient_token,
-        item: o.order_category === "Diagnostic" 
-          ? `Diagnostic: ${o.order_details?.test_type || "Lab Work"}` 
+        item: o.order_category === "Diagnostic"
+          ? `Diagnostic: ${o.order_details?.test_type || "Lab Work"}`
           : (o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`),
         status: o.status,
         labName: o.lab_name || "Apex Dental Lab",
@@ -711,13 +711,10 @@ export default function DoctorLayout({ children }) {
       }
 
       const newTimelineEvent = {
-<<<<<<< HEAD
         date: "10-06-2026 (Today)",
         note: eventNote,
-=======
         date: getTodayString(),
         note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
->>>>>>> 15829b010ca79fa2b84084a7982f3e691588722a
         type: "Lab Order"
       };
 

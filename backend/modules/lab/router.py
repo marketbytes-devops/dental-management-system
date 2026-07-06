@@ -128,14 +128,14 @@ def update_lab_order_status(
     if not order:
         raise HTTPException(status_code=404, detail="Lab order not found")
 
-    order.status = status_data.status
+    order.status = status_data.status  # type: ignore
     if status_data.result_document_url:
-        order.result_document_url = status_data.result_document_url
+        order.result_document_url = status_data.result_document_url  # type: ignore
         
     if status_data.status == "Rejected":
-        order.rejection_reason = status_data.rejection_reason
+        order.rejection_reason = status_data.rejection_reason  # type: ignore
     else:
-        order.rejection_reason = None
+        order.rejection_reason = None  # type: ignore
         
     db.commit()
     db.refresh(order)
@@ -189,21 +189,21 @@ def edit_lab_order(
         raise HTTPException(status_code=404, detail="Lab order not found")
 
     if edit_data.order_category is not None:
-        order.order_category = edit_data.order_category
+        order.order_category = edit_data.order_category  # type: ignore
     if edit_data.order_details is not None:
-        order.order_details = edit_data.order_details
+        order.order_details = edit_data.order_details  # type: ignore
     if edit_data.prosthetic_type is not None:
-        order.prosthetic_type = edit_data.prosthetic_type
+        order.prosthetic_type = edit_data.prosthetic_type  # type: ignore
     if edit_data.material is not None:
-        order.material = edit_data.material
+        order.material = edit_data.material  # type: ignore
     if edit_data.shade is not None:
-        order.shade = edit_data.shade
+        order.shade = edit_data.shade  # type: ignore
     if edit_data.priority is not None:
-        order.priority = edit_data.priority
+        order.priority = edit_data.priority  # type: ignore
     if edit_data.due_date is not None:
-        order.due_date = edit_data.due_date
+        order.due_date = edit_data.due_date  # type: ignore
     if edit_data.notes is not None:
-        order.notes = edit_data.notes
+        order.notes = edit_data.notes  # type: ignore
 
     db.commit()
     db.refresh(order)
@@ -239,7 +239,7 @@ def mark_notification_as_read(
     notif = db.query(LabNotificationModel).filter(LabNotificationModel.id == notif_id).first()
     if not notif:
         raise HTTPException(status_code=404, detail="Notification not found")
-    notif.read = True
+    notif.read = True  # type: ignore
     db.commit()
     db.refresh(notif)
     return notif
@@ -281,7 +281,10 @@ def create_inventory_item(
         current_stock=item_data.current_stock,
         minimum_stock_alert=item_data.minimum_stock_alert,
         unit=item_data.unit,
-        unit_price=item_data.unit_price
+        unit_price=item_data.unit_price,
+        supplier=item_data.supplier,
+        expiry_date=item_data.expiry_date,
+        batch_number=item_data.batch_number
     )
     db.add(new_item)
     db.commit()
@@ -299,12 +302,15 @@ def update_inventory_item(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    if item_data.name is not None: item.name = item_data.name
-    if item_data.category is not None: item.category = item_data.category
-    if item_data.current_stock is not None: item.current_stock = item_data.current_stock
-    if item_data.minimum_stock_alert is not None: item.minimum_stock_alert = item_data.minimum_stock_alert
-    if item_data.unit is not None: item.unit = item_data.unit
-    if item_data.unit_price is not None: item.unit_price = item_data.unit_price
+    if item_data.name is not None: item.name = item_data.name  # type: ignore
+    if item_data.category is not None: item.category = item_data.category  # type: ignore
+    if item_data.current_stock is not None: item.current_stock = item_data.current_stock  # type: ignore
+    if item_data.minimum_stock_alert is not None: item.minimum_stock_alert = item_data.minimum_stock_alert  # type: ignore
+    if item_data.unit is not None: item.unit = item_data.unit  # type: ignore
+    if item_data.unit_price is not None: item.unit_price = item_data.unit_price  # type: ignore
+    if item_data.supplier is not None: item.supplier = item_data.supplier  # type: ignore
+    if item_data.expiry_date is not None: item.expiry_date = item_data.expiry_date  # type: ignore
+    if item_data.batch_number is not None: item.batch_number = item_data.batch_number  # type: ignore
 
     db.commit()
     db.refresh(item)
@@ -359,14 +365,14 @@ def update_restock_request_status(
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
 
-    req.status = status_data.status
+    req.status = status_data.status  # type: ignore
     
     # If fulfilled, update inventory stock automatically
     if req.status == "Fulfilled":
         if req.item_id:
             item = db.query(InventoryItemModel).filter(InventoryItemModel.id == req.item_id).first()
             if item:
-                item.current_stock += req.requested_quantity
+                item.current_stock += req.requested_quantity  # type: ignore
         else:
             # Create a new inventory item
             new_item = InventoryItemModel(
@@ -379,17 +385,27 @@ def update_restock_request_status(
             )
             db.add(new_item)
             db.flush()
-            req.item_id = new_item.id
+            req.item_id = new_item.id  # type: ignore
             
     db.commit()
     db.refresh(req)
 
     # Notify lab tech
+    if req.status == "Ordered":
+        notif_title = f"Restock Request Ordered"
+        notif_desc = f"Your restock request for {req.item_name} has been approved and ordered from the supplier."
+    elif req.status == "Fulfilled":
+        notif_title = f"Restock Request Received"
+        notif_desc = f"The requested {req.item_name} has arrived and is updated in the inventory."
+    else:
+        notif_title = f"Restock Request {req.status}"
+        notif_desc = f"Your restock request for {req.item_name} is marked as {req.status}."
+
     notif = LabNotificationModel(
         recipient_role="lab tech",
         type="inventory",
-        title=f"Restock Request {req.status}",
-        desc=f"Your restock request for {req.item_name} is marked as {req.status}.",
+        title=notif_title,
+        desc=notif_desc,
         read=False
     )
     db.add(notif)

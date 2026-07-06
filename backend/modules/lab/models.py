@@ -51,6 +51,9 @@ class InventoryItemModel(Base):
     minimum_stock_alert = Column(Integer, default=10)
     unit = Column(String, default="pcs")
     unit_price = Column(Float, nullable=True) # For future billing phase
+    supplier = Column(String, nullable=True)
+    expiry_date = Column(String, nullable=True)
+    batch_number = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

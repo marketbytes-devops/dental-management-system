@@ -21,7 +21,7 @@ from modules.auth.models import UserModel
 from modules.patient.models import PatientModel, PatientConsentModel, PatientPrescriptionModel, PatientNotificationModel, DoctorFeedbackModel
 from modules.frontdesk.models import AppointmentModel
 from modules.frontdesk.communication_models import CommunicationLogModel
-from modules.lab.models import LabOrderModel, LabNotificationModel
+from modules.lab.models import LabOrderModel, LabNotificationModel, InventoryItemModel, RestockRequestModel
 from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
@@ -50,6 +50,10 @@ try:
                 conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;"))
                 conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;"))
                 conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS supplier VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS expiry_date VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS batch_number VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS unit_price FLOAT;"))
                 print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")
@@ -79,7 +83,7 @@ app = FastAPI(title="SmileCare Dental Management API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

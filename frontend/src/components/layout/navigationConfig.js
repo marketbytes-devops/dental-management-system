@@ -40,11 +40,8 @@ import {
   Scissors,
   Sparkles,
   User,
-<<<<<<< HEAD
-  Package
-=======
+  Package,
   MessageSquare
->>>>>>> 15829b010ca79fa2b84084a7982f3e691588722a
 } from "lucide-react";
 
 import ToothIcon from "@/components/ui/shared/ToothIcon";

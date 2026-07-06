@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, AlertTriangle, TrendingUp, Search, Check, X, Bell } from "lucide-react";
+import { Package, AlertTriangle, TrendingUp, Search, Check, X, Bell, Plus, Truck, CheckCircle } from "lucide-react";
 import { 
   getLabInventory, 
   updateInventoryItem, 
   getRestockRequests, 
-  updateRestockRequestStatus 
+  updateRestockRequestStatus,
+  createInventoryItem
 } from "@/services/api";
 
 export default function AdminInventory() {
@@ -20,6 +21,21 @@ export default function AdminInventory() {
 
   const [toast, setToast] = useState({ show: false, message: "" });
   const [isLoading, setIsLoading] = useState(true);
+
+  // Add Item Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newItem, setNewItem] = useState({
+    name: "",
+    category: "Production Materials",
+    supplier: "",
+    current_stock: 0,
+    minimum_stock_alert: 10,
+    unit: "pcs",
+    unit_price: 0,
+    expiry_date: "",
+    batch_number: ""
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const triggerToast = (message) => {
     setToast({ show: true, message });
@@ -42,7 +58,7 @@ export default function AdminInventory() {
         unit: item.unit,
         price: item.unit_price,
         status: item.current_stock === 0 ? "Out of Stock" : (item.current_stock <= item.minimum_stock_alert ? "Low Stock" : "In Stock"),
-        supplier: "Global Dental Supplies"
+        supplier: item.supplier || "Unknown Supplier"
       }));
       setInventory(mappedInv);
 
@@ -84,14 +100,25 @@ export default function AdminInventory() {
     setFilteredInventory(result);
   }, [inventory, searchQuery, categoryFilter, statusFilter]);
 
-  const handleApproveRequest = async (reqId) => {
+  const handleOrderRequest = async (reqId) => {
+    try {
+      await updateRestockRequestStatus(reqId, { status: "Ordered" });
+      triggerToast(`Restock request #${reqId} ordered from supplier.`);
+      fetchData();
+    } catch (err) {
+      console.error("Failed to order request", err);
+      triggerToast("Error ordering request.");
+    }
+  };
+
+  const handleReceiveRequest = async (reqId) => {
     try {
       await updateRestockRequestStatus(reqId, { status: "Fulfilled" });
-      triggerToast(`Restock request #${reqId} approved and stock updated.`);
-      fetchData(); // Refresh data to show new stock
+      triggerToast(`Restock request #${reqId} marked as received and stock updated.`);
+      fetchData();
     } catch (err) {
-      console.error("Failed to approve request", err);
-      triggerToast("Error approving request.");
+      console.error("Failed to receive request", err);
+      triggerToast("Error marking request as received.");
     }
   };
 
@@ -106,13 +133,40 @@ export default function AdminInventory() {
     }
   };
 
+  const handleAddItem = async (e) => {
+    e.preventDefault();
+    try {
+      setIsSubmitting(true);
+      await createInventoryItem(newItem);
+      triggerToast("New inventory item added successfully!");
+      setIsAddModalOpen(false);
+      setNewItem({
+        name: "",
+        category: "Production Materials",
+        supplier: "",
+        current_stock: 0,
+        minimum_stock_alert: 10,
+        unit: "pcs",
+        unit_price: 0,
+        expiry_date: "",
+        batch_number: ""
+      });
+      fetchData();
+    } catch (err) {
+      console.error("Failed to add item:", err);
+      triggerToast("Error adding new item.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // KPI calculations
   const totalItems = inventory.length;
   const lowStockCount = inventory.filter((item) => item.status === "Low Stock").length;
   const outOfStockCount = inventory.filter((item) => item.status === "Out of Stock").length;
   const totalValuation = inventory.reduce((acc, item) => acc + item.quantity * item.price, 0);
 
-  const pendingRequests = restockRequests.filter(r => r.status === "Pending");
+  const activeRequests = restockRequests.filter(r => r.status === "Pending" || r.status === "Ordered");
 
   const getStatusStyle = (status) => {
     switch (status) {
@@ -135,9 +189,18 @@ export default function AdminInventory() {
         </div>
       )}
 
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Inventory & Restocking</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage clinical and lab inventory, monitor valuations, and approve lab tech restock requests.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Inventory & Restocking</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage clinical and lab inventory, monitor valuations, and approve lab tech restock requests.</p>
+        </div>
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary-dark transition-colors shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          Add New Item
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -182,31 +245,31 @@ export default function AdminInventory() {
         </div>
       </div>
 
-      {pendingRequests.length > 0 && (
+      {activeRequests.length > 0 && (
         <div className="bg-white border border-warning/30 rounded-2xl shadow-sm overflow-hidden animate-fade-in">
           <div className="p-4 bg-warning/10 border-b border-warning/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-warning" />
-              <h3 className="text-sm font-bold text-gray-900">Pending Restock Requests</h3>
+              <h3 className="text-sm font-bold text-gray-900">Active Restock Requests</h3>
             </div>
             <span className="text-xs font-bold bg-white px-2 py-0.5 rounded-full text-warning border border-warning/20">
-              {pendingRequests.length} Requires Approval
+              {activeRequests.length} Active
             </span>
           </div>
-          <div className="p-0">
+          <div className="p-0 overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100 font-bold text-gray-500 uppercase tracking-wider">
                   <th className="px-4 py-3">Request ID</th>
                   <th className="px-4 py-3">Item Name</th>
                   <th className="px-4 py-3">Requested Qty</th>
-                  <th className="px-4 py-3">Notes</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {pendingRequests.map((req) => (
+                {activeRequests.map((req) => (
                   <tr key={req.id} className="hover:bg-gray-50/40">
                     <td className="px-4 py-3 font-bold">#{req.id}</td>
                     <td className="px-4 py-3 font-semibold">
@@ -214,23 +277,42 @@ export default function AdminInventory() {
                       {req.item_name}
                     </td>
                     <td className="px-4 py-3 font-bold text-primary">+{req.requested_quantity} units</td>
-                    <td className="px-4 py-3 text-gray-500">{req.notes || "-"}</td>
+                    <td className="px-4 py-3">
+                      {req.status === "Pending" ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-warning/10 text-warning uppercase">Pending</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-600 uppercase">Ordered</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{new Date(req.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right space-x-2">
-                      <button 
-                        onClick={() => handleApproveRequest(req.id)}
-                        className="p-1.5 bg-success/10 text-success rounded-lg hover:bg-success/20 transition-colors"
-                        title="Approve & Restock"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleRejectRequest(req.id)}
-                        className="p-1.5 bg-danger/10 text-danger rounded-lg hover:bg-danger/20 transition-colors"
-                        title="Reject Request"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {req.status === "Pending" ? (
+                        <>
+                          <button 
+                            onClick={() => handleOrderRequest(req.id)}
+                            className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                            title="Approve & Order from Supplier"
+                          >
+                            <Truck className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleRejectRequest(req.id)}
+                            className="p-1.5 bg-danger/10 text-danger rounded-lg hover:bg-danger/20 transition-colors"
+                            title="Reject Request"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <button 
+                          onClick={() => handleReceiveRequest(req.id)}
+                          className="px-2 py-1.5 bg-success/10 text-success rounded-lg hover:bg-success/20 transition-colors flex items-center justify-center ml-auto gap-1 text-[11px] font-bold uppercase"
+                          title="Mark as Received & Update Stock"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Received
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -260,8 +342,10 @@ export default function AdminInventory() {
               className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-700"
             >
               <option value="All">All Categories</option>
-              <option value="Lab Materials">Lab Materials</option>
+              <option value="Production Materials">Production Materials</option>
               <option value="Clinical Supplies">Clinical Supplies</option>
+              <option value="Clinical Pharmacy">Clinical Pharmacy</option>
+              <option value="General">General</option>
             </select>
 
             <select 
@@ -302,7 +386,10 @@ export default function AdminInventory() {
                 filteredInventory.map((item) => (
                   <tr key={item.code} className="hover:bg-gray-50/40 transition-colors">
                     <td className="px-4 py-3 font-bold text-gray-900">{item.code}</td>
-                    <td className="px-4 py-3 font-semibold text-gray-800">{item.name}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-800">
+                      {item.name}
+                      <span className="block text-[10px] text-gray-400 font-normal mt-0.5">{item.supplier}</span>
+                    </td>
                     <td className="px-4 py-3 font-bold text-gray-900">
                       {item.quantity} <span className="text-[10px] text-gray-400 font-normal">{item.unit}</span>
                       <span className="block text-[9px] text-gray-400 font-semibold mt-0.5">Min: {item.minLevel}</span>
@@ -321,6 +408,168 @@ export default function AdminInventory() {
           </table>
         </div>
       </div>
+
+      {/* Add New Item Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h3 className="text-lg font-bold text-gray-900">Add New Inventory Item</h3>
+              <button 
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              <form id="add-item-form" onSubmit={handleAddItem} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-xs font-semibold text-gray-700">Item Name *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newItem.name}
+                      onChange={e => setNewItem({...newItem, name: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      placeholder="e.g., Dental Composite Resin"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700">Category *</label>
+                    <select 
+                      value={newItem.category}
+                      onChange={e => setNewItem({...newItem, category: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    >
+                      <option value="Production Materials">Production Materials</option>
+                      <option value="Clinical Supplies">Clinical Supplies</option>
+                      <option value="Clinical Pharmacy">Clinical Pharmacy</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700">Supplier</label>
+                    <input 
+                      type="text" 
+                      value={newItem.supplier}
+                      onChange={e => setNewItem({...newItem, supplier: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      placeholder="e.g., Global Dental Suppliers"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700">Initial Stock *</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      required
+                      value={newItem.current_stock}
+                      onChange={e => setNewItem({...newItem, current_stock: parseInt(e.target.value) || 0})}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700">Min. Stock Alert *</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      required
+                      value={newItem.minimum_stock_alert}
+                      onChange={e => setNewItem({...newItem, minimum_stock_alert: parseInt(e.target.value) || 0})}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700">Unit *</label>
+                    <select 
+                      value={newItem.unit}
+                      onChange={e => setNewItem({...newItem, unit: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    >
+                      <option value="pcs">Pieces (pcs)</option>
+                      <option value="boxes">Boxes</option>
+                      <option value="ml">Milliliters (ml)</option>
+                      <option value="g">Grams (g)</option>
+                      <option value="kits">Kits</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700">Unit Price (₹) *</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      step="0.01"
+                      required
+                      value={newItem.unit_price}
+                      onChange={e => setNewItem({...newItem, unit_price: parseFloat(e.target.value) || 0})}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700">Batch Number</label>
+                    <input 
+                      type="text" 
+                      value={newItem.batch_number}
+                      onChange={e => setNewItem({...newItem, batch_number: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      placeholder="Optional"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700">Expiry Date</label>
+                    <input 
+                      type="date" 
+                      value={newItem.expiry_date}
+                      onChange={e => setNewItem({...newItem, expiry_date: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-700"
+                    />
+                  </div>
+                </div>
+              </form>
+            </div>
+            
+            <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 mt-auto">
+              <button 
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-200 bg-gray-100 rounded-xl transition-colors"
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                form="add-item-form"
+                disabled={isSubmitting}
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-primary hover:bg-primary-dark rounded-xl transition-colors flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Save Item
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

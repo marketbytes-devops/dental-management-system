@@ -80,6 +80,9 @@ class InventoryItemCreate(BaseModel):
     minimum_stock_alert: Optional[int] = 10
     unit: Optional[str] = "pcs"
     unit_price: Optional[float] = None
+    supplier: Optional[str] = None
+    expiry_date: Optional[str] = None
+    batch_number: Optional[str] = None
 
 class InventoryItemUpdate(BaseModel):
     name: Optional[str] = None
@@ -88,6 +91,9 @@ class InventoryItemUpdate(BaseModel):
     minimum_stock_alert: Optional[int] = None
     unit: Optional[str] = None
     unit_price: Optional[float] = None
+    supplier: Optional[str] = None
+    expiry_date: Optional[str] = None
+    batch_number: Optional[str] = None
 
 class InventoryItemResponse(BaseModel):
     id: int
@@ -97,6 +103,9 @@ class InventoryItemResponse(BaseModel):
     minimum_stock_alert: int
     unit: str
     unit_price: Optional[float] = None
+    supplier: Optional[str] = None
+    expiry_date: Optional[str] = None
+    batch_number: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -110,7 +119,7 @@ class RestockRequestCreate(BaseModel):
     notes: Optional[str] = None
 
 class RestockRequestStatusUpdate(BaseModel):
-    status: str # Approved, Fulfilled, Rejected
+    status: str # Ordered, Fulfilled, Rejected
 
 class RestockRequestResponse(BaseModel):
     id: int

@@ -118,7 +118,7 @@ export const ROLE_NAV_ITEMS = {
   ],
   "lab tech": [
     { name: "Dashboard", href: "/labtechnicians/dashboard", icon: BarChart3 },
-    { name: "Production Board", href: "/labtechnicians/production", icon: Wrench },
+    { name: "Lab Case Tracker", href: "/labtechnicians/production", icon: Wrench },
     { name: "Lab Orders", href: "/labtechnicians/orders", icon: Microscope },
     { name: "Clinical Pharmacy", href: "/labtechnicians/inventory", icon: Package },
     { name: "Billing & Warranty", href: "/labtechnicians/invoices", icon: Receipt },

@@ -4,13 +4,26 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from database import get_db
 from dependencies import get_current_user
-from modules.lab.models import LabOrderModel, LabNotificationModel, InventoryItemModel, RestockRequestModel
+from modules.lab.models import (
+    LabOrderModel, 
+    LabNotificationModel, 
+    LabVendorModel, 
+    LabOrderCommentModel, 
+    LabAuditTrailModel,
+    InventoryItemModel,
+    RestockRequestModel
+)
 from modules.lab.schemas import (
     LabOrderCreate,
     LabOrderStatusUpdate,
     LabOrderEdit,
     LabOrderResponse,
     LabNotificationResponse,
+    LabVendorCreate,
+    LabVendorResponse,
+    LabOrderCommentCreate,
+    LabOrderCommentResponse,
+    LabAuditTrailResponse,
     InventoryItemCreate,
     InventoryItemUpdate,
     InventoryItemResponse,

@@ -686,11 +686,11 @@ export default function DoctorLayout({ children }) {
         lab_name: labName,
         due_date: "2026-06-15",
         notes: `Tooth #${tooth}, Shade ${shade}`
-      });
+      };
+
+      const createdOrder = await createLabOrder(payload);
 
       const newTimelineEvent = {
-        date: "10-06-2026 (Today)",
-        note: eventNote,
         date: getTodayString(),
         note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
         type: "Lab Order"
@@ -701,11 +701,11 @@ export default function DoctorLayout({ children }) {
         [viewingPatientToken]: {
           ...prev[viewingPatientToken],
           timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
-          ...(orderData.order_category === "Prosthetic" ? { teethChart: { ...prev[viewingPatientToken].teethChart, [orderData.tooth]: "lab-ordered" } } : {})
+          teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
         }
       }));
 
-      showNotification(`Lab order submitted to ${orderData.labName}.`);
+      showNotification(`Lab order submitted to ${labName}.`);
       fetchLabOrders();
     } catch (err) {
       console.error("Error submitting lab order:", err);

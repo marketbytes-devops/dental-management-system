@@ -22,7 +22,7 @@ from modules.auth.models import UserModel
 from modules.patient.models import PatientModel, PatientConsentModel, PatientPrescriptionModel, PatientNotificationModel, DoctorFeedbackModel
 from modules.frontdesk.models import AppointmentModel
 from modules.frontdesk.communication_models import CommunicationLogModel
-from modules.lab.models import LabOrderModel, LabNotificationModel
+from modules.lab.models import LabOrderModel, LabNotificationModel, InventoryItemModel, RestockRequestModel
 from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
@@ -38,6 +38,7 @@ Base.metadata.create_all(bind=engine)
 # Run schema migrations for missing columns – each runs in its own transaction
 # so a "column already exists" error on one never aborts the others.
 from sqlalchemy import text
+<<<<<<< HEAD
 
 def _run_migration(sql: str):
     try:
@@ -60,6 +61,29 @@ if not engine.url.drivername.startswith("sqlite"):
     _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;")
     _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;")
     print("Database migrations applied successfully.")
+=======
+try:
+    if engine is not None:
+        with engine.begin() as conn:
+            if not engine.url.drivername.startswith("sqlite"):
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS lab_name VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS order_category VARCHAR DEFAULT 'Prosthetic';"))
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS order_details JSON;"))
+                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS result_document_url VARCHAR;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS patient_id INTEGER;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS doctor_id INTEGER;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;"))
+                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS supplier VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS expiry_date VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS batch_number VARCHAR;"))
+                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS unit_price FLOAT;"))
+                print("Database migrations applied successfully.")
+except Exception as e:
+    print(f"Error running database migrations: {e}")
+>>>>>>> 41a6c7e2e14c7154a42ffe3a2cdd20965c7fd621
 
 # Seed default admin user if not exists
 db = SessionLocal()
@@ -88,7 +112,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -132,7 +156,12 @@ def get_about_stats(db: Session = Depends(get_db)):
     doctors_list = []
     for u in doctor_users:
         doc = db.query(DoctorModel).filter(DoctorModel.user_id == u.id).first()
-        specialty = doc.specialty if (doc and doc.specialty) else (", ".join(u.specialties) if u.specialties else "General Dentistry")
+        if doc and doc.specialty:
+            specialty = doc.specialty
+        elif isinstance(u.specialties, list) and u.specialties:
+            specialty = ", ".join(str(s) for s in u.specialties)
+        else:
+            specialty = "General Dentistry"
         doctors_list.append({
             "id": u.id,
             "name": u.name if u.name.startswith("Dr. ") else f"Dr. {u.name}",

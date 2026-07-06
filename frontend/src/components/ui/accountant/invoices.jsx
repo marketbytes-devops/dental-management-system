@@ -127,9 +127,8 @@ export default function AccountantInvoices() {
                     <td className="py-3.5 px-2 font-mono text-xs text-gray-700">{inv.amount}</td>
                     <td className="py-3.5 px-2 font-mono text-xs text-gray-500">{inv.date}</td>
                     <td className="py-3.5 px-2 text-right">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                        inv.status === "Paid" ? "bg-success/10 text-success" : "bg-danger/10 text-danger animate-pulse"
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${inv.status === "Paid" ? "bg-success/10 text-success" : "bg-danger/10 text-danger animate-pulse"
+                        }`}>
                         {inv.status}
                       </span>
                     </td>

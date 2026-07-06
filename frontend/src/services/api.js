@@ -4,7 +4,7 @@ import axios from "axios";
 // 1. Axios Client Configuration & Interceptors
 // ==========================================
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -367,6 +367,36 @@ export const markAllNotificationsAsRead = async () => {
 
 export const deleteNotification = async (id) => {
   const response = await client.delete(`/lab/notifications/${id}`);
+  return response.data;
+};
+
+export const getLabInventory = async () => {
+  const response = await client.get("/lab/inventory");
+  return response.data;
+};
+
+export const createInventoryItem = async (itemData) => {
+  const response = await client.post("/lab/inventory", itemData);
+  return response.data;
+};
+
+export const updateInventoryItem = async (id, itemData) => {
+  const response = await client.put(`/lab/inventory/${id}`, itemData);
+  return response.data;
+};
+
+export const getRestockRequests = async () => {
+  const response = await client.get("/lab/restock-requests");
+  return response.data;
+};
+
+export const createRestockRequest = async (requestData) => {
+  const response = await client.post("/lab/restock-requests", requestData);
+  return response.data;
+};
+
+export const updateRestockRequestStatus = async (id, statusData) => {
+  const response = await client.put(`/lab/restock-requests/${id}/status`, statusData);
   return response.data;
 };
 

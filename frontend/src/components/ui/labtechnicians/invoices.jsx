@@ -1,12 +1,26 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Coins, CreditCard, Receipt, Truck } from "lucide-react";
+import {
+  Coins,
+  CreditCard,
+  Receipt,
+  Truck,
+  Search,
+  Filter,
+  Download,
+  Send,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  ChevronRight,
+  Printer,
+  FileText
+} from "lucide-react";
 import { getLabOrders } from "@/services/api";
 import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
 
-// Status lifecycle from dispatch.jsx: "Ready / Shipped", "Completed", "Delivered"
 const DISPATCHED_STATUSES = ["Ready / Shipped", "Completed", "Delivered"];
 
 function mapOrderToInvoice(o) {
@@ -66,14 +80,15 @@ const TABS = [
 ];
 
 export default function LabInvoices() {
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [allInvoices, setAllInvoices] = useState([]);
   const [activeTab, setActiveTab] = useState("all");
   const [selectedInvId, setSelectedInvId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  // Track which invoices have been downloaded this session
   const [downloadedIds, setDownloadedIds] = useState(new Set());
-  // Post-download confirmation modal
   const [sendModal, setSendModal] = useState({ show: false, invoiceId: "", invoiceName: "" });
   const invoicePreviewRef = useRef(null);
 
@@ -99,41 +114,57 @@ export default function LabInvoices() {
     return () => clearInterval(interval);
   }, []);
 
-  // Derived list based on active tab
+  // Filter logic
   const pendingInvoices = allInvoices.filter(
     (inv) => inv.status === "Unpaid" || inv.status === "Overdue"
   );
-  const invoices =
+
+  const filteredByTab =
     activeTab === "dispatched"
       ? allInvoices.filter((inv) => inv.dispatched)
       : activeTab === "pending"
-      ? pendingInvoices
-      : allInvoices;
+        ? pendingInvoices
+        : allInvoices;
 
-  // Auto-select first of current tab
+  const invoices = filteredByTab.filter((inv) => {
+    const matchesSearch =
+      inv.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.dentist.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      inv.clinic.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      inv.status.toLowerCase() === statusFilter.toLowerCase();
+
+    return matchesSearch && matchesStatus;
+  });
+
+  // Auto-select first matching invoice when list changes
   useEffect(() => {
     if (invoices.length > 0 && !invoices.some((inv) => inv.id === selectedInvId)) {
       setSelectedInvId(invoices[0].id);
     }
-  }, [activeTab, invoices]);
+  }, [activeTab, searchQuery, statusFilter]);
 
   const triggerToast = (message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
   };
 
-  const currentInvoice = invoices.find((inv) => inv.id === selectedInvId) ||
-    invoices[0] || {
-      id: "N/A",
-      caseId: "N/A",
-      patient: "No Invoice Available",
-      dentist: "N/A",
-      clinic: "N/A",
-      amount: 0,
-      status: "N/A",
-      date: "N/A",
-      items: [],
-    };
+  const currentInvoice = allInvoices.find((inv) => inv.id === selectedInvId) ||
+    invoices[0] ||
+    allInvoices[0] || {
+    id: "N/A",
+    caseId: "N/A",
+    patient: "No Invoice Available",
+    dentist: "N/A",
+    clinic: "N/A",
+    amount: 0,
+    status: "N/A",
+    date: "N/A",
+    items: [],
+  };
 
   // Stats across ALL invoices
   const dispatchedInvoices = allInvoices.filter((inv) => inv.dispatched);
@@ -141,26 +172,41 @@ export default function LabInvoices() {
     (acc, inv) => (inv.status === "Paid" ? acc + inv.amount : acc),
     0
   );
-  // Outstanding = Unpaid + Overdue across ALL invoices
   const outstandingAmount = allInvoices.reduce(
     (acc, inv) =>
       inv.status === "Unpaid" || inv.status === "Overdue" ? acc + inv.amount : acc,
     0
   );
-  const pendingCount = pendingInvoices?.length ?? 0;
+  const pendingCount = pendingInvoices.length;
   const paidCount = allInvoices.filter((inv) => inv.status === "Paid").length;
 
-  const getStatusColor = (status) => {
+  const getStatusBadge = (status) => {
     switch (status) {
       case "Paid":
-        return "bg-success/10 text-success border-success/20";
+        return (
+          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+            <CheckCircle className="w-3.5 h-3.5" /> Paid
+          </span>
+        );
       case "Dispatched":
-        return "bg-primary/10 text-primary border-primary/20";
+        return (
+          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
+            <Truck className="w-3.5 h-3.5" /> Dispatched
+          </span>
+        );
       case "Unpaid":
-        return "bg-warning/10 text-warning border-warning/20";
+        return (
+          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
+            <Clock className="w-3.5 h-3.5" /> Unpaid
+          </span>
+        );
       case "Overdue":
       default:
-        return "bg-danger/10 text-danger border-danger/20";
+        return (
+          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200/60">
+            <AlertCircle className="w-3.5 h-3.5" /> Overdue
+          </span>
+        );
     }
   };
 
@@ -182,14 +228,11 @@ export default function LabInvoices() {
       pdf.addImage(dataUrl, "PNG", 10, 10, imgWidth, Math.min(imgHeight, pageHeight - 20));
       pdf.save(`${currentInvoice.id}.pdf`);
 
-      // ── Post-download logic ──────────────────────────────────────
-      // 1. Mark this invoice as downloaded in local session state
       setDownloadedIds((prev) => new Set([...prev, currentInvoice.id]));
-
-      // 2. Show success toast
       triggerToast(`Invoice ${currentInvoice.id} downloaded successfully.`, "success");
 
-      // 3. Prompt to send to accountant (only for non-paid invoices)
+      setInvoiceModalOpen(false);
+
       if (currentInvoice.status !== "Paid") {
         setTimeout(() => {
           setSendModal({
@@ -197,7 +240,7 @@ export default function LabInvoices() {
             invoiceId: currentInvoice.id,
             invoiceName: `${currentInvoice.patient} — ${currentInvoice.dentist}`,
           });
-        }, 800); // slight delay so toast is visible first
+        }, 800);
       }
     } catch (err) {
       console.error(err);
@@ -214,340 +257,425 @@ export default function LabInvoices() {
   };
 
   return (
-    <div className="space-y-6 pb-10">
-      {/* Post-download Send Modal */}
+    <div className="space-y-6 pb-12 text-gray-800">
+      {/* Send Modal */}
       {sendModal.show && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full mx-4 space-y-5 border border-gray-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-sm w-full mx-4 space-y-5 border border-slate-100 animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3">
-              <span className="w-10 h-10 rounded-2xl bg-success/10 flex items-center justify-center shrink-0 text-xl">✅</span>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0 text-xl">🎉</div>
               <div>
-                <h4 className="font-extrabold text-gray-900 text-sm">PDF Downloaded!</h4>
-                <p className="text-xs text-gray-400 mt-0.5">Invoice {sendModal.invoiceId}</p>
+                <h4 className="font-black text-slate-900 text-base">Invoice Ready!</h4>
+                <p className="text-xs text-slate-400 mt-0.5">{sendModal.invoiceId}</p>
               </div>
             </div>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Would you like to send this invoice to the <span className="font-bold text-gray-900">Accountant</span> for processing?
+            <p className="text-sm text-slate-600 leading-relaxed">
+              Would you like to instantly dispatch this statement to the <span className="font-semibold text-slate-900">Accountant</span>?
             </p>
-            <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2">
-              📋 {sendModal.invoiceName}
-            </p>
+            <div className="text-xs text-slate-500 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
+              <span className="font-bold text-slate-400 block mb-1">RECIPIENT & DETAILS</span>
+              {sendModal.invoiceName}
+            </div>
             <div className="flex gap-3">
               <button
                 onClick={() => handleSendInvoice(sendModal.invoiceId)}
-                className="flex-1 py-2.5 bg-primary text-white font-extrabold rounded-xl text-xs shadow-sm shadow-primary/35 hover:bg-primary/90 transition-colors cursor-pointer"
+                className="flex-1 py-2.5 bg-primary text-white font-extrabold rounded-xl text-xs shadow-md shadow-primary/20 hover:bg-primary/95 transition-all active:scale-95 cursor-pointer"
               >
-                ✉️ Yes, Send Now
+                Yes, Send Now
               </button>
               <button
                 onClick={() => setSendModal({ show: false, invoiceId: "", invoiceName: "" })}
-                className="flex-1 py-2.5 bg-white border border-gray-200 text-gray-600 font-extrabold rounded-xl text-xs hover:bg-gray-50 transition-colors cursor-pointer"
+                className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-extrabold rounded-xl text-xs hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
               >
-                Later
+                Maybe Later
               </button>
             </div>
           </div>
         </div>
       )}
+
       {/* Toast Notification */}
       {toast.show && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border border-gray-100 bg-white animate-in fade-in slide-in-from-bottom-5 duration-300">
-          <span className={`w-3 h-3 rounded-full animate-pulse ${toast.type === "error" ? "bg-danger" : "bg-success"}`} />
-          <span className="text-sm font-semibold text-gray-800">{toast.message}</span>
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border border-slate-100 bg-white animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${toast.type === "error" ? "bg-rose-500" : "bg-emerald-500"}`} />
+          <span className="text-sm font-semibold text-slate-800">{toast.message}</span>
         </div>
       )}
 
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Lab Invoices</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Generate dental lab billing statements, track clinic dues, and export financial summaries.
-        </p>
+      {/* Header section */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Billing & Invoices</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Overview of lab orders, clinical outstanding balances, statement previews, and direct exports.
+          </p>
+        </div>
       </div>
 
-      {/* Counter Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Total Revenue (Paid)</p>
-            <h3 className="text-2xl font-black text-gray-900">₹{totalRevenue.toLocaleString()}</h3>
-            <p className="text-xs text-success font-semibold mt-1">From {paidCount} completed fabrications</p>
+      {/* Modern Stats Blocks */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-3xl p-5 border border-slate-150/80 shadow-sm flex items-center justify-between transition-all hover:shadow-md">
+          <div className="space-y-1">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Total Revenue</span>
+            <h3 className="text-2xl font-black text-slate-900">₹{totalRevenue.toLocaleString()}</h3>
+            <span className="text-[11px] text-emerald-600 font-bold block">From {paidCount} paid jobs</span>
           </div>
-          <span className="bg-success/10 p-3 rounded-xl text-success flex items-center justify-center shrink-0">
+          <div className="bg-emerald-50 text-emerald-600 p-3.5 rounded-2xl shrink-0">
             <Coins className="w-6 h-6" />
-          </span>
+          </div>
         </div>
 
-        <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Outstanding Amount</p>
-            <h3 className="text-2xl font-black text-gray-900">₹{outstandingAmount.toLocaleString()}</h3>
-            <p className="text-xs text-warning font-semibold mt-1">{pendingCount} unpaid / overdue invoices</p>
+        <div className="bg-white rounded-3xl p-5 border border-slate-150/80 shadow-sm flex items-center justify-between transition-all hover:shadow-md">
+          <div className="space-y-1">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Outstanding Due</span>
+            <h3 className="text-2xl font-black text-rose-600">₹{outstandingAmount.toLocaleString()}</h3>
+            <span className="text-[11px] text-amber-600 font-semibold block">{pendingCount} pending payment statements</span>
           </div>
-          <span className="bg-warning/10 p-3 rounded-xl text-warning flex items-center justify-center shrink-0">
+          <div className="bg-rose-50 text-rose-600 p-3.5 rounded-2xl shrink-0">
             <CreditCard className="w-6 h-6" />
-          </span>
+          </div>
         </div>
 
-        <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Dispatched Orders</p>
-            <h3 className="text-2xl font-black text-gray-900">{dispatchedInvoices.length}</h3>
-            <p className="text-xs text-primary font-semibold mt-1">Ready / shipped cases</p>
+        <div className="bg-white rounded-3xl p-5 border border-slate-150/80 shadow-sm flex items-center justify-between transition-all hover:shadow-md">
+          <div className="space-y-1">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Dispatched Jobs</span>
+            <h3 className="text-2xl font-black text-blue-600">{dispatchedInvoices.length}</h3>
+            <span className="text-[11px] text-slate-400 font-semibold block">Ready or shipped statements</span>
           </div>
-          <span className="bg-primary/10 p-3 rounded-xl text-primary flex items-center justify-center shrink-0">
+          <div className="bg-blue-50 text-blue-600 p-3.5 rounded-2xl shrink-0">
             <Truck className="w-6 h-6" />
-          </span>
-        </div>
-
-        <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">All Invoices</p>
-            <h3 className="text-2xl font-black text-gray-900">{allInvoices.length}</h3>
-            <p className="text-xs text-gray-450 mt-1">Total billing cases</p>
           </div>
-          <span className="bg-gray-100 p-3 rounded-xl text-gray-500 flex items-center justify-center shrink-0">
+        </div>
+
+        <div className="bg-white rounded-3xl p-5 border border-slate-150/80 shadow-sm flex items-center justify-between transition-all hover:shadow-md">
+          <div className="space-y-1">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">All Statements</span>
+            <h3 className="text-2xl font-black text-slate-900">{allInvoices.length}</h3>
+            <span className="text-[11px] text-slate-400 font-semibold block">Total registered records</span>
+          </div>
+          <div className="bg-slate-100 text-slate-500 p-3.5 rounded-2xl shrink-0">
             <Receipt className="w-6 h-6" />
-          </span>
+          </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-100 pb-0">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2.5 text-xs font-extrabold rounded-t-xl border-b-2 transition-colors cursor-pointer ${
-              activeTab === tab.key
-                ? "border-primary text-primary bg-primary/5"
-                : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            {tab.label}
-            {tab.key === "pending" && pendingCount > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 bg-warning text-white text-[9px] rounded-full font-black">
-                {pendingCount}
-              </span>
-            )}
-            {tab.key === "dispatched" && dispatchedInvoices.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 bg-primary text-white text-[9px] rounded-full font-black">
-                {dispatchedInvoices.length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Main Content Layout */}
+      {/* Main interactive segment */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
 
-        {/* Left: Invoices list */}
-        <div className="lg:col-span-7 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex flex-col justify-between overflow-x-auto">
-          <div className="space-y-4">
+        {/* Left Side: Search & Ledger List */}
+        <div className="lg:col-span-12 bg-white border border-slate-150 rounded-3xl p-6 shadow-sm flex flex-col space-y-5">
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-extrabold text-gray-900">
-                {activeTab === "dispatched"
-                  ? "Dispatched Bills"
-                  : activeTab === "pending"
-                  ? "Pending Invoices"
-                  : "Billing Ledger"}
-              </h3>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {activeTab === "dispatched"
-                  ? "Invoices for orders marked Ready / Shipped, Completed, or Delivered"
-                  : activeTab === "pending"
-                  ? "Unpaid and overdue invoices requiring follow-up"
-                  : "Summary of all outstanding and cleared invoices"}
-              </p>
+              <h3 className="text-lg font-black text-slate-900">Billing Ledger</h3>
+              <p className="text-xs text-slate-400">Search, filter and inspect clinic dues records</p>
             </div>
 
-            {invoices.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Receipt className="w-10 h-10 text-gray-200 mb-3" />
-                <p className="text-sm font-bold text-gray-400">
-                  {activeTab === "dispatched"
-                    ? "No dispatched orders yet"
-                    : activeTab === "pending"
-                    ? "No pending invoices — all clear! ✅"
-                    : "No invoices found"}
-                </p>
-                <p className="text-xs text-gray-300 mt-1">
-                  {activeTab === "dispatched"
-                    ? "Orders will appear here once marked as Ready / Shipped or Delivered"
-                    : activeTab === "pending"
-                    ? "All invoices have been settled"
-                    : "Lab orders will appear here once created"}
-                </p>
-              </div>
-            ) : (
-              <table className="w-full text-left border-collapse text-xs">
+            {/* Tab selector */}
+            <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 shrink-0">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`px-3 py-1.5 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${activeTab === tab.key
+                    ? "bg-white text-primary shadow-sm"
+                    : "text-slate-400 hover:text-slate-600"
+                    }`}
+                >
+                  {tab.key === "all" ? "All" : tab.key === "pending" ? `Pending (${pendingCount})` : `Dispatched (${dispatchedInvoices.length})`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Search, Filter controls */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            <div className="sm:col-span-8 relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <input
+                type="text"
+                placeholder="Search by ID, patient, dentist or clinic..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              />
+            </div>
+
+            <div className="sm:col-span-4 relative">
+              <Filter className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none cursor-pointer"
+              >
+                <option value="all">All Statuses</option>
+                <option value="paid">Paid</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="overdue">Overdue</option>
+                <option value="dispatched">Dispatched</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Ledger Table */}
+          {invoices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/40">
+              <FileText className="w-10 h-10 text-slate-300 mb-3" />
+              <h4 className="text-sm font-black text-slate-700">No matching invoices</h4>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                We couldn't find any invoices matching your search parameters or filter tab.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-gray-50/70 border-b border-gray-100 font-bold text-gray-500 uppercase tracking-wider">
-                    <th className="px-4 py-3">Invoice ID</th>
-                    <th className="px-4 py-3">Patient & Dentist</th>
-                    <th className="px-4 py-3">Due Date</th>
-                    <th className="px-4 py-3">Amount</th>
-                    <th className="px-4 py-3">Status</th>
-                    {activeTab === "dispatched" && (
-                      <th className="px-4 py-3">Order Status</th>
-                    )}
-                    <th className="px-4 py-3 text-right">Actions</th>
+                  <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="pb-3 px-3">Invoice ID</th>
+                    <th className="pb-3 px-3">Client & Patient</th>
+                    <th className="pb-3 px-3">Due Date</th>
+                    <th className="pb-3 px-3">Amount</th>
+                    <th className="pb-3 px-3">Status</th>
+                    <th className="pb-3 px-3 text-right">Preview</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 text-sm">
+                <tbody className="divide-y divide-slate-50/80">
                   {invoices.map((inv) => (
                     <tr
                       key={inv.id}
-                      onClick={() => setSelectedInvId(inv.id)}
-                      className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
-                        selectedInvId === inv.id ? "bg-primary/5" : ""
-                      }`}
+                      onClick={() => {
+                        setSelectedInvId(inv.id);
+                        setInvoiceModalOpen(true);
+                      }}
+                      className={`group hover:bg-slate-50/60 transition-all cursor-pointer ${selectedInvId === inv.id ? "bg-primary/5" : ""
+                        }`}
                     >
-                      <td className="px-4 py-3 font-bold text-gray-900">
-                        <div className="flex items-center gap-1.5">
-                          {inv.id}
+                      <td className="py-4 px-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-extrabold text-slate-900 group-hover:text-primary transition-colors">
+                            {inv.id}
+                          </span>
                           {downloadedIds.has(inv.id) && (
-                            <span className="px-1.5 py-0.5 bg-success/10 text-success border border-success/20 text-[8px] font-black rounded uppercase tracking-wider">
+                            <span className="w-max px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/50 text-[8px] font-black rounded uppercase tracking-wider">
                               ✓ Downloaded
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-655">
+                      <td className="py-4 px-3">
                         <div>
-                          <p className="font-semibold text-gray-800">{inv.patient}</p>
-                          <p className="text-[10px] text-gray-400">{inv.dentist}</p>
+                          <p className="font-bold text-slate-800 text-xs sm:text-sm">{inv.patient}</p>
+                          <p className="text-[10px] text-slate-450 mt-0.5 font-medium">{inv.dentist} • {inv.clinic}</p>
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-medium text-gray-500">{inv.date}</td>
-                      <td className="px-4 py-3 font-bold text-gray-900">₹{inv.amount.toLocaleString()}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${getStatusColor(inv.status)}`}>
-                          {inv.status}
-                        </span>
+                      <td className="py-4 px-3 font-semibold text-slate-500 text-xs">{inv.date}</td>
+                      <td className="py-4 px-3 font-black text-slate-900 text-xs sm:text-sm">₹{inv.amount.toLocaleString()}</td>
+                      <td className="py-4 px-3">
+                        {getStatusBadge(inv.status)}
                       </td>
-                      {activeTab === "dispatched" && (
-                        <td className="px-4 py-3">
-                          <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border bg-primary/5 text-primary border-primary/10">
-                            {inv.orderStatus}
-                          </span>
-                        </td>
-                      )}
-                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-4 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => setSelectedInvId(inv.id)}
-                          className="px-2 py-1 text-[10px] font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                          onClick={() => {
+                            setSelectedInvId(inv.id);
+                            setInvoiceModalOpen(true);
+                          }}
+                          className={`p-1.5 rounded-lg border transition-all cursor-pointer ${selectedInvId === inv.id
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white hover:bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700"
+                            }`}
                         >
-                          View
+                          <ChevronRight className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Printable Invoice Preview */}
-        <div className="lg:col-span-5 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-base font-extrabold text-gray-900 font-sans">Statement Preview</h3>
-              <p className="text-xs text-gray-400 mt-0.5">High-fidelity printable invoice template</p>
             </div>
-
-            {/* Printable Frame */}
-            <div ref={invoicePreviewRef} className="border border-gray-200 rounded-xl p-5 bg-white space-y-4 text-xs shadow-inner">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="text-sm font-black text-gray-900">SmileCare Dental Lab</h4>
-                  <p className="text-[10px] text-gray-400 mt-0.5">12th Floor, Metro Plaza, Bangalore</p>
-                </div>
-                <div className="text-right">
-                  <h4 className="font-extrabold text-primary text-sm">{currentInvoice.id}</h4>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Date: {currentInvoice.date}</p>
-                  {currentInvoice.dispatched && (
-                    <span className="inline-block mt-1 px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 text-[8px] font-black rounded uppercase tracking-wider">
-                      📦 Dispatched
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="h-px bg-gray-200" />
-
-              {/* Client coords */}
-              <div className="grid grid-cols-2 gap-4 text-[10px] text-gray-600">
-                <div>
-                  <p className="font-bold uppercase text-gray-400 tracking-wider">Billed To:</p>
-                  <p className="font-bold text-gray-800 mt-0.5">{currentInvoice.dentist}</p>
-                  <p className="mt-0.5">{currentInvoice.clinic}</p>
-                </div>
-                <div>
-                  <p className="font-bold uppercase text-gray-400 tracking-wider">Patient Case:</p>
-                  <p className="font-bold text-gray-800 mt-0.5">{currentInvoice.patient}</p>
-                  <p className="mt-0.5">Case Reference: {currentInvoice.caseId}</p>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              <div className="space-y-1.5 pt-1">
-                <div className="grid grid-cols-12 font-bold text-gray-450 border-b border-gray-200 pb-1 text-[9px] uppercase tracking-wider">
-                  <span className="col-span-8">Restoration Work Item</span>
-                  <span className="col-span-1 text-center">Qty</span>
-                  <span className="col-span-3 text-right">Price</span>
-                </div>
-                {currentInvoice.items.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-12 text-gray-700 py-1">
-                    <span className="col-span-8 font-semibold">{item.name}</span>
-                    <span className="col-span-1 text-center font-bold">{item.qty}</span>
-                    <span className="col-span-3 text-right font-bold">₹{item.rate.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="h-px bg-gray-200" />
-
-              {/* Total + Status */}
-              <div className="flex justify-between items-center pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] uppercase font-black text-gray-400 tracking-wider">Grand Total:</span>
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${getStatusColor(currentInvoice.status)}`}>
-                    {currentInvoice.status}
-                  </span>
-                </div>
-                <span className="text-base font-black text-gray-900">₹{currentInvoice.amount.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-6 border-t border-gray-100 bg-white">
-            <button
-              onClick={handleDownloadPDF}
-              disabled={isGeneratingPDF}
-              className="flex-1 py-2.5 bg-primary text-white font-extrabold rounded-xl text-xs shadow-sm shadow-primary/35 hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isGeneratingPDF ? "⏳ Generating..." : downloadedIds.has(currentInvoice.id) ? "📥 Re-download PDF" : "📥 Download PDF"}
-            </button>
-            <button
-              onClick={() => handleSendInvoice(currentInvoice.id)}
-              className={`flex-1 py-2.5 font-extrabold rounded-xl text-xs transition-colors cursor-pointer border ${
-                downloadedIds.has(currentInvoice.id) && currentInvoice.status !== "Paid"
-                  ? "bg-success text-white border-success shadow-sm shadow-success/35 hover:bg-success/90 animate-pulse"
-                  : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {downloadedIds.has(currentInvoice.id) && currentInvoice.status !== "Paid"
-                ? "✉️ Send to Accountant ↗"
-                : "✉️ Send to Accountant"}
-            </button>
-          </div>
+          )}
         </div>
 
       </div>
+      {invoiceModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
+
+            {/* Header */}
+            <div className="flex justify-between items-center border-b p-6">
+              <div>
+                <h2 className="text-xl font-bold">
+                  Invoice Details
+                </h2>
+                <p className="text-sm text-gray-500">
+                  {currentInvoice.id}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setInvoiceModalOpen(false)}
+                className="text-2xl hover:text-red-500"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Invoice */}
+            <div className="p-6">
+
+              <div
+                ref={invoicePreviewRef}
+                className="border border-slate-200 rounded-2xl p-5 sm:p-6 bg-white space-y-5 text-xs shadow-inner select-none transition-all duration-200"
+              >
+                {/* Paste this */}
+
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="text-base font-black text-slate-900 tracking-tight">
+                      SmileCare Dental Lab
+                    </h4>
+                    <p className="text-[10px] text-slate-450 mt-1">
+                      12th Floor, Metro Plaza, Bangalore
+                    </p>
+                    <p className="text-[9px] text-slate-400">
+                      contact@smilecarelab.com
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="px-2 py-0.5 bg-primary/10 text-primary text-[8px] font-black tracking-widest rounded-md uppercase border border-primary/20 block w-max ml-auto mb-1">
+                      LAB STATEMENT
+                    </span>
+
+                    <h4 className="font-extrabold text-primary text-sm sm:text-base">
+                      {currentInvoice.id}
+                    </h4>
+
+                    <p className="text-[10px] text-slate-450 mt-1">
+                      Issued: {currentInvoice.date}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="h-px bg-slate-150/80" />
+
+                <div className="grid grid-cols-2 gap-4 text-[11px] text-slate-600">
+                  <div className="space-y-1">
+                    <span className="font-bold uppercase text-slate-400 text-[9px] tracking-wider block">
+                      Billed To
+                    </span>
+
+                    <p className="font-extrabold text-slate-950">
+                      {currentInvoice.dentist}
+                    </p>
+
+                    <p className="text-[10px] leading-relaxed text-slate-500">
+                      {currentInvoice.clinic}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="font-bold uppercase text-slate-400 text-[9px] tracking-wider block">
+                      Case Description
+                    </span>
+
+                    <p className="font-extrabold text-slate-950">
+                      {currentInvoice.patient}
+                    </p>
+
+                    <p className="text-[10px] text-slate-500">
+                      Case Ref: {currentInvoice.caseId}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <div className="grid grid-cols-12 font-bold text-slate-400 border-b border-slate-100 pb-1.5 text-[9px] uppercase tracking-wider">
+                    <span className="col-span-8">Work Description</span>
+                    <span className="col-span-1 text-center">Qty</span>
+                    <span className="col-span-3 text-right">Total Price</span>
+                  </div>
+
+                  {currentInvoice.items.length === 0 ? (
+                    <p className="text-center text-slate-400 py-3">
+                      No work items found
+                    </p>
+                  ) : (
+                    currentInvoice.items.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-12 text-slate-700 py-1 items-center font-medium"
+                      >
+                        <span className="col-span-8 font-semibold text-slate-800">
+                          {item.name}
+                        </span>
+
+                        <span className="col-span-1 text-center font-bold text-slate-950">
+                          {item.qty}
+                        </span>
+
+                        <span className="col-span-3 text-right font-bold text-slate-950">
+                          ₹{item.rate.toLocaleString()}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="h-px bg-slate-150/80" />
+
+                <div className="flex justify-between items-center pt-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
+                      Payment Status:
+                    </span>
+
+                    <span
+                      className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${currentInvoice.status === "Paid"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200/50"
+                        : currentInvoice.status === "Dispatched"
+                          ? "bg-blue-50 text-blue-700 border-blue-200/50"
+                          : "bg-amber-50 text-amber-700 border-amber-200/50"
+                        }`}
+                    >
+                      {currentInvoice.status}
+                    </span>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 block uppercase font-bold">
+                      Grand Total
+                    </span>
+
+                    <span className="text-lg font-black text-slate-900">
+                      ₹{currentInvoice.amount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="border-t p-6 flex justify-end gap-3">
+
+              <button
+                onClick={handleDownloadPDF}
+                className="px-5 py-3 bg-primary text-white rounded-xl"
+              >
+                Download PDF
+              </button>
+
+              <button
+                onClick={() => handleSendInvoice(currentInvoice.id)}
+                className="px-5 py-3 border rounded-xl"
+              >
+                Dispatch
+              </button>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

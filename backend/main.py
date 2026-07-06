@@ -38,30 +38,6 @@ Base.metadata.create_all(bind=engine)
 # Run schema migrations for missing columns – each runs in its own transaction
 # so a "column already exists" error on one never aborts the others.
 from sqlalchemy import text
-<<<<<<< HEAD
-
-def _run_migration(sql: str):
-    try:
-        with engine.begin() as conn:
-            conn.execute(text(sql))
-    except Exception:
-        pass  # column already exists or other benign error
-
-# Profile picture columns (SQLite + PostgreSQL)
-_run_migration("ALTER TABLE users ADD COLUMN profile_picture VARCHAR;")
-_run_migration("ALTER TABLE patients ADD COLUMN profile_picture VARCHAR;")
-
-# PostgreSQL-only migrations (use IF NOT EXISTS so they're idempotent)
-if not engine.url.drivername.startswith("sqlite"):
-    _run_migration("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS lab_name VARCHAR;")
-    _run_migration("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR;")
-    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS patient_id INTEGER;")
-    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS doctor_id INTEGER;")
-    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;")
-    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;")
-    _run_migration("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;")
-    print("Database migrations applied successfully.")
-=======
 try:
     if engine is not None:
         with engine.begin() as conn:
@@ -83,7 +59,6 @@ try:
                 print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")
->>>>>>> 41a6c7e2e14c7154a42ffe3a2cdd20965c7fd621
 
 # Seed default admin user if not exists
 db = SessionLocal()

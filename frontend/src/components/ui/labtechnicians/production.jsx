@@ -21,18 +21,12 @@ import {
   Truck,
   ArrowRight
 } from "lucide-react";
-import { getLabOrders, updateLabOrderStatus } from "@/services/api";
+import { getLabOrders, updateLabOrderStatus, updateLabOrder } from "@/services/api";
 
 const COLUMNS = ["New Cases", "Design Complete", "Milling", "Printing", "Finishing", "QC"];
 
 export default function LabProduction() {
-  const [stageMap, setStageMap] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("lab_production_stage_map");
-      return saved ? JSON.parse(saved) : {};
-    }
-    return {};
-  });
+  // stageMap state removed since state is now saved directly in database
 
   const [dbCases, setDbCases] = useState([]);
   
@@ -89,7 +83,7 @@ export default function LabProduction() {
         dentistContact: o.dentist_contact || "+91 98765 43210",
         type: o.prosthetic_type,
         material: o.material || "Zirconia",
-        stage: "New Cases",
+        stage: o.stage || "New Cases",
         priority: o.priority || "Medium",
         dueDate: o.due_date || "2026-06-15",
         tech: "AJ",
@@ -125,10 +119,7 @@ export default function LabProduction() {
     }
   }, [dbCases]);
 
-  const cases = dbCases.map(dbc => ({
-    ...dbc,
-    stage: stageMap[dbc.id] || dbc.stage
-  }));
+  const cases = dbCases;
 
   const activeCases = cases.filter(c => c.status !== "Completed" && c.status !== "Rejected");
   const currentCase = cases.find(c => c.id === selectedCaseId);
@@ -150,19 +141,24 @@ export default function LabProduction() {
     }
   };
 
-  const updateStage = (caseId, targetStage) => {
-    setStageMap(prev => {
-      const nextMap = { ...prev, [caseId]: targetStage };
-      localStorage.setItem("lab_production_stage_map", JSON.stringify(nextMap));
-      return nextMap;
-    });
-
-    // If moving to QC stage, automatically prompt to QC status
+  const updateStage = async (caseId, targetStage) => {
     const targetCase = cases.find(c => c.id === caseId);
-    if (targetCase && targetStage === "QC" && targetCase.status !== "QC Pending" && targetCase.status !== "Ready / Shipped") {
-      updateDbStatus(caseId, "QC Pending");
-    } else if (targetCase && targetStage !== "QC" && targetCase.status === "QC Pending") {
-      updateDbStatus(caseId, "In Progress");
+    if (!targetCase) return;
+
+    let newStatus = targetCase.status;
+    if (targetStage === "QC" && targetCase.status !== "QC Pending" && targetCase.status !== "Ready / Shipped") {
+      newStatus = "QC Pending";
+    } else if (targetStage !== "QC" && targetCase.status === "QC Pending") {
+      newStatus = "In Progress";
+    }
+
+    try {
+      await updateLabOrder(caseId, { stage: targetStage, status: newStatus });
+      fetchDbCases();
+      triggerToast(`Case stage updated to ${targetStage}`);
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to update case stage", "error");
     }
   };
 
@@ -804,7 +800,12 @@ export default function LabProduction() {
                         <input
                           type="text"
                           readOnly
-                          value={`TRK-2026-${currentCase.id.split("-")[2] || "000"}`}
+                          value={(() => {
+                            const parts = currentCase.id.split("-");
+                            let suffix = parts.length >= 3 ? parts[2] : (parts[1] || parts[0] || "000");
+                            if (/^\d+$/.test(suffix)) suffix = suffix.padStart(3, "0");
+                            return `TRK-2026-${suffix}`;
+                          })()}
                           className="w-full px-3 py-2 border border-gray-150 bg-gray-50 rounded-xl text-xs text-gray-400 focus:outline-none"
                         />
                       </div>

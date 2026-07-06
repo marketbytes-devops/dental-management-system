@@ -21,7 +21,7 @@ from modules.auth.models import UserModel
 from modules.patient.models import PatientModel, PatientConsentModel, PatientPrescriptionModel
 from modules.frontdesk.models import AppointmentModel
 from modules.frontdesk.communication_models import CommunicationLogModel
-from modules.lab.models import LabOrderModel, LabNotificationModel
+from modules.lab.models import LabOrderModel, LabNotificationModel, LabVendorModel, LabOrderCommentModel, LabAuditTrailModel
 from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
@@ -41,6 +41,22 @@ try:
         if not engine.url.drivername.startswith("sqlite"):
             conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS lab_name VARCHAR;"))
             conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS treatment_plan_step_id INTEGER;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS tooth_quadrant VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS procedure_code VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS margin_design VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS impression_type VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS attachments JSON;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS parent_order_id VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_category VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS vendor_id INTEGER;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS courier_name VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS tracking_number VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS dispatch_date VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS expected_return_date VARCHAR;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS external_cost INTEGER;"))
+            conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS stage VARCHAR DEFAULT 'New Cases';"))
+            
             conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS patient_id INTEGER;"))
             conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS doctor_id INTEGER;"))
             conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;"))

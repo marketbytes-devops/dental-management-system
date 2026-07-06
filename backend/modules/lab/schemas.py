@@ -1,6 +1,5 @@
-# schemas.py - Pydantic request/response models
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Any
 from datetime import datetime
 
 class LabOrderCreate(BaseModel):
@@ -15,10 +14,28 @@ class LabOrderCreate(BaseModel):
     notes: Optional[str] = None
     due_date: Optional[str] = None
     lab_name: Optional[str] = None
+    
+    # New columns
+    treatment_plan_step_id: Optional[int] = None
+    tooth_quadrant: Optional[str] = None
+    procedure_code: Optional[str] = None
+    margin_design: Optional[str] = None
+    impression_type: Optional[str] = "Physical"
+    attachments: Optional[List[Any]] = None
+    vendor_id: Optional[int] = None
+    courier_name: Optional[str] = None
+    tracking_number: Optional[str] = None
+    dispatch_date: Optional[str] = None
+    expected_return_date: Optional[str] = None
+    external_cost: Optional[int] = 0
+    parent_order_id: Optional[str] = None
+    rejection_category: Optional[str] = None
+    stage: Optional[str] = "New Cases"
 
 class LabOrderStatusUpdate(BaseModel):
     status: str
     rejection_reason: Optional[str] = None
+    rejection_category: Optional[str] = None
 
 class LabOrderEdit(BaseModel):
     prosthetic_type: Optional[str] = None
@@ -28,6 +45,23 @@ class LabOrderEdit(BaseModel):
     due_date: Optional[str] = None
     notes: Optional[str] = None
     lab_name: Optional[str] = None
+    status: Optional[str] = None
+    
+    treatment_plan_step_id: Optional[int] = None
+    tooth_quadrant: Optional[str] = None
+    procedure_code: Optional[str] = None
+    margin_design: Optional[str] = None
+    impression_type: Optional[str] = None
+    attachments: Optional[List[Any]] = None
+    vendor_id: Optional[int] = None
+    courier_name: Optional[str] = None
+    tracking_number: Optional[str] = None
+    dispatch_date: Optional[str] = None
+    expected_return_date: Optional[str] = None
+    external_cost: Optional[int] = None
+    parent_order_id: Optional[str] = None
+    rejection_category: Optional[str] = None
+    stage: Optional[str] = None
 
 class LabOrderResponse(BaseModel):
     id: str
@@ -45,6 +79,69 @@ class LabOrderResponse(BaseModel):
     lab_name: Optional[str] = None
     rejection_reason: Optional[str] = None
     created_at: Optional[datetime] = None
+    
+    # New columns
+    treatment_plan_step_id: Optional[int] = None
+    tooth_quadrant: Optional[str] = None
+    procedure_code: Optional[str] = None
+    margin_design: Optional[str] = None
+    impression_type: Optional[str] = "Physical"
+    attachments: Optional[List[Any]] = None
+    vendor_id: Optional[int] = None
+    courier_name: Optional[str] = None
+    tracking_number: Optional[str] = None
+    dispatch_date: Optional[str] = None
+    expected_return_date: Optional[str] = None
+    external_cost: Optional[int] = 0
+    parent_order_id: Optional[str] = None
+    rejection_category: Optional[str] = None
+    stage: Optional[str] = "New Cases"
+
+    class Config:
+        from_attributes = True
+
+class LabVendorCreate(BaseModel):
+    name: str
+    contact_person: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    average_tat_days: Optional[int] = 5
+    pricing_list: Optional[Any] = None
+
+class LabVendorResponse(BaseModel):
+    id: int
+    name: str
+    contact_person: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    average_tat_days: int
+    pricing_list: Optional[Any] = None
+    rating: float
+
+    class Config:
+        from_attributes = True
+
+class LabOrderCommentCreate(BaseModel):
+    message: str
+
+class LabOrderCommentResponse(BaseModel):
+    id: int
+    order_id: str
+    user_name: str
+    user_role: str
+    message: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class LabAuditTrailResponse(BaseModel):
+    id: int
+    order_id: str
+    user_name: str
+    action: str
+    note: Optional[str] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True

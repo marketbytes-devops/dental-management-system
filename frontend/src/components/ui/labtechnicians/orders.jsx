@@ -1124,7 +1124,12 @@ export default function LabOrders() {
                         <input
                           type="text"
                           readOnly
-                          value={`TRK-2026-${currentCase.id.split("-")[2] || "000"}`}
+                          value={(() => {
+                            const parts = currentCase.id.split("-");
+                            let suffix = parts.length >= 3 ? parts[2] : (parts[1] || parts[0] || "000");
+                            if (/^\d+$/.test(suffix)) suffix = suffix.padStart(3, "0");
+                            return `TRK-2026-${suffix}`;
+                          })()}
                           className="w-full px-3 py-2 border border-gray-150 bg-gray-50 rounded-xl text-xs text-gray-400 focus:outline-none"
                         />
                       </div>

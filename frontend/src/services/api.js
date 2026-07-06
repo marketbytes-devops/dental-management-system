@@ -342,6 +342,55 @@ export const deleteNotification = async (id) => {
   return response.data;
 };
 
+export const createLabRework = async (id, statusData) => {
+  const response = await client.post(`/lab/orders/${id}/rework`, statusData);
+  return response.data;
+};
+
+export const getLabComments = async (id) => {
+  const response = await client.get(`/lab/orders/${id}/comments`);
+  return response.data;
+};
+
+export const createLabComment = async (id, commentData) => {
+  const response = await client.post(`/lab/orders/${id}/comments`, commentData);
+  return response.data;
+};
+
+export const getLabAuditTrail = async (id) => {
+  const response = await client.get(`/lab/orders/${id}/audit`);
+  return response.data;
+};
+
+export const getLabVendors = async () => {
+  const response = await client.get("/lab/vendors");
+  return response.data;
+};
+
+export const createLabVendor = async (vendorData) => {
+  const response = await client.post("/lab/vendors", vendorData);
+  return response.data;
+};
+
+export const updateLabVendor = async (id, vendorData) => {
+  const response = await client.put(`/lab/vendors/${id}`, vendorData);
+  return response.data;
+};
+
+export const deleteLabVendor = async (id) => {
+  const response = await client.delete(`/lab/vendors/${id}`);
+  return response.data;
+};
+
+export const uploadLabFile = async (formData) => {
+  const response = await client.post("/lab/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data"
+    }
+  });
+  return response.data;
+};
+
 // ==========================================
 // 7. Doctor & Treatment Plan API Endpoints
 // ==========================================

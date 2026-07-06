@@ -13,7 +13,11 @@ export default function LabInvoices() {
     try {
       const data = await getLabOrders();
         const mapped = data.map(o => {
-          const suffix = o.id.split("-")[2] || "000";
+          const parts = o.id.split("-");
+          let suffix = parts.length >= 3 ? parts[2] : (parts[1] || parts[0] || "000");
+          if (/^\d+$/.test(suffix)) {
+            suffix = suffix.padStart(3, "0");
+          }
           const invId = `INV-2026-${suffix}`;
           
           let rate = 5000;
@@ -192,7 +196,7 @@ export default function LabInvoices() {
               <tbody className="divide-y divide-gray-100 text-sm">
                 {invoices.map((inv) => (
                   <tr 
-                    key={inv.id} 
+                    key={inv.caseId} 
                     onClick={() => setSelectedInvId(inv.id)}
                     className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
                       selectedInvId === inv.id ? "bg-primary/5" : ""

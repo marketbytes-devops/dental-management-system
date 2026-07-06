@@ -673,16 +673,24 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  const handleSubmitLabOrder = async ({ item, tooth, shade, labName }) => {
+  const handleSubmitLabOrder = async (payload) => {
     try {
       const createdOrder = await createLabOrder({
         patient_token: viewingPatientToken,
-        prosthetic_type: item,
-        material: `Tooth #${tooth}`,
-        shade: shade,
-        lab_name: labName,
-        due_date: "2026-06-15",
-        notes: `Tooth #${tooth}, Shade ${shade}`
+        prosthetic_type: payload.item,
+        material: payload.material || `Tooth #${payload.tooth}`,
+        shade: payload.shade,
+        lab_name: payload.labName,
+        due_date: payload.due_date || "2026-06-15",
+        notes: payload.notes || `Tooth #${payload.tooth}, Shade ${payload.shade}`,
+        treatment_plan_step_id: payload.treatment_plan_step_id,
+        tooth_quadrant: payload.tooth_quadrant || payload.tooth,
+        procedure_code: payload.procedure_code,
+        margin_design: payload.margin_design,
+        impression_type: payload.impression_type || "Physical",
+        attachments: payload.attachments,
+        vendor_id: payload.vendor_id,
+        external_cost: payload.external_cost || 0
       });
 
       const newTimelineEvent = {

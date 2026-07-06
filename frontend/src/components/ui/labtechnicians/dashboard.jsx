@@ -183,7 +183,7 @@ export default function LabDashboard() {
           activities.push({
             id: `${order.id}-crown-completed`,
             caseId: order.id,
-            text: `${order.prosthetic_type} fabrication completed for case ${order.id}`,
+            text: `${order.prosthetic_type || order.order_category} processing completed for case ${order.id}`,
             time: designTime,
             type: "fabrication"
           });
@@ -376,10 +376,19 @@ export default function LabDashboard() {
                       <span className="text-gray-300">•</span>
                       <span>Dentist: {order.dentist_name}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                      <span className="bg-gray-100 px-1.5 py-0.5 rounded font-semibold text-gray-600">{order.prosthetic_type}</span>
-                      <span>Material: {order.material || "Zirconia"}</span>
-                      <span>Shade: <span className="font-bold text-amber-800 bg-amber-50 px-1 rounded border border-amber-100">{order.shade || "A2"}</span></span>
+                    <div className="flex items-center gap-2 text-[10px] text-gray-500 flex-wrap">
+                      <span className="bg-gray-100 px-1.5 py-0.5 rounded font-semibold text-gray-600">{order.order_category}</span>
+                      {order.order_category === "Prosthetic" ? (
+                        <>
+                          <span>Type: {order.prosthetic_type || "N/A"}</span>
+                          <span>Material: {order.material || "N/A"}</span>
+                          {order.shade && order.shade !== "N/A" && <span>Shade: <span className="font-bold text-amber-800 bg-amber-50 px-1 rounded border border-amber-100">{order.shade}</span></span>}
+                        </>
+                      ) : (
+                        <>
+                          <span>Test: {order.order_details?.test_type || "Diagnostic"}</span>
+                        </>
+                      )}
                       <span className="text-gray-300">•</span>
                       <span className="flex items-center gap-1 font-semibold text-danger"><Calendar className="w-3.5 h-3.5 text-danger" /> Due: {order.due_date}</span>
                     </div>
@@ -480,7 +489,7 @@ export default function LabDashboard() {
                       Patient: {order.patient_name || "Walk-in Patient"}
                     </div>
                     <div className="text-[10px] text-gray-400">
-                      Type: {order.prosthetic_type} • Material: {order.material || "Zirconia"}
+                      Category: {order.order_category} • Details: {order.prosthetic_type || order.order_details?.test_type || "N/A"}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

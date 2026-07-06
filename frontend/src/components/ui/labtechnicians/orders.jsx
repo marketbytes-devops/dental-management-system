@@ -40,6 +40,8 @@ export default function LabOrders() {
         patientName: o.patient_name || "Walk-in Patient",
         dentistName: o.dentist_name || "Dr. Anoop Nair",
         dentistContact: o.dentist_contact || "+91 98765 43210",
+        orderCategory: o.order_category || "Prosthetic",
+        orderDetails: o.order_details || {},
         prostheticType: o.prosthetic_type,
         material: o.material || "Zirconia",
         shade: o.shade || "A2",
@@ -47,7 +49,8 @@ export default function LabOrders() {
         dueDate: o.due_date || "2026-06-15",
         status: o.status,
         notes: o.notes || "",
-        rejectionReason: o.rejection_reason || ""
+        rejectionReason: o.rejection_reason || "",
+        resultDocumentUrl: o.result_document_url || ""
       }));
       setOrders(mapped);
     } catch (err) {
@@ -107,6 +110,8 @@ export default function LabOrders() {
     patient: selectedOrder.patientName,
     dentist: selectedOrder.dentistName,
     dentistContact: selectedOrder.dentistContact,
+    orderCategory: selectedOrder.orderCategory,
+    orderDetails: selectedOrder.orderDetails,
     type: selectedOrder.prostheticType,
     material: selectedOrder.material,
     priority: selectedOrder.priority,
@@ -114,7 +119,8 @@ export default function LabOrders() {
     shade: selectedOrder.shade,
     status: selectedOrder.status,
     notes: selectedOrder.notes,
-    rejectionReason: selectedOrder.rejectionReason
+    rejectionReason: selectedOrder.rejectionReason,
+    resultDocumentUrl: selectedOrder.resultDocumentUrl
   } : null;
 
   const updateDbStatus = async (caseId, statusValue, rejectionReason = null) => {
@@ -659,8 +665,17 @@ export default function LabOrders() {
                     </td>
                     <td className="px-6 py-4 text-gray-600">
                       <div>
-                        <p className="font-semibold text-gray-750 text-xs">{order.prostheticType}</p>
-                        <p className="text-[11px] text-gray-400">{order.material} (Shade: {order.shade})</p>
+                        {order.orderCategory === "Prosthetic" ? (
+                          <>
+                            <p className="font-semibold text-gray-750 text-xs">{order.prostheticType}</p>
+                            <p className="text-[11px] text-gray-400">{order.material} (Shade: {order.shade})</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-semibold text-gray-750 text-xs">{order.orderCategory}</p>
+                            <p className="text-[11px] text-gray-400 truncate max-w-[150px]">{JSON.stringify(order.orderDetails)}</p>
+                          </>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -766,9 +781,13 @@ export default function LabOrders() {
             <div className="flex border-b border-gray-100 bg-gray-50/20 px-4 py-1.5 shrink-0 overflow-x-auto gap-1">
               {[
                 { id: "specs", label: "Specs & Timeline" },
-                { id: "viewer", label: "Scan Viewer" },
-                { id: "cad", label: "CAD Desk" },
-                { id: "qc", label: "Quality Control" },
+                ...(currentCase.orderCategory === "Prosthetic" ? [
+                  { id: "viewer", label: "Scan Viewer" },
+                  { id: "cad", label: "CAD Desk" },
+                  { id: "qc", label: "Quality Control" },
+                ] : [
+                  { id: "results", label: "Lab Results" }
+                ]),
                 { id: "dispatch", label: "Dispatch" }
               ].map(tab => (
                 <button
@@ -796,18 +815,35 @@ export default function LabOrders() {
                     <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Case Specifications</h4>
                     
                     <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <span className="text-gray-400 font-medium">Prosthetic Type</span>
-                        <p className="font-bold text-gray-800 mt-0.5">{currentCase.type}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-400 font-medium">Material</span>
-                        <p className="font-bold text-gray-800 mt-0.5">{currentCase.material}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-400 font-medium">Restoration Shade</span>
-                        <p className="font-bold text-amber-805 bg-amber-50 px-2 py-0.5 rounded border border-amber-250/20 inline-block mt-0.5">{currentCase.shade}</p>
-                      </div>
+                      {currentCase.orderCategory === "Prosthetic" ? (
+                        <>
+                          <div>
+                            <span className="text-gray-400 font-medium">Prosthetic Type</span>
+                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.type}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 font-medium">Material</span>
+                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.material}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 font-medium">Restoration Shade</span>
+                            <p className="font-bold text-amber-805 bg-amber-50 px-2 py-0.5 rounded border border-amber-250/20 inline-block mt-0.5">{currentCase.shade}</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <span className="text-gray-400 font-medium">Order Category</span>
+                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.orderCategory}</p>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-gray-400 font-medium">Order Details</span>
+                            <pre className="mt-1 p-2 bg-gray-100 rounded text-[10px] text-gray-700 font-mono overflow-auto whitespace-pre-wrap">
+                              {JSON.stringify(currentCase.orderDetails, null, 2)}
+                            </pre>
+                          </div>
+                        </>
+                      )}
                       <div>
                         <span className="text-gray-400 font-medium">Estimated Delivery</span>
                         <p className="font-bold text-danger flex items-center gap-1 mt-0.5">
@@ -1082,6 +1118,41 @@ export default function LabOrders() {
                       <CheckCircle className="w-4 h-4" /> Pass Quality Check
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* Tab: Lab Results (For Non-Prosthetic Orders) */}
+              {activeTab === "results" && currentCase.orderCategory !== "Prosthetic" && (
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Upload Lab Results</h4>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Provide the document link to automatically sync with patient reports.</p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-700">Result Document URL</label>
+                    <input 
+                      type="url"
+                      placeholder="https://drive.google.com/..."
+                      value={currentCase.resultDocumentUrl || ""}
+                      onChange={async (e) => {
+                        const newUrl = e.target.value;
+                        await updateLabOrder(currentCase.id, { result_document_url: newUrl });
+                        setSelectedOrder(prev => ({...prev, resultDocumentUrl: newUrl}));
+                      }}
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary"
+                    />
+                  </div>
+                  {currentCase.resultDocumentUrl && (
+                    <div className="bg-success/5 border border-success/20 rounded-2xl p-4 flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-success shrink-0 mt-0.5" />
+                      <div>
+                        <h5 className="text-xs font-bold text-success">Document Attached</h5>
+                        <p className="text-[10px] text-gray-500 mt-0.5">The result document has been successfully attached to the case. It will sync with patient reports once completed.</p>
+                        <a href={currentCase.resultDocumentUrl} target="_blank" className="text-xs text-primary font-semibold mt-2 inline-block">View Document ↗</a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

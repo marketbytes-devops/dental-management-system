@@ -21,7 +21,7 @@ from modules.auth.models import UserModel
 from modules.patient.models import PatientModel, PatientConsentModel, PatientPrescriptionModel, PatientNotificationModel, DoctorFeedbackModel
 from modules.frontdesk.models import AppointmentModel
 from modules.frontdesk.communication_models import CommunicationLogModel
-from modules.lab.models import LabOrderModel, LabNotificationModel, LabVendorModel, LabOrderCommentModel, LabAuditTrailModel, InventoryItemModel, RestockRequestModel
+from modules.lab.models import LabOrderModel, LabNotificationModel, LabVendorModel, LabOrderCommentModel, LabAuditTrailModel, InventoryItemModel, RestockRequestModel, ClinicalEncounterModel, ProstheticCaseDetailModel, PathologyCaseDetailModel
 from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
@@ -34,44 +34,85 @@ from modules.auth.service import hash_password
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-# Run schema migrations for missing columns in remote PostgreSQL
+# Run schema migrations for missing columns in both SQLite and PostgreSQL
 from sqlalchemy import text
 try:
     if engine is not None:
         with engine.begin() as conn:
-            if not engine.url.drivername.startswith("sqlite"):
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS lab_name VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS treatment_plan_step_id INTEGER;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS tooth_quadrant VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS procedure_code VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS margin_design VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS impression_type VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS attachments JSON;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS parent_order_id VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS rejection_category VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS vendor_id INTEGER;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS courier_name VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS tracking_number VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS dispatch_date VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS expected_return_date VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS external_cost INTEGER;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS stage VARCHAR DEFAULT 'New Cases';"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS order_category VARCHAR DEFAULT 'Prosthetic';"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS order_details JSON;"))
-                conn.execute(text("ALTER TABLE lab_orders ADD COLUMN IF NOT EXISTS result_document_url VARCHAR;"))
-                
-                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS patient_id INTEGER;"))
-                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS doctor_id INTEGER;"))
-                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS content VARCHAR;"))
-                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS signing_method VARCHAR;"))
-                conn.execute(text("ALTER TABLE patient_consents ADD COLUMN IF NOT EXISTS pdf_file_path VARCHAR;"))
-                
-                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS supplier VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS expiry_date VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS batch_number VARCHAR;"))
-                conn.execute(text("ALTER TABLE lab_inventory_items ADD COLUMN IF NOT EXISTS unit_price FLOAT;"))
-                print("Database migrations applied successfully.")
+            # Query existing columns for lab_orders
+            if engine.dialect.name == "sqlite":
+                col_query = conn.execute(text("PRAGMA table_info(lab_orders);")).fetchall()
+                existing_cols = [row[1] for row in col_query]
+            else:
+                col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='lab_orders';")).fetchall()
+                existing_cols = [row[0] for row in col_query]
+            
+            # Helper to add column if it doesn't exist
+            def add_col_if_missing(col_name, col_type):
+                if col_name not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE lab_orders ADD COLUMN {col_name} {col_type};"))
+                    print(f"Added column {col_name} to lab_orders.")
+
+            # List of columns to migrate
+            add_col_if_missing("lab_name", "VARCHAR")
+            add_col_if_missing("rejection_reason", "VARCHAR")
+            add_col_if_missing("treatment_plan_step_id", "INTEGER")
+            add_col_if_missing("tooth_quadrant", "VARCHAR")
+            add_col_if_missing("procedure_code", "VARCHAR")
+            add_col_if_missing("margin_design", "VARCHAR")
+            add_col_if_missing("impression_type", "VARCHAR")
+            add_col_if_missing("attachments", "JSON")
+            add_col_if_missing("parent_order_id", "VARCHAR")
+            add_col_if_missing("rejection_category", "VARCHAR")
+            add_col_if_missing("vendor_id", "INTEGER")
+            add_col_if_missing("courier_name", "VARCHAR")
+            add_col_if_missing("tracking_number", "VARCHAR")
+            add_col_if_missing("dispatch_date", "VARCHAR")
+            add_col_if_missing("expected_return_date", "VARCHAR")
+            add_col_if_missing("external_cost", "INTEGER")
+            add_col_if_missing("stage", "VARCHAR DEFAULT 'New Cases'")
+            add_col_if_missing("order_category", "VARCHAR DEFAULT 'Prosthetic'")
+            add_col_if_missing("order_details", "JSON")
+            add_col_if_missing("result_document_url", "VARCHAR")
+            add_col_if_missing("is_rework", "BOOLEAN DEFAULT FALSE")
+            add_col_if_missing("original_case_id", "VARCHAR")
+
+            # Also check patient_consents table
+            if engine.dialect.name == "sqlite":
+                consent_col_query = conn.execute(text("PRAGMA table_info(patient_consents);")).fetchall()
+                existing_consent_cols = [row[1] for row in consent_col_query]
+            else:
+                consent_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='patient_consents';")).fetchall()
+                existing_consent_cols = [row[0] for row in consent_col_query]
+
+            def add_consent_col_if_missing(col_name, col_type):
+                if col_name not in existing_consent_cols:
+                    conn.execute(text(f"ALTER TABLE patient_consents ADD COLUMN {col_name} {col_type};"))
+
+            add_consent_col_if_missing("patient_id", "INTEGER")
+            add_consent_col_if_missing("doctor_id", "INTEGER")
+            add_consent_col_if_missing("content", "VARCHAR")
+            add_consent_col_if_missing("signing_method", "VARCHAR")
+            add_consent_col_if_missing("pdf_file_path", "VARCHAR")
+
+            # Also check lab_inventory_items table
+            if engine.dialect.name == "sqlite":
+                inv_col_query = conn.execute(text("PRAGMA table_info(lab_inventory_items);")).fetchall()
+                existing_inv_cols = [row[1] for row in inv_col_query]
+            else:
+                inv_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='lab_inventory_items';")).fetchall()
+                existing_inv_cols = [row[0] for row in inv_col_query]
+
+            def add_inv_col_if_missing(col_name, col_type):
+                if col_name not in existing_inv_cols:
+                    conn.execute(text(f"ALTER TABLE lab_inventory_items ADD COLUMN {col_name} {col_type};"))
+
+            add_inv_col_if_missing("supplier", "VARCHAR")
+            add_inv_col_if_missing("expiry_date", "VARCHAR")
+            add_inv_col_if_missing("batch_number", "VARCHAR")
+            add_inv_col_if_missing("unit_price", "FLOAT")
+
+            print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")
 

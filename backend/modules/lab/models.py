@@ -1,5 +1,6 @@
 # models.py - database table definitions
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, JSON, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
 
@@ -23,7 +24,7 @@ class LabOrderModel(Base):
     shade = Column(String, nullable=True)
     
     priority = Column(String, default="Medium")
-    status = Column(String, default="Pending")
+    status = Column(String, default="submitted")
     notes = Column(String, nullable=True)
     due_date = Column(String, nullable=True)
     lab_name = Column(String, nullable=True)
@@ -39,6 +40,8 @@ class LabOrderModel(Base):
     attachments = Column(JSON, nullable=True)  # List of objects: [{"name": "", "url": "", "type": ""}]
     parent_order_id = Column(String, nullable=True)
     rejection_category = Column(String, nullable=True)
+    is_rework = Column(Boolean, default=False)
+    original_case_id = Column(String, nullable=True)
     vendor_id = Column(Integer, nullable=True)
     courier_name = Column(String, nullable=True)
     tracking_number = Column(String, nullable=True)
@@ -46,6 +49,10 @@ class LabOrderModel(Base):
     expected_return_date = Column(String, nullable=True)
     external_cost = Column(Integer, default=0)
     stage = Column(String, default="New Cases")
+
+    prosthetic_detail = relationship("ProstheticCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")
+    pathology_detail = relationship("PathologyCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")
+    encounter = relationship("ClinicalEncounterModel", back_populates="lab_case", uselist=False)
 
 class LabVendorModel(Base):
     __tablename__ = "lab_vendors"
@@ -116,3 +123,43 @@ class RestockRequestModel(Base):
     status = Column(String, default="Pending") # Pending, Approved, Fulfilled, Rejected
     notes = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class ProstheticCaseDetailModel(Base):
+    __tablename__ = "prosthetic_case_details"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    lab_case_id = Column(String, ForeignKey("lab_orders.id", ondelete="CASCADE"), nullable=False, unique=True)
+    tooth_number = Column(String, nullable=True)
+    fabrication_type = Column(String, nullable=True)
+    scan_file = Column(String, nullable=True)
+    material = Column(String, nullable=True)
+    shade = Column(String, nullable=True)
+    opposing_bite_scan = Column(String, nullable=True)
+    implant_system = Column(String, nullable=True)
+
+    lab_case = relationship("LabOrderModel", back_populates="prosthetic_detail")
+
+class PathologyCaseDetailModel(Base):
+    __tablename__ = "pathology_case_details"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    lab_case_id = Column(String, ForeignKey("lab_orders.id", ondelete="CASCADE"), nullable=False, unique=True)
+    test_type = Column(String, nullable=True)
+    sample_type = Column(String, nullable=True)
+    reason_for_test = Column(String, nullable=True)
+    external_lab_name = Column(String, nullable=True)
+    sample_collected_confirm = Column(Boolean, default=False)
+
+    lab_case = relationship("LabOrderModel", back_populates="pathology_detail")
+
+class ClinicalEncounterModel(Base):
+    __tablename__ = "clinical_encounters"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    patient_token = Column(String, index=True, nullable=False)
+    doctor_name = Column(String, nullable=False)
+    notes = Column(String, nullable=True)
+    lab_case_id = Column(String, ForeignKey("lab_orders.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    lab_case = relationship("LabOrderModel", back_populates="encounter")

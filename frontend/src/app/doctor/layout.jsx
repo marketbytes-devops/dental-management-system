@@ -15,6 +15,7 @@ import {
   markAllNotificationsAsRead,
   updateLabOrderStatus,
   createLabOrder,
+  updateLabOrder,
   getQueue,
   callPatient,
   updateAppointmentStatus,
@@ -98,12 +99,39 @@ export default function DoctorLayout({ children }) {
       const mapped = data.map(o => ({
         id: o.id,
         patientToken: o.patient_token,
+        patient_name: o.patient_name,
+        dentist_name: o.dentist_name,
+        dentist_contact: o.dentist_contact,
+        orderCategory: o.order_category,
+        order_category: o.order_category,
+        order_details: o.order_details,
+        prostheticType: o.prosthetic_type,
+        prosthetic_type: o.prosthetic_type,
+        material: o.material,
+        shade: o.shade,
+        priority: o.priority,
+        notes: o.notes,
+        tooth_number: o.tooth_number,
+        toothQuadrant: o.tooth_quadrant || o.tooth_number,
+        implantSystem: o.implant_system,
+        testType: o.test_type,
+        test_type: o.test_type,
+        sampleType: o.sample_type,
+        sample_type: o.sample_type,
+        reasonForTest: o.reason_for_test,
+        reason_for_test: o.reason_for_test,
+        sampleCollectedConfirm: o.sample_collected_confirm,
+        sample_collected_confirm: o.sample_collected_confirm,
+        is_rework: o.is_rework,
         item: o.order_category === "Diagnostic"
-          ? `Diagnostic: ${o.order_details?.test_type || "Lab Work"}`
+          ? `Diagnostic: ${o.test_type || "Lab Work"}`
           : (o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`),
         status: o.status,
         labName: o.lab_name || "Apex Dental Lab",
+        lab_name: o.lab_name,
         eta: o.due_date || "3 Days",
+        dueDate: o.due_date,
+        due_date: o.due_date,
         resultDocumentUrl: o.result_document_url || null
       }));
       setLabOrders(mapped);
@@ -676,23 +704,20 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  const handleSubmitLabOrder = async ({ item, tooth, shade, labName }) => {
+  const handleSubmitLabOrder = async (payload) => {
     try {
-      let payload = {
-        patient_token: viewingPatientToken,
-        prosthetic_type: item,
-        material: `Tooth #${tooth}`,
-        shade: shade,
-        lab_name: labName,
-        due_date: "2026-06-15",
-        notes: `Tooth #${tooth}, Shade ${shade}`
-      };
-
+      if (!payload.patient_token) {
+        payload.patient_token = viewingPatientToken;
+      }
       const createdOrder = await createLabOrder(payload);
+
+      const label = payload.order_category === "Diagnostic"
+        ? `Diagnostic: ${payload.test_type}`
+        : `${payload.fabrication_type} (Tooth #${payload.tooth_number})`;
 
       const newTimelineEvent = {
         date: getTodayString(),
-        note: `Ordered ${createdOrder.prosthetic_type} (Tooth #${tooth}, Shade ${shade}) from ${labName}`,
+        note: `Ordered ${label} from ${payload.lab_name}`,
         type: "Lab Order"
       };
 
@@ -701,15 +726,29 @@ export default function DoctorLayout({ children }) {
         [viewingPatientToken]: {
           ...prev[viewingPatientToken],
           timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
-          teethChart: { ...prev[viewingPatientToken].teethChart, [tooth]: "lab-ordered" }
+          teethChart: payload.tooth_number ? { 
+            ...prev[viewingPatientToken].teethChart, 
+            [payload.tooth_number]: "lab-ordered" 
+          } : prev[viewingPatientToken].teethChart
         }
       }));
 
-      showNotification(`Lab order submitted to ${labName}.`);
+      showNotification(`Lab order submitted to ${payload.lab_name}.`);
       fetchLabOrders();
     } catch (err) {
       console.error("Error submitting lab order:", err);
       showNotification("Failed to submit lab order.");
+    }
+  };
+
+  const handleUpdateLabOrder = async (id, payload) => {
+    try {
+      await updateLabOrder(id, payload);
+      showNotification(`Lab order ${id} updated successfully.`);
+      fetchLabOrders();
+    } catch (err) {
+      console.error("Error updating lab order:", err);
+      showNotification(err.response?.data?.detail || "Failed to update lab order.");
     }
   };
 
@@ -1020,6 +1059,7 @@ export default function DoctorLayout({ children }) {
         setEmergencyAlert,
         queue,
         labOrders,
+        fetchLabOrders,
         rxDraft,
         notification,
         showNotification,
@@ -1036,6 +1076,7 @@ export default function DoctorLayout({ children }) {
         simulateEmergencyCheckin,
         handleMarkLabDelivered,
         handleSubmitLabOrder,
+        handleUpdateLabOrder,
         handleToggleToothState,
         handleAddDraftMedicine,
         handleRemoveDraftMed,

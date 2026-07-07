@@ -25,6 +25,7 @@ import {
   Microscope
 } from "lucide-react";
 import { getLabOrders, updateLabOrderStatus, updateLabOrder } from "@/services/api";
+import { validateLabOrderFields } from "@/services/labValidation";
 
 
 
@@ -50,7 +51,29 @@ export default function LabOrders() {
         status: o.status,
         notes: o.notes || "",
         rejectionReason: o.rejection_reason || "",
-        resultDocumentUrl: o.result_document_url || ""
+        resultDocumentUrl: o.result_document_url || "",
+        // Added properties
+        labName: o.lab_name || "",
+        vendorId: o.vendor_id || "",
+        impressionType: o.impression_type || "Physical",
+        toothQuadrant: o.tooth_quadrant || "",
+        externalCost: o.external_cost || 0,
+        dispatchDate: o.dispatch_date || "",
+        expectedReturnDate: o.expected_return_date || "",
+        receivedDate: o.received_date || "",
+        marginDesign: o.margin_design || "",
+        procedureCode: o.procedure_code || "",
+        stage: o.stage || "New Cases",
+        patientToken: o.patient_token || "",
+        isRework: o.is_rework || false,
+        originalCaseId: o.original_case_id || "",
+        scanFile: o.scan_file || "",
+        opposingBiteScan: o.opposing_bite_scan || "",
+        implantSystem: o.implant_system || "",
+        testType: o.test_type || "",
+        sampleType: o.sample_type || "",
+        reasonForTest: o.reason_for_test || "",
+        sampleCollectedConfirm: o.sample_collected_confirm || false
       }));
       setOrders(mapped);
     } catch (err) {
@@ -70,40 +93,109 @@ export default function LabOrders() {
   const [dentistFilter, setDentistFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
 
+  const [activeCategory, setActiveCategory] = useState("Dental Prosthetics");
+  const [viewMode, setViewMode] = useState("table");
+
+  // Flag modal states
+  const [isFlagModalOpen, setIsFlagModalOpen] = useState(false);
+  const [flagOrder, setFlagOrder] = useState(null);
+  const [flagNote, setFlagNote] = useState("");
+
+  const validateOrderFields = (order) => {
+    const missing = validateLabOrderFields(order);
+    
+    // Add lab-tech specific universal routing requirements
+    if (!order.labName && !order.lab_name && !order.external_lab_name) {
+      missing.push("Lab partner selection");
+    }
+    if (!order.dueDate && !order.due_date) {
+      missing.push("Due date");
+    }
+    return missing;
+  };
+
+  const handleFlagSubmit = async (e) => {
+    e.preventDefault();
+    if (!flagOrder) return;
+    try {
+      await updateLabOrderStatus(flagOrder.id, {
+        status: "Flagged",
+        rejection_reason: flagNote
+      });
+      triggerToast(`Case ${flagOrder.id} has been flagged for Doctor review.`);
+      setIsFlagModalOpen(false);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to flag order.", "error");
+    }
+  };
+
+  const handleOpenFlagModal = (order) => {
+    setFlagOrder(order);
+    const missing = validateOrderFields(order);
+    setFlagNote(`Missing fields required for confirmation: ${missing.join(", ")}`);
+    setIsFlagModalOpen(true);
+  };
+
+  // Rework modal states
+  const [isReworkModalOpen, setIsReworkModalOpen] = useState(false);
+  const [reworkOrder, setReworkOrder] = useState(null);
+  const [reworkReason, setReworkReason] = useState("shade mismatch");
+  const [reworkNote, setReworkNote] = useState("");
+
+  // Dispatch Modal States
+  const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
+  const [dispatchOrder, setDispatchOrder] = useState(null);
+  const [dispatchFormData, setDispatchFormData] = useState({
+    labName: "Apex Dental Laboratories",
+    address: "SmileCare Dental Practice, 4th Floor, Suite 402, Jubilee Hills, Hyderabad, Telangana - 500033",
+    expectedReturnDate: "",
+    courierPartner: "SmileCare Express",
+    marginClearance: "Verified (Correct)",
+    prepHeight: "Verified (Correct)",
+    occlusalFit: "Verified (Correct)",
+    externalCost: 3500,
+    notes: "",
+    prostheticType: "",
+    material: "",
+    shade: "",
+    toothQuadrant: ""
+  });
+
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Drawer tab and viewer states
-  const [activeTab, setActiveTab] = useState("specs");
-  const [stlRotation, setStlRotation] = useState(45);
-  const [stlZoom, setStlZoom] = useState(1);
-  const [viewerType, setViewerType] = useState("STL");
+  // Drawer states
+  const [selectedLabPartner, setSelectedLabPartner] = useState("apex");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [labNotes, setLabNotes] = useState("");
+  const [isReceived, setIsReceived] = useState(false);
+  const [receivedDate, setReceivedDate] = useState("");
+  const [isReworkModalOpen2, setIsReworkModalOpen2] = useState(false);
+  const [reworkReason2, setReworkReason2] = useState("");
+  const [reworkCategory2, setReworkCategory2] = useState("shade mismatch");
 
-  // CAD Design desk states
-  const [cadVersions, setCadVersions] = useState([
-    { version: "v1.2", date: "2026-06-10 11:30 AM", author: "Alen Joseph (CAD)", status: "Approved", notes: "Marginal fit tightened by 10 microns.", color: "bg-success/10 text-success border-success/20" },
-    { version: "v1.1", date: "2026-06-09 03:45 PM", author: "Alen Joseph (CAD)", status: "Rejected", notes: "Dentist requested thinner margins.", color: "bg-danger/10 text-danger border-danger/20" },
-    { version: "v1.0", date: "2026-06-08 10:15 AM", author: "Scanner Import", status: "Approved", notes: "Initial STL mesh imported.", color: "bg-success/10 text-success border-success/20" }
-  ]);
-  const [designerNote, setDesignerNote] = useState("");
-  const [designerNotesList, setDesignerNotesList] = useState([
-    "Contact point on mesial aspect of #26 adjusted to 0.5mm.",
-    "Minimum zirconia thickness parameters checked (0.8mm)."
-  ]);
-
-  // QC checklist states
-  const [qcChecklist, setQcChecklist] = useState({
-    dimensions: false,
-    colorMatch: false,
-    surfaceFinish: false,
-    accuracy: false,
-    materialQuality: false
-  });
-  const [qcComments, setQcComments] = useState("");
-
-  // Courier/Dispatch states
-  const [courierPartner, setCourierPartner] = useState("SmileCare Express");
-  const [estDeliveryDate, setEstDeliveryDate] = useState("Tomorrow, 02:00 PM");
+  const LAB_PARTNERS = {
+    apex: {
+      name: "Apex Dental Laboratories",
+      address: "Apex Dental Lab, 2nd Floor, Plot 14, Road 12, Banjara Hills, Hyderabad — 500034",
+      contact: "+91 40 2345 6789",
+      specialty: "Zirconia Crowns, E-max Veneers, Full-Arch Bridges"
+    },
+    precision: {
+      name: "Precision Milling Centre",
+      address: "Precision Milling Centre, Unit 3, HITEC City, Madhapur, Hyderabad — 500081",
+      contact: "+91 40 6678 9012",
+      specialty: "CAD-CAM Milling, PMMA Temporaries, Implant Crowns"
+    },
+    citypath: {
+      name: "City Path Labs",
+      address: "City Path Diagnostics, Lane 4, Punjagutta, Hyderabad — 500082",
+      contact: "+91 40 4456 7890",
+      specialty: "Biopsy Analysis, Blood Tests, Microbiology Panels"
+    }
+  };
 
   const currentCase = selectedOrder ? {
     id: selectedOrder.id,
@@ -120,7 +212,16 @@ export default function LabOrders() {
     status: selectedOrder.status,
     notes: selectedOrder.notes,
     rejectionReason: selectedOrder.rejectionReason,
-    resultDocumentUrl: selectedOrder.resultDocumentUrl
+    resultDocumentUrl: selectedOrder.resultDocumentUrl,
+    scanFile: selectedOrder.scanFile,
+    opposingBiteScan: selectedOrder.opposingBiteScan,
+    implantSystem: selectedOrder.implantSystem,
+    testType: selectedOrder.testType,
+    sampleType: selectedOrder.sampleType,
+    reasonForTest: selectedOrder.reasonForTest,
+    sampleCollectedConfirm: selectedOrder.sampleCollectedConfirm,
+    isRework: selectedOrder.isRework,
+    toothQuadrant: selectedOrder.toothQuadrant
   } : null;
 
   const updateDbStatus = async (caseId, statusValue, rejectionReason = null) => {
@@ -256,6 +357,13 @@ export default function LabOrders() {
   useEffect(() => {
     let result = [...orders];
 
+    // Filter by category first
+    result = result.filter((o) =>
+      activeCategory === "Dental Prosthetics"
+        ? o.orderCategory === "Prosthetic"
+        : o.orderCategory !== "Prosthetic"
+    );
+
     if (searchQuery.trim() !== "") {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -297,12 +405,28 @@ export default function LabOrders() {
     }
 
     setFilteredOrders(result);
-  }, [orders, searchQuery, statusFilter, priorityFilter, dentistFilter, dateFilter]);
+  }, [orders, searchQuery, statusFilter, priorityFilter, dentistFilter, dateFilter, activeCategory]);
 
-  const totalCases = orders.length;
-  const pendingCases = orders.filter((o) => o.status === "Pending").length;
-  const inProductionCases = orders.filter((o) => o.status === "Accepted" || o.status === "In Progress").length;
-  const urgentHighCases = orders.filter((o) => o.priority === "Urgent" || o.priority === "High").length;
+  const categoryFiltered = orders.filter((o) =>
+    activeCategory === "Dental Prosthetics"
+      ? o.orderCategory === "Prosthetic"
+      : o.orderCategory !== "Prosthetic"
+  );
+
+  const totalCases = categoryFiltered.filter((o) => o.status !== "completed" && o.status !== "Completed").length;
+  const pendingCases = categoryFiltered.filter((o) => 
+    ["submitted", "Submitted", "Pending", "Flagged", "flagged", "ordered", "Ordered"].includes(o.status)
+  ).length;
+  const inProductionCases = categoryFiltered.filter((o) => {
+    if (activeCategory === "Dental Prosthetics") {
+      return ["received_by_lab", "in_design", "in_fabrication", "quality_check", "Accepted", "In Progress", "Confirmed", "Sent to Lab", "Received from Lab", "Fitted"].includes(o.status);
+    } else {
+      return ["Sample Collected", "Sent to Lab", "Report Received", "Reviewed by Doctor"].includes(o.status);
+    }
+  }).length;
+  const urgentHighCases = categoryFiltered.filter((o) => 
+    ["Urgent", "High"].includes(o.priority) && o.status !== "completed" && o.status !== "Completed"
+  ).length;
 
   const getPriorityStyle = (priority) => {
     switch (priority) {
@@ -318,30 +442,123 @@ export default function LabOrders() {
     }
   };
 
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case "Submitted":
+      case "submitted":
+        return "Submitted";
+      case "Pending Doctor Confirmation":
+      case "Pending Doctor Review":
+        return "Pending Doctor Confirmation";
+      case "Doctor Accepted":
+      case "Confirmed":
+      case "confirmed":
+        return "Doctor Accepted";
+      case "Order Sent to Lab":
+      case "Sent to Lab":
+      case "sent_to_lab":
+        return "Order Sent to Lab";
+      case "Order Received":
+      case "Received from Lab":
+      case "received_from_lab":
+        return "Order Received";
+      case "Returned for Rework":
+      case "returned_for_rework":
+        return "Returned for Rework";
+      case "Completed":
+      case "completed":
+        return "Completed";
+      case "Flagged":
+      case "flagged":
+        return "Flagged";
+      case "Rejected":
+        return "Rejected";
+      case "Ordered":
+      case "ordered":
+        return "Ordered";
+      case "Sample Collected":
+      case "sample_collected":
+        return "Sample Collected";
+      case "Report Received":
+      case "report_received":
+        return "Report Received";
+      case "Reviewed by Doctor":
+      case "reviewed_by_doctor":
+        return "Reviewed by Doctor";
+      default:
+        return status || "Unknown";
+    }
+  };
+
   const getStatusDotColor = (status) => {
     switch (status) {
-      case "Pending":
-        return "bg-warning";
-      case "Accepted":
-        return "bg-primary";
-      case "In Progress":
-        return "bg-purple-500";
+      case "Submitted":
+      case "submitted":
+        return "bg-blue-400";
+      case "Pending Doctor Confirmation":
+      case "Pending Doctor Review":
+        return "bg-warning animate-pulse";
+      case "Doctor Accepted":
+      case "Confirmed":
+      case "confirmed":
+        return "bg-emerald-400";
+      case "Order Sent to Lab":
+      case "Sent to Lab":
+      case "sent_to_lab":
+        return "bg-indigo-600";
+      case "Order Received":
+      case "Received from Lab":
+      case "received_from_lab":
+        return "bg-purple-600";
+      case "Returned for Rework":
+      case "returned_for_rework":
+        return "bg-danger animate-pulse";
       case "Completed":
+      case "completed":
         return "bg-success";
+      case "Flagged":
+      case "flagged":
+        return "bg-danger animate-pulse";
       case "Rejected":
         return "bg-danger";
+      case "Ordered":
+      case "ordered":
+        return "bg-yellow-500";
+      case "Sample Collected":
+      case "sample_collected":
+        return "bg-emerald-400";
+      case "Report Received":
+      case "report_received":
+        return "bg-purple-600";
+      case "Reviewed by Doctor":
+      case "reviewed_by_doctor":
+        return "bg-teal-500";
       default:
         return "bg-gray-400";
     }
   };
 
+  const handleTransitionStatus = async (orderId, nextStatus) => {
+    try {
+      await updateLabOrderStatus(orderId, { status: nextStatus });
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev) => ({ ...prev, status: nextStatus }));
+      }
+      triggerToast(`Case ${orderId} status updated to ${getStatusLabel(nextStatus)}.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to update status.", "error");
+    }
+  };
+
   const handleAcceptOrder = async (orderId) => {
     try {
-      await updateLabOrderStatus(orderId, { status: "Accepted" });
+      await updateLabOrderStatus(orderId, { status: "received_by_lab" });
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev) => ({ ...prev, status: "Accepted" }));
+        setSelectedOrder((prev) => ({ ...prev, status: "received_by_lab" }));
       }
-      triggerToast(`Case ${orderId} has been successfully accepted.`);
+      triggerToast(`Case ${orderId} accepted by lab.`);
       fetchOrders();
     } catch (err) {
       console.error(err);
@@ -351,23 +568,23 @@ export default function LabOrders() {
 
   const handleStartProduction = async (orderId) => {
     try {
-      await updateLabOrderStatus(orderId, { status: "In Progress" });
+      await updateLabOrderStatus(orderId, { status: "in_design" });
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev) => ({ ...prev, status: "In Progress" }));
+        setSelectedOrder((prev) => ({ ...prev, status: "in_design" }));
       }
-      triggerToast(`Case ${orderId} status updated to In Production.`);
+      triggerToast(`Case ${orderId} status updated to In Design.`);
       fetchOrders();
     } catch (err) {
       console.error(err);
-      triggerToast("Failed to start production.", "error");
+      triggerToast("Failed to start design.", "error");
     }
   };
 
   const handleCompleteOrder = async (orderId) => {
     try {
-      await updateLabOrderStatus(orderId, { status: "Completed" });
+      await updateLabOrderStatus(orderId, { status: "completed" });
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev) => ({ ...prev, status: "Completed" }));
+        setSelectedOrder((prev) => ({ ...prev, status: "completed" }));
       }
       triggerToast(`Case ${orderId} marked as Completed.`);
       fetchOrders();
@@ -376,6 +593,236 @@ export default function LabOrders() {
       triggerToast("Failed to complete order.", "error");
     }
   };
+
+  const handleOpenReworkModal = (order) => {
+    setReworkOrder(order);
+    setReworkReason("shade mismatch");
+    setReworkNote("");
+    setIsReworkModalOpen(true);
+  };
+
+  const handleReworkSubmit = async (e) => {
+    e.preventDefault();
+    if (!reworkOrder) return;
+    try {
+      await updateLabOrderStatus(reworkOrder.id, {
+        status: "Returned for Rework",
+        rejection_category: reworkReason,
+        rejection_reason: reworkNote
+      });
+      triggerToast(`Case ${reworkOrder.id} returned for rework.`);
+      setIsReworkModalOpen(false);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to update status for rework.", "error");
+    }
+  };
+
+  const handleDragStart = (e, orderId) => {
+    e.dataTransfer.setData("text/plain", orderId);
+  };
+
+  const handleDrop = async (e, columnId) => {
+    e.preventDefault();
+    const orderId = e.dataTransfer.getData("text/plain");
+    if (!orderId) return;
+
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+
+    let targetStatus = "";
+    if (activeCategory === "Dental Prosthetics") {
+      if (columnId === "Submitted") targetStatus = "Submitted";
+      else if (columnId === "ConfirmedSent") targetStatus = "Doctor Accepted";
+      else if (columnId === "ReceivedFitted") targetStatus = "Order Received";
+      else if (columnId === "Completed") targetStatus = "Completed";
+    } else {
+      if (columnId === "OrderedCollected") targetStatus = "Sample Collected";
+      else if (columnId === "SentReport") targetStatus = "Report Received";
+      else if (columnId === "Reviewed") targetStatus = "Reviewed by Doctor";
+      else if (columnId === "Completed") targetStatus = "Completed";
+    }
+
+    if (targetStatus && targetStatus !== order.status) {
+      if (activeCategory === "Dental Prosthetics" && columnId !== "Submitted") {
+        const missing = validateOrderFields(order);
+        if (missing.length > 0) {
+          triggerToast(`Cannot move case: missing confirmation fields: ${missing.join(", ")}`, "error");
+          return;
+        }
+      }
+      const ok = await updateDbStatus(orderId, targetStatus);
+      if (ok) {
+        triggerToast(`Case ${orderId} moved to ${targetStatus}.`);
+      } else {
+        triggerToast("Failed to move case.", "error");
+      }
+    }
+  };
+
+  const renderOrderActions = (order) => {
+    const isProsthetic = order.orderCategory === "Prosthetic";
+    const missing = validateOrderFields(order);
+    const hasMissing = missing.length > 0;
+    
+    if (isProsthetic) {
+      if (order.status === "submitted" || order.status === "Submitted" || order.status === "Pending" || order.status === "Flagged" || order.status === "flagged") {
+        return (
+          <div className="flex gap-2 items-center flex-wrap">
+            <button
+              onClick={() => updateDbStatus(order.id, "Doctor Accepted")}
+              disabled={hasMissing}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                hasMissing 
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200" 
+                  : "bg-primary text-white hover:bg-primary/95"
+              }`}
+              title={hasMissing ? `Missing fields: ${missing.join(", ")}` : "Confirm Order"}
+            >
+              Confirm Order
+            </button>
+            {order.status !== "Flagged" && order.status !== "flagged" && (
+              <button
+                onClick={() => handleOpenFlagModal(order)}
+                className="px-2.5 py-1.5 bg-warning/10 hover:bg-warning text-warning hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer border border-warning/10"
+              >
+                Flag for Doctor
+              </button>
+            )}
+            {hasMissing && (
+              <span className="text-[10px] text-warning font-semibold block w-full mt-1">
+                ⚠️ Missing: {missing.join(", ")}
+              </span>
+            )}
+          </div>
+        );
+      }
+      if (["Confirmed", "confirmed", "Doctor Accepted"].includes(order.status)) {
+        return (
+          <button
+            onClick={() => updateDbStatus(order.id, "Order Sent to Lab")}
+            className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-650 hover:text-white border border-indigo-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Mark as Sent to Lab
+          </button>
+        );
+      }
+      if (["Sent to Lab", "sent_to_lab", "Order Sent to Lab", "in_design", "in_fabrication", "quality_check"].includes(order.status)) {
+        return (
+          <button
+            onClick={() => updateDbStatus(order.id, "Order Received")}
+            className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-600 text-purple-650 hover:text-white border border-purple-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Mark as Received from Lab
+          </button>
+        );
+      }
+      if (["Received from Lab", "received_from_lab", "Order Received"].includes(order.status)) {
+        return (
+          <button
+            onClick={() => updateDbStatus(order.id, "Fitted")}
+            className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-500 text-teal-500 hover:text-white border border-teal-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Mark as Delivered to Clinic
+          </button>
+        );
+      }
+      if (order.status === "Fitted" || order.status === "fitted") {
+        return (
+          <div className="flex gap-2 items-center flex-wrap">
+            <button
+              onClick={() => updateDbStatus(order.id, "Completed")}
+              className="px-2.5 py-1.5 bg-success/15 hover:bg-success text-success hover:text-white border border-success/20 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Complete Order
+            </button>
+            <button
+              onClick={() => handleOpenReworkModal(order)}
+              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Return for Correction
+            </button>
+          </div>
+        );
+      }
+      if (order.status === "Completed" || order.status === "completed") {
+        return (
+          <button
+            onClick={() => handleOpenReworkModal(order)}
+            className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Return for Correction
+          </button>
+        );
+      }
+    } else {
+      // Diagnostic / Pathology
+      if (order.status === "Ordered" || order.status === "ordered" || order.status === "Pending" || order.status === "submitted" || order.status === "Submitted") {
+        return (
+          <button
+            onClick={() => updateDbStatus(order.id, "Sample Collected")}
+            className="px-2.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Confirm Sample Collection
+          </button>
+        );
+      }
+      if (order.status === "Sample Collected" || order.status === "sample_collected") {
+        return (
+          <button
+            onClick={() => updateDbStatus(order.id, "Order Sent to Lab")}
+            className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-650 hover:text-white border border-indigo-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Mark as Sent to Lab
+          </button>
+        );
+      }
+      if (["Sent to Lab", "sent_to_lab", "Order Sent to Lab"].includes(order.status)) {
+        return (
+          <button
+            onClick={() => updateDbStatus(order.id, "Report Received")}
+            className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-600 text-purple-650 hover:text-white border border-purple-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Mark as Report Received
+          </button>
+        );
+      }
+      if (order.status === "Report Received" || order.status === "report_received") {
+        return (
+          <button
+            onClick={() => updateDbStatus(order.id, "Reviewed by Doctor")}
+            className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-500 text-teal-500 hover:text-white border border-teal-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Mark as Reviewed by Doctor
+          </button>
+        );
+      }
+      if (order.status === "Reviewed by Doctor" || order.status === "reviewed_by_doctor") {
+        return (
+          <button
+            onClick={() => updateDbStatus(order.id, "Completed")}
+            className="px-2.5 py-1.5 bg-success/15 hover:bg-success text-success hover:text-white border border-success/20 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Mark as Completed
+          </button>
+        );
+      }
+    }
+    return null;
+  };
+
+  const BOARD_COLUMNS = activeCategory === "Dental Prosthetics" ? [
+    { id: "Submitted", label: "Submitted & Flagged", statuses: ["Submitted", "submitted", "Flagged", "flagged", "Pending", "returned_for_rework", "Returned for Rework"] },
+    { id: "ConfirmedSent", label: "Doctor Confirmed & Sent", statuses: ["Pending Doctor Confirmation", "Pending Doctor Review", "Confirmed", "confirmed", "Doctor Accepted", "Order Sent to Lab", "Sent to Lab", "In Progress", "Accepted", "received_by_lab", "in_design", "in_fabrication", "quality_check"] },
+    { id: "ReceivedFitted", label: "Received & Fitted", statuses: ["Order Received", "Received from Lab", "received_from_lab", "Fitted", "fitted"] },
+    { id: "Completed", label: "Completed", statuses: ["Completed", "completed"] }
+  ] : [
+    { id: "OrderedCollected", label: "Ordered & Collected", statuses: ["Ordered", "ordered", "Sample Collected", "sample_collected", "Pending"] },
+    { id: "SentReport", label: "Sent & Report", statuses: ["Order Sent to Lab", "Sent to Lab", "sent_to_lab", "Report Received", "report_received"] },
+    { id: "Reviewed", label: "Reviewed by Doctor", statuses: ["Reviewed by Doctor", "reviewed_by_doctor"] },
+    { id: "Completed", label: "Completed", statuses: ["Completed", "completed"] }
+  ];
 
   const openRejectModal = (orderId) => {
     setRejectTargetId(orderId);
@@ -450,17 +897,63 @@ export default function LabOrders() {
     }
   };
 
+  const handleSendToInHouse = async (orderId) => {
+    try {
+      await updateLabOrder(orderId, { lab_name: "In-House", status: "Accepted" });
+      triggerToast(`Case ${orderId} has been successfully routed to In-House.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to route to In-House.", "error");
+    }
+  };
+
+  const handleOpenDispatchModal = (order) => {
+    setDispatchOrder(order);
+    const details = order.orderDetails || {};
+    setDispatchFormData({
+      address: details.address || "",
+      expectedReturnDate: order.expectedReturnDate || order.dueDate || "",
+      notes: details.notes || order.notes || "",
+    });
+    setIsDispatchModalOpen(true);
+  };
+
+  const handleDispatchSubmit = async (e) => {
+    e.preventDefault();
+    if (!dispatchOrder) return;
+    try {
+      const orderDetailsPayload = {
+        ...dispatchOrder.orderDetails,
+        address: dispatchFormData.address,
+        notes: dispatchFormData.notes
+      };
+
+      await updateLabOrder(dispatchOrder.id, {
+        status: "Sent to Lab",
+        expected_return_date: dispatchFormData.expectedReturnDate,
+        order_details: orderDetailsPayload,
+      });
+
+      triggerToast(`Case ${dispatchOrder.id} sent to external lab successfully.`);
+      setIsDispatchModalOpen(false);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to dispatch order.", "error");
+    }
+  };
+
   const openDetailsDrawer = (order) => {
     setSelectedOrder(order);
     setIsDrawerOpen(true);
-    setQcChecklist({
-      dimensions: false,
-      colorMatch: false,
-      surfaceFinish: false,
-      accuracy: false,
-      materialQuality: false
-    });
-    setQcComments("");
+
+    const partnerKey = Object.keys(LAB_PARTNERS).find(key => LAB_PARTNERS[key].name === order.labName) || "apex";
+    setSelectedLabPartner(partnerKey);
+    setDeliveryAddress(order.orderDetails?.address || LAB_PARTNERS[partnerKey].address);
+    setLabNotes(order.orderDetails?.notes || order.notes || "");
+    setIsReceived(["Order Received", "Completed"].includes(order.status));
+    setReceivedDate(order.receivedDate || "");
   };
 
   return (
@@ -472,10 +965,36 @@ export default function LabOrders() {
         </div>
       )}
 
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Lab Orders</h1>
           <p className="text-sm text-gray-500 mt-1">Manage prosthetic fabrications, track statuses, and coordinate with dentists.</p>
+        </div>
+        
+        {/* Category Toggle */}
+        <div className="flex bg-gray-100 p-1 rounded-xl shrink-0 border border-gray-200 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setActiveCategory("Dental Prosthetics")}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              activeCategory === "Dental Prosthetics"
+                ? "bg-white text-gray-900 shadow-sm font-extrabold"
+                : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            Dental Prosthetics
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveCategory("Blood Work / Pathology")}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              activeCategory === "Blood Work / Pathology"
+                ? "bg-white text-gray-900 shadow-sm font-extrabold"
+                : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            Blood Work / Pathology
+          </button>
         </div>
       </div>
 
@@ -535,7 +1054,7 @@ export default function LabOrders() {
 
       <div className="bg-white rounded-2xl border border-gray-150 shadow-sm overflow-hidden p-6 space-y-4">
         <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full lg:w-96 flex items-center bg-gray-50 rounded-xl px-4 py-2.5 border border-gray-200 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <div className="relative w-full lg:w-96 flex items-center bg-gray-55 rounded-xl px-4 py-2.5 border border-gray-200 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
             <Search className="text-gray-400 mr-2.5 w-4 h-4 shrink-0" />
             <input 
               type="text" 
@@ -547,7 +1066,7 @@ export default function LabOrders() {
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery("")}
-                className="text-gray-400 hover:text-gray-600 ml-1.5 text-xs bg-gray-200/60 rounded-full w-5 h-5 flex items-center justify-center"
+                className="text-gray-400 hover:text-gray-655 ml-1.5 text-xs bg-gray-200/60 rounded-full w-5 h-5 flex items-center justify-center"
               >
                 ✕
               </button>
@@ -555,6 +1074,32 @@ export default function LabOrders() {
           </div>
 
           <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center justify-end">
+            {/* View Mode Toggle */}
+            <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 mr-2 shadow-xs shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  viewMode === "table"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                Table
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("board")}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  viewMode === "board"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                Board
+              </button>
+            </div>
+
             {(searchQuery || statusFilter || priorityFilter || dentistFilter || dateFilter) && (
               <button 
                 onClick={() => {
@@ -573,14 +1118,19 @@ export default function LabOrders() {
             <select 
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-700 min-w-[110px]"
+              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-705 min-w-[110px]"
             >
               <option value="">All Statuses</option>
-              <option value="Pending">Pending</option>
-              <option value="Accepted">Accepted</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
-              <option value="Rejected">Rejected</option>
+              <option value="submitted">Submitted</option>
+              <option value="received_by_lab">Received by Lab</option>
+              <option value="in_design">In Design</option>
+              <option value="in_fabrication">In Fabrication</option>
+              <option value="quality_check">Quality Check</option>
+              <option value="shipped">Shipped</option>
+              <option value="received_at_clinic">Received at Clinic</option>
+              <option value="fitted">Fitted</option>
+              <option value="completed">Completed</option>
+              <option value="returned_for_rework">Returned for Rework</option>
             </select>
 
             <select 
@@ -619,133 +1169,179 @@ export default function LabOrders() {
           </div>
         </div>
 
-        <div className="overflow-x-auto border border-gray-100 rounded-xl">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/70 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <th className="px-6 py-4">Case ID</th>
-                <th className="px-6 py-4">Patient Name</th>
-                <th className="px-6 py-4">Dentist</th>
-                <th className="px-6 py-4">Prosthetic Specs</th>
-                <th className="px-6 py-4">Priority</th>
-                <th className="px-6 py-4">Due Date</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-sm">
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="px-6 py-10 text-center text-gray-450">
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <Search className="w-8 h-8 text-gray-300" />
-                      <p className="font-semibold text-base text-gray-750">No lab orders found</p>
-                      <p className="text-xs text-gray-400">Try adjusting your filters or search term.</p>
-                    </div>
-                  </td>
+        {viewMode === "table" ? (
+          <div className="overflow-x-auto border border-gray-100 rounded-xl">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/70 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4">Case ID</th>
+                  <th className="px-6 py-4">Patient Name</th>
+                  <th className="px-6 py-4">Dentist</th>
+                  <th className="px-6 py-4">Prosthetic Specs</th>
+                  <th className="px-6 py-4">Priority</th>
+                  <th className="px-6 py-4">Due Date</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
-              ) : (
-                filteredOrders.map((order) => (
-                  <tr 
-                    key={order.id} 
-                    className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
-                    onClick={() => openDetailsDrawer(order)}
-                  >
-                    <td className="px-6 py-4 font-bold text-gray-900 text-xs group-hover:text-primary transition-colors">
-                      {order.id}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-800">
-                      {order.patientName}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      <div>
-                        <p className="font-medium text-gray-800">{order.dentistName}</p>
-                        <p className="text-xs text-gray-400">{order.dentistContact}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      <div>
-                        {order.orderCategory === "Prosthetic" ? (
-                          <>
-                            <p className="font-semibold text-gray-750 text-xs">{order.prostheticType}</p>
-                            <p className="text-[11px] text-gray-400">{order.material} (Shade: {order.shade})</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-semibold text-gray-750 text-xs">{order.orderCategory}</p>
-                            <p className="text-[11px] text-gray-400 truncate max-w-[150px]">{JSON.stringify(order.orderDetails)}</p>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${getPriorityStyle(order.priority)}`}>
-                        {order.priority}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-600 font-medium">
-                      {order.dueDate === "2026-06-10" ? (
-                        <span className="text-danger font-semibold flex items-center gap-1">
-                          Today ⚠️
-                        </span>
-                      ) : (
-                        order.dueDate
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-full ${getStatusDotColor(order.status)}`}></span>
-                        <span className="text-sm font-semibold text-gray-700">{order.status}</span>
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end gap-1.5">
-                        {order.status === "Pending" && (
-                          <>
-                            <button 
-                              onClick={() => handleAcceptOrder(order.id)}
-                              className="px-2.5 py-1.5 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
-                            >
-                              Accept
-                            </button>
-                            <button 
-                              onClick={() => openRejectModal(order.id)}
-                              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        {order.status === "Accepted" && (
-                          <button 
-                            onClick={() => handleStartProduction(order.id)}
-                            className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-600 text-purple-600 hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer border border-purple-100"
-                          >
-                            Start Production
-                          </button>
-                        )}
-                        {order.status === "In Progress" && (
-                          <button 
-                            onClick={() => handleCompleteOrder(order.id)}
-                            className="px-2.5 py-1.5 bg-success/10 hover:bg-success text-success hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
-                          >
-                            Complete
-                          </button>
-                        )}
-                        <button 
-                          onClick={() => openDetailsDrawer(order)}
-                          className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-100 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                        >
-                          View Details
-                        </button>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-sm">
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="px-6 py-10 text-center text-gray-450">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Search className="w-8 h-8 text-gray-300" />
+                        <p className="font-semibold text-base text-gray-750">No lab orders found</p>
+                        <p className="text-xs text-gray-400">Try adjusting your filters or search term.</p>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  filteredOrders.map((order) => (
+                    <tr 
+                      key={order.id} 
+                      className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
+                      onClick={() => openDetailsDrawer(order)}
+                    >
+                      <td className="px-6 py-4 font-bold text-gray-900 text-xs group-hover:text-primary transition-colors">
+                        {order.id}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-gray-800">
+                        {order.patientName}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        <div>
+                          <p className="font-medium text-gray-800">{order.dentistName}</p>
+                          <p className="text-xs text-gray-400">{order.dentistContact}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        <div>
+                          {order.orderCategory === "Prosthetic" ? (
+                            <>
+                              <p className="font-semibold text-gray-750 text-xs">{order.prostheticType}</p>
+                              <p className="text-[11px] text-gray-400">{order.material} (Shade: {order.shade})</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-semibold text-gray-750 text-xs">{order.orderCategory}</p>
+                              <p className="text-[11px] text-gray-400 truncate max-w-[150px]">{JSON.stringify(order.orderDetails)}</p>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${getPriorityStyle(order.priority)}`}>
+                          {order.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 font-medium">
+                        {order.dueDate === "2026-06-10" ? (
+                          <span className="text-danger font-semibold flex items-center gap-1">
+                            Today ⚠️
+                          </span>
+                        ) : (
+                          order.dueDate
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-full ${getStatusDotColor(order.status)}`}></span>
+                          <span className="text-sm font-semibold text-gray-700">{getStatusLabel(order.status)}</span>
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-end items-center gap-1.5 flex-wrap">
+                          {renderOrderActions(order)}
+                          <button 
+                            onClick={() => openDetailsDrawer(order)}
+                            className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-100 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                          >
+                            View Details
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+            {BOARD_COLUMNS.map((column) => {
+              const columnOrders = filteredOrders.filter((o) =>
+                column.statuses.includes(o.status)
+              );
+              return (
+                <div
+                  key={column.id}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => handleDrop(e, column.id)}
+                  className="bg-gray-55 border border-gray-150 rounded-2xl p-4 flex flex-col min-h-[500px]"
+                >
+                  <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-200">
+                    <h4 className="font-extrabold text-sm text-gray-800 flex items-center gap-2">
+                      {column.label}
+                      <span className="bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full font-bold">
+                        {columnOrders.length}
+                      </span>
+                    </h4>
+                  </div>
+                  <div className="flex-1 space-y-3 overflow-y-auto max-h-[600px] pr-1">
+                    {columnOrders.length === 0 ? (
+                      <div className="h-24 border border-dashed border-gray-200 rounded-xl flex items-center justify-center text-xs text-gray-400 bg-white">
+                        No cases
+                      </div>
+                    ) : (
+                      columnOrders.map((order) => (
+                        <div
+                          key={order.id}
+                          draggable="true"
+                          onDragStart={(e) => handleDragStart(e, order.id)}
+                          onClick={() => openDetailsDrawer(order)}
+                          className="bg-white border border-gray-155 rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group hover:border-primary/45 relative select-none"
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-xs font-black text-gray-900 group-hover:text-primary transition-colors">
+                              {order.id}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wide ${getPriorityStyle(order.priority)}`}>
+                              {order.priority}
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <p className="font-bold text-sm text-gray-850 truncate">{order.patientName}</p>
+                            <p className="text-xs text-gray-450 truncate">Dr. {order.dentistName}</p>
+                          </div>
+                          
+                          <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2.5">
+                            <div className="flex flex-col">
+                              <span className="text-[9px] text-gray-400 uppercase tracking-wider">Due Date</span>
+                              <span className={`text-[11px] font-bold ${order.dueDate === "2026-06-10" ? "text-danger" : "text-gray-600"}`}>
+                                {order.dueDate}
+                              </span>
+                            </div>
+                            
+                            {order.isRework && (
+                              <span className="bg-danger/10 text-danger border border-danger/20 text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                Rework
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="mt-3 flex gap-1.5 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
+                            {renderOrderActions(order)}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
       {isDrawerOpen && currentCase && (
         <>
@@ -777,468 +1373,402 @@ export default function LabOrders() {
               </button>
             </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex border-b border-gray-100 bg-gray-50/20 px-4 py-1.5 shrink-0 overflow-x-auto gap-1">
-              {[
-                { id: "specs", label: "Specs & Timeline" },
-                ...(currentCase.orderCategory === "Prosthetic" ? [
-                  { id: "viewer", label: "Scan Viewer" },
-                  { id: "cad", label: "CAD Desk" },
-                  { id: "qc", label: "Quality Control" },
-                ] : [
-                  { id: "results", label: "Lab Results" }
-                ]),
-                { id: "dispatch", label: "Dispatch" }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-3 py-1.5 text-xs font-extrabold rounded-lg cursor-pointer whitespace-nowrap transition-all ${
-                    activeTab === tab.id 
-                      ? "bg-primary text-white shadow-sm" 
-                      : "text-gray-550 hover:text-gray-800 hover:bg-gray-100/50"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {/* Single scrollable content — no tabs */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-6 space-y-6">
 
-            {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              
-              {/* Tab: Specs & Timeline */}
-              {activeTab === "specs" && (
-                <div className="space-y-6">
-                  {/* Specification Card */}
-                  <div className="bg-gray-55 border border-gray-150 p-4 rounded-2xl space-y-3.5">
-                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Case Specifications</h4>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-xs">
+                {/* ── SECTION 1: Doctor's Specifications (read-only) ── */}
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Order Specifications</p>
+                  <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-4">
+
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
                       {currentCase.orderCategory === "Prosthetic" ? (
                         <>
                           <div>
-                            <span className="text-gray-400 font-medium">Prosthetic Type</span>
-                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.type}</p>
+                            <p className="text-gray-400 font-medium">Prosthetic Type</p>
+                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.type || "—"}</p>
                           </div>
                           <div>
-                            <span className="text-gray-400 font-medium">Material</span>
-                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.material}</p>
+                            <p className="text-gray-400 font-medium">Material</p>
+                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.material || "—"}</p>
                           </div>
                           <div>
-                            <span className="text-gray-400 font-medium">Restoration Shade</span>
-                            <p className="font-bold text-amber-805 bg-amber-50 px-2 py-0.5 rounded border border-amber-250/20 inline-block mt-0.5">{currentCase.shade}</p>
+                            <p className="text-gray-400 font-medium">Tooth / Quadrant</p>
+                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.toothQuadrant ? `#${currentCase.toothQuadrant}` : "—"}</p>
                           </div>
+                          <div>
+                            <p className="text-gray-400 font-medium">Shade</p>
+                            <p className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/30 inline-block mt-0.5">{currentCase.shade || "—"}</p>
+                          </div>
+                          {currentCase.implantSystem && (
+                            <div className="col-span-2">
+                              <p className="text-gray-400 font-medium">Implant System</p>
+                              <p className="font-bold text-gray-800 mt-0.5">{currentCase.implantSystem}</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-gray-400 font-medium">Due Date</p>
+                            <p className="font-bold text-danger mt-0.5 flex items-center gap-1"><Calendar className="w-3 h-3" />{currentCase.dueDate || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 font-medium">Priority</p>
+                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.priority || "—"}</p>
+                          </div>
+                          {currentCase.scanFile && (
+                            <div className="col-span-2">
+                              <p className="text-gray-400 font-medium mb-1">Scan File</p>
+                              <a href={`/api/lab/files/${currentCase.scanFile}`} download
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 border border-primary/20 rounded-lg text-primary hover:bg-primary/10 font-bold text-[11px] transition-colors">
+                                📂 {currentCase.scanFile}
+                              </a>
+                            </div>
+                          )}
+                          {currentCase.opposingBiteScan && (
+                            <div className="col-span-2">
+                              <p className="text-gray-400 font-medium mb-1">Opposing Bite Scan</p>
+                              <a href={`/api/lab/files/${currentCase.opposingBiteScan}`} download
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 border border-primary/20 rounded-lg text-primary hover:bg-primary/10 font-bold text-[11px] transition-colors">
+                                📂 {currentCase.opposingBiteScan}
+                              </a>
+                            </div>
+                          )}
                         </>
                       ) : (
                         <>
                           <div>
-                            <span className="text-gray-400 font-medium">Order Category</span>
-                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.orderCategory}</p>
+                            <p className="text-gray-400 font-medium">Test Type</p>
+                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.testType || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 font-medium">Sample Type</p>
+                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.sampleType || "—"}</p>
                           </div>
                           <div className="col-span-2">
-                            <span className="text-gray-400 font-medium">Order Details</span>
-                            <pre className="mt-1 p-2 bg-gray-100 rounded text-[10px] text-gray-700 font-mono overflow-auto whitespace-pre-wrap">
-                              {JSON.stringify(currentCase.orderDetails, null, 2)}
-                            </pre>
+                            <p className="text-gray-400 font-medium">Reason for Test</p>
+                            <p className="font-bold text-gray-700 mt-0.5">{currentCase.reasonForTest || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 font-medium">Due Date</p>
+                            <p className="font-bold text-danger mt-0.5 flex items-center gap-1"><Calendar className="w-3 h-3" />{currentCase.dueDate || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400 font-medium">Sample Collected</p>
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider mt-0.5 ${
+                              currentCase.sampleCollectedConfirm
+                                ? "bg-success/10 text-success border-success/20"
+                                : "bg-danger/10 text-danger border-danger/20"
+                            }`}>
+                              {currentCase.sampleCollectedConfirm ? "Confirmed" : "Pending"}
+                            </span>
                           </div>
                         </>
                       )}
-                      <div>
-                        <span className="text-gray-400 font-medium">Estimated Delivery</span>
-                        <p className="font-bold text-danger flex items-center gap-1 mt-0.5">
-                          <Calendar className="w-3.5 h-3.5 text-danger" /> {currentCase.dueDate}
-                        </p>
-                      </div>
                     </div>
 
                     {currentCase.notes && (
-                      <div className="border-t border-gray-250/40 pt-3 text-xs text-gray-600 italic">
-                        "{currentCase.notes}"
+                      <div className="pt-3 border-t border-gray-200">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Doctor&apos;s Notes</p>
+                        <p className="text-xs text-gray-600 italic leading-relaxed">&ldquo;{currentCase.notes}&rdquo;</p>
                       </div>
                     )}
                   </div>
 
-                  {/* Dentist Contact Card */}
-                  <div className="border border-gray-150 rounded-2xl p-4 flex items-center justify-between">
+                  {/* Ordering Dentist strip */}
+                  <div className="mt-3 border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between bg-white">
                     <div>
-                      <span className="text-[9px] font-black text-primary uppercase tracking-widest bg-primary/10 px-2 py-0.5 rounded">Dentist Info</span>
-                      <h4 className="text-sm font-bold text-gray-900 mt-2">{currentCase.dentist}</h4>
-                      <p className="text-xs text-gray-400 mt-0.5">{currentCase.dentistContact}</p>
+                      <p className="text-[9px] font-black text-primary uppercase tracking-widest">Ordering Dentist</p>
+                      <p className="text-xs font-bold text-gray-900 mt-0.5">{currentCase.dentist}</p>
+                      <p className="text-[10px] text-gray-400">{currentCase.dentistContact}</p>
                     </div>
-                    <span className="text-2xl bg-gray-50 p-2.5 rounded-xl border border-gray-100">👤</span>
-                  </div>
-
-                  {/* Work Timeline */}
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Fabrication Timeline</h4>
-                    <div className="relative pl-5 space-y-5 border-l-2 border-gray-105 ml-2 py-1">
-                      {[
-                        { name: "Order Received", done: true, desc: "Impression scanned and received by doctor." },
-                        { name: "Design Approved", done: currentCase.status !== "Pending", desc: "CAD tooth model approved by technician." },
-                        { name: "Milling / 3D Print", done: currentCase.status === "In Progress" || currentCase.status === "QC Pending" || currentCase.status === "Ready / Shipped" || currentCase.status === "Completed", desc: "Fabricating actual prosthesis shape." },
-                        { name: "QC Passed", done: currentCase.status === "Ready / Shipped" || currentCase.status === "Completed", desc: "Dimensional tolerances verify ok." },
-                        { name: "Dispatch & Shipped", done: currentCase.status === "Completed", desc: "Dispatched and shipped to clinic." }
-                      ].map((step, idx) => (
-                        <div key={idx} className="relative">
-                          <span className={`absolute -left-[28.5px] top-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center text-[8px] font-black ${
-                            step.done ? "bg-success border-success text-white" : "bg-white border-gray-200 text-transparent"
-                          }`}>
-                            ✓
-                          </span>
-                          <div>
-                            <p className={`text-xs font-bold ${step.done ? "text-success" : "text-gray-400"}`}>{step.name}</p>
-                            <p className="text-[10px] text-gray-450 leading-relaxed mt-0.5">{step.desc}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <span className="text-lg bg-gray-50 p-2 rounded-xl border border-gray-100">👤</span>
                   </div>
                 </div>
-              )}
 
-              {/* Tab: Scan Viewer */}
-              {activeTab === "viewer" && (
-                <div className="space-y-5 h-full flex flex-col">
-                  <div className="flex border-b border-gray-100 gap-2 pb-2">
-                    {["STL", "XRAY", "PDF"].map((vt) => (
-                      <button
-                        key={vt}
-                        onClick={() => setViewerType(vt)}
-                        className={`px-3 py-1 text-[10px] font-extrabold uppercase tracking-wide rounded-md cursor-pointer transition-all ${
-                          viewerType === vt ? "bg-gray-900 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-500"
+                {/* Divider */}
+                <div className="border-t border-dashed border-gray-200" />
+
+                {/* ── SECTION 2: Service Provider ── */}
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Select Service Provider</p>
+                  <div className="space-y-2">
+                    {Object.entries(LAB_PARTNERS).map(([key, lab]) => (
+                      <label
+                        key={key}
+                        className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                          selectedLabPartner === key
+                            ? "border-primary bg-primary/5"
+                            : "border-gray-100 hover:border-gray-200 bg-white"
                         }`}
                       >
-                        {vt} File
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="bg-gray-950 rounded-2xl h-[320px] flex items-center justify-center overflow-hidden relative">
-                    
-                    {/* STL Viewer Mock */}
-                    {viewerType === "STL" && (
-                      <div className="w-full h-full p-4 flex flex-col justify-between select-none">
-                        <div className="flex justify-between items-center text-white">
-                          <span className="text-[9px] bg-white/10 px-2 py-0.5 rounded border border-white/10 text-primary font-bold">STL 3D Wireframe Active</span>
-                          <div className="flex gap-1.5">
-                            <button onClick={() => setStlZoom(prev => Math.min(2, prev + 0.1))} className="w-6 h-6 bg-white/10 rounded flex items-center justify-center hover:bg-white/20 text-xs font-bold">+</button>
-                            <button onClick={() => setStlZoom(prev => Math.max(0.5, prev - 0.1))} className="w-6 h-6 bg-white/10 rounded flex items-center justify-center hover:bg-white/20 text-xs font-bold">-</button>
-                          </div>
-                        </div>
-
-                        {/* Tooth wireframe spinner */}
-                        <div 
-                          style={{
-                            transform: `rotateX(${stlRotation}deg) rotateY(${stlRotation * 1.2}deg) scale(${stlZoom})`,
-                            transition: "transform 0.1s ease-out"
-                          }}
-                          className="w-24 h-24 border-2 border-primary/40 rounded-xl flex items-center justify-center self-center animate-spin duration-15000"
-                        >
-                          <svg className="w-12 h-12 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-                          </svg>
-                        </div>
-
-                        <div className="flex justify-between items-center text-[10px] text-gray-400">
-                          <span>Rotate mesh model:</span>
-                          <input 
-                            type="range" 
-                            min="0" 
-                            max="360"
-                            value={stlRotation}
-                            onChange={(e) => setStlRotation(Number(e.target.value))}
-                            className="w-24 accent-primary"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* X-Ray Viewer */}
-                    {viewerType === "XRAY" && (
-                      <div className="w-full h-full relative p-4 flex items-center justify-center">
-                        <img 
-                          src="https://images.unsplash.com/photo-1559757175-5700dde675bc?q=80&w=400&auto=format&fit=crop" 
-                          alt="Dental Xray" 
-                          className="max-h-full max-w-full object-contain rounded opacity-75 border border-white/10"
-                        />
-                        <div className="absolute bottom-4 left-4 text-[9px] bg-black/60 px-2 py-0.5 rounded text-white border border-white/10">
-                          Panoramic retraction scanning
-                        </div>
-                      </div>
-                    )}
-
-                    {/* PDF prescription mock */}
-                    {viewerType === "PDF" && (
-                      <div className="flex flex-col items-center justify-center text-white space-y-3">
-                        <span className="text-4xl">📄</span>
-                        <div className="text-center">
-                          <p className="text-xs font-bold">presc_{currentCase.id.toLowerCase()}.pdf</p>
-                          <p className="text-[10px] text-gray-450 mt-0.5">SmileCare digital prescription sheet</p>
-                        </div>
-                        <button className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-[10px] font-black tracking-wide uppercase transition-all">
-                          Download Prescription
-                        </button>
-                      </div>
-                    )}
-
-                  </div>
-                </div>
-              )}
-
-              {/* Tab: CAD Desk */}
-              {activeTab === "cad" && (
-                <div className="space-y-6">
-                  {/* Version List */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Revision History</h4>
-                    <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1">
-                      {cadVersions.map((v, idx) => (
-                        <div key={idx} className="p-3 border border-gray-150 rounded-xl flex flex-col gap-1 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-gray-800">{v.version}</span>
-                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${v.color}`}>
-                              {v.status}
-                            </span>
-                          </div>
-                          <p className="text-[9px] text-gray-455">{v.date} by {v.author}</p>
-                          <p className="text-xs text-gray-650 mt-0.5 font-medium">{v.notes}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Dropzone Upload */}
-                  <div className="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center hover:border-primary/50 transition-colors relative cursor-pointer">
-                    <input 
-                      type="file" 
-                      id="drawer-stl-uploader" 
-                      className="hidden" 
-                      onChange={handleCadVersionUpload}
-                    />
-                    <label htmlFor="drawer-stl-uploader" className="cursor-pointer flex flex-col items-center gap-1 select-none">
-                      <span className="text-xl">📤</span>
-                      <p className="text-xs font-bold text-gray-700">Drag & Drop scanner model (.stl, .obj)</p>
-                      <p className="text-[9px] text-gray-400">Click to browse local files</p>
-                    </label>
-                  </div>
-
-                  {/* Designer notes log */}
-                  <div className="space-y-3.5 border-t border-gray-100 pt-4">
-                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Technician Design Log</h4>
-                    
-                    <div className="space-y-2 max-h-[120px] overflow-y-auto pr-1">
-                      {designerNotesList.map((note, idx) => (
-                        <div key={idx} className="flex gap-2 text-xs text-gray-600 bg-gray-50 border border-gray-100/50 p-2.5 rounded-xl">
-                          <span className="text-primary font-black">•</span>
-                          <p className="leading-relaxed">{note}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <form onSubmit={handleAddDesignerNote} className="flex gap-2">
-                      <input 
-                        type="text" 
-                        placeholder="Log designer parameters..." 
-                        value={designerNote}
-                        onChange={(e) => setDesignerNote(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-                      />
-                      <button 
-                        type="submit" 
-                        className="px-3.5 py-2 bg-primary text-white font-bold rounded-xl text-xs hover:bg-primary/95 transition-all shadow-sm cursor-pointer"
-                      >
-                        Add
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* Tab: Quality Control */}
-              {activeTab === "qc" && (
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Quality Checklist</h4>
-                    <p className="text-[10px] text-gray-400 mt-0.5">All items must be verified before passing case</p>
-                  </div>
-
-                  <div className="space-y-3 bg-gray-50 border border-gray-150 p-4 rounded-2xl">
-                    {[
-                      { key: "dimensions", name: "Margin & Dimensions", desc: "Checks sits snugly on die model without gaps." },
-                      { key: "colorMatch", name: "Shade Verification", desc: "Matches guide tone under 5500K daylight." },
-                      { key: "surfaceFinish", name: "Occlusion & Glaze", desc: "Luster fits and bites correctly on articulating arches." },
-                      { key: "accuracy", name: "Anatomical Accuracy", desc: "Aligns correctly without excessive force." },
-                      { key: "materialQuality", name: "Material Integrity", desc: "Inspect for sintering cracks or structural flaws." }
-                    ].map(item => (
-                      <label key={item.key} className="flex items-start gap-3 cursor-pointer group p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-gray-100">
                         <input
-                          type="checkbox"
-                          checked={qcChecklist[item.key]}
-                          onChange={() => setQcChecklist(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
-                          className="mt-0.5 w-4 h-4 border-gray-305 rounded text-primary focus:ring-primary accent-primary"
+                          type="radio"
+                          name="labPartner"
+                          value={key}
+                          checked={selectedLabPartner === key}
+                          onChange={() => {
+                            setSelectedLabPartner(key);
+                            setDeliveryAddress(LAB_PARTNERS[key].address);
+                          }}
+                          className="mt-0.5 accent-primary shrink-0"
                         />
-                        <div>
-                          <span className="text-xs font-bold text-gray-805 group-hover:text-primary transition-colors">{item.name}</span>
-                          <p className="text-[10px] text-gray-405 leading-relaxed mt-0.5">{item.desc}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-gray-900">{lab.name}</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">{lab.specialty}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">{lab.contact}</p>
                         </div>
+                        {selectedLabPartner === key && (
+                          <span className="w-4 h-4 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
+                            <span className="text-white text-[8px] font-black">✓</span>
+                          </span>
+                        )}
                       </label>
                     ))}
                   </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-455 uppercase tracking-wider">QC Comments / Failure Notes</label>
-                    <textarea
-                      rows={3}
-                      placeholder="Input rework instructions or inspection pass observations..."
-                      value={qcComments}
-                      onChange={(e) => setQcComments(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-850 placeholder-gray-400 leading-relaxed"
-                    />
-                  </div>
-
-                  {/* QC Action buttons */}
-                  <div className="flex flex-wrap items-center gap-2 pt-2">
-                    <button
-                      onClick={handleQCReject}
-                      className="px-3.5 py-2.5 text-xs font-bold text-danger bg-danger/5 border border-danger/10 hover:bg-danger hover:text-white rounded-xl transition-all cursor-pointer flex-1"
-                    >
-                      Reject/Discard
-                    </button>
-                    <button
-                      onClick={handleQCFailRework}
-                      className="px-3.5 py-2.5 text-xs font-bold text-warning bg-warning/5 border border-warning/10 hover:bg-warning hover:text-white rounded-xl transition-all cursor-pointer flex-1"
-                    >
-                      Rework Needed
-                    </button>
-                    <button
-                      onClick={handleQCPass}
-                      className="px-4 py-2.5 text-xs font-bold text-white bg-success hover:bg-success/95 rounded-xl transition-all shadow-sm cursor-pointer flex-[2] flex items-center justify-center gap-1"
-                    >
-                      <CheckCircle className="w-4 h-4" /> Pass Quality Check
-                    </button>
-                  </div>
                 </div>
-              )}
 
-              {/* Tab: Lab Results (For Non-Prosthetic Orders) */}
-              {activeTab === "results" && currentCase.orderCategory !== "Prosthetic" && (
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Upload Lab Results</h4>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Provide the document link to automatically sync with patient reports.</p>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <label className="text-xs font-bold text-gray-700">Result Document URL</label>
-                    <input 
-                      type="url"
-                      placeholder="https://drive.google.com/..."
-                      value={currentCase.resultDocumentUrl || ""}
-                      onChange={async (e) => {
-                        const newUrl = e.target.value;
-                        await updateLabOrder(currentCase.id, { result_document_url: newUrl });
-                        setSelectedOrder(prev => ({...prev, resultDocumentUrl: newUrl}));
-                      }}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary"
-                    />
-                  </div>
-                  {currentCase.resultDocumentUrl && (
-                    <div className="bg-success/5 border border-success/20 rounded-2xl p-4 flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-success shrink-0 mt-0.5" />
-                      <div>
-                        <h5 className="text-xs font-bold text-success">Document Attached</h5>
-                        <p className="text-[10px] text-gray-500 mt-0.5">The result document has been successfully attached to the case. It will sync with patient reports once completed.</p>
-                        <a href={currentCase.resultDocumentUrl} target="_blank" className="text-xs text-primary font-semibold mt-2 inline-block">View Document ↗</a>
-                      </div>
-                    </div>
-                  )}
+                {/* ── SECTION 3: Delivery Address ── */}
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                    Delivery Address <span className="text-red-400 normal-case tracking-normal font-bold">*</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Enter the address where the item should be delivered"
+                    value={deliveryAddress || (selectedLabPartner ? LAB_PARTNERS[selectedLabPartner].address : "")}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 resize-none placeholder-gray-400 leading-relaxed"
+                  />
                 </div>
-              )}
 
-              {/* Tab: Dispatch */}
-              {activeTab === "dispatch" && (
-                <div className="space-y-6">
-                  {/* Courier partner details */}
-                  <div className="space-y-4">
+                {/* ── SECTION 4: Additional Notes ── */}
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                    Additional Notes
+                    <span className="ml-1.5 normal-case tracking-normal font-normal text-gray-400">(optional — sent to doctor)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="e.g. Please use A1 shade guide. Urgent — patient appointment on Friday."
+                    value={labNotes}
+                    onChange={(e) => setLabNotes(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 resize-none placeholder-gray-400 leading-relaxed"
+                  />
+                </div>
+
+                {/* ── SECTION 5: Send to Doctor / Dispatch button ── */}
+                {["Pending Doctor Review", "Pending Doctor Confirmation"].includes(currentCase.status) ? (
+                  <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200/60 rounded-2xl">
+                    <span className="text-lg shrink-0">⏳</span>
                     <div>
-                      <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Delivery Logistics</h4>
-                      <p className="text-[10px] text-gray-450 mt-0.5">Courier shipping provider information</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 text-xs">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-450 uppercase tracking-wider">Courier Service</label>
-                        <select
-                          value={courierPartner}
-                          onChange={(e) => setCourierPartner(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm"
-                        >
-                          <option value="SmileCare Express">SmileCare Express Logistics</option>
-                          <option value="DHL Express">DHL Express Delivery</option>
-                          <option value="FedEx Clinical">FedEx Clinical Shipping</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-450 uppercase tracking-wider">Estimated Delivery</label>
-                        <input
-                          type="text"
-                          value={estDeliveryDate}
-                          onChange={(e) => setEstDeliveryDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-205 rounded-xl text-xs text-gray-850 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-455 uppercase tracking-wider">Tracking Code</label>
-                        <input
-                          type="text"
-                          readOnly
-                          value={(() => {
-                            const parts = currentCase.id.split("-");
-                            let suffix = parts.length >= 3 ? parts[2] : (parts[1] || parts[0] || "000");
-                            if (/^\d+$/.test(suffix)) suffix = suffix.padStart(3, "0");
-                            return `TRK-2026-${suffix}`;
-                          })()}
-                          className="w-full px-3 py-2 border border-gray-150 bg-gray-50 rounded-xl text-xs text-gray-400 focus:outline-none"
-                        />
-                      </div>
+                      <p className="text-xs font-bold text-amber-800">Awaiting Doctor Confirmation</p>
+                      <p className="text-[10px] text-amber-600/80 mt-0.5 leading-relaxed">
+                        This order has been sent to {currentCase.dentist}. Waiting for them to review and confirm before it is dispatched.
+                      </p>
                     </div>
                   </div>
-
-                  {/* Dispatch confirmation check */}
-                  {currentCase.status === "Ready / Shipped" ? (
-                    <div className="bg-success/5 border border-success/20 rounded-2xl p-4 flex items-start gap-3">
-                      <span className="w-5 h-5 rounded-full bg-success text-white flex items-center justify-center font-bold text-xs shrink-0">✓</span>
+                ) : ["Confirmed", "Doctor Accepted"].includes(currentCase.status) ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-4 bg-success/5 border border-success/20 rounded-2xl">
+                      <span className="w-5 h-5 rounded-full bg-success flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="text-white text-[9px] font-black">✓</span>
+                      </span>
                       <div>
-                        <h5 className="text-xs font-bold text-success">Passed Quality Control</h5>
-                        <p className="text-[10px] text-gray-500 leading-relaxed mt-0.5">This restoration is packed and fully cleared for courier pickup.</p>
+                        <p className="text-xs font-bold text-success">Doctor Confirmed — Ready to Dispatch</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">
+                          {currentCase.dentist} has reviewed and confirmed this order. You can now physically send the package.
+                        </p>
                       </div>
                     </div>
-                  ) : (
-                    <div className="bg-warning/5 border border-warning/20 rounded-2xl p-4 flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-                      <div>
-                        <h5 className="text-xs font-bold text-warning">Awaiting QC Verification</h5>
-                        <p className="text-[10px] text-gray-500 leading-relaxed mt-0.5">You must pass the Quality Control checks first. However, you can still dispatch directly if required.</p>
-                      </div>
+                    <button
+                      onClick={async () => {
+                        const ok = await updateDbStatus(currentCase.id, "Order Sent to Lab");
+                        if (ok) {
+                          triggerToast(`Case ${currentCase.id} marked as Order Sent to Lab.`);
+                        } else {
+                          triggerToast("Failed to update status.", "error");
+                        }
+                      }}
+                      className="w-full py-3.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Truck className="w-4 h-4" /> Mark as Sent to Lab
+                    </button>
+                  </div>
+                ) : ["Sent to Lab", "Order Sent to Lab", "Order Received", "Completed", "Returned for Rework"].includes(currentCase.status) ? (
+                  <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
+                    <span className="text-lg shrink-0">📦</span>
+                    <div>
+                      <p className="text-xs font-bold text-primary">Dispatched &amp; Sent to External Lab</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">
+                        This order has been physically sent to {selectedLabPartner ? LAB_PARTNERS[selectedLabPartner]?.name : "the lab"}.
+                      </p>
                     </div>
-                  )}
-
+                  </div>
+                ) : (
                   <button
-                    onClick={handleDispatchOrder}
-                    className="w-full py-3 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                    onClick={async () => {
+                      if (!deliveryAddress && !LAB_PARTNERS[selectedLabPartner]?.address) {
+                        triggerToast("Please enter a delivery address.", "error");
+                        return;
+                      }
+                      const ok = await updateDbStatus(currentCase.id, "Pending Doctor Confirmation");
+                      if (ok) {
+                        triggerToast(`Order sent to ${currentCase.dentist} for confirmation.`);
+                      } else {
+                        triggerToast("Failed to send. Please try again.", "error");
+                      }
+                    }}
+                    className="w-full py-3.5 bg-primary hover:bg-primary/90 text-white font-extrabold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Truck className="w-4 h-4" /> Dispatch & Ship Case
+                    <Truck className="w-4 h-4" />
+                    Send to Doctor for Confirmation
                   </button>
-                </div>
-              )}
+                )}
 
+                {/* ── SECTION 6: Receipt tracking (only after order is sent to lab) ── */}
+                {["Sent to Lab", "Order Sent to Lab", "Order Received", "Completed", "Returned for Rework"].includes(currentCase.status) && (
+                  <>
+                    <div className="border-t border-dashed border-gray-200" />
+
+                    <div>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Item Receipt</p>
+
+                      <div className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-150 rounded-xl">
+                        <input
+                          type="checkbox"
+                          id="received-check"
+                          checked={isReceived || ["Order Received", "Completed"].includes(currentCase.status)}
+                          onChange={async (e) => {
+                            const checked = e.target.checked;
+                            setIsReceived(checked);
+                            if (checked) {
+                              await updateDbStatus(currentCase.id, "Order Received");
+                            } else {
+                              await updateDbStatus(currentCase.id, "Order Sent to Lab");
+                            }
+                          }}
+                          className="mt-0.5 w-4 h-4 accent-primary shrink-0 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <label htmlFor="received-check" className="text-xs font-bold text-gray-800 cursor-pointer">
+                            Item Received at Clinic
+                          </label>
+                          <p className="text-[10px] text-gray-400 mt-0.5">Tick this once the package arrives from the lab.</p>
+                          {(isReceived || ["Order Received", "Completed"].includes(currentCase.status)) && (
+                            <div className="mt-3">
+                              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Date & Time Received</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 10 July 2026, 11:30 AM"
+                                value={receivedDate}
+                                onChange={(e) => setReceivedDate(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 placeholder-gray-400"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {isReceived && (
+                        <button
+                          onClick={() => setIsReworkModalOpen2(true)}
+                          className="mt-3 w-full py-2.5 bg-warning/10 hover:bg-warning/20 border border-warning/30 text-warning font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          🔄 Return / Request Rework
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+
+              </div>
             </div>
 
           </div>
         </>
+      )}
+
+      {/* Return / Rework Reason Modal */}
+      {isReworkModalOpen2 && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <span className="text-warning">🔄</span> Return / Request Rework
+              </h2>
+              <button
+                onClick={() => setIsReworkModalOpen2(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 hover:bg-gray-100 rounded-full cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">Reason Category</label>
+                <select
+                  value={reworkCategory2}
+                  onChange={(e) => setReworkCategory2(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-warning/20 focus:border-warning"
+                >
+                  <option value="shade mismatch">Shade Mismatch</option>
+                  <option value="poor fit">Poor Fit / Wrong Size</option>
+                  <option value="contact issue">Contact Point Issue</option>
+                  <option value="surface defect">Surface Defect / Crack</option>
+                  <option value="wrong specs">Wrong Specifications</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                  Detailed Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  placeholder="Describe the issue clearly so the lab can correct it..."
+                  value={reworkReason2}
+                  onChange={(e) => setReworkReason2(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-warning/20 focus:border-warning text-gray-800 placeholder-gray-400 resize-none leading-relaxed"
+                />
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsReworkModalOpen2(false)}
+                className="px-4 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!reworkReason2.trim()) {
+                    triggerToast("Please describe the rework reason.", "error");
+                    return;
+                  }
+                  const ok = await updateDbStatus(currentCase.id, "Returned for Rework", reworkReason2);
+                  if (ok) {
+                    triggerToast(`Case ${currentCase.id} returned for rework.`);
+                    setIsReworkModalOpen2(false);
+                    setReworkReason2("");
+                    setIsReceived(false);
+                  } else {
+                    triggerToast("Failed to update status.", "error");
+                  }
+                }}
+                disabled={!reworkReason2.trim()}
+                className="px-4 py-2 text-xs font-bold text-white bg-warning hover:bg-warning/90 rounded-xl transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm Return
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {isEditModalOpen && (
@@ -1408,6 +1938,247 @@ export default function LabOrders() {
                 Confirm Rejection
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send to External Lab Modal */}
+      {isDispatchModalOpen && dispatchOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <span className="text-lg">📦</span> Send to External Lab
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">Review the doctor&apos;s order, enter the delivery address, and send.</p>
+              </div>
+              <button 
+                onClick={() => setIsDispatchModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleDispatchSubmit}>
+              <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
+
+                {/* Doctor Specs — read-only */}
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Doctor&apos;s Specifications</p>
+
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+                    {[
+                      { label: "Patient", value: dispatchOrder.patientName },
+                      { label: "Dentist", value: dispatchOrder.dentistName },
+                      { label: "Case ID", value: dispatchOrder.id },
+                      { label: "Priority", value: dispatchOrder.priority },
+                      { label: "Category", value: dispatchOrder.category || dispatchOrder.prostheticType || "—" },
+                      { label: "Tooth / Quadrant", value: dispatchOrder.toothQuadrant || "—" },
+                      { label: "Material", value: dispatchOrder.material || "—" },
+                      { label: "Shade", value: dispatchOrder.shade || "—" },
+                      { label: "Due Date", value: dispatchOrder.dueDate || "—" },
+                    ].map(({ label, value }) => (
+                      <div key={label}>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</p>
+                        <p className="text-sm font-medium text-gray-800 mt-0.5">{value || "—"}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {(dispatchOrder.notes || (dispatchOrder.orderDetails || {}).notes) && (
+                    <div className="pt-2 border-t border-gray-200">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Doctor&apos;s Notes</p>
+                      <p className="text-sm text-gray-700 leading-relaxed">{dispatchOrder.notes || (dispatchOrder.orderDetails || {}).notes}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Delivery Address */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Lab Delivery Address <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    rows="3"
+                    required
+                    placeholder="e.g. Apex Dental Lab, 2nd Floor, Banjara Hills, Hyderabad — 500034"
+                    value={dispatchFormData.address}
+                    onChange={(e) => setDispatchFormData({ ...dispatchFormData, address: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 resize-none placeholder:text-gray-400"
+                  ></textarea>
+                </div>
+
+                {/* Expected Return Date */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Expected Return Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={dispatchFormData.expectedReturnDate}
+                    onChange={(e) => setDispatchFormData({ ...dispatchFormData, expectedReturnDate: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800"
+                  />
+                </div>
+
+                {/* Optional notes */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Additional Instructions <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <textarea
+                    rows="2"
+                    value={dispatchFormData.notes}
+                    onChange={(e) => setDispatchFormData({ ...dispatchFormData, notes: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 resize-none placeholder:text-gray-400"
+                    placeholder="Any special handling notes for the lab..."
+                  ></textarea>
+                </div>
+
+              </div>
+
+              <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsDispatchModalOpen(false)}
+                  className="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-sm font-semibold text-white bg-primary rounded-xl hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30 cursor-pointer flex items-center gap-2"
+                >
+                  <Truck className="w-4 h-4" /> Send to Lab
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Rework Modal */}
+      {isReworkModalOpen && reworkOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <span className="text-danger">🔄</span> Return Case {reworkOrder.id} for Correction
+              </h2>
+              <button 
+                onClick={() => setIsReworkModalOpen(false)}
+                className="text-gray-400 hover:text-gray-655 transition-colors p-2 hover:bg-gray-100 rounded-full"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleReworkSubmit}>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-500">
+                  Please specify the reason for returning this case to the lab. The case will be re-opened for correction.
+                </p>
+                
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Rework Reason</label>
+                  <select
+                    value={reworkReason}
+                    onChange={(e) => setReworkReason(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-danger/20 focus:border-danger outline-none transition-all text-sm text-gray-800 bg-white"
+                  >
+                    <option value="shade mismatch">Shade Mismatch</option>
+                    <option value="poor fit">Poor Fit</option>
+                    <option value="contact issue">Contact Issue</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Detailed Explanation / Notes</label>
+                  <textarea 
+                    rows="4"
+                    required
+                    placeholder="Enter detailed correction request notes..."
+                    value={reworkNote}
+                    onChange={(e) => setReworkNote(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-danger/20 focus:border-danger outline-none transition-all text-sm text-gray-805 resize-none placeholder:text-gray-400"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsReworkModalOpen(false)}
+                  className="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2 text-sm font-semibold text-white bg-danger rounded-xl hover:bg-danger/90 transition-colors shadow-sm shadow-danger/30 cursor-pointer"
+                >
+                  Confirm Return
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Flag Modal */}
+      {isFlagModalOpen && flagOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <span className="text-warning">🚩</span> Flag Case {flagOrder.id} for Doctor
+              </h2>
+              <button 
+                onClick={() => setIsFlagModalOpen(false)}
+                className="text-gray-400 hover:text-gray-655 transition-colors p-2 hover:bg-gray-100 rounded-full font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleFlagSubmit}>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-500">
+                  This sends the case back to the doctor as "Flagged" to fill in missing fields or resolve clinical issues.
+                </p>
+                
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Flag Explanation / Missing Fields Note</label>
+                  <textarea 
+                    rows="5"
+                    required
+                    placeholder="Describe what is missing or incorrect..."
+                    value={flagNote}
+                    onChange={(e) => setFlagNote(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-warning/20 focus:border-warning outline-none transition-all text-sm text-gray-805 resize-none placeholder:text-gray-400"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsFlagModalOpen(false)}
+                  className="px-5 py-2 text-sm font-medium text-gray-655 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2 text-sm font-semibold text-white bg-warning hover:bg-warning/90 rounded-xl transition-colors shadow-sm shadow-warning/30 cursor-pointer"
+                >
+                  Send Flag Note
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

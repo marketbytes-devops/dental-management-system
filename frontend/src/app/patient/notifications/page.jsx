@@ -33,7 +33,7 @@ const postCareInstructions = [
   }
 ];
 
-export const metadata = {
+const metadata = {
   title: 'My Notifications | Patient Portal',
   description: 'View your notifications, reminders, and post-care instructions.',
 };

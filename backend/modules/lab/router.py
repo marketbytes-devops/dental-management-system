@@ -1,16 +1,32 @@
 # router.py - lab technician and doctor lab endpoints
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from database import get_db
 from dependencies import get_current_user
-from modules.lab.models import LabOrderModel, LabNotificationModel, InventoryItemModel, RestockRequestModel
+from modules.lab.models import (
+    LabOrderModel, 
+    LabNotificationModel, 
+    LabVendorModel, 
+    LabOrderCommentModel, 
+    LabAuditTrailModel,
+    InventoryItemModel,
+    RestockRequestModel,
+    ClinicalEncounterModel,
+    ProstheticCaseDetailModel,
+    PathologyCaseDetailModel
+)
 from modules.lab.schemas import (
     LabOrderCreate,
     LabOrderStatusUpdate,
     LabOrderEdit,
     LabOrderResponse,
     LabNotificationResponse,
+    LabVendorCreate,
+    LabVendorResponse,
+    LabOrderCommentCreate,
+    LabOrderCommentResponse,
+    LabAuditTrailResponse,
     InventoryItemCreate,
     InventoryItemUpdate,
     InventoryItemResponse,
@@ -22,13 +38,68 @@ from modules.patient.models import PatientModel, PatientNotificationModel
 from modules.doctor.models import DoctorModel
 from modules.auth.models import UserModel
 import random
+import os
+import shutil
 from datetime import datetime
+
+def serialize_order(order: LabOrderModel):
+    if not order:
+        return order
+    # Dynamically attach fields from detail records for easy serialization
+    order.tooth_number = None
+    order.fabrication_type = None
+    order.scan_file = None
+    order.opposing_bite_scan = None
+    order.implant_system = None
+    order.test_type = None
+    order.sample_type = None
+    order.reason_for_test = None
+    order.external_lab_name = None
+    order.sample_collected_confirm = None
+
+    if order.order_category == "Prosthetic":
+        detail = order.prosthetic_detail
+        if detail:
+            order.tooth_number = detail.tooth_number
+            order.fabrication_type = detail.fabrication_type
+            order.scan_file = detail.scan_file
+            order.material = detail.material
+            order.shade = detail.shade
+            order.opposing_bite_scan = detail.opposing_bite_scan
+            order.implant_system = detail.implant_system
+    else: # Diagnostic / Pathology
+        detail = order.pathology_detail
+        if detail:
+            order.test_type = detail.test_type
+            order.sample_type = detail.sample_type
+            order.reason_for_test = detail.reason_for_test
+            order.external_lab_name = detail.external_lab_name
+            order.sample_collected_confirm = detail.sample_collected_confirm
+    return order
 
 router = APIRouter(
     prefix="/lab",
     tags=["lab"]
 )
 
+# -------------------------------------------------------------
+# File Upload Endpoint (Local Storage)
+# -------------------------------------------------------------
+@router.post("/upload")
+def upload_lab_file(file: UploadFile = File(...)):
+    # Ensure static/uploads exists
+    upload_dir = os.path.join("static", "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    file_path = os.path.join(upload_dir, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    return {"name": file.filename, "url": f"/static/uploads/{file.filename}"}
+
+# -------------------------------------------------------------
+# Lab Orders Endpoints
+# -------------------------------------------------------------
 @router.post("/orders", response_model=LabOrderResponse)
 def create_lab_order(
     order_data: LabOrderCreate,
@@ -65,7 +136,6 @@ def create_lab_order(
         dentist_contact = "+91 98765 43210"
 
     # 3. Generate a case ID
-    # Format e.g.: CASE-2026-009 or similar. Let's make it unique
     random_suffix = f"{random.randint(1, 999):03d}"
     case_id = f"CASE-2026-{random_suffix}"
     
@@ -73,6 +143,10 @@ def create_lab_order(
     while db.query(LabOrderModel).filter(LabOrderModel.id == case_id).first():
         random_suffix = f"{random.randint(1, 999):03d}"
         case_id = f"CASE-2026-{random_suffix}"
+
+    initial_status = "Submitted"
+    if order_data.order_category in ["Diagnostic", "Blood Work", "Pathology", "Blood Work / Pathology"]:
+        initial_status = "Ordered"
 
     new_order = LabOrderModel(
         id=case_id,
@@ -82,20 +156,83 @@ def create_lab_order(
         dentist_contact=dentist_contact,
         order_category=order_data.order_category,
         order_details=order_data.order_details,
-        prosthetic_type=order_data.prosthetic_type,
+        prosthetic_type=order_data.prosthetic_type or order_data.fabrication_type,
         material=order_data.material,
         shade=order_data.shade,
         priority=order_data.priority,
-        status="Pending",
+        status=initial_status,
         notes=order_data.notes,
         due_date=order_data.due_date or "2026-06-15",
-        rejection_reason=None
+        rejection_reason=None,
+        
+        # Extended fields
+        treatment_plan_step_id=order_data.treatment_plan_step_id,
+        tooth_quadrant=order_data.tooth_quadrant or order_data.tooth_number,
+        procedure_code=order_data.procedure_code,
+        margin_design=order_data.margin_design,
+        impression_type=order_data.impression_type or "Physical",
+        attachments=order_data.attachments,
+        vendor_id=order_data.vendor_id,
+        courier_name=order_data.courier_name,
+        tracking_number=order_data.tracking_number,
+        dispatch_date=order_data.dispatch_date,
+        expected_return_date=order_data.expected_return_date,
+        external_cost=order_data.external_cost or 0,
+        parent_order_id=order_data.parent_order_id,
+        rejection_category=order_data.rejection_category,
+        is_rework=order_data.is_rework or False,
+        original_case_id=order_data.original_case_id,
+        stage=order_data.stage or "New Cases"
     )
 
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
 
+    # 3. Create category-specific details
+    if order_data.order_category in ["Diagnostic", "Blood Work", "Pathology", "Blood Work / Pathology"]:
+        pathology_detail = PathologyCaseDetailModel(
+            lab_case_id=case_id,
+            test_type=order_data.test_type,
+            sample_type=order_data.sample_type,
+            reason_for_test=order_data.reason_for_test,
+            external_lab_name=order_data.external_lab_name or order_data.lab_name,
+            sample_collected_confirm=order_data.sample_collected_confirm or False
+        )
+        db.add(pathology_detail)
+    else:
+        prosthetic_detail = ProstheticCaseDetailModel(
+            lab_case_id=case_id,
+            tooth_number=order_data.tooth_number or order_data.tooth_quadrant,
+            fabrication_type=order_data.fabrication_type or order_data.prosthetic_type,
+            scan_file=order_data.scan_file,
+            material=order_data.material,
+            shade=order_data.shade,
+            opposing_bite_scan=order_data.opposing_bite_scan,
+            implant_system=order_data.implant_system
+        )
+        db.add(prosthetic_detail)
+
+    # Create clinical encounter
+    encounter = ClinicalEncounterModel(
+        patient_token=order_data.patient_token,
+        doctor_name=dentist_name,
+        notes=f"Clinical session: Lab case {case_id} generated for {patient_name}.",
+        lab_case_id=case_id
+    )
+    db.add(encounter)
+    db.commit()
+    db.refresh(new_order)
+
+    # Create audit trail entry
+    audit = LabAuditTrailModel(
+        order_id=case_id,
+        user_name=dentist_name,
+        action="Created",
+        note=f"Lab order submitted for {patient_name}."
+    )
+    db.add(audit)
+    
     # 4. Generate notification for Lab Technician
     notif = LabNotificationModel(
         recipient_role="lab tech",
@@ -107,7 +244,7 @@ def create_lab_order(
     db.add(notif)
     db.commit()
 
-    return new_order
+    return serialize_order(new_order)
 
 @router.get("/orders", response_model=List[LabOrderResponse])
 def get_lab_orders(
@@ -115,7 +252,18 @@ def get_lab_orders(
     current_user: dict = Depends(get_current_user)
 ):
     orders = db.query(LabOrderModel).order_by(LabOrderModel.created_at.desc()).all()
-    return orders
+    return [serialize_order(o) for o in orders]
+
+@router.get("/orders/{order_id}", response_model=LabOrderResponse)
+def get_lab_order(
+    order_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Lab order not found")
+    return serialize_order(order)
 
 @router.put("/orders/{order_id}/status", response_model=LabOrderResponse)
 def update_lab_order_status(
@@ -128,40 +276,71 @@ def update_lab_order_status(
     if not order:
         raise HTTPException(status_code=404, detail="Lab order not found")
 
+    old_status = order.status
     order.status = status_data.status  # type: ignore
     if status_data.result_document_url:
         order.result_document_url = status_data.result_document_url  # type: ignore
         
-    if status_data.status == "Rejected":
+    if status_data.status in ["Rejected", "returned_for_rework", "Flagged"]:
         order.rejection_reason = status_data.rejection_reason  # type: ignore
     else:
         order.rejection_reason = None  # type: ignore
         
+    if status_data.rejection_category:
+        order.rejection_category = status_data.rejection_category  # type: ignore
+
+    if status_data.status == "returned_for_rework":
+        order.is_rework = True
+        if not order.original_case_id:
+            order.original_case_id = order_id
+        
     db.commit()
     db.refresh(order)
 
-    # Generate notification for Doctor
-    desc = f"Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} has been updated to '{status_data.status}' by Lab Technician."
-    if status_data.status == "Rejected" and status_data.rejection_reason:
-        desc += f" Reason: {status_data.rejection_reason}"
-
-    notif = LabNotificationModel(
-        recipient_role="doctor",
-        type="labs",
-        title=f"Lab Case {order_id} Updated",
-        desc=desc,
-        read=False
+    user_name = current_user.get("name") or "System User"
+    
+    # Audit trail
+    audit = LabAuditTrailModel(
+        order_id=order_id,
+        user_name=user_name,
+        action=f"Status changed to: {status_data.status}",
+        note=f"From {old_status}. Reason: {status_data.rejection_reason}" if status_data.status in ["Rejected", "returned_for_rework", "Flagged"] else f"From {old_status}."
     )
+    db.add(audit)
+
+    # Generate notification
+    if status_data.status in ["Confirmed", "Doctor Accepted"]:
+        notif = LabNotificationModel(
+            recipient_role="lab tech",
+            type="Orders",
+            title="Lab Order Confirmed by Doctor",
+            desc=f"Case {order_id} has been reviewed and confirmed by {user_name}.",
+            read=False
+        )
+    else:
+        desc = f"Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} has been updated to '{status_data.status}' by Lab Technician."
+        if status_data.status in ["Rejected", "Flagged"] and status_data.rejection_reason:
+            desc += f" Note/Reason: {status_data.rejection_reason}"
+        notif = LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title=f"Lab Case {order_id} Updated",
+            desc=desc,
+            read=False
+        )
     db.add(notif)
     db.commit()
 
     # Trigger patient notification for lab updates
-    if order.patient_token and status_data.status in ["Dispatched", "Delivered", "Ready", "Completed"]:
+    if order.patient_token and status_data.status in ["Dispatched", "Delivered", "Ready", "Completed", "shipped", "fitted", "completed"]:
         status_map = {
             "Dispatched": "dispatched",
             "Delivered": "delivered",
             "Ready": "ready for fitting",
-            "Completed": "completed"
+            "Completed": "completed",
+            "shipped": "shipped",
+            "fitted": "ready for fitting",
+            "completed": "completed"
         }
         status_lbl = status_map.get(status_data.status, status_data.status.lower())
         patient_notif = PatientNotificationModel(
@@ -175,7 +354,7 @@ def update_lab_order_status(
         db.add(patient_notif)
         db.commit()
 
-    return order
+    return serialize_order(order)
 
 @router.put("/orders/{order_id}", response_model=LabOrderResponse)
 def edit_lab_order(
@@ -188,27 +367,311 @@ def edit_lab_order(
     if not order:
         raise HTTPException(status_code=404, detail="Lab order not found")
 
+    # Lock direct edits once Sent to Lab or later
+    if order.status not in ["Submitted", "submitted", "Confirmed", "confirmed", "Doctor Accepted", "doctor_accepted", "Ordered", "ordered", "Flagged", "flagged", "Pending", "Pending Review", "Pending Doctor Review", "Pending Doctor Confirmation"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Direct edits are locked once order is Sent to Lab or later. Please use Return for Correction."
+        )
+
+    changes = []
+
     if edit_data.order_category is not None:
         order.order_category = edit_data.order_category  # type: ignore
+        changes.append("order_category")
     if edit_data.order_details is not None:
         order.order_details = edit_data.order_details  # type: ignore
+        changes.append("order_details")
     if edit_data.prosthetic_type is not None:
         order.prosthetic_type = edit_data.prosthetic_type  # type: ignore
+        changes.append("prosthetic_type")
     if edit_data.material is not None:
         order.material = edit_data.material  # type: ignore
+        changes.append("material")
     if edit_data.shade is not None:
         order.shade = edit_data.shade  # type: ignore
+        changes.append("shade")
     if edit_data.priority is not None:
         order.priority = edit_data.priority  # type: ignore
+        changes.append("priority")
     if edit_data.due_date is not None:
         order.due_date = edit_data.due_date  # type: ignore
+        changes.append("due_date")
     if edit_data.notes is not None:
         order.notes = edit_data.notes  # type: ignore
+        changes.append("notes")
+    if edit_data.lab_name is not None:
+        order.lab_name = edit_data.lab_name  # type: ignore
+        changes.append("lab_name")
+    if edit_data.status is not None:
+        order.status = edit_data.status  # type: ignore
+        changes.append("status")
+    if edit_data.treatment_plan_step_id is not None:
+        order.treatment_plan_step_id = edit_data.treatment_plan_step_id  # type: ignore
+        changes.append("treatment_plan_step_id")
+    if edit_data.tooth_quadrant is not None:
+        order.tooth_quadrant = edit_data.tooth_quadrant  # type: ignore
+        changes.append("tooth_quadrant")
+    if edit_data.procedure_code is not None:
+        order.procedure_code = edit_data.procedure_code  # type: ignore
+        changes.append("procedure_code")
+    if edit_data.margin_design is not None:
+        order.margin_design = edit_data.margin_design  # type: ignore
+        changes.append("margin_design")
+    if edit_data.impression_type is not None:
+        order.impression_type = edit_data.impression_type  # type: ignore
+        changes.append("impression_type")
+    if edit_data.attachments is not None:
+        order.attachments = edit_data.attachments  # type: ignore
+        changes.append("attachments")
+    if edit_data.vendor_id is not None:
+        order.vendor_id = edit_data.vendor_id  # type: ignore
+        changes.append("vendor_id")
+    if edit_data.courier_name is not None:
+        order.courier_name = edit_data.courier_name  # type: ignore
+        changes.append("courier_name")
+    if edit_data.tracking_number is not None:
+        order.tracking_number = edit_data.tracking_number  # type: ignore
+        changes.append("tracking_number")
+    if edit_data.dispatch_date is not None:
+        order.dispatch_date = edit_data.dispatch_date  # type: ignore
+        changes.append("dispatch_date")
+    if edit_data.expected_return_date is not None:
+        order.expected_return_date = edit_data.expected_return_date  # type: ignore
+        changes.append("expected_return_date")
+    if edit_data.external_cost is not None:
+        order.external_cost = edit_data.external_cost  # type: ignore
+        changes.append("external_cost")
+    if edit_data.parent_order_id is not None:
+        order.parent_order_id = edit_data.parent_order_id  # type: ignore
+        changes.append("parent_order_id")
+    if edit_data.is_rework is not None:
+        order.is_rework = edit_data.is_rework  # type: ignore
+        changes.append("is_rework")
+    if edit_data.original_case_id is not None:
+        order.original_case_id = edit_data.original_case_id  # type: ignore
+        changes.append("original_case_id")
+    if edit_data.rejection_category is not None:
+        order.rejection_category = edit_data.rejection_category  # type: ignore
+        changes.append("rejection_category")
+    if edit_data.rejection_reason is not None:
+        order.rejection_reason = edit_data.rejection_reason  # type: ignore
+        changes.append("rejection_reason")
+    if edit_data.stage is not None:
+        order.stage = edit_data.stage  # type: ignore
+        changes.append("stage")
+
+    db.commit()
+
+    # Update category-specific detail models
+    if order.order_category in ["Diagnostic", "Blood Work", "Pathology", "Blood Work / Pathology"]:
+        detail = order.pathology_detail
+        if not detail:
+            detail = PathologyCaseDetailModel(lab_case_id=order_id)
+            db.add(detail)
+        
+        if edit_data.test_type is not None:
+            detail.test_type = edit_data.test_type
+        if edit_data.sample_type is not None:
+            detail.sample_type = edit_data.sample_type
+        if edit_data.reason_for_test is not None:
+            detail.reason_for_test = edit_data.reason_for_test
+        if edit_data.external_lab_name is not None:
+            detail.external_lab_name = edit_data.external_lab_name
+        elif edit_data.lab_name is not None:
+            detail.external_lab_name = edit_data.lab_name
+        if edit_data.sample_collected_confirm is not None:
+            detail.sample_collected_confirm = edit_data.sample_collected_confirm
+    else:
+        detail = order.prosthetic_detail
+        if not detail:
+            detail = ProstheticCaseDetailModel(lab_case_id=order_id)
+            db.add(detail)
+
+        if edit_data.tooth_number is not None:
+            detail.tooth_number = edit_data.tooth_number
+        elif edit_data.tooth_quadrant is not None:
+            detail.tooth_number = edit_data.tooth_quadrant
+        
+        if edit_data.fabrication_type is not None:
+            detail.fabrication_type = edit_data.fabrication_type
+        elif edit_data.prosthetic_type is not None:
+            detail.fabrication_type = edit_data.prosthetic_type
+
+        if edit_data.scan_file is not None:
+            detail.scan_file = edit_data.scan_file
+        if edit_data.material is not None:
+            detail.material = edit_data.material
+        if edit_data.shade is not None:
+            detail.shade = edit_data.shade
+        if edit_data.opposing_bite_scan is not None:
+            detail.opposing_bite_scan = edit_data.opposing_bite_scan
+        if edit_data.implant_system is not None:
+            detail.implant_system = edit_data.implant_system
 
     db.commit()
     db.refresh(order)
-    return order
 
+    # Log audit entry
+    user_name = current_user.get("name") or "User"
+    if changes:
+        db.add(LabAuditTrailModel(
+            order_id=order_id,
+            user_name=user_name,
+            action="Order Edited",
+            note=f"Modified fields: {', '.join(changes)}"
+        ))
+        db.commit()
+
+    return serialize_order(order)
+
+# -------------------------------------------------------------
+# Rework Handling Endpoint
+# -------------------------------------------------------------
+@router.post("/orders/{order_id}/rework", response_model=LabOrderResponse)
+def create_lab_rework_order(
+    order_id: str,
+    status_data: LabOrderStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    original_order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).first()
+    if not original_order:
+        raise HTTPException(status_code=404, detail="Original lab order not found")
+
+    # Reopen the case - set status back to Submitted
+    original_order.status = "Submitted"
+    original_order.rejection_reason = status_data.rejection_reason
+    original_order.rejection_category = status_data.rejection_category
+    original_order.is_rework = True
+    if not original_order.original_case_id:
+        original_order.original_case_id = order_id
+        
+    db.commit()
+    db.refresh(original_order)
+    
+    # Audit trail for the reopened order
+    user_name = current_user.get("name") or "Doctor"
+    db.add(LabAuditTrailModel(
+        order_id=order_id,
+        user_name=user_name,
+        action="Returned for Correction",
+        note=f"Category: {status_data.rejection_category}. Reason: {status_data.rejection_reason}"
+    ))
+    
+    # Notification for Lab Tech
+    db.add(LabNotificationModel(
+        recipient_role="lab tech",
+        type="Orders",
+        title="Rework Order Submitted",
+        desc=f"Case {order_id} returned for correction by doctor. Reason: {status_data.rejection_reason}",
+        read=False
+    ))
+    
+    db.commit()
+    return serialize_order(original_order)
+
+# -------------------------------------------------------------
+# Comments Endpoints
+# -------------------------------------------------------------
+@router.get("/orders/{order_id}/comments", response_model=List[LabOrderCommentResponse])
+def get_lab_comments(order_id: str, db: Session = Depends(get_db)):
+    comments = db.query(LabOrderCommentModel).filter(LabOrderCommentModel.order_id == order_id).order_by(LabOrderCommentModel.created_at.asc()).all()
+    return comments
+
+@router.post("/orders/{order_id}/comments", response_model=LabOrderCommentResponse)
+def post_lab_comment(
+    order_id: str,
+    comment_data: LabOrderCommentCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    user_name = current_user.get("name") or "User"
+    user_roles = current_user.get("roles") or []
+    user_role = "doctor" if any(r.lower() == "doctor" for r in user_roles) else "lab tech"
+    
+    new_comment = LabOrderCommentModel(
+        order_id=order_id,
+        user_name=user_name,
+        user_role=user_role,
+        message=comment_data.message
+    )
+    
+    db.add(new_comment)
+    db.commit()
+    db.refresh(new_comment)
+    return new_comment
+
+# -------------------------------------------------------------
+# Audit Trail Endpoint
+# -------------------------------------------------------------
+@router.get("/orders/{order_id}/audit", response_model=List[LabAuditTrailResponse])
+def get_lab_audit_trail(order_id: str, db: Session = Depends(get_db)):
+    logs = db.query(LabAuditTrailModel).filter(LabAuditTrailModel.order_id == order_id).order_by(LabAuditTrailModel.created_at.asc()).all()
+    return logs
+
+# -------------------------------------------------------------
+# Lab Vendors Directory Endpoints
+# -------------------------------------------------------------
+@router.get("/vendors", response_model=List[LabVendorResponse])
+def get_lab_vendors(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    vendors = db.query(LabVendorModel).all()
+    return vendors
+
+@router.post("/vendors", response_model=LabVendorResponse)
+def create_lab_vendor(
+    vendor_data: LabVendorCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    new_vendor = LabVendorModel(
+        name=vendor_data.name,
+        contact_person=vendor_data.contact_person,
+        phone=vendor_data.phone,
+        email=vendor_data.email,
+        average_tat_days=vendor_data.average_tat_days,
+        pricing_list=vendor_data.pricing_list,
+        rating=5.0
+    )
+    db.add(new_vendor)
+    db.commit()
+    db.refresh(new_vendor)
+    return new_vendor
+
+@router.put("/vendors/{vendor_id}", response_model=LabVendorResponse)
+def update_lab_vendor(
+    vendor_id: int,
+    vendor_data: LabVendorCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    vendor = db.query(LabVendorModel).filter(LabVendorModel.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+        
+    vendor.name = vendor_data.name
+    vendor.contact_person = vendor_data.contact_person
+    vendor.phone = vendor_data.phone
+    vendor.email = vendor_data.email
+    vendor.average_tat_days = vendor_data.average_tat_days
+    vendor.pricing_list = vendor_data.pricing_list
+    
+    db.commit()
+    db.refresh(vendor)
+    return vendor
+
+@router.delete("/vendors/{vendor_id}")
+def delete_lab_vendor(vendor_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    vendor = db.query(LabVendorModel).filter(LabVendorModel.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    db.delete(vendor)
+    db.commit()
+    return {"detail": "Vendor deleted successfully"}
+
+# -------------------------------------------------------------
+# Notifications Hub Endpoints
+# -------------------------------------------------------------
 @router.get("/notifications", response_model=List[LabNotificationResponse])
 def get_lab_notifications(
     recipient_role: Optional[str] = None,

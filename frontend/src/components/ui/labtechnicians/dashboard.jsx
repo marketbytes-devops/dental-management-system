@@ -361,7 +361,7 @@ export default function LabDashboard() {
               <div className="p-8 text-center flex flex-col items-center justify-center text-gray-400 space-y-2">
                 <span className="text-3xl">🎉</span>
                 <p className="text-sm font-semibold">All caught up! No pending doctor orders.</p>
-                <p className="text-xs text-gray-400">Approved orders will automatically flow to your Production Board.</p>
+                <p className="text-xs text-gray-400">Approved orders will automatically flow to your Lab Orders Board.</p>
               </div>
             ) : (
               pendingOrders.map((order) => (
@@ -495,7 +495,7 @@ export default function LabDashboard() {
                   <div className="flex items-center gap-3">
                     {getStatusDot(order.status)}
                     <Link 
-                      href="/labtechnicians/production"
+                      href="/labtechnicians/orders"
                       className="px-2.5 py-1 text-[10px] font-bold text-primary hover:text-white hover:bg-primary border border-primary/20 hover:border-transparent rounded transition-all"
                     >
                       Track Case
@@ -549,7 +549,7 @@ export default function LabDashboard() {
                   <div className="flex items-center gap-3">
                     {getStatusDot(order.status)}
                     <Link 
-                      href="/labtechnicians/production"
+                      href="/labtechnicians/orders"
                       className="px-2.5 py-1 text-[10px] font-bold text-danger hover:text-white hover:bg-danger border border-danger/20 hover:border-transparent rounded transition-all"
                     >
                       Escalate

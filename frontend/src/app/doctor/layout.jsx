@@ -819,6 +819,44 @@ export default function DoctorLayout({ children }) {
     }
   };
 
+  const handleSaveDirectPrescription = async (patientToken, medications) => {
+    if (!medications || medications.length === 0) return;
+
+    try {
+      await createPrescription({
+        patient_token: patientToken,
+        doctor_name: currentDoctorName,
+        medications: medications
+      });
+
+      const rxText = medications.map(m => `${m.medicine} (${m.schedule} - ${m.timing} for ${m.duration})`).join(" | ");
+
+      const newTimelineEvent = {
+        date: getTodayString(),
+        note: `Rx Prescription issued: ${rxText}`,
+        type: "Prescription",
+        details: medications
+      };
+
+      setPatients(prev => {
+        const patient = prev[patientToken];
+        if (!patient) return prev;
+        return {
+          ...prev,
+          [patientToken]: {
+            ...patient,
+            timeline: [newTimelineEvent, ...patient.timeline]
+          }
+        };
+      });
+      showNotification("Prescription created successfully.");
+    } catch (err) {
+      console.error("Failed to save direct prescription:", err);
+      showNotification("Failed to save prescription: " + (err.message || ""));
+      throw err;
+    }
+  };
+
   const handleSubmitDiagNote = (noteText) => {
     if (!viewingPatient) return;
 
@@ -1104,6 +1142,7 @@ export default function DoctorLayout({ children }) {
         handleAddDraftMedicine,
         handleRemoveDraftMed,
         handleSavePrescription,
+        handleSaveDirectPrescription,
         handleSubmitDiagNote,
         handleSubmitSpecialtyLog,
         handleAddAlert,

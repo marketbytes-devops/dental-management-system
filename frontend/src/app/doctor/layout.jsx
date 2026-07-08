@@ -984,6 +984,26 @@ export default function DoctorLayout({ children }) {
         }
       }
 
+      let stepsCountText = "Nill";
+      let hasActive = false;
+      if (activePlan) {
+        hasActive = activePlan.status === "Active";
+        if (Array.isArray(activePlan.steps)) {
+          const completed = activePlan.steps.filter(s => s.status === "Completed").length;
+          stepsCountText = `${completed}/${activePlan.steps.length} Steps`;
+        }
+      }
+
+      // Calculate last visited date (completed appointments)
+      let lastVisit = "Nill";
+      if (Array.isArray(appointmentsData)) {
+        const completedApps = appointmentsData.filter(app => app.status === "Completed");
+        if (completedApps.length > 0) {
+          completedApps.sort((a, b) => new Date(b.appointment_date) - new Date(a.appointment_date));
+          lastVisit = completedApps[0].appointment_date;
+        }
+      }
+
       setPatients(prev => {
         const existingEvents = prev[token]?.timeline || [];
         const mergedEvents = [...timelineEvents];
@@ -1029,6 +1049,9 @@ export default function DoctorLayout({ children }) {
           ...prev,
           [token]: {
             ...patient,
+            lastVisitedDate: lastVisit,
+            planStepsProgress: stepsCountText,
+            hasActivePlan: hasActive,
             timeline: mergedEvents
           }
         };

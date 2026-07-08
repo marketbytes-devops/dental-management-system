@@ -137,7 +137,7 @@ export default function DoctorManagementPage() {
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Stethoscope className="w-6 h-6 text-primary" /> Doctor Roster & Schedules
+            <Stethoscope className="w-6 h-6 text-primary" /> Doctor Details & Schedules
           </h1>
           <p className="text-sm text-gray-500 mt-1">Manage doctor work schedules, active operatories, and status codes.</p>
         </div>

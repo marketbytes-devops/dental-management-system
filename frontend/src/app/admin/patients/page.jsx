@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Search, X, History, CreditCard, User, Activity, AlertTriangle, FileText, IndianRupee } from "lucide-react";
+import { Users, Search, X, History, CreditCard, User, Activity, AlertTriangle, FileText, IndianRupee, Printer } from "lucide-react";
 import client from "@/services/api";
 
 export default function GlobalPatientDirectoryPage() {
@@ -12,6 +12,7 @@ export default function GlobalPatientDirectoryPage() {
   const [filterProcedure, setFilterProcedure] = useState("");
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [activeTab, setActiveTab] = useState("profile"); // profile, clinical, payment
+  const [printPatient, setPrintPatient] = useState(null);
 
   const fetchPatients = async () => {
     setLoading(true);
@@ -160,6 +161,13 @@ export default function GlobalPatientDirectoryPage() {
                         className="px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
                       >
                         Audit Details
+                      </button>
+                      <button
+                        onClick={() => setPrintPatient(p)}
+                        className="px-3 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg text-xs font-bold transition-all cursor-pointer outline-none"
+                        title="Print patient details"
+                      >
+                        <Printer className="w-3.5 h-3.5 inline mr-1" />Print
                       </button>
                     </td>
                   </tr>
@@ -337,6 +345,171 @@ export default function GlobalPatientDirectoryPage() {
           </div>
         </div>
       )}
+
+      {/* Patient Print Modal */}
+      {printPatient && (
+        <div className="fixed inset-0 bg-gray-950/45 backdrop-blur-xs flex items-center justify-center z-50 p-4 print:bg-white print:p-0 print:absolute print:inset-0 print-patient-section">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-gray-150 overflow-hidden flex flex-col max-h-[90vh] print:shadow-none print:w-full print:max-w-none print:h-auto print:max-h-none print:rounded-none print:border-none">
+            
+            {/* Modal Header (hidden when printing) */}
+            <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100 bg-primary/5 print:hidden">
+              <div>
+                <h3 className="font-extrabold text-lg text-gray-900">Patient Report</h3>
+                <p className="text-[10px] text-gray-500 font-bold uppercase mt-0.5">Complete patient dossier for printing</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Print Report
+                </button>
+                <button 
+                  onClick={() => setPrintPatient(null)}
+                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full cursor-pointer outline-none"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Print-Only Header */}
+            <div className="hidden print:block p-8 border-b border-gray-300 mb-2">
+              <h1 className="text-2xl font-bold text-gray-900 text-center uppercase tracking-wide">Marketbytes Dental Clinic</h1>
+              <h2 className="text-lg text-gray-700 text-center mt-1">Patient Report</h2>
+              <div className="mt-4 flex justify-between text-sm text-gray-600">
+                <p><strong>Patient:</strong> {printPatient.name}</p>
+                <p><strong>Token:</strong> {printPatient.token}</p>
+              </div>
+              <div className="mt-1 flex justify-between text-sm text-gray-600">
+                <p><strong>Phone:</strong> {printPatient.phone}</p>
+                <p><strong>Date Generated:</strong> {new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto print:overflow-visible print:p-8 space-y-6">
+              
+              {/* Section 1: Profile Details */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 print:text-gray-600">
+                  <User className="w-3.5 h-3.5" /> Patient Profile
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 border border-gray-100 rounded-xl print:bg-white print:border-gray-300">
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Full Name</span>
+                    <p className="text-sm font-bold text-gray-900 mt-0.5">{printPatient.name}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Contact</span>
+                    <p className="text-sm font-bold text-gray-900 mt-0.5">{printPatient.phone}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Demographics</span>
+                    <p className="text-sm font-bold text-gray-900 mt-0.5">{printPatient.gender}, {printPatient.age} yrs</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase block">Blood Group</span>
+                    <p className="text-sm font-bold text-gray-900 mt-0.5">{printPatient.bloodGroup}</p>
+                  </div>
+                </div>
+                {printPatient.medicalAlerts.length > 0 && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-xl print:bg-white print:border-red-300">
+                    <span className="text-[10px] font-black text-rose-600 uppercase flex items-center gap-1 mb-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Medical Alerts
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {printPatient.medicalAlerts.map((a, i) => (
+                        <span key={i} className="bg-rose-100 px-2 py-0.5 rounded text-[9px] font-black uppercase text-rose-700 print:border print:border-rose-300">{a}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Treatment History */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 print:text-gray-600">
+                  <Activity className="w-3.5 h-3.5" /> Treatment History
+                </h4>
+                <div className="border border-gray-200 rounded-xl overflow-hidden print:border-gray-300 print:rounded-none">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/80 border-b border-gray-200 print:bg-gray-100">
+                        <th className="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase">Type</th>
+                        <th className="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 print:divide-gray-300">
+                      {printPatient.timeline.map((event, idx) => (
+                        <tr key={idx} className="print:hover:bg-transparent">
+                          <td className="px-4 py-2.5 text-xs font-semibold text-gray-600 whitespace-nowrap">{event.date}</td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded print:bg-white print:border print:border-primary/30">{event.type}</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-gray-700">{event.note}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Section 3: Payment Summary */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 print:text-gray-600">
+                  <CreditCard className="w-3.5 h-3.5" /> Payment Summary
+                </h4>
+                <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl print:bg-white print:border-gray-300">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-3 bg-white rounded-lg border border-gray-100 print:border-gray-300">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase block">Total Billed</span>
+                      <p className="text-lg font-black text-gray-900 mt-1">₹{printPatient.paymentDetails.totalBilled}</p>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg border border-gray-100 print:border-gray-300">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase block">Amount Paid</span>
+                      <p className="text-lg font-black text-emerald-600 mt-1">₹{printPatient.paymentDetails.amountPaid}</p>
+                    </div>
+                    <div className="text-center p-3 bg-white rounded-lg border border-rose-100 print:border-rose-300">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase block">Balance</span>
+                      <p className="text-lg font-black text-rose-600 mt-1">₹{printPatient.paymentDetails.balance}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex justify-between items-center pt-3 border-t border-gray-200">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Payment Status</span>
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                      printPatient.paymentDetails.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 
+                      printPatient.paymentDetails.status === 'Pending' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {printPatient.paymentDetails.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Print styles for patient report */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-patient-section, .print-patient-section * {
+            visibility: visible;
+          }
+          .print-patient-section {
+            position: absolute !important;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+        }
+      `}} />
 
     </div>
   );

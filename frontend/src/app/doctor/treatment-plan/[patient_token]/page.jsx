@@ -22,6 +22,8 @@ import {
   Clock
 } from "lucide-react";
 import { useDoctor } from "@/app/doctor/layout";
+import ToothChart from "@/components/ui/doctor/workspace/ToothChart";
+import SmileCareChart from "@/components/ui/doctor/workspace/smilecare/SmileCareChart";
 import { 
   getPatientByToken,
   getPatientTreatmentPlan, 
@@ -191,7 +193,7 @@ export default function DoctorTreatmentPlanPage() {
   const params = useParams();
   const router = useRouter();
   const patientToken = params.patient_token;
-  const { enrichPatientTimeline } = useDoctor() || {};
+  const { enrichPatientTimeline, viewingPatient, handleToggleToothState } = useDoctor() || {};
 
   const [doctorSpecialty, setDoctorSpecialty] = useState("General Dentistry");
 
@@ -590,6 +592,12 @@ export default function DoctorTreatmentPlanPage() {
           </div>
         </div>
       )}
+
+      {/* SmileCare 3D Dental Charting Panel */}
+      <SmileCareChart 
+        patientToken={patientToken} 
+        mode="endo" 
+      />
 
       {/* Main Forms Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

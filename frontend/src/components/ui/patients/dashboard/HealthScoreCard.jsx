@@ -26,7 +26,7 @@ export default function HealthScoreCard({ score = 78, lastUpdated, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-6 cursor-pointer hover:shadow-md hover:border-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 xl:p-6 flex flex-col sm:flex-row xl:flex-col 2xl:flex-row items-center sm:items-center xl:items-center 2xl:items-center gap-4 xl:gap-6 cursor-pointer hover:shadow-md hover:border-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-center sm:text-left xl:text-center 2xl:text-left"
     >
       {/* Circular ring */}
       <div className="relative flex-shrink-0">

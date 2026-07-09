@@ -127,7 +127,7 @@ export default function PatientDashboardPage() {
       </div>
 
       {/* Row 1 — KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <HealthScoreCard
           score={oralHealthDetails?.score ?? 95}
           lastUpdated={oralHealthDetails?.updated_at || profile?.created_at}
@@ -180,10 +180,10 @@ export default function PatientDashboardPage() {
       </div>
 
       {/* Row 3 — Next Appointment + Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
         {/* Next Appointment */}
-        <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div className="xl:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Next Appointment</h3>
           {nextAppointment ? (
             <div className="space-y-3">
@@ -218,7 +218,7 @@ export default function PatientDashboardPage() {
         </div>
 
         {/* Recent Activity */}
-        <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div className="xl:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
             <Link href="/patient/records" className="text-sm text-primary font-medium hover:underline">View All</Link>

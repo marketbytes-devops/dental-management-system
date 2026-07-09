@@ -1,6 +1,7 @@
 # main.py - Single entry point, everyone's routers register here
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # Import routers from modules
 from modules.auth.router import router as auth_router
@@ -139,6 +140,8 @@ finally:
     db.close()
 
 app = FastAPI(title="SmileCare Dental Management API", version="1.0.0")
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,

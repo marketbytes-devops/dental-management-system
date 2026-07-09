@@ -76,6 +76,17 @@ function LoginContent() {
   const [authError, setAuthError] = useState("");
   const [portalType, setPortalType] = useState(null); // 'patient', 'staff', or null
 
+  useEffect(() => {
+    const role = searchParams.get("roles");
+    if (role === "patient") {
+      setPortalType("patient");
+    } else if (role === "staff") {
+      setPortalType("staff");
+    } else {
+      setPortalType("");
+    }
+  }, [searchParams]);
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!emailId.trim() || !password) {

@@ -95,7 +95,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
           const sLower = spec.toLowerCase();
           const subLower = sub.name.toLowerCase();
           return (
-            sLower.includes(subLower) || 
+            sLower.includes(subLower) ||
             subLower.includes(sLower) ||
             (subLower === "general dentistry" && (sLower.includes("general") || sLower.includes("dentist"))) ||
             (subLower === "oral surgery" && (sLower.includes("surgery") || sLower.includes("surgeon")))
@@ -153,31 +153,37 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
     <div className={`bg-white border-r border-gray-200 flex flex-col h-full shadow-sm transition-all duration-300 relative ${isMinimized ? "w-16" : "w-64"}`}>
 
       {/* Floating Toggle Button */}
-      {onToggleMinimize && (
+      <div className="h-16 border-b border-gray-100 flex items-center justify-between px-4">
+
+        <div className="flex items-center gap-2 overflow-hidden">
+          <ToothIcon className="w-6 h-6 text-primary shrink-0" />
+
+          {!isMinimized && (
+            <>
+              <span className="font-bold text-lg text-primary">
+                SmileCare
+              </span>
+
+              {roleLabel && (
+                <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary uppercase">
+                  {roleLabel}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+
         <button
           onClick={onToggleMinimize}
-          className="absolute top-5 -right-3 w-6 h-6 bg-white hover:bg-gray-100 border border-gray-200 rounded-full flex items-center justify-center shadow-md text-gray-500 hover:text-primary transition-all cursor-pointer z-50 focus:outline-none"
-          title={isMinimized ? "Expand Sidebar" : "Collapse Sidebar"}
+          className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition"
         >
           {isMinimized ? (
-            <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+            <ChevronRight className="w-5 h-5" />
           ) : (
-            <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
+            <ChevronLeft className="w-5 h-5" />
           )}
         </button>
-      )}
 
-      {/* Brand Header */}
-      <div className={`h-16 flex items-center border-b border-gray-100 shrink-0 ${isMinimized ? "justify-center px-2" : "justify-start px-6 gap-2"}`}>
-        <span className="text-xl font-bold text-primary flex items-center gap-2">
-          <ToothIcon className="w-6 h-6 text-primary shrink-0" strokeWidth={2.5} />
-          {!isMinimized && <span>SmileCare</span>}
-        </span>
-        {!isMinimized && roleLabel && (
-          <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-1 rounded-md uppercase tracking-wider shrink-0">
-            {roleLabel}
-          </span>
-        )}
       </div>
 
       {/* Navigation */}
@@ -329,9 +335,9 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
             title={currentUser?.name || "User"}
           >
             {currentUser?.profile_picture ? (
-              <img 
-                src={currentUser.profile_picture.startsWith("http") ? currentUser.profile_picture : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${currentUser.profile_picture}`} 
-                alt={currentUser.name} 
+              <img
+                src={currentUser.profile_picture.startsWith("http") ? currentUser.profile_picture : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${currentUser.profile_picture}`}
+                alt={currentUser.name}
                 className="w-full h-full object-cover"
               />
             ) : role === "doctor" ? (

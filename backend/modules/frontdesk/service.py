@@ -1,5 +1,6 @@
 # service.py - business logic
 import random
+import logging
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
@@ -7,6 +8,9 @@ from fastapi import HTTPException, status
 from .models import AppointmentModel
 from .schemas import AppointmentCreate, AppointmentUpdate, CheckInRequest
 from modules.patient.models import PatientModel
+from twilio_service import send_sms
+
+logger = logging.getLogger(__name__)
 
 def parse_time_str(time_str: str, date_obj: date) -> datetime:
     """Parses time strings like '10:30 AM' or '02:00 PM' into a datetime object."""
@@ -161,14 +165,31 @@ def send_checkin_otp(db: Session, appt_id: int) -> AppointmentModel:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Appointment not found."
         )
-    
+
     # If OTP is not generated yet, generate it
     if not appt.otp:
         appt.otp = str(random.randint(100000, 999999))
-        
+
     appt.otp_status = "Sent"
     db.commit()
     db.refresh(appt)
+
+    # ── Send OTP via Twilio SMS ───────────────────────────────────────────────
+    patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    if patient and patient.phone:
+        sms_body = (
+            f"SmileCare Dental: Your check-in OTP is {appt.otp}. "
+            f"Valid for today's appointment only. Do NOT share this code."
+        )
+        sent = send_sms(patient.phone, sms_body)
+        if sent:
+            logger.info(f"OTP SMS sent to patient {patient.name} ({patient.phone}) for appointment {appt_id}.")
+        else:
+            logger.warning(f"OTP SMS could not be sent to {patient.phone}. OTP still saved in DB.")
+    else:
+        logger.warning(f"No patient phone found for appointment {appt_id}. SMS skipped.")
+    # ─────────────────────────────────────────────────────────────────────────
+
     return appt
 
 def verify_checkin_otp(db: Session, appt_id: int, otp_code: str) -> AppointmentModel:

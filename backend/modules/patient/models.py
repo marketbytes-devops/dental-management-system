@@ -37,6 +37,7 @@ class PatientModel(Base):
 
     # Status / system fields
     is_active = Column(Boolean, default=True)
+    profile_picture = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

@@ -1,6 +1,9 @@
 # router.py - auth endpoints
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
+import os
+import shutil
+import datetime
 from database import get_db
 from modules.auth.models import UserModel, StaffProfileModel
 from modules.patient.models import PatientModel
@@ -203,6 +206,8 @@ def update_profile(
     if profile_data.password is not None:
         from modules.auth.service import hash_password
         user.password_hash = hash_password(profile_data.password)
+    if profile_data.profile_picture is not None:
+        user.profile_picture = profile_data.profile_picture
 
     db.commit()
     db.refresh(user)
@@ -278,6 +283,52 @@ def update_profile(
         user.board = profile.board
 
     return user
+
+
+@router.post("/profile/picture")
+def upload_profile_picture(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user_id = current_user.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload: missing user_id"
+        )
+    
+    user = db.query(UserModel).filter(UserModel.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+        
+    os.makedirs("static/uploads", exist_ok=True)
+    
+    # Save the file
+    ext = os.path.splitext(file.filename)[1]
+    filename = f"profile_{user_id}_{int(datetime.datetime.now().timestamp())}{ext}"
+    file_path = os.path.join("static/uploads", filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # Remove old profile picture if exists
+    if user.profile_picture:
+        old_path = user.profile_picture.lstrip("/")
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except Exception:
+                pass
+                
+    user.profile_picture = f"/static/uploads/{filename}"
+    db.commit()
+    db.refresh(user)
+    
+    return {"profile_picture": user.profile_picture}
 
 
 def match_doctor_appointment(doc_name: str, appt_doc_name: str) -> bool:

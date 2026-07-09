@@ -75,7 +75,7 @@ export default function Home() {
   const triggerAuthGateAction = (action) => {
     setIsAuthGateOpen(false);
     if (action === "login") {
-      router.push("/login?role=patient");
+      router.push("/login?roles=patient");
     } else if (action === "register") {
       router.push("/register");
     }
@@ -191,49 +191,63 @@ export default function Home() {
 
       {/* AUTHENTICATION GATE MODAL FOR BOOK APPOINTMENT */}
       {isAuthGateOpen && (
-        <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-2xl p-8 max-w-sm w-full relative space-y-6 text-center animate-scaleIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-md rounded-3xl bg-white shadow-2xl p-8 animate-scaleIn">
 
-            {/* Close Button */}
+            {/* Close */}
             <button
               onClick={() => setIsAuthGateOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition-colors p-1.5 hover:bg-slate-50 rounded-xl cursor-pointer"
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 transition cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 text-slate-500" />
             </button>
 
-            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
-              <Calendar className="w-8 h-8" />
+            {/* Icon */}
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <Calendar className="h-8 w-8 text-primary" />
             </div>
 
-            <div className="space-y-2">
-              <h3 className="text-lg font-bold text-slate-900">Sign In to Book Appointment</h3>
-              <p className="text-slate-500 text-xs leading-relaxed">
-                To reserve an appointment slot with a SmileCare specialist, you must sign in as a patient or create a new registration record.
+            {/* Heading */}
+            <div className="mt-6 text-center">
+              <h2 className="text-2xl font-bold text-slate-900">
+                Login Required
+              </h2>
+
+              <p className="mt-3 text-sm text-slate-600 leading-6">
+                You need a patient account to book an appointment.
+                <br />
+                If you already have an account, sign in.
+                Otherwise, create a new account to continue.
               </p>
             </div>
 
-            <div className="space-y-3">
+            {/* Buttons */}
+            <div className="mt-8 space-y-3">
+
               <button
                 onClick={() => triggerAuthGateAction("login")}
-                className="w-full bg-primary hover:bg-primary/95 text-white text-xs font-bold py-3 rounded-2xl transition-all shadow-md shadow-primary/20 flex items-center justify-center gap-2 cursor-pointer"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-sm font-semibold text-white hover:bg-primary/90 transition cursor-pointer"
               >
-                Sign In as Patient <ArrowRight className="w-3.5 h-3.5" />
+                Sign In
+                <ArrowRight className="w-4 h-4" />
               </button>
+
               <button
                 onClick={() => triggerAuthGateAction("register")}
-                className="w-full bg-secondary hover:bg-secondary/95 text-white text-xs font-bold py-3 rounded-2xl transition-all shadow-md shadow-secondary/20 flex items-center justify-center gap-2 cursor-pointer"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
               >
-                Register New Account <UserPlus className="w-3.5 h-3.5" />
+                Create New Account
+                <UserPlus className="w-4 h-4" />
               </button>
+
               <button
                 onClick={() => setIsAuthGateOpen(false)}
-                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold py-2.5 rounded-2xl transition-all cursor-pointer"
+                className="w-full rounded-2xl py-3 text-sm font-medium text-slate-500 hover:bg-slate-100 transition cursor-pointer"
               >
-                Cancel
+                Maybe Later
               </button>
-            </div>
 
+            </div>
           </div>
         </div>
       )}

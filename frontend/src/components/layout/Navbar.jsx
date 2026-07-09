@@ -157,6 +157,7 @@ export default function Navbar() {
     localStorage.removeItem("patient_user");
     localStorage.removeItem("patient_name");
     localStorage.removeItem("patient_token");
+    localStorage.removeItem("patient_profile_picture");
     window.location.href = "/login";
   };
 

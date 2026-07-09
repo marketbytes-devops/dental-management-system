@@ -2,7 +2,7 @@
 
 import { Clock, Trash2, Inbox } from "lucide-react";
 
-export default function LeaveList({ userId, requests, onCancel }) {
+export default function LeaveList({ userId, requests, onCancel, isAdmin = false, }) {
   const myRequests = requests.filter((r) => r.userId === userId);
 
   const getStatusBadge = (status) => {
@@ -82,13 +82,14 @@ export default function LeaveList({ userId, requests, onCancel }) {
               </div>
 
               {/* Cancel Request Action */}
-              {(isPending || req.status === "Approved") && (
+              {isAdmin || isPending && (
                 <div className="flex justify-end border-t border-gray-100/60 pt-2">
                   <button
                     onClick={() => onCancel(req.id)}
                     className="text-danger hover:text-danger/90 font-bold text-[10px] flex items-center gap-1 cursor-pointer outline-none"
                   >
-                    <Trash2 className="w-3.5 h-3.5" /> Cancel Leave
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Cancel Leave
                   </button>
                 </div>
               )}

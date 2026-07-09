@@ -25,6 +25,7 @@ class PatientBase(BaseModel):
 
     # Medical
     known_allergies: Optional[str] = None
+    profile_picture: Optional[str] = None
 
 
 class PatientCreate(PatientBase):
@@ -42,6 +43,7 @@ class PatientUpdate(BaseModel):
     emergency_contact_name: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
     known_allergies: Optional[str] = None
+    profile_picture: Optional[str] = None
 
 
 class PasswordChangeRequest(BaseModel):

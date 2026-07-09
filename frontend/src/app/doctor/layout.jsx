@@ -25,7 +25,9 @@ import {
   createPrescription,
   createReferral,
   getAllReferrals,
-  updateReferral
+  updateReferral,
+  saveClinicalNote,
+  getPatientClinicalNotes
 } from "@/services/api";
 
 // Create context
@@ -819,24 +821,74 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  const handleSubmitDiagNote = (noteText) => {
+  const handleSaveDirectPrescription = async (patientToken, medications) => {
+    if (!medications || medications.length === 0) return;
+
+    try {
+      await createPrescription({
+        patient_token: patientToken,
+        doctor_name: currentDoctorName,
+        medications: medications
+      });
+
+      const rxText = medications.map(m => `${m.medicine} (${m.schedule} - ${m.timing} for ${m.duration})`).join(" | ");
+
+      const newTimelineEvent = {
+        date: getTodayString(),
+        note: `Rx Prescription issued: ${rxText}`,
+        type: "Prescription",
+        details: medications
+      };
+
+      setPatients(prev => {
+        const patient = prev[patientToken];
+        if (!patient) return prev;
+        return {
+          ...prev,
+          [patientToken]: {
+            ...patient,
+            timeline: [newTimelineEvent, ...patient.timeline]
+          }
+        };
+      });
+      showNotification("Prescription created successfully.");
+    } catch (err) {
+      console.error("Failed to save direct prescription:", err);
+      showNotification("Failed to save prescription: " + (err.message || ""));
+      throw err;
+    }
+  };
+
+  const handleSubmitDiagNote = async (noteText) => {
     if (!viewingPatient) return;
 
-    const newTimelineEvent = {
-      date: getTodayString(),
-      note: noteText,
-      type: "Clinical Note"
-    };
+    try {
+      await saveClinicalNote({
+        patient_token: viewingPatient.token,
+        doctor_name: currentDoctorName || "Dr. Nair",
+        note: noteText,
+        date: getTodayString()
+      });
 
-    setPatients(prev => ({
-      ...prev,
-      [viewingPatientToken]: {
-        ...prev[viewingPatientToken],
-        timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline]
-      }
-    }));
+      const newTimelineEvent = {
+        date: getTodayString(),
+        note: noteText,
+        type: "Clinical Note"
+      };
 
-    showNotification("Clinical diagnosis note updated.");
+      setPatients(prev => ({
+        ...prev,
+        [viewingPatientToken]: {
+          ...prev[viewingPatientToken],
+          timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline]
+        }
+      }));
+
+      showNotification("Clinical diagnosis note updated.");
+    } catch (err) {
+      console.error("Failed to save clinical note:", err);
+      showNotification("Failed to save clinical note: " + (err.message || ""));
+    }
   };
 
   const handleSubmitSpecialtyLog = (noteText, sheetLabel, isAutoSave = false) => {
@@ -902,7 +954,7 @@ export default function DoctorLayout({ children }) {
       if (!patientData || !patientData.id) return;
       const patientId = patientData.id;
 
-      const [appointmentsData, plansData] = await Promise.all([
+      const [appointmentsData, plansData, clinicalNotesData] = await Promise.all([
         getPatientAppointments(patientId).catch(err => {
           console.warn("Failed to fetch appointments:", err);
           return [];
@@ -910,10 +962,24 @@ export default function DoctorLayout({ children }) {
         getPatientTreatmentPlan(token).catch(err => {
           console.warn("Failed to fetch treatment plan:", err);
           return null;
+        }),
+        getPatientClinicalNotes(token).catch(err => {
+          console.warn("Failed to fetch clinical notes:", err);
+          return [];
         })
       ]);
 
       const timelineEvents = [];
+
+      if (Array.isArray(clinicalNotesData)) {
+        clinicalNotesData.forEach(cn => {
+          timelineEvents.push({
+            date: cn.date,
+            note: cn.note,
+            type: "Clinical Note"
+          });
+        });
+      }
 
       if (Array.isArray(appointmentsData)) {
         appointmentsData.forEach(app => {
@@ -1104,6 +1170,7 @@ export default function DoctorLayout({ children }) {
         handleAddDraftMedicine,
         handleRemoveDraftMed,
         handleSavePrescription,
+        handleSaveDirectPrescription,
         handleSubmitDiagNote,
         handleSubmitSpecialtyLog,
         handleAddAlert,

@@ -20,6 +20,28 @@ import {
   Share2
 } from "lucide-react";
 
+const parseStructuredNote = (noteText) => {
+  if (!noteText) return null;
+  if (!noteText.includes("[Chief Complaint]:") && !noteText.includes("[Medical History]:")) {
+    return null;
+  }
+  
+  const getValue = (key) => {
+    const regex = new RegExp(`\\[${key}\\]:\\s*([\\s\\S]*?)(?=\\n\\[|$)`);
+    const match = noteText.match(regex);
+    return match ? match[1].trim() : "N/A";
+  };
+
+  return {
+    chiefComplaint: getValue("Chief Complaint"),
+    medicalHistory: getValue("Medical History"),
+    dentalHistory: getValue("Dental History"),
+    vitalsBP: getValue("Vitals BP"),
+    allergies: getValue("Allergies"),
+    consultationNote: getValue("Consultation Note")
+  };
+};
+
 export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
   const router = useRouter();
   const {
@@ -36,6 +58,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
     handleAddDraftMedicine,
     handleRemoveDraftMed,
     handleSavePrescription,
+    handleSaveDirectPrescription,
     handleSubmitLabOrder,
     handleSubmitDiagNote,
     handleReferPatient,
@@ -53,6 +76,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
   const [showNewRefForm, setShowNewRefForm] = useState(false);
   const [showNewLabForm, setShowNewLabForm] = useState(false);
   const [showNewPrescriptionForm, setShowNewPrescriptionForm] = useState(false);
+  const [expandedNotes, setExpandedNotes] = useState({});
 
   // Reset active tab and compose states when patient changes
   useEffect(() => {
@@ -62,6 +86,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
       setShowNewRefForm(false);
       setShowNewLabForm(false);
       setShowNewPrescriptionForm(false);
+      setExpandedNotes({});
     }
   }, [viewingPatient?.token]);
 
@@ -144,7 +169,6 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
   const TABS = [
     { id: "diagnosis", label: "Diagnosis & Logs", icon: <ClipboardList className="w-4 h-4" />, stat: totalDiagnosisNotes },
     { id: "plan", label: "Treatment Plan", icon: <TrendingUp className="w-4 h-4" />, stat: planStepsProgress },
-    { id: "prescription", label: "Prescriptions", icon: <Pill className="w-4 h-4" />, stat: totalPrescriptions },
     { id: "labs", label: "Lab Orders", icon: <Microscope className="w-4 h-4" />, stat: totalLabOrders },
     { id: "reports", label: "Reports Library", icon: <FileText className="w-4 h-4" />, stat: totalReports },
     { id: "referral", label: "Referrals", icon: <Share2 className="w-4 h-4" />, stat: totalReferrals }
@@ -194,7 +218,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
       </div>
 
       {/* Main clinical sheet single-column body */}
-      <div className="max-w-4xl mx-auto p-6 space-y-6 text-left">
+      <div className="w-full p-6 space-y-6 text-left">
         {activeKpiSection === "reports" && (
           <div className="bg-white rounded-2xl border border-gray-150 shadow-sm p-6 space-y-4 animate-scale-up">
             <div className="flex justify-between items-center pb-3 border-b border-gray-100">
@@ -257,121 +281,143 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
             </div>
 
             {showNewDiagForm && (
-              <div className="p-5 bg-gray-50 border border-gray-150 rounded-2xl space-y-3 animate-scale-up">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Compose Clinical Diagnosis Note</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewDiagForm(false)}
-                    className="text-[10px] font-bold text-gray-400 hover:text-gray-700 underline cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <ClinicalNotes
-                  onSubmitDiagNote={(noteText) => {
-                    handleSubmitDiagNote(noteText);
-                    setShowNewDiagForm(false);
-                  }}
-                />
-              </div>
+              <ClinicalNotes
+                onCancel={() => setShowNewDiagForm(false)}
+                onSubmitDiagNote={async (noteText, prescribedMeds) => {
+                  handleSubmitDiagNote(noteText);
+                  if (prescribedMeds && prescribedMeds.length > 0) {
+                    await handleSaveDirectPrescription(viewingPatient.token, prescribedMeds);
+                  }
+                  setShowNewDiagForm(false);
+                }}
+              />
             )}
 
             {diagnosisNotes.length > 0 ? (
-              <div className="space-y-3 pt-2">
-                {diagnosisNotes.map((note, idx) => (
-                  <div key={idx} className="p-4 border border-gray-150 rounded-xl bg-gray-50/20 hover:bg-gray-50/50 transition-colors">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] bg-gray-100 text-gray-550 px-2.5 py-0.5 rounded font-black">{note.date}</span>
-                      <span className="text-[9px] font-black uppercase text-primary tracking-wider">{note.type || "Clinical Note"}</span>
+              <div className="space-y-4 pt-2">
+                {diagnosisNotes.map((note, idx) => {
+                  const parsed = parseStructuredNote(note.note);
+                  const isExpanded = !!expandedNotes[idx];
+                  const doctorName = note.doctor_name || "Dr. Nair";
+                  
+                  if (parsed) {
+                    const conditions = parsed.medicalHistory.split(",").map(c => c.trim()).filter(Boolean);
+                    
+                    return (
+                      <div key={idx} className="bg-white border-b border-gray-100 text-gray-800 pb-5 pt-2 space-y-4 last:border-b-0 animate-scale-up text-left">
+                        {/* Collapsed Header View */}
+                        <div 
+                          onClick={() => setExpandedNotes(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none hover:opacity-90 transition-opacity"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-[10px] bg-gray-100 text-gray-500 border border-gray-200 px-2.5 py-0.5 rounded font-black tracking-wider uppercase">{note.date}</span>
+                            <span className="text-[9px] font-black uppercase text-primary bg-primary/10 px-2 py-0.5 rounded tracking-wider">Consultation Log</span>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-gray-800 truncate">
+                              <span className="text-gray-400 font-semibold mr-1">Chief Complaint:</span>
+                              {parsed.chiefComplaint}
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-xs text-gray-500 font-semibold">
+                              Doctor: <strong className="text-gray-700 font-bold">{doctorName}</strong>
+                            </span>
+                            <button
+                              type="button"
+                              className="text-[10px] font-black text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-lg transition-colors cursor-pointer outline-none border-none"
+                            >
+                              {isExpanded ? "Collapse ▲" : "View Details ▼"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Detailed Expanded View */}
+                        {isExpanded && (
+                          <div className="pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 animate-fadeIn">
+                            {/* Chief Complaint */}
+                            <div className="space-y-1">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Chief complaint</span>
+                              <p className="text-xs font-semibold text-gray-750 leading-relaxed">{parsed.chiefComplaint}</p>
+                            </div>
+
+                            {/* Medical History */}
+                            <div className="space-y-1">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Medical history</span>
+                              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                {conditions.map((cond, cIdx) => (
+                                  <span key={cIdx} className="bg-red-50 text-red-700 border border-red-100 text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                                    {cond}
+                                  </span>
+                                ))}
+                                {conditions.length === 0 && (
+                                  <span className="text-[10px] text-gray-400 italic">None specified</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Dental History */}
+                            <div className="space-y-1">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Dental history</span>
+                              <p className="text-xs font-semibold text-gray-750 leading-relaxed">{parsed.dentalHistory}</p>
+                            </div>
+
+                            {/* Vitals / Allergies */}
+                            <div className="space-y-1">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Vitals / allergies</span>
+                              <div className="grid grid-cols-2 gap-3 pt-0.5">
+                                <div className="bg-gray-50 border border-gray-100 p-2 rounded-lg text-left">
+                                  <span className="text-[8px] uppercase text-gray-450 block font-bold">BP Vitals</span>
+                                  <span className="text-[10px] font-bold text-gray-750">{parsed.vitalsBP}</span>
+                                </div>
+                                <div className="bg-gray-50 border border-gray-100 p-2 rounded-lg text-left">
+                                  <span className="text-[8px] uppercase text-gray-450 block font-bold">Allergies</span>
+                                  <span className="text-[10px] font-bold text-gray-750">{parsed.allergies}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Doctor's Consultation Notes */}
+                            {parsed.consultationNote && parsed.consultationNote !== "N/A" && (
+                              <div className="space-y-1 md:col-span-2">
+                                <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Doctor's / Consultation Note</span>
+                                <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap">{parsed.consultationNote}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Fallback for flat non-structured notes
+                  return (
+                    <div key={idx} className="pb-4 border-b border-gray-100 last:border-b-0 hover:opacity-95 transition-opacity">
+                      <div 
+                        onClick={() => setExpandedNotes(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                        className="flex justify-between items-center cursor-pointer select-none"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] bg-gray-100 text-gray-550 px-2.5 py-0.5 rounded font-black">{note.date}</span>
+                          <span className="text-[9px] font-black uppercase text-primary tracking-wider">{note.type || "Clinical Note"}</span>
+                        </div>
+                        <span className="text-[10px] text-primary font-bold">{isExpanded ? "Collapse ▲" : "View Details ▼"}</span>
+                      </div>
+                      {isExpanded ? (
+                        <p className="text-xs font-bold text-gray-805 mt-2 whitespace-pre-wrap leading-relaxed">{note.note}</p>
+                      ) : (
+                        <p className="text-xs font-semibold text-gray-450 mt-1 truncate max-w-xl">{note.note}</p>
+                      )}
                     </div>
-                    <p className="text-xs font-bold text-gray-805 mt-2 whitespace-pre-wrap leading-relaxed">{note.note}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8 text-xs text-gray-500 font-medium italic">
                 No previous diagnosis logs found for this patient.
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeKpiSection === "prescription" && (
-          <div className="bg-white rounded-2xl border border-gray-150 shadow-sm p-6 space-y-4 animate-scale-up">
-            <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-              <div>
-                <h3 className="text-sm font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
-                  <Pill className="w-4 h-4 text-teal-600" /> Prescriptions & Medication Log
-                </h3>
-                <p className="text-[10px] text-gray-550 mt-0.5 font-medium">Issue active prescriptions and review historical patient scripts.</p>
-              </div>
-              
-              {!showNewPrescriptionForm && (
-                <button
-                  type="button"
-                  onClick={() => setShowNewPrescriptionForm(true)}
-                  className="px-4 py-2 bg-primary hover:bg-primary/95 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm cursor-pointer outline-none border-none"
-                >
-                  + New Prescription
-                </button>
-              )}
-            </div>
-
-            {showNewPrescriptionForm && (
-              <div className="p-5 bg-gray-50 border border-gray-150 rounded-2xl space-y-3 animate-scale-up">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Compose New Prescription</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPrescriptionForm(false)}
-                    className="text-[10px] font-bold text-gray-400 hover:text-gray-700 underline cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <PrescriptionForm
-                  rxDraft={rxDraft}
-                  onAddMedicine={handleAddDraftMedicine}
-                  onRemoveDraftMed={handleRemoveDraftMed}
-                  onSavePrescription={async () => {
-                    await handleSavePrescription();
-                    setShowNewPrescriptionForm(false);
-                  }}
-                  showNotification={showNotification}
-                />
-              </div>
-            )}
-
-            {prescriptionEvents.length > 0 ? (
-              <div className="space-y-3 pt-2">
-                {prescriptionEvents.map((note, idx) => (
-                  <div key={idx} className="p-4 border border-gray-150 rounded-xl bg-gray-50/20 hover:bg-gray-50/50 transition-colors">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] bg-gray-100 text-gray-550 px-2.5 py-0.5 rounded font-black">{note.date}</span>
-                      <span className="text-[9px] font-black uppercase text-teal-600 tracking-wider">Rx Script</span>
-                    </div>
-                    <p className="text-xs font-bold text-gray-805 mt-2 whitespace-pre-wrap leading-relaxed">{note.note}</p>
-                    
-                    {note.details && Array.isArray(note.details) && (
-                      <div className="mt-3 pt-2.5 border-t border-gray-100/50 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-gray-600">
-                        {note.details.map((m, i) => (
-                          <div key={i} className="flex gap-2 items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
-                            <span className="text-teal-600 shrink-0">💊</span>
-                            <div>
-                              <span className="font-bold text-gray-800">{m.medicine}</span>
-                              <span className="text-[10px] text-gray-500 font-semibold block">{m.schedule} • {m.timing} for {m.duration}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-xs text-gray-550 font-medium italic">
-                No active or previous prescriptions found for this patient.
               </div>
             )}
           </div>

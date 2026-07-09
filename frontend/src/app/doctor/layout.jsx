@@ -859,7 +859,7 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  const handleSubmitDiagNote = async (noteText) => {
+  const handleSubmitDiagNote = async (noteText, prescribedMeds = []) => {
     if (!viewingPatient) return;
 
     try {
@@ -867,13 +867,15 @@ export default function DoctorLayout({ children }) {
         patient_token: viewingPatient.token,
         doctor_name: currentDoctorName || "Dr. Nair",
         note: noteText,
-        date: getTodayString()
+        date: getTodayString(),
+        medications: prescribedMeds
       });
 
       const newTimelineEvent = {
         date: getTodayString(),
         note: noteText,
-        type: "Clinical Note"
+        type: "Clinical Note",
+        medications: prescribedMeds
       };
 
       setPatients(prev => ({
@@ -976,7 +978,8 @@ export default function DoctorLayout({ children }) {
           timelineEvents.push({
             date: cn.date,
             note: cn.note,
-            type: "Clinical Note"
+            type: "Clinical Note",
+            medications: cn.medications
           });
         });
       }

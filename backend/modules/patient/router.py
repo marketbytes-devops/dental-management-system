@@ -1278,9 +1278,21 @@ def save_clinical_note_route(
         patient_token=req.patient_token,
         doctor_name=req.doctor_name,
         note=req.note,
-        date=note_date
+        date=note_date,
+        medications=req.medications
     )
     db.add(new_note)
+
+    # Automatically create a matching PatientPrescription record if medications list is present
+    if req.medications and len(req.medications) > 0:
+        from .models import PatientPrescription
+        new_rx = PatientPrescription(
+            patient_token=req.patient_token,
+            doctor_name=req.doctor_name,
+            medications=req.medications
+        )
+        db.add(new_rx)
+
     db.commit()
     db.refresh(new_note)
     return new_note

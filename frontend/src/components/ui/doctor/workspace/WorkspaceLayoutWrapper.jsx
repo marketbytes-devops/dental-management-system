@@ -284,10 +284,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
               <ClinicalNotes
                 onCancel={() => setShowNewDiagForm(false)}
                 onSubmitDiagNote={async (noteText, prescribedMeds) => {
-                  handleSubmitDiagNote(noteText);
-                  if (prescribedMeds && prescribedMeds.length > 0) {
-                    await handleSaveDirectPrescription(viewingPatient.token, prescribedMeds);
-                  }
+                  await handleSubmitDiagNote(noteText, prescribedMeds);
                   setShowNewDiagForm(false);
                 }}
               />

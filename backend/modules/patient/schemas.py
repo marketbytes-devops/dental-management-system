@@ -191,6 +191,7 @@ class ClinicalNoteCreate(BaseModel):
     doctor_name: str
     note: str
     date: Optional[str] = None
+    medications: Optional[list] = None
 
 
 class ClinicalNoteResponse(BaseModel):
@@ -199,6 +200,7 @@ class ClinicalNoteResponse(BaseModel):
     doctor_name: str
     note: str
     date: str
+    medications: Optional[list] = None
     created_at: datetime
 
     class Config:

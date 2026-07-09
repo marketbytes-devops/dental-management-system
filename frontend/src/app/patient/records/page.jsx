@@ -580,16 +580,56 @@ export default function PatientRecordsPage() {
                               <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">{parsed.consultationNote}</p>
                             </div>
                           )}
+
+                          {/* Prescribed Medications */}
+                          {note.medications && note.medications.length > 0 && (
+                            <div className="space-y-2 md:col-span-2 text-left pt-4 border-t border-gray-150 animate-fadeIn">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block">Prescribed Medications</span>
+                              <div className="divide-y divide-gray-100 bg-slate-50/50 border border-slate-100 rounded-xl overflow-hidden mt-1">
+                                {note.medications.map((med, mIdx) => (
+                                  <div key={med.id || mIdx} className="flex justify-between items-center p-3 text-xs font-semibold text-gray-700 hover:bg-gray-100/50">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                      <span>
+                                        <strong className="text-gray-900 font-bold">{med.medicine}</strong> ({med.schedule} • {med.timing} • {med.duration})
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
                       {/* Fallback Detailed Expanded View for non-structured notes */}
                       {isExpanded && !parsed && (
-                        <div className="pt-4 border-t border-gray-100 text-left animate-fadeIn">
-                          <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block mb-1">Consultation note details</span>
-                          <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                            {note.note}
-                          </p>
+                        <div className="pt-4 border-t border-gray-100 text-left animate-fadeIn space-y-4">
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block mb-1">Consultation note details</span>
+                            <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                              {note.note}
+                            </p>
+                          </div>
+
+                          {/* Prescribed Medications Fallback */}
+                          {note.medications && note.medications.length > 0 && (
+                            <div className="space-y-2 pt-4 border-t border-gray-150 text-left">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block">Prescribed Medications</span>
+                              <div className="divide-y divide-gray-100 bg-slate-50/50 border border-slate-100 rounded-xl overflow-hidden mt-1">
+                                {note.medications.map((med, mIdx) => (
+                                  <div key={med.id || mIdx} className="flex justify-between items-center p-3 text-xs font-semibold text-gray-700 hover:bg-gray-100/50">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                      <span>
+                                        <strong className="text-gray-900 font-bold">{med.medicine}</strong> ({med.schedule} • {med.timing} • {med.duration})
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

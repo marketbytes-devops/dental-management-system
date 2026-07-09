@@ -12,7 +12,7 @@ export default function LastVisitSummaryCard({ lastVisit, onClick }) {
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Last Visit Summary</p>
         {lastVisit ? (
           <>
-            <h3 className="text-xl font-bold text-gray-900 truncate max-w-[120px] sm:max-w-[200px]">
+            <h3 className="text-xl font-bold text-gray-900 truncate">
               {lastVisit.treatment}
             </h3>
             <p className="text-xs text-purple-600 font-medium mt-2">

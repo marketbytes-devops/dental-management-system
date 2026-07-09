@@ -183,3 +183,24 @@ class DoctorFeedbackResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Clinical Note Schemas ---
+class ClinicalNoteCreate(BaseModel):
+    patient_token: str
+    doctor_name: str
+    note: str
+    date: Optional[str] = None
+
+
+class ClinicalNoteResponse(BaseModel):
+    id: int
+    patient_token: str
+    doctor_name: str
+    note: str
+    date: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+

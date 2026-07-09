@@ -9,9 +9,16 @@ import {
   User, 
   ChevronRight, 
   Filter, 
-  Search
+  Search,
+  X,
+  Undo2
 } from "lucide-react";
-import { getAllComplaints, updateComplaintStatus } from "@/services/api";
+import { 
+  getAllComplaints, 
+  updateComplaintStatus, 
+  reopenComplaint, 
+  getComplaintLogs 
+} from "@/services/api";
 
 export default function AdminComplaintsPage() {
   const [complaints, setComplaints] = useState([]);
@@ -23,6 +30,13 @@ export default function AdminComplaintsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+
+  // Audit trail and action states
+  const [logs, setLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [transitionNote, setTransitionNote] = useState("");
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenModalOpen, setReopenModalOpen] = useState(false);
 
   const fetchComplaints = async () => {
     try {
@@ -46,19 +60,73 @@ export default function AdminComplaintsPage() {
     fetchComplaints();
   }, []);
 
+  // Fetch logs whenever selected complaint changes
+  useEffect(() => {
+    if (selectedComplaint) {
+      const fetchLogs = async () => {
+        try {
+          setLoadingLogs(true);
+          const data = await getComplaintLogs(selectedComplaint.id);
+          setLogs(data);
+        } catch (err) {
+          console.error("Failed to fetch logs:", err);
+        } finally {
+          setLoadingLogs(false);
+        }
+      };
+      fetchLogs();
+      setTransitionNote("");
+    } else {
+      setLogs([]);
+    }
+  }, [selectedComplaint]);
+
   const handleUpdateStatus = async (id, newStatus) => {
     try {
       setUpdatingId(id);
-      const updated = await updateComplaintStatus(id, newStatus);
+      const updated = await updateComplaintStatus(id, newStatus, transitionNote);
       
       // Update local state
       setComplaints(prev => prev.map(c => c.id === id ? updated : c));
       if (selectedComplaint && selectedComplaint.id === id) {
         setSelectedComplaint(updated);
       }
+      setTransitionNote("");
+      
+      // Refresh logs
+      const updatedLogs = await getComplaintLogs(id);
+      setLogs(updatedLogs);
     } catch (err) {
       console.error("Failed to update status:", err);
       alert("Failed to update status: " + err.message);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleReopen = async (e) => {
+    e.preventDefault();
+    if (!reopenReason.trim()) {
+      alert("A mandatory reason is required to reopen.");
+      return;
+    }
+    
+    try {
+      setUpdatingId(selectedComplaint.id);
+      const updated = await reopenComplaint(selectedComplaint.id, reopenReason);
+      
+      // Update local state
+      setComplaints(prev => prev.map(c => c.id === selectedComplaint.id ? updated : c));
+      setSelectedComplaint(updated);
+      setReopenReason("");
+      setReopenModalOpen(false);
+      
+      // Refresh logs
+      const updatedLogs = await getComplaintLogs(selectedComplaint.id);
+      setLogs(updatedLogs);
+    } catch (err) {
+      console.error("Failed to reopen complaint:", err);
+      alert("Failed to reopen: " + err.message);
     } finally {
       setUpdatingId(null);
     }
@@ -68,6 +136,7 @@ export default function AdminComplaintsPage() {
   const pendingCount = complaints.filter(c => c.status?.toLowerCase() === "pending").length;
   const underReviewCount = complaints.filter(c => c.status?.toLowerCase() === "under review").length;
   const resolvedCount = complaints.filter(c => c.status?.toLowerCase() === "resolved").length;
+  const closedCount = complaints.filter(c => c.status?.toLowerCase() === "closed").length;
 
   // Filtered list
   const filteredComplaints = complaints.filter(c => {
@@ -95,6 +164,12 @@ export default function AdminComplaintsPage() {
         return (
           <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 uppercase animate-pulse">
             <Clock className="w-3 h-3" /> Under Review
+          </span>
+        );
+      case "closed":
+        return (
+          <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-gray-300 uppercase">
+            <X className="w-3 h-3" /> Closed
           </span>
         );
       default:
@@ -137,7 +212,7 @@ export default function AdminComplaintsPage() {
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
         {/* Total */}
         <div className="bg-white p-5 rounded-2xl border border-gray-150 shadow-xs flex items-center gap-4 text-left">
           <div className="p-3 bg-gray-50 text-gray-600 rounded-xl">
@@ -181,6 +256,17 @@ export default function AdminComplaintsPage() {
             <p className="text-2xl font-black text-gray-900 mt-0.5">{resolvedCount}</p>
           </div>
         </div>
+
+        {/* Closed */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-150 shadow-xs flex items-center gap-4 text-left">
+          <div className="p-3 bg-gray-100 text-gray-500 rounded-xl">
+            <X className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Closed</p>
+            <p className="text-2xl font-black text-gray-900 mt-0.5">{closedCount}</p>
+          </div>
+        </div>
       </div>
 
       {/* Search & Filters */}
@@ -213,6 +299,7 @@ export default function AdminComplaintsPage() {
             <option value="pending">Pending</option>
             <option value="under review">Under Review</option>
             <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
           </select>
 
           {/* Role Filter */}
@@ -343,6 +430,45 @@ export default function AdminComplaintsPage() {
                     <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Current Status</p>
                     <div className="mt-1">{getStatusBadge(selectedComplaint.status)}</div>
                   </div>
+
+                  {selectedComplaint.resolved_at && (
+                    <div className="bg-gray-50 border border-gray-150 rounded-xl p-3 col-span-2">
+                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Resolved Date</p>
+                      <p className="text-xs font-semibold text-gray-700 mt-1">
+                        {new Date(selectedComplaint.resolved_at).toLocaleString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedComplaint.closed_at && (
+                    <div className="bg-gray-50 border border-gray-150 rounded-xl p-3 col-span-2">
+                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Closed Date</p>
+                      <p className="text-xs font-semibold text-gray-700 mt-1">
+                        {new Date(selectedComplaint.closed_at).toLocaleString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedComplaint.related_complaint_id && (
+                    <div className="bg-gray-50 border border-gray-150 rounded-xl p-3 col-span-2">
+                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Linked to Complaint</p>
+                      <p className="text-xs font-extrabold text-primary mt-1">
+                        Related Complaint ID: #{selectedComplaint.related_complaint_id}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Complaint Text */}
@@ -355,30 +481,145 @@ export default function AdminComplaintsPage() {
 
                 <div className="space-y-2">
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Detailed Body</p>
-                  <div className="bg-gray-50/50 border border-gray-150 rounded-2xl p-4 min-h-[160px] text-xs text-gray-755 whitespace-pre-wrap leading-relaxed font-semibold">
+                  <div className="bg-gray-50/50 border border-gray-150 rounded-2xl p-4 min-h-[120px] text-xs text-gray-755 whitespace-pre-wrap leading-relaxed font-semibold">
                     {selectedComplaint.body}
                   </div>
                 </div>
 
                 {/* Administrative Actions */}
                 <div className="pt-4 border-t border-gray-100 space-y-3">
-                  <p className="text-[10px] text-gray-450 font-bold uppercase tracking-wider">Update Status</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleUpdateStatus(selectedComplaint.id, "Under Review")}
-                      disabled={updatingId === selectedComplaint.id || selectedComplaint.status?.toLowerCase() === "under review"}
-                      className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
-                    >
-                      <Clock className="w-3.5 h-3.5" /> Review
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(selectedComplaint.id, "Resolved")}
-                      disabled={updatingId === selectedComplaint.id || selectedComplaint.status?.toLowerCase() === "resolved"}
-                      className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Resolve
-                    </button>
-                  </div>
+                  <p className="text-[10px] text-gray-450 font-bold uppercase tracking-wider">Actions</p>
+                  
+                  {selectedComplaint.status?.toLowerCase() === "closed" ? (
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-center text-xs font-bold text-gray-500">
+                      Closed (Final State - No changes allowed)
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Transition Note Input (only for non-closed complaints) */}
+                      <div className="space-y-1">
+                        <label className="block text-[9px] uppercase font-bold text-gray-400 tracking-wider">Transition Note / Comment (Optional)</label>
+                        <textarea
+                          value={transitionNote}
+                          onChange={(e) => setTransitionNote(e.target.value)}
+                          placeholder="Add comments or status investigation updates..."
+                          rows={2}
+                          className="w-full px-3 py-2 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-800 outline-none focus:border-primary focus:bg-white transition-all font-semibold resize-none"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {/* Resolve to Closed (from Resolved) */}
+                        {selectedComplaint.status?.toLowerCase() === "resolved" && (
+                          <>
+                            <button
+                              onClick={() => setReopenModalOpen(true)}
+                              disabled={updatingId === selectedComplaint.id}
+                              className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
+                            >
+                              <Undo2 className="w-3.5 h-3.5" /> Reopen
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStatus(selectedComplaint.id, "Closed")}
+                              disabled={updatingId === selectedComplaint.id}
+                              className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
+                            >
+                              <X className="w-3.5 h-3.5" /> Close
+                            </button>
+                          </>
+                        )}
+
+                        {/* Transitions from Pending */}
+                        {selectedComplaint.status?.toLowerCase() === "pending" && (
+                          <>
+                            <button
+                              onClick={() => handleUpdateStatus(selectedComplaint.id, "Under Review")}
+                              disabled={updatingId === selectedComplaint.id}
+                              className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
+                            >
+                              <Clock className="w-3.5 h-3.5" /> Review
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStatus(selectedComplaint.id, "Resolved")}
+                              disabled={updatingId === selectedComplaint.id}
+                              className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Resolve
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStatus(selectedComplaint.id, "Closed")}
+                              disabled={updatingId === selectedComplaint.id}
+                              className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
+                            >
+                              <X className="w-3.5 h-3.5" /> Close
+                            </button>
+                          </>
+                        )}
+
+                        {/* Transitions from Under Review */}
+                        {selectedComplaint.status?.toLowerCase() === "under review" && (
+                          <>
+                            <button
+                              onClick={() => handleUpdateStatus(selectedComplaint.id, "Resolved")}
+                              disabled={updatingId === selectedComplaint.id}
+                              className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Resolve
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStatus(selectedComplaint.id, "Closed")}
+                              disabled={updatingId === selectedComplaint.id}
+                              className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer disabled:opacity-50"
+                            >
+                              <X className="w-3.5 h-3.5" /> Close
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Audit Trail Timeline */}
+                <div className="pt-4 border-t border-gray-100 space-y-3">
+                  <p className="text-[10px] text-gray-450 font-bold uppercase tracking-wider">Status History & Audit Trail</p>
+                  {loadingLogs ? (
+                    <p className="text-xs text-gray-450">Loading audit history...</p>
+                  ) : logs.length === 0 ? (
+                    <p className="text-xs text-gray-450">No logs available.</p>
+                  ) : (
+                    <div className="relative pl-4 border-l border-gray-200 space-y-4">
+                      {logs.map((log) => {
+                        const logDate = new Date(log.created_at).toLocaleDateString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
+                        return (
+                          <div key={log.id} className="relative space-y-0.5 text-xs text-left">
+                            {/* Dot indicator */}
+                            <span className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-primary border-2 border-white ring-4 ring-primary/10"></span>
+                            <div className="flex items-center gap-1.5 font-bold text-gray-700">
+                              <span>
+                                {log.from_status ? `${log.from_status} → ` : ""}
+                                <span className="text-primary">{log.to_status}</span>
+                              </span>
+                              <span className="text-[10px] font-normal text-gray-400">{logDate}</span>
+                            </div>
+                            <p className="text-[10px] font-semibold text-gray-500">
+                              By: <span className="text-gray-700">{log.changed_by_name}</span>
+                            </p>
+                            {log.note && (
+                              <p className="text-xs font-normal text-gray-650 bg-gray-50 p-2 rounded border border-gray-150 mt-1 whitespace-pre-wrap">
+                                {log.note}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -391,6 +632,58 @@ export default function AdminComplaintsPage() {
           </div>
         </div>
       </div>
+
+      {/* Mandatory Reopen Modal */}
+      {reopenModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 text-left border border-gray-150">
+            <div className="flex items-center justify-between p-5 border-b border-b-gray-100 bg-gray-50/50">
+              <div>
+                <h2 className="text-base font-extrabold text-gray-950">Reopen Complaint</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Mandatory Reason Required</p>
+              </div>
+              <button 
+                onClick={() => setReopenModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 hover:bg-gray-100 rounded-full cursor-pointer outline-none"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleReopen}>
+              <div className="p-5 space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Reason for Reopening</label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={reopenReason}
+                    onChange={(e) => setReopenReason(e.target.value)}
+                    placeholder="Provide a clear, detailed reason for reopening this complaint..."
+                    className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-800 outline-none focus:border-primary focus:bg-white transition-all font-semibold resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="px-5 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReopenModalOpen(false)}
+                  className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 cursor-pointer transition-colors outline-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/95 cursor-pointer transition-colors outline-none"
+                >
+                  Confirm Reopen
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

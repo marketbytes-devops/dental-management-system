@@ -25,6 +25,43 @@ import ReferralCard from "@/components/ui/patients/records/referralCard";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import { getPatientTreatmentPlan, getPendingConsents, getPatientPrescriptions, getPatientReferrals, getMyClinicalNotes } from "@/services/api";
 
+const parseCustomDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  
+  // Clean custom timeline suffixes
+  const cleanStr = dateStr.replace(" (Today)", "").trim();
+  
+  if (cleanStr.includes("T") || (cleanStr.includes("-") && cleanStr.split("-")[0].length === 4)) {
+    return new Date(cleanStr);
+  }
+  
+  const spaceParts = cleanStr.split(" ");
+  const dateParts = spaceParts[0].split("-");
+  if (dateParts.length === 3) {
+    const day = parseInt(dateParts[0], 10);
+    const month = parseInt(dateParts[1], 10) - 1; // 0-indexed month
+    const year = parseInt(dateParts[2], 10);
+    
+    let hours = 0;
+    let minutes = 0;
+    
+    if (spaceParts.length >= 2) {
+      const timeParts = spaceParts[1].split(":");
+      if (timeParts.length >= 2) {
+        hours = parseInt(timeParts[0], 10);
+        minutes = parseInt(timeParts[1], 10);
+        if (spaceParts.length >= 3 && spaceParts[2].toLowerCase() === "pm" && hours < 12) {
+          hours += 12;
+        } else if (spaceParts.length >= 3 && spaceParts[2].toLowerCase() === "am" && hours === 12) {
+          hours = 0;
+        }
+      }
+    }
+    return new Date(year, month, day, hours, minutes);
+  }
+  return new Date(cleanStr);
+};
+
 const parseStructuredNote = (noteText) => {
   if (!noteText) return null;
   if (!noteText.includes("[Chief Complaint]:") && !noteText.includes("[Medical History]:")) {
@@ -172,8 +209,9 @@ export default function PatientRecordsPage() {
 
   // Formats DB medications structure to PrescriptionCard expectation
   const formattedPrescriptions = prescriptions.flatMap((rxObj) => {
-    const dateStr = rxObj.created_at
-      ? new Date(rxObj.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    const dateObj = parseCustomDate(rxObj.created_at);
+    const dateStr = dateObj && !isNaN(dateObj.getTime())
+      ? dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
       : "Recent";
 
     // Deem active if created within the past 7 days
@@ -492,8 +530,16 @@ export default function PatientRecordsPage() {
                   const parsed = parseStructuredNote(note.note);
                   const isExpanded = !!expandedNotes[idx];
                   const doctorName = note.doctor_name || "Doctor";
-                  const displayDate = note.date
-                    ? new Date(note.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                  const dateObj = parseCustomDate(note.date);
+                  const displayDate = dateObj && !isNaN(dateObj.getTime())
+                    ? dateObj.toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true
+                      })
                     : "Recent";
 
                   return (

@@ -133,9 +133,9 @@ export default function PatientDashboardPage() {
           lastUpdated={oralHealthDetails?.updated_at || profile?.created_at}
           onClick={() => setIsHealthModalOpen(true)}
         />
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-secondary/30 transition-colors">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-secondary/30 transition-colors min-h-[110px]">
           <div className="absolute top-0 right-0 w-24 h-24 bg-secondary/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-          <div>
+          <div className="text-left">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Upcoming Appointments</p>
             <h3 className="text-2xl font-bold text-gray-900">
               {confirmedAppointments.length}
@@ -146,9 +146,9 @@ export default function PatientDashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-danger/30 transition-colors">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-danger/30 transition-colors min-h-[110px]">
           <div className="absolute top-0 right-0 w-24 h-24 bg-danger/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-          <div>
+          <div className="text-left">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Outstanding Balance</p>
             <h3 className="text-2xl font-bold text-gray-900">
               ₹0

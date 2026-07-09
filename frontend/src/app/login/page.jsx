@@ -127,6 +127,7 @@ function LoginContent() {
         localStorage.setItem("patient_name", patientProfile.name);
         localStorage.setItem("patient_phone", patientProfile.phone);
         localStorage.setItem("patient_email", patientProfile.email);
+        localStorage.setItem("patient_profile_picture", patientProfile.profile_picture || "");
 
         setIsSubmitting(false);
         router.push("/patient/dashboard");
@@ -138,6 +139,7 @@ function LoginContent() {
         localStorage.removeItem("patient_phone");
         localStorage.removeItem("patient_email");
         localStorage.removeItem("patient_user");
+        localStorage.removeItem("patient_profile_picture");
 
         // Save token to localStorage first so getProfile interceptor can use it
         localStorage.setItem("staff_jwt_token", jwtToken);

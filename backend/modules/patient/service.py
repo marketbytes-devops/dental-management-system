@@ -66,6 +66,7 @@ def create_patient(db: Session, patient_in: PatientCreate) -> PatientModel:
         emergency_contact_phone=patient_in.emergency_contact_phone,
         # Medical
         known_allergies=patient_in.known_allergies,
+        profile_picture=patient_in.profile_picture,
         # Auth
         password=hashed_password,
         is_active=True,

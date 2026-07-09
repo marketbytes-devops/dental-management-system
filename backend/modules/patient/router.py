@@ -1,9 +1,10 @@
 # router.py - all /patient/* endpoints
 import os
 import datetime
+import shutil
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -109,6 +110,46 @@ def update_profile(
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     return updated
+
+
+@router.post("/profile/picture")
+def upload_patient_profile_picture(
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+        
+    os.makedirs("static/uploads", exist_ok=True)
+    
+    # Save the file
+    ext = os.path.splitext(file.filename)[1]
+    filename = f"patient_{patient_id}_{int(datetime.datetime.now().timestamp())}{ext}"
+    file_path = os.path.join("static/uploads", filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # Remove old profile picture if exists
+    if patient.profile_picture:
+        old_path = patient.profile_picture.lstrip("/")
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except Exception:
+                pass
+                
+    patient.profile_picture = f"/static/uploads/{filename}"
+    db.commit()
+    db.refresh(patient)
+    
+    return {"profile_picture": patient.profile_picture}
 
 
 @router.post("/change-password")
@@ -270,7 +311,7 @@ def sign_consent(
 
     # Generate PDF
     pdf_path = generate_consent_pdf(
-        title=consent.title,
+        title=consent.title,     #type:ignore
         body_text=consent.content or "",
         signature_data=req.signature_data,
         patient_name=patient.name,
@@ -459,7 +500,9 @@ from dependencies import get_current_user
 from modules.doctor.models import DoctorModel
 from shared.utils.pdf_generator import generate_consent_pdf
 
-from .models import PatientConsent, PatientModel, PatientNotificationModel, DoctorFeedbackModel
+from .models import (
+    PatientModel, PatientConsent, PatientNotificationModel, DoctorFeedbackModel
+)
 from .schemas import (
     ConsentRequest,
     ConsentResponse,

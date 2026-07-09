@@ -14,6 +14,7 @@ class UserModel(Base):
     roles = Column(JSON, nullable=False, default=[])
     specialties = Column(JSON, nullable=False, default=[])
     status = Column(String, default="Active")
+    profile_picture = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -4,7 +4,7 @@ from database import get_db
 from dependencies import get_current_active_user, require_admin
 from modules.auth.models import UserModel
 from modules.leave.models import LeaveRequestModel
-from datetime import datetime
+from datetime import datetime, date
 
 router = APIRouter(prefix="/leave", tags=["leave"])
 
@@ -54,26 +54,74 @@ def apply_leave(
     role_label = get_user_role_label(user)
 
     try:
-        start_dt = datetime.strptime(payload["startDate"], "%Y-%m-%d")
-        end_dt = datetime.strptime(payload["endDate"], "%Y-%m-%d")
+        start_dt = datetime.strptime(payload["startDate"], "%Y-%m-%d").date()
+        end_dt = datetime.strptime(payload["endDate"], "%Y-%m-%d").date()
+
+        today = date.today()
+
+        if start_dt < today:
+            raise HTTPException(
+                status_code=400,
+                detail="Leave cannot start on a past date."
+            )
+
+        if end_dt < start_dt:
+            raise HTTPException(
+                status_code=400,
+                detail="End date must be on or after start date."
+            )
+
         days = (end_dt - start_dt).days + 1
-        if days <= 0:
-            raise HTTPException(status_code=400, detail="End date must be on or after start date.")
+
+    except HTTPException:
+        raise
+
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid date format. Use YYYY-MM-DD."
+        )
+
+    # Check for overlapping Pending or Approved leave requests
+    existing_requests = db.query(LeaveRequestModel).filter(
+        LeaveRequestModel.user_id == user.id,
+        LeaveRequestModel.status.in_(["Pending", "Approved"])
+    ).all()
+
+    for leave in existing_requests:
+        existing_start = leave.start_date
+        existing_end = leave.end_date
+
+        # Convert to date if stored as string
+        if isinstance(existing_start, str):
+            existing_start = datetime.strptime(existing_start, "%Y-%m-%d").date()
+        if isinstance(existing_end, str):
+            existing_end = datetime.strptime(existing_end, "%Y-%m-%d").date()
+
+        # Overlap condition
+        if start_dt <= existing_end and end_dt >= existing_start:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"You already have a {leave.status.lower()} leave "
+                    f"from {existing_start} to {existing_end}."
+                )
+            )
+
+    
 
     new_request = LeaveRequestModel(
-        user_id=user.id,
-        staff_name=user.name,
-        role=role_label,
-        type=payload["type"],
-        start_date=payload["startDate"],
-        end_date=payload["endDate"],
-        days=days,
-        reason=payload["reason"],
-        status="Pending",
-        on_call_doctor=payload.get("onCallDoctor", "")
-    )
+    user_id=user.id,
+    staff_name=user.name,
+    role=role_label,
+    type=payload["type"],
+    start_date=start_dt,
+    end_date=end_dt,
+    days=days,
+    reason=payload["reason"],
+    status="Pending",
+    on_call_doctor=payload.get("onCallDoctor", "")
+)
     db.add(new_request)
     db.commit()
     db.refresh(new_request)

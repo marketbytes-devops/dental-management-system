@@ -71,6 +71,7 @@ export default function AuthGuard({ children, allowedRoles = [], type = "staff" 
           localStorage.setItem("patient_name", profile.name);
           localStorage.setItem("patient_phone", profile.phone);
           localStorage.setItem("patient_email", profile.email);
+          localStorage.setItem("patient_profile_picture", profile.profile_picture || "");
         } else {
           localStorage.setItem("staff_user", JSON.stringify(profile));
         }
@@ -102,6 +103,7 @@ export default function AuthGuard({ children, allowedRoles = [], type = "staff" 
             localStorage.removeItem("patient_name");
             localStorage.removeItem("patient_phone");
             localStorage.removeItem("patient_email");
+            localStorage.removeItem("patient_profile_picture");
           } else {
             localStorage.removeItem("staff_user");
           }

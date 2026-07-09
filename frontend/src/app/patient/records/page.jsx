@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-  Heart, 
-  FileSignature, 
-  Check, 
-  X, 
-  Calendar, 
-  Activity, 
-  ChevronDown, 
-  Coins, 
-  Loader2, 
+import {
+  Heart,
+  FileSignature,
+  Check,
+  X,
+  Calendar,
+  Activity,
+  ChevronDown,
+  Coins,
+  Loader2,
   AlertCircle,
   Paperclip,
   CheckCircle,
@@ -132,12 +132,12 @@ export default function PatientRecordsPage() {
 
   // Formats DB medications structure to PrescriptionCard expectation
   const formattedPrescriptions = prescriptions.flatMap((rxObj) => {
-    const dateStr = rxObj.created_at 
+    const dateStr = rxObj.created_at
       ? new Date(rxObj.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
       : "Recent";
-    
+
     // Deem active if created within the past 7 days
-    const isRecent = rxObj.created_at 
+    const isRecent = rxObj.created_at
       ? (new Date() - new Date(rxObj.created_at)) < (7 * 24 * 60 * 60 * 1000)
       : true;
 
@@ -285,7 +285,7 @@ export default function PatientRecordsPage() {
                       </span>
                       <div className="grid grid-cols-1 gap-1.5">
                         {activePlan.attachments.map((file, i) => (
-                          <a 
+                          <a
                             key={i}
                             href="#"
                             onClick={(e) => { e.preventDefault(); alert("Viewing mock attachment..."); }}
@@ -313,62 +313,61 @@ export default function PatientRecordsPage() {
                         if (phaseSteps.length === 0) return null;
                         return (
                           <div key={phaseName} className="space-y-2.5">
-                          <div className="bg-slate-100 p-2.5 rounded-xl border border-slate-200">
-                            <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{phaseName}</span>
-                          </div>
+                            <div className="bg-slate-100 p-2.5 rounded-xl border border-slate-200">
+                              <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{phaseName}</span>
+                            </div>
 
-                          <div className="space-y-2.5">
-                            {phaseSteps.map((step) => (
-                              <div key={step.id} className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50/50 border border-gray-150 p-4 rounded-2xl gap-4 hover:shadow-sm transition-all duration-300">
-                                <div className="space-y-1 text-left">
-                                  <div className="font-bold text-gray-800 text-sm">{step.title}</div>
-                                  {step.details && <p className="text-xs text-gray-500">{step.details}</p>}
-                                  {step.notes && (
-                                    <p className="text-[11px] text-primary italic font-medium bg-white px-2 py-1 rounded border border-gray-100 mt-1.5">
-                                      📝 Notes: {step.notes}
-                                    </p>
-                                  )}
-                                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                                    <span className="text-[10px] font-bold text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-100">
-                                      Est. Cost: ₹{step.cost.toLocaleString()}
-                                    </span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                                      step.status === "Completed" ? "bg-emerald-50 border-emerald-100 text-emerald-700" :
-                                      step.status === "In Progress" ? "bg-sky-50 border-sky-100 text-sky-700" :
-                                      "bg-gray-50 border-gray-200 text-gray-505"
-                                    }`}>
-                                      Status: {step.status}
-                                    </span>
+                            <div className="space-y-2.5">
+                              {phaseSteps.map((step) => (
+                                <div key={step.id} className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50/50 border border-gray-150 p-4 rounded-2xl gap-4 hover:shadow-sm transition-all duration-300">
+                                  <div className="space-y-1 text-left">
+                                    <div className="font-bold text-gray-800 text-sm">{step.title}</div>
+                                    {step.details && <p className="text-xs text-gray-500">{step.details}</p>}
+                                    {step.notes && (
+                                      <p className="text-[11px] text-primary italic font-medium bg-white px-2 py-1 rounded border border-gray-100 mt-1.5">
+                                        📝 Notes: {step.notes}
+                                      </p>
+                                    )}
+                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                      <span className="text-[10px] font-bold text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-100">
+                                        Est. Cost: ₹{step.cost.toLocaleString()}
+                                      </span>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${step.status === "Completed" ? "bg-emerald-50 border-emerald-100 text-emerald-700" :
+                                          step.status === "In Progress" ? "bg-sky-50 border-sky-100 text-sky-700" :
+                                            "bg-gray-50 border-gray-200 text-gray-505"
+                                        }`}>
+                                        Status: {step.status}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 self-stretch md:self-center justify-end">
+                                    {step.requires_consent ? (
+                                      step.consent_status === "Given" ? (
+                                        <a
+                                          href={`http://localhost:8000/patient/consents/${step.consent_id}/pdf`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-250 px-3 py-1.5 rounded-xl flex items-center gap-1.5 hover:bg-emerald-100/50 transition-colors"
+                                        >
+                                          🟢 Signed <FileDown className="w-3.5 h-3.5" />
+                                        </a>
+                                      ) : (
+                                        <button
+                                          onClick={() => triggerSignConsent(step.consent_id)}
+                                          className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-250 hover:bg-amber-100/50 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all animate-pulse cursor-pointer"
+                                        >
+                                          🟡 Awaiting Consent <FileSignature className="w-3.5 h-3.5" />
+                                        </button>
+                                      )
+                                    ) : (
+                                      <span className="text-[10px] text-gray-400 italic">No special consent required</span>
+                                    )}
                                   </div>
                                 </div>
-
-                                <div className="flex items-center gap-2 self-stretch md:self-center justify-end">
-                                  {step.requires_consent ? (
-                                    step.consent_status === "Given" ? (
-                                      <a
-                                        href={`http://localhost:8000/patient/consents/${step.consent_id}/pdf`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-250 px-3 py-1.5 rounded-xl flex items-center gap-1.5 hover:bg-emerald-100/50 transition-colors"
-                                      >
-                                        🟢 Signed <FileDown className="w-3.5 h-3.5" />
-                                      </a>
-                                    ) : (
-                                      <button
-                                        onClick={() => triggerSignConsent(step.consent_id)}
-                                        className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-250 hover:bg-amber-100/50 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all animate-pulse cursor-pointer"
-                                      >
-                                        🟡 Awaiting Consent <FileSignature className="w-3.5 h-3.5" />
-                                      </button>
-                                    )
-                                  ) : (
-                                    <span className="text-[10px] text-gray-400 italic">No special consent required</span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
                         );
                       });
                     })()}
@@ -390,9 +389,8 @@ export default function PatientRecordsPage() {
                     <details key={plan.id} className="group bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
                       <summary className="p-4 font-bold text-gray-700 cursor-pointer list-none flex justify-between items-center select-none group-open:bg-gray-50/50">
                         <div className="flex items-center gap-3">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                            plan.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-gray-150 text-gray-505"
-                          }`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${plan.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-gray-150 text-gray-505"
+                            }`}>
                             {plan.status}
                           </span>
                           <span className="text-xs font-bold text-gray-800">
@@ -436,28 +434,12 @@ export default function PatientRecordsPage() {
         return <ActivePrescriptions prescriptions={formattedPrescriptions} />;
 
       case "all-rx":
-        if (prescriptionsLoading) {
-          return (
-            <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
-              <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              <span className="text-sm font-semibold text-gray-500">Loading prescription history...</span>
-            </div>
-          );
-        }
         return (
           <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6">Prescription History</h3>
-            {formattedPrescriptions.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                {formattedPrescriptions.map((rx) => (
-                  <PrescriptionCard key={rx.id} rx={rx} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-gray-400 text-sm py-8">
-                No prescription history records found.
-              </div>
-            )}
+            <h3 className="text-lg font-bold text-gray-900 mb-6">Clinical Notes</h3>
+            <div className="text-center text-gray-400 text-sm py-8">
+              Your clinical notes will appear here.
+            </div>
           </div>
         );
 
@@ -503,17 +485,16 @@ export default function PatientRecordsPage() {
         {[
           { id: "treatment-plans", label: "Treatment Plans" },
           { id: "active-rx", label: "Active Prescriptions" },
-          { id: "all-rx", label: "Prescription History" },
+          { id: "all-rx", label: "Clinical Notes" },
           { id: "referrals", label: "Referral Letters" },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
-              activeTab === tab.id
+            className={`py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${activeTab === tab.id
                 ? "border-primary text-primary"
                 : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+              }`}
           >
             {tab.label}
           </button>

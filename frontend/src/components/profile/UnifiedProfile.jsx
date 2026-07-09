@@ -8,7 +8,9 @@ import {
   updateProfile, 
   getPatientProfile, 
   updatePatientProfile,
-  changePatientPassword
+  changePatientPassword,
+  uploadProfilePicture,
+  uploadPatientProfilePicture
 } from "@/services/api";
 
 export default function UnifiedProfile({ role }) {
@@ -74,7 +76,8 @@ export default function UnifiedProfile({ role }) {
           insurance: {
             provider: "Not provided",
             policyId: "N/A"
-          }
+          },
+          profilePicture: data.profile_picture || null
         };
         setProfile(formatted);
       } else {
@@ -95,7 +98,8 @@ export default function UnifiedProfile({ role }) {
           specialties: data.specialties || [],
           licenceId: data.licence_id || "",
           chairSetup: data.chair_setup || "",
-          board: data.board || ""
+          board: data.board || "",
+          profilePicture: data.profile_picture || null
         };
         setProfile(formatted);
       }
@@ -178,6 +182,55 @@ export default function UnifiedProfile({ role }) {
       setIsEditing(false);
     } catch (err) {
       alert(err.response?.data?.detail || err.message || "Failed to save profile changes.");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size must be less than 5MB");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setSaveLoading(true);
+    try {
+      let res;
+      if (role === "patient") {
+        res = await uploadPatientProfilePicture(formData);
+      } else {
+        res = await uploadProfilePicture(formData);
+      }
+
+      setProfile((prev) => ({
+        ...prev,
+        profilePicture: res.profile_picture,
+      }));
+
+      if (role === "patient" && typeof window !== "undefined") {
+        localStorage.setItem("patient_profile_picture", res.profile_picture || "");
+      } else if (role !== "patient" && typeof window !== "undefined") {
+        const stored = localStorage.getItem("staff_user");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            parsed.profile_picture = res.profile_picture;
+            localStorage.setItem("staff_user", JSON.stringify(parsed));
+          } catch (err) {
+            console.error("Failed to update staff_user in localStorage:", err);
+          }
+        }
+      }
+
+      alert("Profile picture updated successfully!");
+    } catch (err) {
+      alert(err.response?.data?.detail || err.message || "Failed to upload profile picture.");
     } finally {
       setSaveLoading(false);
     }
@@ -279,8 +332,33 @@ export default function UnifiedProfile({ role }) {
 
       {/* Profile Card Header */}
       <div className="bg-white border border-gray-150 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-center gap-6">
-        <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold text-3xl">
-          {profile.name.charAt(0).toUpperCase()}
+        <div className="relative group w-20 h-20 rounded-2xl overflow-hidden bg-primary/10 flex items-center justify-center border border-gray-100">
+          {profile.profilePicture ? (
+            <img 
+              src={profile.profilePicture.startsWith("http") ? profile.profilePicture : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${profile.profilePicture}`} 
+              alt={profile.name} 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="text-primary font-bold text-3xl">{profile.name.charAt(0).toUpperCase()}</span>
+          )}
+          
+          <label className="absolute inset-0 bg-black/45 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer">
+            <Pencil className="w-5 h-5 text-white" />
+            <span className="text-[10px] text-white font-bold mt-1">Upload</span>
+            <input 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={handleImageUpload} 
+              disabled={saveLoading}
+            />
+          </label>
+          {saveLoading && (
+            <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+              <div className="w-5 h-5 border-2 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+            </div>
+          )}
         </div>
         <div className="text-center md:text-left space-y-1 flex-1">
           <h2 className="text-xl font-bold text-gray-900">{profile.name}</h2>

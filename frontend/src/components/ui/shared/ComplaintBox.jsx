@@ -11,9 +11,15 @@ import {
   ChevronDown, 
   ChevronUp, 
   Paperclip,
-  Send
+  Send,
+  Undo2
 } from "lucide-react";
-import { getMyComplaints, submitComplaint } from "@/services/api";
+import { 
+  getMyComplaints, 
+  submitComplaint, 
+  reopenComplaint, 
+  getComplaintLogs 
+} from "@/services/api";
 
 export default function ComplaintBox() {
   const [complaints, setComplaints] = useState([]);
@@ -24,6 +30,7 @@ export default function ComplaintBox() {
   // Form fields
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [relatedComplaintId, setRelatedComplaintId] = useState(null);
   
   // Feedback messages
   const [errorMsg, setErrorMsg] = useState("");
@@ -31,6 +38,13 @@ export default function ComplaintBox() {
   
   // Expanded complaints tracker
   const [expandedId, setExpandedId] = useState(null);
+  const [expandedLogs, setExpandedLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  // Reopen modal states
+  const [reopenModalOpen, setReopenModalOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenId, setReopenId] = useState(null);
 
   const fetchComplaints = async () => {
     try {
@@ -59,10 +73,15 @@ export default function ComplaintBox() {
       setSubmitting(true);
       setErrorMsg("");
       setSuccessMsg("");
-      await submitComplaint({ subject, body });
+      await submitComplaint({ 
+        subject, 
+        body, 
+        related_complaint_id: relatedComplaintId 
+      });
       setSuccessMsg("Complaint submitted successfully to the administrator.");
       setSubject("");
       setBody("");
+      setRelatedComplaintId(null);
       
       // Close modal after a short delay and refresh list
       setTimeout(() => {
@@ -79,8 +98,75 @@ export default function ComplaintBox() {
     }
   };
 
-  const toggleExpand = (id) => {
-    setExpandedId(prev => (prev === id ? null : id));
+  const toggleExpand = async (id) => {
+    if (expandedId === id) {
+      setExpandedId(null);
+      setExpandedLogs([]);
+    } else {
+      setExpandedId(id);
+      setExpandedLogs([]);
+      try {
+        setLoadingLogs(true);
+        const data = await getComplaintLogs(id);
+        setExpandedLogs(data);
+      } catch (err) {
+        console.error("Failed to fetch logs:", err);
+      } finally {
+        setLoadingLogs(false);
+      }
+    }
+  };
+
+  const triggerReopen = (id) => {
+    setReopenId(id);
+    setReopenReason("");
+    setReopenModalOpen(true);
+  };
+
+  const handleReopenSubmit = async (e) => {
+    e.preventDefault();
+    if (!reopenReason.trim()) {
+      alert("A mandatory reason is required to reopen.");
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      await reopenComplaint(reopenId, reopenReason);
+      setReopenModalOpen(false);
+      
+      // Refresh list
+      await fetchComplaints();
+      
+      // Refresh logs if it was expanded
+      if (expandedId === reopenId) {
+        const data = await getComplaintLogs(reopenId);
+        setExpandedLogs(data);
+      }
+    } catch (err) {
+      console.error("Failed to reopen:", err);
+      alert("Failed to reopen: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const triggerFileRelated = (id) => {
+    setRelatedComplaintId(id);
+    setSubject("");
+    setBody("");
+    setErrorMsg("");
+    setSuccessMsg("");
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setRelatedComplaintId(null);
+    setSubject("");
+    setBody("");
+    setErrorMsg("");
+    setSuccessMsg("");
   };
 
   const getStatusBadge = (status) => {
@@ -95,6 +181,12 @@ export default function ComplaintBox() {
         return (
           <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-amber-200 animate-pulse">
             <Clock className="w-3.5 h-3.5" /> Under Review
+          </span>
+        );
+      case "closed":
+        return (
+          <span className="inline-flex items-center gap-1 bg-gray-150 text-gray-600 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-gray-300">
+            <X className="w-3.5 h-3.5" /> Closed
           </span>
         );
       default:
@@ -192,7 +284,8 @@ export default function ComplaintBox() {
 
                   {/* Expanded body details */}
                   {isExpanded && (
-                    <div className="px-5 pb-5 pt-1 border-t border-dashed border-gray-100 bg-gray-50/50 animate-in fade-in duration-200">
+                    <div className="px-5 pb-5 pt-1 border-t border-dashed border-gray-100 bg-gray-50/50 animate-in fade-in duration-200 space-y-4">
+                      {/* Body Content */}
                       <div className="bg-white rounded-xl border border-gray-150 p-4 space-y-3 shadow-xs">
                         <div className="flex justify-between items-center text-[10px] uppercase font-bold text-gray-400 tracking-wider">
                           <span>Complaint Content</span>
@@ -203,6 +296,85 @@ export default function ComplaintBox() {
                         <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed font-medium">
                           {complaint.body}
                         </p>
+                        
+                        {/* Audit Details */}
+                        {(complaint.resolved_at || complaint.closed_at || complaint.related_complaint_id) && (
+                          <div className="pt-2 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-2 text-[10px] font-bold text-gray-500 uppercase">
+                            {complaint.resolved_at && (
+                              <div>
+                                Resolved At: <span className="text-gray-750">{new Date(complaint.resolved_at).toLocaleString()}</span>
+                              </div>
+                            )}
+                            {complaint.closed_at && (
+                              <div>
+                                Closed At: <span className="text-gray-750">{new Date(complaint.closed_at).toLocaleString()}</span>
+                              </div>
+                            )}
+                            {complaint.related_complaint_id && (
+                              <div className="md:col-span-2 text-primary">
+                                Linked to Complaint ID: #{complaint.related_complaint_id}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2">
+                        {complaint.status?.toLowerCase() === "resolved" && (
+                          <button
+                            onClick={() => triggerReopen(complaint.id)}
+                            className="inline-flex items-center gap-1 bg-primary hover:bg-primary/90 text-white text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-colors shadow-sm"
+                          >
+                            <Undo2 className="w-3.5 h-3.5" /> Reopen Complaint
+                          </button>
+                        )}
+                        {complaint.status?.toLowerCase() === "closed" && (
+                          <button
+                            onClick={() => triggerFileRelated(complaint.id)}
+                            className="inline-flex items-center gap-1 bg-gray-600 hover:bg-gray-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-colors shadow-sm"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> File Related Complaint
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Audit Logs Trail */}
+                      <div className="bg-white rounded-xl border border-gray-150 p-4 space-y-3 shadow-xs">
+                        <h4 className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Status History & Audit Trail</h4>
+                        {loadingLogs ? (
+                          <p className="text-xs text-gray-450">Loading history logs...</p>
+                        ) : expandedLogs.length === 0 ? (
+                          <p className="text-xs text-gray-450">No logs found.</p>
+                        ) : (
+                          <div className="relative pl-4 border-l border-gray-200 space-y-3">
+                            {expandedLogs.map((log) => (
+                              <div key={log.id} className="relative text-xs text-left">
+                                <span className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-primary border-2 border-white ring-4 ring-primary/10"></span>
+                                <div className="font-bold text-gray-700">
+                                  {log.from_status ? `${log.from_status} → ` : ""}
+                                  <span className="text-primary">{log.to_status}</span>
+                                  <span className="text-[10px] font-normal text-gray-400 ml-2">
+                                    {new Date(log.created_at).toLocaleDateString([], {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-gray-400 mt-0.5">
+                                  Action by: <span className="text-gray-600 font-bold">{log.changed_by_name}</span>
+                                </div>
+                                {log.note && (
+                                  <p className="text-xs font-medium text-gray-650 bg-gray-50 border border-gray-150 rounded p-1.5 mt-1 whitespace-pre-wrap">
+                                    {log.note}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -222,10 +394,12 @@ export default function ComplaintBox() {
             <div className="flex items-center justify-between p-5 border-b border-b-gray-100 bg-gray-50/50">
               <div>
                 <h2 className="text-base font-extrabold text-gray-950">File a New Complaint</h2>
-                <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Reach out to the administrative team</p>
+                <p className="text-[10px] text-gray-450 font-bold uppercase mt-0.5">
+                  {relatedComplaintId ? `Linking back to closed complaint #${relatedComplaintId}` : 'Reach out to the administrative team'}
+                </p>
               </div>
               <button 
-                onClick={() => setModalOpen(false)}
+                onClick={handleCloseModal}
                 disabled={submitting}
                 className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 hover:bg-gray-100 rounded-full cursor-pointer outline-none disabled:opacity-50"
               >
@@ -283,7 +457,7 @@ export default function ComplaintBox() {
               <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={handleCloseModal}
                   disabled={submitting}
                   className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 cursor-pointer transition-colors disabled:opacity-50 outline-none"
                 >
@@ -304,6 +478,58 @@ export default function ComplaintBox() {
                       <Send className="w-3.5 h-3.5" /> Submit Complaint
                     </>
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Mandatory Reopen Modal for Staff */}
+      {reopenModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 text-left border border-gray-150">
+            <div className="flex items-center justify-between p-5 border-b border-b-gray-100 bg-gray-50/50">
+              <div>
+                <h2 className="text-base font-extrabold text-gray-950">Reopen Complaint</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5">Mandatory Reason Required</p>
+              </div>
+              <button 
+                onClick={() => setReopenModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 hover:bg-gray-100 rounded-full cursor-pointer outline-none"
+              >
+                <X className="w-4.5 h-4.5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleReopenSubmit}>
+              <div className="p-5 space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider">Reason for Reopening</label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={reopenReason}
+                    onChange={(e) => setReopenReason(e.target.value)}
+                    placeholder="Provide a clear, detailed reason for reopening this complaint..."
+                    className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-800 outline-none focus:border-primary focus:bg-white transition-all font-semibold resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="px-5 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReopenModalOpen(false)}
+                  className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 cursor-pointer transition-colors outline-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/95 cursor-pointer transition-colors outline-none"
+                >
+                  Confirm Reopen
                 </button>
               </div>
             </form>

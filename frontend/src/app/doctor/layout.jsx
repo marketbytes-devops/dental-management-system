@@ -859,7 +859,7 @@ export default function DoctorLayout({ children }) {
     }
   };
 
-  const handleSubmitDiagNote = async (noteText) => {
+  const handleSubmitDiagNote = async (noteText, prescribedMeds = []) => {
     if (!viewingPatient) return;
 
     try {
@@ -867,13 +867,16 @@ export default function DoctorLayout({ children }) {
         patient_token: viewingPatient.token,
         doctor_name: currentDoctorName || "Dr. Nair",
         note: noteText,
-        date: getTodayString()
+        date: new Date().toISOString(),
+        medications: prescribedMeds
       });
 
       const newTimelineEvent = {
-        date: getTodayString(),
+        date: new Date().toISOString(),
         note: noteText,
-        type: "Clinical Note"
+        type: "Clinical Note",
+        medications: prescribedMeds,
+        doctor_name: currentDoctorName || "Dr. Nair"
       };
 
       setPatients(prev => ({
@@ -976,7 +979,9 @@ export default function DoctorLayout({ children }) {
           timelineEvents.push({
             date: cn.date,
             note: cn.note,
-            type: "Clinical Note"
+            type: "Clinical Note",
+            medications: cn.medications,
+            doctor_name: cn.doctor_name
           });
         });
       }
@@ -987,7 +992,8 @@ export default function DoctorLayout({ children }) {
             timelineEvents.push({
               date: app.appointment_date,
               note: `Treated for ${app.treatment_type} with symptoms "${app.symptoms || 'None'}"`,
-              type: "Treatment"
+              type: "Treatment",
+              doctor_name: app.doctor_name
             });
           } else if (app.status !== "Cancelled") {
             timelineEvents.push({
@@ -1006,7 +1012,8 @@ export default function DoctorLayout({ children }) {
           timelineEvents.push({
             date: ref.date,
             note: `Referral Consultation Completed by ${ref.targetDoctor || "Specialist"}: ${ref.myConsultationNotes}`,
-            type: "Consultation"
+            type: "Consultation",
+            doctor_name: ref.targetDoctor
           });
         } else {
           timelineEvents.push({

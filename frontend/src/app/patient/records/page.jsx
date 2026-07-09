@@ -25,6 +25,43 @@ import ReferralCard from "@/components/ui/patients/records/referralCard";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
 import { getPatientTreatmentPlan, getPendingConsents, getPatientPrescriptions, getPatientReferrals, getMyClinicalNotes } from "@/services/api";
 
+const parseCustomDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  
+  // Clean custom timeline suffixes
+  const cleanStr = dateStr.replace(" (Today)", "").trim();
+  
+  if (cleanStr.includes("T") || (cleanStr.includes("-") && cleanStr.split("-")[0].length === 4)) {
+    return new Date(cleanStr);
+  }
+  
+  const spaceParts = cleanStr.split(" ");
+  const dateParts = spaceParts[0].split("-");
+  if (dateParts.length === 3) {
+    const day = parseInt(dateParts[0], 10);
+    const month = parseInt(dateParts[1], 10) - 1; // 0-indexed month
+    const year = parseInt(dateParts[2], 10);
+    
+    let hours = 0;
+    let minutes = 0;
+    
+    if (spaceParts.length >= 2) {
+      const timeParts = spaceParts[1].split(":");
+      if (timeParts.length >= 2) {
+        hours = parseInt(timeParts[0], 10);
+        minutes = parseInt(timeParts[1], 10);
+        if (spaceParts.length >= 3 && spaceParts[2].toLowerCase() === "pm" && hours < 12) {
+          hours += 12;
+        } else if (spaceParts.length >= 3 && spaceParts[2].toLowerCase() === "am" && hours === 12) {
+          hours = 0;
+        }
+      }
+    }
+    return new Date(year, month, day, hours, minutes);
+  }
+  return new Date(cleanStr);
+};
+
 const parseStructuredNote = (noteText) => {
   if (!noteText) return null;
   if (!noteText.includes("[Chief Complaint]:") && !noteText.includes("[Medical History]:")) {
@@ -172,8 +209,9 @@ export default function PatientRecordsPage() {
 
   // Formats DB medications structure to PrescriptionCard expectation
   const formattedPrescriptions = prescriptions.flatMap((rxObj) => {
-    const dateStr = rxObj.created_at
-      ? new Date(rxObj.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    const dateObj = parseCustomDate(rxObj.created_at);
+    const dateStr = dateObj && !isNaN(dateObj.getTime())
+      ? dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
       : "Recent";
 
     // Deem active if created within the past 7 days
@@ -492,8 +530,16 @@ export default function PatientRecordsPage() {
                   const parsed = parseStructuredNote(note.note);
                   const isExpanded = !!expandedNotes[idx];
                   const doctorName = note.doctor_name || "Doctor";
-                  const displayDate = note.date
-                    ? new Date(note.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                  const dateObj = parseCustomDate(note.date);
+                  const displayDate = dateObj && !isNaN(dateObj.getTime())
+                    ? dateObj.toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true
+                      })
                     : "Recent";
 
                   return (
@@ -580,16 +626,56 @@ export default function PatientRecordsPage() {
                               <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">{parsed.consultationNote}</p>
                             </div>
                           )}
+
+                          {/* Prescribed Medications */}
+                          {note.medications && note.medications.length > 0 && (
+                            <div className="space-y-2 md:col-span-2 text-left pt-4 border-t border-gray-150 animate-fadeIn">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block">Prescribed Medications</span>
+                              <div className="divide-y divide-gray-100 bg-slate-50/50 border border-slate-100 rounded-xl overflow-hidden mt-1">
+                                {note.medications.map((med, mIdx) => (
+                                  <div key={med.id || mIdx} className="flex justify-between items-center p-3 text-xs font-semibold text-gray-700 hover:bg-gray-100/50">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                      <span>
+                                        <strong className="text-gray-900 font-bold">{med.medicine}</strong> ({med.schedule} • {med.timing} • {med.duration})
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 
                       {/* Fallback Detailed Expanded View for non-structured notes */}
                       {isExpanded && !parsed && (
-                        <div className="pt-4 border-t border-gray-100 text-left animate-fadeIn">
-                          <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block mb-1">Consultation note details</span>
-                          <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                            {note.note}
-                          </p>
+                        <div className="pt-4 border-t border-gray-100 text-left animate-fadeIn space-y-4">
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block mb-1">Consultation note details</span>
+                            <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                              {note.note}
+                            </p>
+                          </div>
+
+                          {/* Prescribed Medications Fallback */}
+                          {note.medications && note.medications.length > 0 && (
+                            <div className="space-y-2 pt-4 border-t border-gray-150 text-left">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block">Prescribed Medications</span>
+                              <div className="divide-y divide-gray-100 bg-slate-50/50 border border-slate-100 rounded-xl overflow-hidden mt-1">
+                                {note.medications.map((med, mIdx) => (
+                                  <div key={med.id || mIdx} className="flex justify-between items-center p-3 text-xs font-semibold text-gray-700 hover:bg-gray-100/50">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                      <span>
+                                        <strong className="text-gray-900 font-bold">{med.medicine}</strong> ({med.schedule} • {med.timing} • {med.duration})
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

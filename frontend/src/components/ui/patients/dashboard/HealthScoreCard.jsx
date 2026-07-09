@@ -18,35 +18,35 @@ export default function HealthScoreCard({ score = 78, lastUpdated, onClick }) {
     ? new Date(lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : "Recently Updated";
 
-  // SVG ring math
-  const radius = 36;
+  // SVG ring math (shrunk to fit 72x72 container)
+  const radius = 28;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
 
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 xl:p-6 flex flex-col sm:flex-row xl:flex-col 2xl:flex-row items-center sm:items-center xl:items-center 2xl:items-center gap-4 xl:gap-6 cursor-pointer hover:shadow-md hover:border-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 text-center sm:text-left xl:text-center 2xl:text-left"
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 min-h-[110px]"
     >
       {/* Circular ring */}
       <div className="relative flex-shrink-0">
-        <svg width="96" height="96" className="-rotate-90">
+        <svg width="72" height="72" className="-rotate-90">
           {/* Background ring */}
           <circle
-            cx="48"
-            cy="48"
+            cx="36"
+            cy="36"
             r={radius}
             fill="none"
             stroke="#e5e7eb"
-            strokeWidth="8"
+            strokeWidth="6"
           />
           {/* Score ring */}
           <circle
-            cx="48"
-            cy="48"
+            cx="36"
+            cy="36"
             r={radius}
             fill="none"
-            strokeWidth="8"
+            strokeWidth="6"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             strokeLinecap="round"
@@ -55,25 +55,22 @@ export default function HealthScoreCard({ score = 78, lastUpdated, onClick }) {
         </svg>
         {/* Score number in center */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-xl font-bold ${color}`}>{score}</span>
-          <span className="text-[10px] text-gray-400 font-medium">/100</span>
+          <span className={`text-base font-bold ${color}`}>{score}</span>
+          <span className="text-[9px] text-gray-400 font-medium">/100</span>
         </div>
       </div>
 
       {/* Text info */}
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+      <div className="min-w-0 flex-1 text-left">
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
           Oral Health Score
         </p>
-        <p className={`text-lg font-bold ${color}`}>{label}</p>
+        <p className={`text-base font-bold ${color} truncate`}>{label}</p>
         <span
-          className={`inline-block mt-2 text-xs font-semibold px-2.5 py-1 rounded-md ${bgColor} ${color}`}
+          className={`inline-block mt-2 text-[10px] font-semibold px-2 py-0.5 rounded ${bgColor} ${color}`}
         >
-          Last updated: {displayDate}
+          {displayDate}
         </span>
-        <p className="text-xs text-gray-400 mt-2">
-          Based on your last dental examination
-        </p>
       </div>
     </div>
   );

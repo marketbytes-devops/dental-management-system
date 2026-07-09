@@ -20,6 +20,43 @@ import {
   Share2
 } from "lucide-react";
 
+const parseCustomDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  
+  // Clean custom timeline suffixes
+  const cleanStr = dateStr.replace(" (Today)", "").trim();
+  
+  if (cleanStr.includes("T") || (cleanStr.includes("-") && cleanStr.split("-")[0].length === 4)) {
+    return new Date(cleanStr);
+  }
+  
+  const spaceParts = cleanStr.split(" ");
+  const dateParts = spaceParts[0].split("-");
+  if (dateParts.length === 3) {
+    const day = parseInt(dateParts[0], 10);
+    const month = parseInt(dateParts[1], 10) - 1; // 0-indexed month
+    const year = parseInt(dateParts[2], 10);
+    
+    let hours = 0;
+    let minutes = 0;
+    
+    if (spaceParts.length >= 2) {
+      const timeParts = spaceParts[1].split(":");
+      if (timeParts.length >= 2) {
+        hours = parseInt(timeParts[0], 10);
+        minutes = parseInt(timeParts[1], 10);
+        if (spaceParts.length >= 3 && spaceParts[2].toLowerCase() === "pm" && hours < 12) {
+          hours += 12;
+        } else if (spaceParts.length >= 3 && spaceParts[2].toLowerCase() === "am" && hours === 12) {
+          hours = 0;
+        }
+      }
+    }
+    return new Date(year, month, day, hours, minutes);
+  }
+  return new Date(cleanStr);
+};
+
 const parseStructuredNote = (noteText) => {
   if (!noteText) return null;
   if (!noteText.includes("[Chief Complaint]:") && !noteText.includes("[Medical History]:")) {
@@ -284,10 +321,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
               <ClinicalNotes
                 onCancel={() => setShowNewDiagForm(false)}
                 onSubmitDiagNote={async (noteText, prescribedMeds) => {
-                  handleSubmitDiagNote(noteText);
-                  if (prescribedMeds && prescribedMeds.length > 0) {
-                    await handleSaveDirectPrescription(viewingPatient.token, prescribedMeds);
-                  }
+                  await handleSubmitDiagNote(noteText, prescribedMeds);
                   setShowNewDiagForm(false);
                 }}
               />
@@ -299,6 +333,17 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
                   const parsed = parseStructuredNote(note.note);
                   const isExpanded = !!expandedNotes[idx];
                   const doctorName = note.doctor_name || "Dr. Nair";
+                  const dateObj = parseCustomDate(note.date);
+                  const formattedDate = dateObj && !isNaN(dateObj.getTime())
+                    ? dateObj.toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true
+                      })
+                    : note.date;
                   
                   if (parsed) {
                     const conditions = parsed.medicalHistory.split(",").map(c => c.trim()).filter(Boolean);
@@ -311,8 +356,8 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
                           className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none hover:opacity-90 transition-opacity"
                         >
                           <div className="flex items-center gap-3">
-                            <span className="text-[10px] bg-gray-100 text-gray-500 border border-gray-200 px-2.5 py-0.5 rounded font-black tracking-wider uppercase">{note.date}</span>
-                            <span className="text-[9px] font-black uppercase text-primary bg-primary/10 px-2 py-0.5 rounded tracking-wider">Consultation Log</span>
+                            <span className="text-[10px] bg-gray-100 text-gray-500 border border-gray-200 px-2.5 py-0.5 rounded font-black tracking-wider uppercase">{formattedDate}</span>
+                            <span className="text-[9px] font-black uppercase text-primary bg-primary/10 px-2.5 py-0.5 rounded tracking-wider">Consultation Log</span>
                           </div>
                           
                           <div className="flex-1 min-w-0">
@@ -401,7 +446,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
                         className="flex justify-between items-center cursor-pointer select-none"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="text-[10px] bg-gray-100 text-gray-550 px-2.5 py-0.5 rounded font-black">{note.date}</span>
+                          <span className="text-[10px] bg-gray-100 text-gray-550 px-2.5 py-0.5 rounded font-black">{formattedDate}</span>
                           <span className="text-[9px] font-black uppercase text-primary tracking-wider">{note.type || "Clinical Note"}</span>
                         </div>
                         <span className="text-[10px] text-primary font-bold">{isExpanded ? "Collapse ▲" : "View Details ▼"}</span>

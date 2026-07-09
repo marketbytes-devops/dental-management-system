@@ -5,21 +5,24 @@ import Link from "next/link";
 import { useDoctor } from "@/app/doctor/layout";
 import DashboardHeader from "@/components/ui/doctor/dashboard/DashboardHeader";
 import KpiCards from "@/components/ui/doctor/dashboard/KpiCards";
-import { Share2, ArrowRight } from "lucide-react";
+import { getDoctorDashboardAppointments } from "@/services/api";
+import { ArrowRight, Calendar } from "lucide-react";
 
 export default function DoctorDashboardPage() {
   const {
-    patients,
     activePatientToken,
     queue,
     labOrders,
     activePatient,
     hasUrgentInQueue,
-    referrals = [],
     currentDoctorName
   } = useDoctor();
 
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentFilter, setAppointmentFilter] = useState("today");
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -27,7 +30,6 @@ export default function DoctorDashboardPage() {
       if (savedUser) {
         try {
           const user = JSON.parse(savedUser);
-          // Check if any required profile details are missing
           const isIncomplete = !user.dob || !user.phone || !user.address || !user.licence_id || !user.chair_setup || !user.board;
           setIsProfileIncomplete(isIncomplete);
         } catch (e) {
@@ -37,26 +39,47 @@ export default function DoctorDashboardPage() {
     }
   }, []);
 
-  const isDoctorMe = (docName) => {
-    if (!docName || !currentDoctorName) return false;
-    const name1 = docName.toLowerCase().replace("dr.", "").trim();
-    const name2 = currentDoctorName.toLowerCase().replace("dr.", "").trim();
-    const words1 = name1.split(/\s+/);
-    const words2 = name2.split(/\s+/);
-    return words1.some(w => words2.includes(w)) || name1.includes(name2) || name2.includes(name1);
-  };
+  useEffect(() => {
+    if (!currentDoctorName) return;
+    let isMounted = true;
+    
+    const fetchAppointments = async () => {
+      setAppointmentsLoading(true);
+      try {
+        const response = await getDoctorDashboardAppointments(currentDoctorName, appointmentFilter);
+        if (isMounted) setAppointments(response);
+      } catch (err) {
+        console.error("Failed to fetch appointments", err);
+        if (isMounted) setAppointments([]);
+      } finally {
+        if (isMounted) setAppointmentsLoading(false);
+      }
+    };
+
+    fetchAppointments();
+    
+    return () => { isMounted = false; };
+  }, [currentDoctorName, appointmentFilter]);
 
   // Metrics
   const totalWaiting = queue.filter(q => q.status === "Waiting").length;
-  const totalAlerts = Object.values(patients).filter(p => p.medicalAlerts.length > 0).length;
+  // Fallback for totalAlerts since patients dictionary was removed
+  const totalAlerts = 0; 
   const activeLabCount = labOrders.filter(l => l.status !== "Delivered").length;
 
-  const incomingPending = referrals.filter(
-    (r) => r.targetDoctor && isDoctorMe(r.targetDoctor) && r.status === "Pending"
-  );
-  const outgoingAll = referrals.filter(
-    (r) => r.referredBy && isDoctorMe(r.referredBy)
-  );
+  // Generate past 6 months for the dropdown
+  const getRecentMonths = () => {
+    const months = [];
+    const d = new Date();
+    for (let i = 0; i < 6; i++) {
+      const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      const label = m.toLocaleString('default', { month: 'long', year: 'numeric' });
+      const val = `month_${m.getFullYear()}-${(m.getMonth() + 1).toString().padStart(2, '0')}`;
+      months.push({ label, val });
+    }
+    return months;
+  };
+  const recentMonths = getRecentMonths();
 
   return (
     <div className="space-y-6">
@@ -91,49 +114,117 @@ export default function DoctorDashboardPage() {
         hasUrgentInQueue={hasUrgentInQueue}
       />
 
-      {/* Referrals Tracker Widget */}
-      <div className="bg-white rounded-3xl border border-gray-150 shadow-xs p-6 space-y-4 text-left">
-        <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+      {/* Appointments Section */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm mt-8 overflow-hidden">
+        <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-              <Share2 className="w-4.5 h-4.5 text-primary" /> Incoming Referrals ({incomingPending.length})
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" /> My Appointments
             </h3>
+            <p className="text-sm text-gray-500 mt-1">View and manage your scheduled visits.</p>
           </div>
-          <Link
-            href="/doctor/referrals"
-            className="text-xs font-bold text-primary hover:underline flex items-center gap-1 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-xl transition-all"
-          >
-            Manage Referrals <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          <div className="flex bg-gray-100/80 p-1 rounded-xl">
+            {['today', 'tomorrow'].map((f) => (
+              <button
+                key={f}
+                onClick={() => setAppointmentFilter(f)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                  appointmentFilter === f 
+                    ? "bg-white text-primary shadow-sm" 
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+                }`}
+              >
+                {f === 'today' ? 'Today' : 'Tomorrow'}
+              </button>
+            ))}
+            <select
+              value={appointmentFilter.startsWith('month_') ? appointmentFilter : ''}
+              onChange={(e) => setAppointmentFilter(e.target.value)}
+              className={`ml-1 px-3 py-2 text-sm font-medium rounded-lg transition-all focus:outline-none cursor-pointer ${
+                appointmentFilter.startsWith('month_') ? 'bg-white text-primary shadow-sm' : 'text-gray-500 bg-transparent hover:text-gray-700 hover:bg-gray-200/50'
+              }`}
+            >
+              <option value="" disabled>Select Month</option>
+              {recentMonths.map(m => (
+                <option key={m.val} value={m.val}>{m.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-          {incomingPending.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {incomingPending.map((ref) => {
-                const pt = Object.values(patients).find(p => p.token === ref.patientToken);
-                return (
-                  <div key={ref.id} className="p-4 bg-gray-50 border border-gray-100 hover:border-primary/20 rounded-2xl flex justify-between items-start gap-4 transition-all">
-                    <div>
-                      <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase">
-                        {ref.patientToken}
-                      </span>
-                      <h5 className="text-sm font-bold text-gray-900 mt-1.5">{pt?.name || "Loading Patient..."}</h5>
-                      <p className="text-xs text-gray-650 mt-1">Referred by: <strong className="text-gray-800">{ref.referredBy}</strong></p>
-                      <p className="text-[11px] text-gray-500 italic mt-1.5">"{ref.reason}"</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[800px]">
+            <thead>
+              <tr className="bg-gray-50/50">
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[20%]">Patient</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[15%]">Token ID</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[20%]">Treatment</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[20%]">Date & Time</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[15%]">Status</th>
+                <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[10%]">Payment</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {appointmentsLoading ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-8 text-center text-gray-400">Loading appointments...</td>
+                </tr>
+              ) : appointments.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
+                    <div className="flex flex-col items-center">
+                      <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3 text-2xl">📅</div>
+                      <p>No appointments found for {appointmentFilter === 'today' ? 'today' : appointmentFilter === 'tomorrow' ? 'tomorrow' : 'this month'}.</p>
                     </div>
-                    <span className="text-[9px] font-extrabold text-amber-600 bg-amber-50 border border-amber-200/50 px-2 py-0.5 rounded uppercase shrink-0">
-                      {ref.status}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8 border border-dashed border-gray-150 rounded-2xl text-xs text-gray-450 font-semibold bg-gray-50/20">
-              No pending inbound consultations.
-            </div>
-          )}
+                  </td>
+                </tr>
+              ) : (
+                appointments.map((appt) => (
+                  <tr key={appt.id} className="hover:bg-gray-50/80 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{appt.patient_name}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs text-gray-600 font-mono bg-gray-100 rounded px-2 py-1 inline-block">
+                        {appt.token_id}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{appt.treatment_type || 'Consultation'}</td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">{appt.appointment_date}</div>
+                      <div className="text-xs text-gray-500">{appt.appointment_time}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                        appt.status === 'Confirmed' ? 'bg-success/10 text-success' :
+                        appt.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
+                        appt.status === 'Cancelled' ? 'bg-danger/10 text-danger' :
+                        appt.status === 'Waiting' ? 'bg-warning/10 text-warning-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {appt.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {appt.payment_status ? (
+                        <span 
+                          className={`inline-flex items-center px-2.5 py-1.5 rounded text-xs font-semibold ${
+                            appt.payment_status === 'Paid' ? 'bg-success/10 text-success border border-success/20' :
+                            appt.payment_status === 'Cancelled' ? 'bg-gray-200 text-gray-600' :
+                            'bg-warning/10 text-warning-700 border border-warning/20'
+                          }`}
+                        >
+                          {appt.payment_status}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 font-medium">-</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

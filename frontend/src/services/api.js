@@ -603,6 +603,17 @@ export const getPatientClinicalNotes = async (patientToken) => {
   return response.data;
 };
 
+// --- Doctor Performance APIs ---
+export const getDoctorPerformance = async (doctorName, period = "all") => {
+  const response = await client.get(`/doctor/performance/${encodeURIComponent(doctorName)}?period=${encodeURIComponent(period)}`);
+  return response.data;
+};
+
+export const getDoctorDashboardAppointments = async (doctorName, filter = "today") => {
+  const response = await client.get(`/doctor/appointments/${encodeURIComponent(doctorName)}?filter=${encodeURIComponent(filter)}`);
+  return response.data;
+};
+
 export const getMyClinicalNotes = async () => {
   const response = await client.get("/patient/clinical-notes");
   return response.data;

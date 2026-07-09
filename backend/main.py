@@ -13,6 +13,7 @@ from modules.leave.router import router as leave_router
 from modules.treatment_plan.router import router as treatment_plan_router
 from modules.complaint.router import router as complaint_router
 from modules.smilecare.router import router as smilecare_router
+from modules.doctor.router import router as doctor_router
 
 
 
@@ -160,6 +161,7 @@ app.include_router(leave_router)
 app.include_router(treatment_plan_router)
 app.include_router(complaint_router)
 app.include_router(smilecare_router)
+app.include_router(doctor_router)
 
 
 

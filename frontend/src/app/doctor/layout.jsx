@@ -726,9 +726,9 @@ export default function DoctorLayout({ children }) {
         [viewingPatientToken]: {
           ...prev[viewingPatientToken],
           timeline: [newTimelineEvent, ...prev[viewingPatientToken].timeline],
-          teethChart: payload.tooth_number ? { 
-            ...prev[viewingPatientToken].teethChart, 
-            [payload.tooth_number]: "lab-ordered" 
+          teethChart: payload.tooth_number ? {
+            ...prev[viewingPatientToken].teethChart,
+            [payload.tooth_number]: "lab-ordered"
           } : prev[viewingPatientToken].teethChart
         }
       }));

@@ -592,3 +592,19 @@ export const getDoctorFeedbackStats = async (doctorName) => {
   const response = await client.get(`/patient/feedback/doctor/${encodeURIComponent(doctorName)}`);
   return response.data;
 };
+
+export const saveClinicalNote = async (noteData) => {
+  const response = await client.post("/patient/clinical-notes", noteData);
+  return response.data;
+};
+
+export const getPatientClinicalNotes = async (patientToken) => {
+  const response = await client.get(`/patient/clinical-notes/${patientToken}`);
+  return response.data;
+};
+
+export const getMyClinicalNotes = async () => {
+  const response = await client.get("/patient/clinical-notes");
+  return response.data;
+};
+

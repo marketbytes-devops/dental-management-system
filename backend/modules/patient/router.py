@@ -13,7 +13,7 @@ from dependencies import get_current_user
 from modules.doctor.models import DoctorModel
 from shared.utils.pdf_generator import generate_consent_pdf
 
-from .models import PatientConsent, PatientModel
+from .models import PatientConsent, PatientModel, ClinicalNoteModel
 from .schemas import (
     ConsentRequest,
     ConsentResponse,
@@ -27,6 +27,8 @@ from .schemas import (
     ReferralCreate,
     ReferralResponse,
     ReferralUpdate,
+    ClinicalNoteCreate,
+    ClinicalNoteResponse,
 )
 from .service import (
     change_patient_password,
@@ -1264,4 +1266,54 @@ def get_doctor_feedback_summary(
             for f in feedbacks
         ]
     }
+
+
+@router.post("/clinical-notes", response_model=ClinicalNoteResponse)
+def save_clinical_note_route(
+    req: ClinicalNoteCreate,
+    db: Session = Depends(get_db)
+):
+    note_date = req.date or datetime.date.today().isoformat()
+    new_note = ClinicalNoteModel(
+        patient_token=req.patient_token,
+        doctor_name=req.doctor_name,
+        note=req.note,
+        date=note_date
+    )
+    db.add(new_note)
+    db.commit()
+    db.refresh(new_note)
+    return new_note
+
+
+@router.get("/clinical-notes", response_model=List[ClinicalNoteResponse])
+def get_my_clinical_notes_route(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+        
+    notes = db.query(ClinicalNoteModel).filter(
+        ClinicalNoteModel.patient_token == patient.token
+    ).order_by(ClinicalNoteModel.created_at.desc()).all()
+    
+    return notes
+
+
+@router.get("/clinical-notes/{patient_token}", response_model=List[ClinicalNoteResponse])
+def get_patient_clinical_notes_route(
+    patient_token: str,
+    db: Session = Depends(get_db)
+):
+    notes = db.query(ClinicalNoteModel).filter(
+        ClinicalNoteModel.patient_token == patient_token
+    ).order_by(ClinicalNoteModel.created_at.desc()).all()
+    return notes
+
 

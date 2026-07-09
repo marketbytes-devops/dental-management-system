@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from database import Base, engine
 from modules.auth.models import UserModel
-from modules.patient.models import PatientModel, PatientConsentModel
+from modules.patient.models import PatientModel, PatientConsentModel, ClinicalNoteModel
 from modules.frontdesk.models import AppointmentModel
 from modules.frontdesk.communication_models import CommunicationLogModel
 from modules.lab.models import LabOrderModel

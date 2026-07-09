@@ -23,8 +23,29 @@ import PrescriptionCard from "@/components/ui/patients/records/prescriptionCard"
 import ActivePrescriptions from "@/components/ui/patients/records/activePrescriptions";
 import ReferralCard from "@/components/ui/patients/records/referralCard";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
-import { getPatientTreatmentPlan, getPendingConsents, getPatientPrescriptions, getPatientReferrals } from "@/services/api";
+import { getPatientTreatmentPlan, getPendingConsents, getPatientPrescriptions, getPatientReferrals, getMyClinicalNotes } from "@/services/api";
 
+const parseStructuredNote = (noteText) => {
+  if (!noteText) return null;
+  if (!noteText.includes("[Chief Complaint]:") && !noteText.includes("[Medical History]:")) {
+    return null;
+  }
+  
+  const getValue = (key) => {
+    const regex = new RegExp(`\\[${key}\\]:\\s*([\\s\\S]*?)(?=\\n\\[|$)`);
+    const match = noteText.match(regex);
+    return match ? match[1].trim() : "N/A";
+  };
+
+  return {
+    chiefComplaint: getValue("Chief Complaint"),
+    medicalHistory: getValue("Medical History"),
+    dentalHistory: getValue("Dental History"),
+    vitalsBP: getValue("Vitals BP"),
+    allergies: getValue("Allergies"),
+    consultationNote: getValue("Consultation Note")
+  };
+};
 
 export default function PatientRecordsPage() {
   const [activeTab, setActiveTab] = useState("treatment-plans"); // treatment-plans | active-rx | all-rx | referrals
@@ -40,6 +61,11 @@ export default function PatientRecordsPage() {
   const [prescriptionsLoading, setPrescriptionsLoading] = useState(false);
   const [referrals, setReferrals] = useState([]);
   const [referralsLoading, setReferralsLoading] = useState(false);
+
+  // Clinical Notes State
+  const [clinicalNotes, setClinicalNotes] = useState([]);
+  const [clinicalNotesLoading, setClinicalNotesLoading] = useState(false);
+  const [expandedNotes, setExpandedNotes] = useState({});
 
   const patientToken = typeof window !== "undefined" ? localStorage.getItem("patient_token") : null;
 
@@ -74,6 +100,18 @@ export default function PatientRecordsPage() {
     }
   };
 
+  const fetchClinicalNotes = async () => {
+    setClinicalNotesLoading(true);
+    try {
+      const data = await getMyClinicalNotes();
+      setClinicalNotes(data);
+    } catch (err) {
+      console.error("Error fetching clinical notes:", err);
+    } finally {
+      setClinicalNotesLoading(false);
+    }
+  };
+
   const fetchReferrals = async () => {
     setReferralsLoading(true);
     try {
@@ -89,8 +127,10 @@ export default function PatientRecordsPage() {
   useEffect(() => {
     if (activeTab === "treatment-plans") {
       fetchPlans();
-    } else if (activeTab === "active-rx" || activeTab === "all-rx") {
+    } else if (activeTab === "active-rx") {
       fetchPrescriptions();
+    } else if (activeTab === "all-rx") {
+      fetchClinicalNotes();
     } else if (activeTab === "referrals") {
       fetchReferrals();
     }
@@ -434,12 +474,133 @@ export default function PatientRecordsPage() {
         return <ActivePrescriptions prescriptions={formattedPrescriptions} />;
 
       case "all-rx":
-        return (
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6">Clinical Notes</h3>
-            <div className="text-center text-gray-400 text-sm py-8">
-              Your clinical notes will appear here.
+        if (clinicalNotesLoading) {
+          return (
+            <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <span className="text-sm font-semibold text-gray-500">Loading clinical notes...</span>
             </div>
+          );
+        }
+
+        return (
+          <div className="space-y-6 text-left">
+            <h3 className="text-lg font-bold text-gray-900">Clinical Consultation Notes</h3>
+            {clinicalNotes.length > 0 ? (
+              <div className="space-y-4">
+                {clinicalNotes.map((note, idx) => {
+                  const parsed = parseStructuredNote(note.note);
+                  const isExpanded = !!expandedNotes[idx];
+                  const doctorName = note.doctor_name || "Doctor";
+                  const displayDate = note.date
+                    ? new Date(note.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                    : "Recent";
+
+                  return (
+                    <div key={note.id || idx} className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm space-y-4">
+                      {/* Collapsed Header View */}
+                      <div 
+                        onClick={() => setExpandedNotes(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded font-black tracking-wider uppercase">{displayDate}</span>
+                          <span className="text-[9px] font-black uppercase text-primary bg-primary/10 px-2.5 py-1 rounded tracking-wider">Consultation Note</span>
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-gray-800 truncate">
+                            <span className="text-gray-400 font-semibold mr-1">Chief Complaint:</span>
+                            {parsed ? parsed.chiefComplaint : note.note}
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs text-gray-500 font-semibold">
+                            Consultant: <strong className="text-gray-700 font-bold">{doctorName}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            className="text-[10px] font-black text-primary bg-primary/10 hover:bg-primary/20 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer outline-none border-none"
+                          >
+                            {isExpanded ? "Hide Details" : "View Details"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Detailed Expanded View - View Only */}
+                      {isExpanded && parsed && (
+                        <div className="pt-5 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 animate-fadeIn">
+                          {/* Chief Complaint */}
+                          <div className="space-y-1 text-left">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Chief complaint</span>
+                            <p className="text-xs font-semibold text-gray-750 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">{parsed.chiefComplaint}</p>
+                          </div>
+
+                          {/* Medical History */}
+                          <div className="space-y-1 text-left">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Medical history</span>
+                            <div className="flex flex-wrap gap-1.5 pt-0.5 bg-slate-50/50 p-3 rounded-xl border border-slate-100 min-h-[46px] items-center">
+                              {parsed.medicalHistory.split(",").map(c => c.trim()).filter(Boolean).map((cond, cIdx) => (
+                                <span key={cIdx} className="bg-red-50 text-red-700 border border-red-100 text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                                  {cond}
+                                </span>
+                              ))}
+                              {(!parsed.medicalHistory || parsed.medicalHistory === "None" || parsed.medicalHistory === "N/A") && (
+                                <span className="text-[10px] text-gray-405 italic">No medical history specified</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Dental History */}
+                          <div className="space-y-1 text-left">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Dental history</span>
+                            <p className="text-xs font-semibold text-gray-750 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">{parsed.dentalHistory}</p>
+                          </div>
+
+                          {/* Vitals / Allergies */}
+                          <div className="space-y-1 text-left">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Vitals / allergies</span>
+                            <div className="grid grid-cols-2 gap-3 pt-0.5">
+                              <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-xl text-left">
+                                <span className="text-[8px] uppercase text-gray-450 block font-bold">BP Vitals</span>
+                                <span className="text-[10px] font-bold text-gray-750">{parsed.vitalsBP}</span>
+                              </div>
+                              <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-xl text-left">
+                                <span className="text-[8px] uppercase text-gray-450 block font-bold">Allergies</span>
+                                <span className="text-[10px] font-bold text-gray-750">{parsed.allergies}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Doctor's Consultation Notes */}
+                          {parsed.consultationNote && parsed.consultationNote !== "N/A" && (
+                            <div className="space-y-1 md:col-span-2 text-left">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Consultation Remarks & Advice</span>
+                              <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">{parsed.consultationNote}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Fallback Detailed Expanded View for non-structured notes */}
+                      {isExpanded && !parsed && (
+                        <div className="pt-4 border-t border-gray-100 text-left animate-fadeIn">
+                          <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block mb-1">Consultation note details</span>
+                          <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                            {note.note}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white p-12 rounded-3xl border border-gray-100 shadow-sm text-center text-gray-400 text-sm italic font-medium">
+                No clinical consultation notes found in your history.
+              </div>
+            )}
           </div>
         );
 

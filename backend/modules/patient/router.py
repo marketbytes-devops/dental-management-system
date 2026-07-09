@@ -311,7 +311,7 @@ def sign_consent(
 
     # Generate PDF
     pdf_path = generate_consent_pdf(
-        title=consent.title,
+        title=consent.title,     #type:ignore
         body_text=consent.content or "",
         signature_data=req.signature_data,
         patient_name=patient.name,
@@ -500,7 +500,9 @@ from dependencies import get_current_user
 from modules.doctor.models import DoctorModel
 from shared.utils.pdf_generator import generate_consent_pdf
 
-from .models import PatientConsent, PatientModel, PatientNotificationModel, DoctorFeedbackModel
+from .models import (
+    PatientModel, PatientConsent, PatientNotificationModel, DoctorFeedbackModel
+)
 from .schemas import (
     ConsentRequest,
     ConsentResponse,

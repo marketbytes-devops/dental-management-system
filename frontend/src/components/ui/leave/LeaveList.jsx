@@ -81,18 +81,6 @@ export default function LeaveList({ userId, requests, onCancel, isAdmin = false,
                 "{req.reason}"
               </div>
 
-              {/* Cancel Request Action */}
-              {isAdmin || isPending && (
-                <div className="flex justify-end border-t border-gray-100/60 pt-2">
-                  <button
-                    onClick={() => onCancel(req.id)}
-                    className="text-danger hover:text-danger/90 font-bold text-[10px] flex items-center gap-1 cursor-pointer outline-none"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Cancel Leave
-                  </button>
-                </div>
-              )}
             </div>
           );
         })}

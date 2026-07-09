@@ -123,7 +123,12 @@ export default function CaseTracking() {
             <div>
               <span className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/10 px-2 py-0.5 rounded-md">Patient Card</span>
               <h3 className="text-lg font-black text-gray-900 mt-2">{currentCase.patientName}</h3>
-              <p className="text-xs text-gray-400 font-medium">SmileCare ID: PT-{currentCase.id.split("-")[2]}</p>
+              <p className="text-xs text-gray-400 font-medium">SmileCare ID: PT-{(() => {
+                const parts = currentCase.id.split("-");
+                let suffix = parts.length >= 3 ? parts[2] : (parts[1] || parts[0] || "000");
+                if (/^\d+$/.test(suffix)) suffix = suffix.padStart(3, "0");
+                return suffix;
+              })()}</p>
             </div>
 
             <div className="h-px bg-gray-100"></div>

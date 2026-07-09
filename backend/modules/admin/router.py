@@ -84,7 +84,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
     is_doctor = any(r.lower() == "doctor" for r in (new_user.roles or []))
     if is_doctor:
-        specialty_str = ", ".join(new_user.specialties) if new_user.specialties else "General Dentistry"
+        specialty_str = ", ".join(new_user.specialties) if new_user.specialties else "General Dentistry"  # type: ignore
         new_doctor = DoctorModel(
             name=new_user.name,
             specialty=specialty_str,
@@ -127,7 +127,7 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
         )
     assert user is not None
     
-    user.status = "Inactive" if user.status == "Active" else "Active"
+    user.status = "Inactive" if user.status == "Active" else "Active"  # type: ignore
     db.commit()
     db.refresh(user)
 
@@ -164,7 +164,7 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
     assert user is not None
     
     if user_data.name is not None:
-        user.name = user_data.name
+        user.name = user_data.name  # type: ignore
         
     if user_data.email is not None:
         existing = db.query(UserModel).filter(
@@ -176,7 +176,7 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A user with this email is already registered."
             )
-        user.email = user_data.email
+        user.email = user_data.email    # type: ignore
         
         username = user_data.email.split("@")[0]
         existing_username = db.query(UserModel).filter(
@@ -185,16 +185,16 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
         ).first()
         if existing_username:
             username = user_data.email
-        user.username = username
+        user.username = username     # type: ignore
 
     if user_data.password is not None:
-        user.password_hash = hash_password(user_data.password)
+        user.password_hash = hash_password(user_data.password)     # type: ignore
 
     if user_data.roles is not None:
-        user.roles = user_data.roles
+        user.roles = user_data.roles     # type: ignore
 
     if user_data.specialties is not None:
-        user.specialties = user_data.specialties
+        user.specialties = user_data.specialties    # type: ignore
 
     db.commit()
     db.refresh(user)
@@ -203,7 +203,7 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
     if is_doctor:
         doctor = db.query(DoctorModel).filter(DoctorModel.user_id == user.id).first()
         if not doctor:
-            specialty_str = ", ".join(user.specialties) if user.specialties else "General Dentistry"
+            specialty_str = ", ".join(user.specialties) if user.specialties else "General Dentistry"  # type: ignore
             doctor = DoctorModel(
                 name=user.name,
                 specialty=specialty_str,
@@ -215,21 +215,21 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
             db.refresh(doctor)
             
         if user_data.name is not None:
-            doctor.name = user.name
+            doctor.name = user.name  # type: ignore
         if user_data.specialties is not None:
-            doctor.specialty = ", ".join(user.specialties) if user.specialties else "General Dentistry"
+            doctor.specialty = ", ".join(user.specialties) if user.specialties else "General Dentistry"  # type: ignore
         if user_data.dob is not None:
-            doctor.dob = user_data.dob
+            doctor.dob = user_data.dob  # type: ignore
         if user_data.phone is not None:
-            doctor.phone = user_data.phone
+            doctor.phone = user_data.phone  # type: ignore
         if user_data.address is not None:
-            doctor.address = user_data.address
+            doctor.address = user_data.address  # type: ignore
         if user_data.licence_id is not None:
-            doctor.licence_id = user_data.licence_id
+            doctor.licence_id = user_data.licence_id  # type: ignore
         if user_data.chair_setup is not None:
-            doctor.chair_setup = user_data.chair_setup
+            doctor.chair_setup = user_data.chair_setup  # type: ignore
         if user_data.board is not None:
-            doctor.board = user_data.board
+            doctor.board = user_data.board  # type: ignore
             
         db.commit()
         db.refresh(doctor)
@@ -323,7 +323,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         recent_activities.append({
             "type": "user",
             "title": "New User Registered",
-            "description": f"{u.name} was registered with roles: {', '.join(u.roles)}.",
+            "description": f"{u.name} was registered with roles: {', '.join(u.roles)}.",    # type: ignore
             "time": u.created_at.strftime("%I:%M %p") if u.created_at else "Today"
         })
         
@@ -348,6 +348,73 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         "alerts_count": alerts_count,
         "recent_activities": recent_activities[:5]
     }
+
+@router.get("/appointments")
+def get_admin_appointments(filter: str = "today", db: Session = Depends(get_db)):
+    from datetime import date, timedelta
+    import calendar
+    
+    today = date.today()
+    
+    query = db.query(AppointmentModel)
+    
+    if filter == "today":
+        query = query.filter(AppointmentModel.appointment_date == today)
+    elif filter == "tomorrow":
+        tomorrow = today + timedelta(days=1)
+        query = query.filter(AppointmentModel.appointment_date == tomorrow)
+    elif filter == "this_month":
+        _, last_day = calendar.monthrange(today.year, today.month)
+        first_date = today.replace(day=1)
+        last_date = today.replace(day=last_day)
+        query = query.filter(AppointmentModel.appointment_date >= first_date, AppointmentModel.appointment_date <= last_date)
+        
+    appointments = query.order_by(AppointmentModel.appointment_date.asc(), AppointmentModel.appointment_time.asc()).all()
+    
+    result = []
+    for appt in appointments:
+        patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+                
+        result.append({
+            "id": appt.id,
+            "patient_id": appt.patient_id,
+            "patient_name": patient.name if patient else "Unknown",
+            "token_id": patient.token if patient and patient.token else f"PT-{appt.patient_id}",
+            "phone": patient.phone if patient else "N/A",
+            "gender": patient.gender if patient else "N/A",
+            "treatment_type": appt.treatment_type,
+            "status": appt.status,
+            "doctor_name": appt.doctor_name,
+            "appointment_date": appt.appointment_date.strftime("%Y-%m-%d"),
+            "appointment_time": appt.appointment_time,
+            "priority": appt.priority or "Routine",
+            "symptoms": appt.symptoms or "N/A",
+            "created_at": appt.created_at.strftime("%Y-%m-%d %H:%M") if appt.created_at else "N/A"
+        })
+        
+    return result
+
+@router.get("/patients/{patient_id}/history")
+def get_patient_history(patient_id: int, db: Session = Depends(get_db)):
+    """Fetch the appointment history for a specific patient."""
+    appointments = db.query(AppointmentModel).filter(
+        AppointmentModel.patient_id == patient_id
+    ).order_by(AppointmentModel.appointment_date.desc(), AppointmentModel.appointment_time.desc()).all()
+    
+    result = []
+    for appt in appointments:
+        result.append({
+            "id": appt.id,
+            "appointment_date": appt.appointment_date.strftime("%Y-%m-%d"),
+            "appointment_time": appt.appointment_time,
+            "doctor_name": appt.doctor_name,
+            "treatment_type": appt.treatment_type or "Consultation",
+            "status": appt.status,
+            "priority": appt.priority or "Routine",
+            "symptoms": appt.symptoms or "N/A"
+        })
+        
+    return result
 
 @router.get("/doctors")
 def get_doctors_roster(db: Session = Depends(get_db)):
@@ -385,8 +452,8 @@ def get_doctors_roster(db: Session = Depends(get_db)):
         roster.append({
             "id": doc.id,
             "name": doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}",
-            "specialty": ", ".join(doc.specialties) if doc.specialties else "General Dentistry",
-            "operatory": f"Operatory {idx % 6 + 1}",
+            "specialty": ", ".join(doc.specialties) if doc.specialties else "General Dentistry",   # type: ignore
+            "operatory": f"Operatory {idx % 6 + 1}", 
             "shift": "09:00 AM - 05:00 PM" if idx % 2 == 0 else "10:00 AM - 06:00 PM",
             "status": status_map,
             "patientsCount": active_count
@@ -404,12 +471,12 @@ def cycle_doctor_status(doctor_id: int, db: Session = Depends(get_db)):
         )
     assert user is not None
     
-    if user.status == "Active":
-        user.status = "On Break"
+    if user.status == "Active":     # type: ignore
+        user.status = "On Break"     # type: ignore
     elif user.status == "On Break":
-        user.status = "Inactive"
+        user.status = "Inactive"      # type: ignore
     else:
-        user.status = "Active"
+        user.status = "Active"     # type: ignore
         
     db.commit()
     db.refresh(user)
@@ -421,6 +488,56 @@ def cycle_doctor_status(doctor_id: int, db: Session = Depends(get_db)):
         status_map = "On Break"
         
     return {"id": user.id, "status": status_map}
+
+
+@router.get("/doctors/{doctor_id}/schedule")
+def get_doctor_schedule(doctor_id: int, db: Session = Depends(get_db)):
+    """Fetch a specific doctor's profile and their appointments for printing."""
+    from datetime import date, timedelta
+
+    user = db.query(UserModel).filter(UserModel.id == doctor_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Doctor not found."
+        )
+
+    doctor = db.query(DoctorModel).filter(DoctorModel.user_id == user.id).first()
+    doc_name = user.name if user.name.startswith("Dr. ") else f"Dr. {user.name}"  # type: ignore
+    specialty = ", ".join(user.specialties) if user.specialties else "General Dentistry"  # type: ignore
+
+    # Fetch appointments where doctor_name matches (today and future)
+    today = date.today()
+    doc_name_clean = user.name.replace("Dr.", "").strip()  # type: ignore
+    appointments = db.query(AppointmentModel).filter(
+        AppointmentModel.doctor_name.ilike(f"%{doc_name_clean}%"),
+        AppointmentModel.appointment_date >= today
+    ).order_by(AppointmentModel.appointment_date.asc(), AppointmentModel.appointment_time.asc()).all()
+
+    appt_list = []
+    for appt in appointments:
+        patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+        appt_list.append({
+            "id": appt.id,
+            "patient_name": patient.name if patient else "Unknown",
+            "treatment_type": appt.treatment_type or "Consultation",
+            "appointment_date": appt.appointment_date.strftime("%Y-%m-%d"),
+            "appointment_time": appt.appointment_time,
+            "status": appt.status,
+            "priority": appt.priority or "Routine"
+        })
+
+    return {
+        "doctor": {
+            "id": user.id,
+            "name": doc_name,
+            "specialty": specialty,
+            "phone": doctor.phone if doctor else "N/A",
+            "operatory": f"Operatory {(doctor_id % 6) + 1}",
+            "shift": "09:00 AM - 05:00 PM"
+        },
+        "appointments": appt_list
+    }
 
 @router.get("/patients")
 def get_global_patient_directory(db: Session = Depends(get_db)):

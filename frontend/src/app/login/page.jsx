@@ -77,13 +77,11 @@ function LoginContent() {
   const [portalType, setPortalType] = useState(null); // 'patient', 'staff', or null
 
   useEffect(() => {
-    const role = searchParams.get("roles");
-    if (role === "patient") {
+    const roleParam = searchParams.get("role");
+    if (roleParam === "patient") {
       setPortalType("patient");
-    } else if (role === "staff") {
+    } else if (roleParam === "staff") {
       setPortalType("staff");
-    } else {
-      setPortalType("");
     }
   }, [searchParams]);
 
@@ -247,6 +245,7 @@ function LoginContent() {
               setEmailId("");
               setPassword("");
               setAuthError("");
+              router.replace("/login");
             }}
             className="flex items-center gap-1 text-blue-400 hover:text-white text-xs font-bold transition-colors cursor-pointer bg-transparent border-none outline-none"
           >

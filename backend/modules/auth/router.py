@@ -17,25 +17,33 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=TokenResponse)
 def login(login_data: UserLogin, db: Session = Depends(get_db)):
+    print(f"\n[DEBUG LOGIN] Attempting login for username: '{login_data.username}'", flush=True)
     # 1. Search in Staff (UserModel)
+    print("[DEBUG LOGIN] Searching in Staff (UserModel)...", flush=True)
     user = db.query(UserModel).filter(
         (UserModel.email.ilike(login_data.username)) | 
         (UserModel.username.ilike(login_data.username))
     ).first()
+    print(f"[DEBUG LOGIN] Staff search completed. Found: {user.username if user else None}", flush=True)
 
     if user:
+        print("[DEBUG LOGIN] Verifying staff password...", flush=True)
         if not verify_password(login_data.password, user.password_hash):
+            print("[DEBUG LOGIN] Staff password verification FAILED.", flush=True)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials. Verify your password."
             )
             
+        print("[DEBUG LOGIN] Staff password verification PASSED. Checking status...", flush=True)
         if user.status != "Active":
+            print(f"[DEBUG LOGIN] Staff user is inactive. Status: {user.status}", flush=True)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="This account has been deactivated. Please contact support."
             )
         
+        print("[DEBUG LOGIN] Generating access token for staff...", flush=True)
         token = create_access_token({
             "sub": user.username,
             "user_id": user.id,
@@ -44,6 +52,7 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
             "roles": user.roles,
             "type": "staff"
         })
+        print("[DEBUG LOGIN] Token generated successfully for staff. Returning response.", flush=True)
         return {
             "access_token": token,
             "token_type": "bearer",
@@ -52,24 +61,32 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
         }
 
     # 2. Search in Patient (PatientModel)
+    print("[DEBUG LOGIN] Searching in Patient (PatientModel)...", flush=True)
     patient = db.query(PatientModel).filter(
         (PatientModel.email.ilike(login_data.username)) |
         (PatientModel.phone == login_data.username)
     ).first()
+    print(f"[DEBUG LOGIN] Patient search completed. Found: {patient.email if patient else None}", flush=True)
 
     if patient:
+        print("[DEBUG LOGIN] Checking patient status...", flush=True)
         if not patient.is_active:
+            print("[DEBUG LOGIN] Patient is inactive.", flush=True)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="This account has been deactivated. Please contact support."
             )
+        
+        print("[DEBUG LOGIN] Verifying patient password...", flush=True)
         from modules.patient.service import verify_password as verify_patient_password
         if not verify_patient_password(login_data.password, patient.password):
+            print("[DEBUG LOGIN] Patient password verification FAILED.", flush=True)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials. Verify your password."
             )
         
+        print("[DEBUG LOGIN] Generating access token for patient...", flush=True)
         token = create_access_token({
             "sub": patient.email,
             "patient_id": patient.id,
@@ -77,6 +94,7 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
             "roles": ["Patient"],
             "type": "patient"
         })
+        print("[DEBUG LOGIN] Token generated successfully for patient. Returning response.", flush=True)
         return {
             "access_token": token,
             "token_type": "bearer",
@@ -85,6 +103,7 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
         }
 
     # 3. Neither matches
+    print("[DEBUG LOGIN] Neither matches. Raising 401 Unauthorized.", flush=True)
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid credentials. Verify your username/email and password."

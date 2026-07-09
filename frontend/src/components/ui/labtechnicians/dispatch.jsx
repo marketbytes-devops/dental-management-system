@@ -14,7 +14,11 @@ export default function LabDispatch() {
       const filtered = data
         .filter(o => o.status === "Ready / Shipped" || o.status === "Completed" || o.status === "Delivered")
         .map(o => {
-          const suffix = o.id.split("-")[2] || "000";
+          const parts = o.id.split("-");
+          let suffix = parts.length >= 3 ? parts[2] : (parts[1] || parts[0] || "000");
+          if (/^\d+$/.test(suffix)) {
+            suffix = suffix.padStart(3, "0");
+          }
           const trackingId = `TRK-2026-${suffix}`;
           
           let status = "Ready";
@@ -147,7 +151,7 @@ export default function LabDispatch() {
               <tbody className="divide-y divide-gray-100 text-sm">
                 {shipments.map((s) => (
                   <tr 
-                    key={s.id} 
+                    key={s.caseId} 
                     onClick={() => setSelectedTrackId(s.id)}
                     className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${
                       selectedTrackId === s.id ? "bg-primary/5" : ""

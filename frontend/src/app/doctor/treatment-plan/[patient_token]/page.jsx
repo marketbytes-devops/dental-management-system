@@ -609,29 +609,8 @@ export default function DoctorTreatmentPlanPage() {
         </div>
       </div>
 
-      {/* Patient Banner */}
-      {patient && (
-        <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-gray-400">Patient Name</span>
-            <p className="text-sm font-bold text-gray-800 mt-1">{patient.name}</p>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-gray-400">Patient ID / Token</span>
-            <p className="text-sm font-semibold text-gray-700 mt-1">{patient.token}</p>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-gray-400">Gender / Age</span>
-            <p className="text-sm font-semibold text-gray-700 mt-1">
-              {patient.gender} / {patient.date_of_birth ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} yrs` : "N/A"}
-            </p>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-gray-400">Phone Contact</span>
-            <p className="text-sm font-semibold text-gray-700 mt-1">{patient.phone}</p>
-          </div>
-        </div>
-      )}
+      
+          
 
       {/* SmileCare 3D Dental Charting Panel */}
       <SmileCareChart 

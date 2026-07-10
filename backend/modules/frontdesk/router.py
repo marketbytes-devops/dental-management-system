@@ -78,6 +78,14 @@ def get_patient_appointments_route(patient_id: int, db: Session = Depends(get_db
     return appointments
 
 
+@router.get("/appointments", response_model=List[AppointmentResponse])
+def get_all_appointments(db: Session = Depends(get_db)):
+    appointments = db.query(AppointmentModel).order_by(AppointmentModel.appointment_date.desc()).all()
+    for appt in appointments:
+        appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    return appointments
+
+
 @router.get("/records")
 def get_patient_records(
     db: Session = Depends(get_db),

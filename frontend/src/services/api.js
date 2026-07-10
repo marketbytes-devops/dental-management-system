@@ -83,6 +83,11 @@ export const getAuthStatus = async () => {
   return response.data;
 };
 
+export const getStaffList = async () => {
+  const response = await client.get("/auth/staff");
+  return response.data;
+};
+
 export const updateAuthStatus = async (statusData) => {
   const response = await client.put("/auth/status", statusData);
   return response.data;
@@ -268,6 +273,11 @@ export const sendAppointmentOtp = async (id) => {
 
 export const getPatientAppointments = async (patientId) => {
   const response = await client.get(`/frontdesk/appointments/patient/${patientId}`);
+  return response.data;
+};
+
+export const getAllAppointments = async () => {
+  const response = await client.get("/frontdesk/appointments");
   return response.data;
 };
 

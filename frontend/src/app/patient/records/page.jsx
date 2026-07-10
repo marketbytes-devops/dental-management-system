@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-  Heart, 
-  FileSignature, 
-  Check, 
-  X, 
-  Calendar, 
-  Activity, 
-  ChevronDown, 
-  Coins, 
-  Loader2, 
+import {
+  Heart,
+  FileSignature,
+  Check,
+  X,
+  Calendar,
+  Activity,
+  ChevronDown,
+  Coins,
+  Loader2,
   AlertCircle,
   Paperclip,
   CheckCircle,
@@ -23,8 +23,66 @@ import PrescriptionCard from "@/components/ui/patients/records/prescriptionCard"
 import ActivePrescriptions from "@/components/ui/patients/records/activePrescriptions";
 import ReferralCard from "@/components/ui/patients/records/referralCard";
 import ConsentFormViewer from "@/components/ui/patients/documents/consentFormViewer";
-import { getPatientTreatmentPlan, getPendingConsents, getPatientPrescriptions, getPatientReferrals } from "@/services/api";
+import { getPatientTreatmentPlan, getPendingConsents, getPatientPrescriptions, getPatientReferrals, getMyClinicalNotes } from "@/services/api";
 
+const parseCustomDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  
+  // Clean custom timeline suffixes
+  const cleanStr = dateStr.replace(" (Today)", "").trim();
+  
+  if (cleanStr.includes("T") || (cleanStr.includes("-") && cleanStr.split("-")[0].length === 4)) {
+    return new Date(cleanStr);
+  }
+  
+  const spaceParts = cleanStr.split(" ");
+  const dateParts = spaceParts[0].split("-");
+  if (dateParts.length === 3) {
+    const day = parseInt(dateParts[0], 10);
+    const month = parseInt(dateParts[1], 10) - 1; // 0-indexed month
+    const year = parseInt(dateParts[2], 10);
+    
+    let hours = 0;
+    let minutes = 0;
+    
+    if (spaceParts.length >= 2) {
+      const timeParts = spaceParts[1].split(":");
+      if (timeParts.length >= 2) {
+        hours = parseInt(timeParts[0], 10);
+        minutes = parseInt(timeParts[1], 10);
+        if (spaceParts.length >= 3 && spaceParts[2].toLowerCase() === "pm" && hours < 12) {
+          hours += 12;
+        } else if (spaceParts.length >= 3 && spaceParts[2].toLowerCase() === "am" && hours === 12) {
+          hours = 0;
+        }
+      }
+    }
+    return new Date(year, month, day, hours, minutes);
+  }
+  return new Date(cleanStr);
+};
+
+const parseStructuredNote = (noteText) => {
+  if (!noteText) return null;
+  if (!noteText.includes("[Chief Complaint]:") && !noteText.includes("[Medical History]:")) {
+    return null;
+  }
+  
+  const getValue = (key) => {
+    const regex = new RegExp(`\\[${key}\\]:\\s*([\\s\\S]*?)(?=\\n\\[|$)`);
+    const match = noteText.match(regex);
+    return match ? match[1].trim() : "N/A";
+  };
+
+  return {
+    chiefComplaint: getValue("Chief Complaint"),
+    medicalHistory: getValue("Medical History"),
+    dentalHistory: getValue("Dental History"),
+    vitalsBP: getValue("Vitals BP"),
+    allergies: getValue("Allergies"),
+    consultationNote: getValue("Consultation Note")
+  };
+};
 
 export default function PatientRecordsPage() {
   const [activeTab, setActiveTab] = useState("treatment-plans"); // treatment-plans | active-rx | all-rx | referrals
@@ -40,6 +98,11 @@ export default function PatientRecordsPage() {
   const [prescriptionsLoading, setPrescriptionsLoading] = useState(false);
   const [referrals, setReferrals] = useState([]);
   const [referralsLoading, setReferralsLoading] = useState(false);
+
+  // Clinical Notes State
+  const [clinicalNotes, setClinicalNotes] = useState([]);
+  const [clinicalNotesLoading, setClinicalNotesLoading] = useState(false);
+  const [expandedNotes, setExpandedNotes] = useState({});
 
   const patientToken = typeof window !== "undefined" ? localStorage.getItem("patient_token") : null;
 
@@ -74,6 +137,18 @@ export default function PatientRecordsPage() {
     }
   };
 
+  const fetchClinicalNotes = async () => {
+    setClinicalNotesLoading(true);
+    try {
+      const data = await getMyClinicalNotes();
+      setClinicalNotes(data);
+    } catch (err) {
+      console.error("Error fetching clinical notes:", err);
+    } finally {
+      setClinicalNotesLoading(false);
+    }
+  };
+
   const fetchReferrals = async () => {
     setReferralsLoading(true);
     try {
@@ -89,8 +164,10 @@ export default function PatientRecordsPage() {
   useEffect(() => {
     if (activeTab === "treatment-plans") {
       fetchPlans();
-    } else if (activeTab === "active-rx" || activeTab === "all-rx") {
+    } else if (activeTab === "active-rx") {
       fetchPrescriptions();
+    } else if (activeTab === "all-rx") {
+      fetchClinicalNotes();
     } else if (activeTab === "referrals") {
       fetchReferrals();
     }
@@ -132,12 +209,13 @@ export default function PatientRecordsPage() {
 
   // Formats DB medications structure to PrescriptionCard expectation
   const formattedPrescriptions = prescriptions.flatMap((rxObj) => {
-    const dateStr = rxObj.created_at 
-      ? new Date(rxObj.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    const dateObj = parseCustomDate(rxObj.created_at);
+    const dateStr = dateObj && !isNaN(dateObj.getTime())
+      ? dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
       : "Recent";
-    
+
     // Deem active if created within the past 7 days
-    const isRecent = rxObj.created_at 
+    const isRecent = rxObj.created_at
       ? (new Date() - new Date(rxObj.created_at)) < (7 * 24 * 60 * 60 * 1000)
       : true;
 
@@ -285,7 +363,7 @@ export default function PatientRecordsPage() {
                       </span>
                       <div className="grid grid-cols-1 gap-1.5">
                         {activePlan.attachments.map((file, i) => (
-                          <a 
+                          <a
                             key={i}
                             href="#"
                             onClick={(e) => { e.preventDefault(); alert("Viewing mock attachment..."); }}
@@ -313,62 +391,61 @@ export default function PatientRecordsPage() {
                         if (phaseSteps.length === 0) return null;
                         return (
                           <div key={phaseName} className="space-y-2.5">
-                          <div className="bg-slate-100 p-2.5 rounded-xl border border-slate-200">
-                            <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{phaseName}</span>
-                          </div>
+                            <div className="bg-slate-100 p-2.5 rounded-xl border border-slate-200">
+                              <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{phaseName}</span>
+                            </div>
 
-                          <div className="space-y-2.5">
-                            {phaseSteps.map((step) => (
-                              <div key={step.id} className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50/50 border border-gray-150 p-4 rounded-2xl gap-4 hover:shadow-sm transition-all duration-300">
-                                <div className="space-y-1 text-left">
-                                  <div className="font-bold text-gray-800 text-sm">{step.title}</div>
-                                  {step.details && <p className="text-xs text-gray-500">{step.details}</p>}
-                                  {step.notes && (
-                                    <p className="text-[11px] text-primary italic font-medium bg-white px-2 py-1 rounded border border-gray-100 mt-1.5">
-                                      📝 Notes: {step.notes}
-                                    </p>
-                                  )}
-                                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                                    <span className="text-[10px] font-bold text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-100">
-                                      Est. Cost: ₹{step.cost.toLocaleString()}
-                                    </span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                                      step.status === "Completed" ? "bg-emerald-50 border-emerald-100 text-emerald-700" :
-                                      step.status === "In Progress" ? "bg-sky-50 border-sky-100 text-sky-700" :
-                                      "bg-gray-50 border-gray-200 text-gray-505"
-                                    }`}>
-                                      Status: {step.status}
-                                    </span>
+                            <div className="space-y-2.5">
+                              {phaseSteps.map((step) => (
+                                <div key={step.id} className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50/50 border border-gray-150 p-4 rounded-2xl gap-4 hover:shadow-sm transition-all duration-300">
+                                  <div className="space-y-1 text-left">
+                                    <div className="font-bold text-gray-800 text-sm">{step.title}</div>
+                                    {step.details && <p className="text-xs text-gray-500">{step.details}</p>}
+                                    {step.notes && (
+                                      <p className="text-[11px] text-primary italic font-medium bg-white px-2 py-1 rounded border border-gray-100 mt-1.5">
+                                        📝 Notes: {step.notes}
+                                      </p>
+                                    )}
+                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                      <span className="text-[10px] font-bold text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-100">
+                                        Est. Cost: ₹{step.cost.toLocaleString()}
+                                      </span>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${step.status === "Completed" ? "bg-emerald-50 border-emerald-100 text-emerald-700" :
+                                          step.status === "In Progress" ? "bg-sky-50 border-sky-100 text-sky-700" :
+                                            "bg-gray-50 border-gray-200 text-gray-505"
+                                        }`}>
+                                        Status: {step.status}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 self-stretch md:self-center justify-end">
+                                    {step.requires_consent ? (
+                                      step.consent_status === "Given" ? (
+                                        <a
+                                          href={`http://localhost:8000/patient/consents/${step.consent_id}/pdf`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-250 px-3 py-1.5 rounded-xl flex items-center gap-1.5 hover:bg-emerald-100/50 transition-colors"
+                                        >
+                                          🟢 Signed <FileDown className="w-3.5 h-3.5" />
+                                        </a>
+                                      ) : (
+                                        <button
+                                          onClick={() => triggerSignConsent(step.consent_id)}
+                                          className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-250 hover:bg-amber-100/50 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all animate-pulse cursor-pointer"
+                                        >
+                                          🟡 Awaiting Consent <FileSignature className="w-3.5 h-3.5" />
+                                        </button>
+                                      )
+                                    ) : (
+                                      <span className="text-[10px] text-gray-400 italic">No special consent required</span>
+                                    )}
                                   </div>
                                 </div>
-
-                                <div className="flex items-center gap-2 self-stretch md:self-center justify-end">
-                                  {step.requires_consent ? (
-                                    step.consent_status === "Given" ? (
-                                      <a
-                                        href={`http://localhost:8000/patient/consents/${step.consent_id}/pdf`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-250 px-3 py-1.5 rounded-xl flex items-center gap-1.5 hover:bg-emerald-100/50 transition-colors"
-                                      >
-                                        🟢 Signed <FileDown className="w-3.5 h-3.5" />
-                                      </a>
-                                    ) : (
-                                      <button
-                                        onClick={() => triggerSignConsent(step.consent_id)}
-                                        className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-250 hover:bg-amber-100/50 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all animate-pulse cursor-pointer"
-                                      >
-                                        🟡 Awaiting Consent <FileSignature className="w-3.5 h-3.5" />
-                                      </button>
-                                    )
-                                  ) : (
-                                    <span className="text-[10px] text-gray-400 italic">No special consent required</span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
                         );
                       });
                     })()}
@@ -390,9 +467,8 @@ export default function PatientRecordsPage() {
                     <details key={plan.id} className="group bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
                       <summary className="p-4 font-bold text-gray-700 cursor-pointer list-none flex justify-between items-center select-none group-open:bg-gray-50/50">
                         <div className="flex items-center gap-3">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                            plan.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-gray-150 text-gray-505"
-                          }`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${plan.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-gray-150 text-gray-505"
+                            }`}>
                             {plan.status}
                           </span>
                           <span className="text-xs font-bold text-gray-800">
@@ -436,26 +512,179 @@ export default function PatientRecordsPage() {
         return <ActivePrescriptions prescriptions={formattedPrescriptions} />;
 
       case "all-rx":
-        if (prescriptionsLoading) {
+        if (clinicalNotesLoading) {
           return (
             <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center flex flex-col items-center justify-center space-y-3 shadow-sm">
               <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              <span className="text-sm font-semibold text-gray-500">Loading prescription history...</span>
+              <span className="text-sm font-semibold text-gray-500">Loading clinical notes...</span>
             </div>
           );
         }
+
         return (
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6">Prescription History</h3>
-            {formattedPrescriptions.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                {formattedPrescriptions.map((rx) => (
-                  <PrescriptionCard key={rx.id} rx={rx} />
-                ))}
+          <div className="space-y-6 text-left">
+            <h3 className="text-lg font-bold text-gray-900">Clinical Consultation Notes</h3>
+            {clinicalNotes.length > 0 ? (
+              <div className="space-y-4">
+                {clinicalNotes.map((note, idx) => {
+                  const parsed = parseStructuredNote(note.note);
+                  const isExpanded = !!expandedNotes[idx];
+                  const doctorName = note.doctor_name || "Doctor";
+                  const dateObj = parseCustomDate(note.date);
+                  const displayDate = dateObj && !isNaN(dateObj.getTime())
+                    ? dateObj.toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true
+                      })
+                    : "Recent";
+
+                  return (
+                    <div key={note.id || idx} className="bg-white rounded-3xl border border-gray-150 p-6 shadow-sm space-y-4">
+                      {/* Collapsed Header View */}
+                      <div 
+                        onClick={() => setExpandedNotes(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded font-black tracking-wider uppercase">{displayDate}</span>
+                          <span className="text-[9px] font-black uppercase text-primary bg-primary/10 px-2.5 py-1 rounded tracking-wider">Consultation Note</span>
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-gray-800 truncate">
+                            <span className="text-gray-400 font-semibold mr-1">Chief Complaint:</span>
+                            {parsed ? parsed.chiefComplaint : note.note}
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs text-gray-500 font-semibold">
+                            Consultant: <strong className="text-gray-700 font-bold">{doctorName}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            className="text-[10px] font-black text-primary bg-primary/10 hover:bg-primary/20 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer outline-none border-none"
+                          >
+                            {isExpanded ? "Hide Details" : "View Details"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Detailed Expanded View - View Only */}
+                      {isExpanded && parsed && (
+                        <div className="pt-5 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 animate-fadeIn">
+                          {/* Chief Complaint */}
+                          <div className="space-y-1 text-left">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Chief complaint</span>
+                            <p className="text-xs font-semibold text-gray-750 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">{parsed.chiefComplaint}</p>
+                          </div>
+
+                          {/* Medical History */}
+                          <div className="space-y-1 text-left">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Medical history</span>
+                            <div className="flex flex-wrap gap-1.5 pt-0.5 bg-slate-50/50 p-3 rounded-xl border border-slate-100 min-h-[46px] items-center">
+                              {parsed.medicalHistory.split(",").map(c => c.trim()).filter(Boolean).map((cond, cIdx) => (
+                                <span key={cIdx} className="bg-red-50 text-red-700 border border-red-100 text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                                  {cond}
+                                </span>
+                              ))}
+                              {(!parsed.medicalHistory || parsed.medicalHistory === "None" || parsed.medicalHistory === "N/A") && (
+                                <span className="text-[10px] text-gray-405 italic">No medical history specified</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Dental History */}
+                          <div className="space-y-1 text-left">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Dental history</span>
+                            <p className="text-xs font-semibold text-gray-750 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">{parsed.dentalHistory}</p>
+                          </div>
+
+                          {/* Vitals / Allergies */}
+                          <div className="space-y-1 text-left">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Vitals / allergies</span>
+                            <div className="grid grid-cols-2 gap-3 pt-0.5">
+                              <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-xl text-left">
+                                <span className="text-[8px] uppercase text-gray-450 block font-bold">BP Vitals</span>
+                                <span className="text-[10px] font-bold text-gray-750">{parsed.vitalsBP}</span>
+                              </div>
+                              <div className="bg-slate-50/50 border border-slate-100 p-3 rounded-xl text-left">
+                                <span className="text-[8px] uppercase text-gray-450 block font-bold">Allergies</span>
+                                <span className="text-[10px] font-bold text-gray-750">{parsed.allergies}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Doctor's Consultation Notes */}
+                          {parsed.consultationNote && parsed.consultationNote !== "N/A" && (
+                            <div className="space-y-1 md:col-span-2 text-left">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Consultation Remarks & Advice</span>
+                              <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">{parsed.consultationNote}</p>
+                            </div>
+                          )}
+
+                          {/* Prescribed Medications */}
+                          {note.medications && note.medications.length > 0 && (
+                            <div className="space-y-2 md:col-span-2 text-left pt-4 border-t border-gray-150 animate-fadeIn">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block">Prescribed Medications</span>
+                              <div className="divide-y divide-gray-100 bg-slate-50/50 border border-slate-100 rounded-xl overflow-hidden mt-1">
+                                {note.medications.map((med, mIdx) => (
+                                  <div key={med.id || mIdx} className="flex justify-between items-center p-3 text-xs font-semibold text-gray-700 hover:bg-gray-100/50">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                      <span>
+                                        <strong className="text-gray-900 font-bold">{med.medicine}</strong> ({med.schedule} • {med.timing} • {med.duration})
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Fallback Detailed Expanded View for non-structured notes */}
+                      {isExpanded && !parsed && (
+                        <div className="pt-4 border-t border-gray-100 text-left animate-fadeIn space-y-4">
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block mb-1">Consultation note details</span>
+                            <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                              {note.note}
+                            </p>
+                          </div>
+
+                          {/* Prescribed Medications Fallback */}
+                          {note.medications && note.medications.length > 0 && (
+                            <div className="space-y-2 pt-4 border-t border-gray-150 text-left">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block">Prescribed Medications</span>
+                              <div className="divide-y divide-gray-100 bg-slate-50/50 border border-slate-100 rounded-xl overflow-hidden mt-1">
+                                {note.medications.map((med, mIdx) => (
+                                  <div key={med.id || mIdx} className="flex justify-between items-center p-3 text-xs font-semibold text-gray-700 hover:bg-gray-100/50">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                      <span>
+                                        <strong className="text-gray-900 font-bold">{med.medicine}</strong> ({med.schedule} • {med.timing} • {med.duration})
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
-              <div className="text-center text-gray-400 text-sm py-8">
-                No prescription history records found.
+              <div className="bg-white p-12 rounded-3xl border border-gray-100 shadow-sm text-center text-gray-400 text-sm italic font-medium">
+                No clinical consultation notes found in your history.
               </div>
             )}
           </div>
@@ -503,17 +732,16 @@ export default function PatientRecordsPage() {
         {[
           { id: "treatment-plans", label: "Treatment Plans" },
           { id: "active-rx", label: "Active Prescriptions" },
-          { id: "all-rx", label: "Prescription History" },
+          { id: "all-rx", label: "Clinical Notes" },
           { id: "referrals", label: "Referral Letters" },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${
-              activeTab === tab.id
+            className={`py-3.5 text-sm font-semibold border-b-2 transition-all whitespace-nowrap ${activeTab === tab.id
                 ? "border-primary text-primary"
                 : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+              }`}
           >
             {tab.label}
           </button>

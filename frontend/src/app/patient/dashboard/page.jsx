@@ -127,15 +127,15 @@ export default function PatientDashboardPage() {
       </div>
 
       {/* Row 1 — KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <HealthScoreCard
           score={oralHealthDetails?.score ?? 95}
           lastUpdated={oralHealthDetails?.updated_at || profile?.created_at}
           onClick={() => setIsHealthModalOpen(true)}
         />
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-secondary/30 transition-colors">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-secondary/30 transition-colors min-h-[110px]">
           <div className="absolute top-0 right-0 w-24 h-24 bg-secondary/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-          <div>
+          <div className="text-left">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Upcoming Appointments</p>
             <h3 className="text-2xl font-bold text-gray-900">
               {confirmedAppointments.length}
@@ -146,9 +146,9 @@ export default function PatientDashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-danger/30 transition-colors">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between relative overflow-hidden group hover:border-danger/30 transition-colors min-h-[110px]">
           <div className="absolute top-0 right-0 w-24 h-24 bg-danger/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-          <div>
+          <div className="text-left">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Outstanding Balance</p>
             <h3 className="text-2xl font-bold text-gray-900">
               ₹0
@@ -180,10 +180,10 @@ export default function PatientDashboardPage() {
       </div>
 
       {/* Row 3 — Next Appointment + Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
         {/* Next Appointment */}
-        <div className="lg:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div className="xl:col-span-1 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Next Appointment</h3>
           {nextAppointment ? (
             <div className="space-y-3">
@@ -218,7 +218,7 @@ export default function PatientDashboardPage() {
         </div>
 
         {/* Recent Activity */}
-        <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div className="xl:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
             <Link href="/patient/records" className="text-sm text-primary font-medium hover:underline">View All</Link>

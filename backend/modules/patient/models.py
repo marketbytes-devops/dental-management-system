@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, JSON, Text
 from sqlalchemy.sql import func
 from database import Base
 
@@ -100,4 +100,17 @@ class DoctorFeedbackModel(Base):
 # Alias for backward compatibility with treatment plan module
 PatientConsentModel = PatientConsent
 PatientPrescriptionModel = PatientPrescription
+
+
+class ClinicalNoteModel(Base):
+    __tablename__ = "patient_clinical_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_token = Column(String, index=True, nullable=False)
+    doctor_name = Column(String, nullable=False)
+    date = Column(String, nullable=False)  # Store YYYY-MM-DD
+    note = Column(Text, nullable=False)    # Store formatted note text
+    medications = Column(JSON, nullable=True)  # Store list of prescribed medications
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 

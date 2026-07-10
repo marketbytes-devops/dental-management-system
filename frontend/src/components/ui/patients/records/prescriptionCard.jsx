@@ -26,14 +26,8 @@ export default function PrescriptionCard({ rx }) {
         </div>
       </div>
 
-      <div className="border-t border-gray-100 mt-4 pt-3 flex items-center justify-between text-xs text-gray-500">
+      <div className="border-t border-gray-100 mt-4 pt-3 text-xs text-gray-500 text-left">
         <span>By {rx.doctor}</span>
-        <button
-          onClick={() => alert(`Refill request for "${rx.drug}" submitted!`)}
-          className="text-primary font-semibold hover:underline"
-        >
-          Request Refill
-        </button>
       </div>
     </div>
   );

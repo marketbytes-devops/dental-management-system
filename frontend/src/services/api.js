@@ -546,10 +546,21 @@ export const getAllComplaints = async () => {
   return response.data;
 };
 
-export const updateComplaintStatus = async (id, status) => {
-  const response = await client.patch(`/complaints/${id}/status`, { status });
+export const updateComplaintStatus = async (id, status, note = null) => {
+  const response = await client.patch(`/complaints/${id}/status`, { status, note });
   return response.data;
 };
+
+export const reopenComplaint = async (id, reason) => {
+  const response = await client.post(`/complaints/${id}/reopen`, { reason });
+  return response.data;
+};
+
+export const getComplaintLogs = async (id) => {
+  const response = await client.get(`/complaints/${id}/logs`);
+  return response.data;
+};
+
 
 
 
@@ -591,3 +602,30 @@ export const getDoctorFeedbackStats = async (doctorName) => {
   const response = await client.get(`/patient/feedback/doctor/${encodeURIComponent(doctorName)}`);
   return response.data;
 };
+
+export const saveClinicalNote = async (noteData) => {
+  const response = await client.post("/patient/clinical-notes", noteData);
+  return response.data;
+};
+
+export const getPatientClinicalNotes = async (patientToken) => {
+  const response = await client.get(`/patient/clinical-notes/${patientToken}`);
+  return response.data;
+};
+
+// --- Doctor Performance APIs ---
+export const getDoctorPerformance = async (doctorName, period = "all") => {
+  const response = await client.get(`/doctor/performance/${encodeURIComponent(doctorName)}?period=${encodeURIComponent(period)}`);
+  return response.data;
+};
+
+export const getDoctorDashboardAppointments = async (doctorName, filter = "today") => {
+  const response = await client.get(`/doctor/appointments/${encodeURIComponent(doctorName)}?filter=${encodeURIComponent(filter)}`);
+  return response.data;
+};
+
+export const getMyClinicalNotes = async () => {
+  const response = await client.get("/patient/clinical-notes");
+  return response.data;
+};
+

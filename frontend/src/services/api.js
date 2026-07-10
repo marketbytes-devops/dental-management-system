@@ -619,3 +619,36 @@ export const getMyClinicalNotes = async () => {
   return response.data;
 };
 
+// ==========================================
+// 10. SmileCare Charting API Endpoints
+// ==========================================
+
+export const getPatientChart = async (patientToken) => {
+  const response = await client.get(`/charts/${encodeURIComponent(patientToken)}`);
+  return response.data;
+};
+
+export const addToothFinding = async (patientToken, toothNumber, findingData) => {
+  const response = await client.post(`/charts/${encodeURIComponent(patientToken)}/teeth/${toothNumber}/findings`, findingData);
+  return response.data;
+};
+
+export const getToothFindingsHistory = async (patientToken, toothNumber) => {
+  const response = await client.get(`/charts/${encodeURIComponent(patientToken)}/teeth/${toothNumber}/history`);
+  return response.data;
+};
+
+// ==========================================
+// 11. Procedures & Billing API Endpoints
+// ==========================================
+
+export const getProcedures = async () => {
+  const response = await client.get("/procedures");
+  return response.data;
+};
+
+export const createBillingRequest = async (billingData) => {
+  const response = await client.post("/billing/request", billingData);
+  return response.data;
+};
+

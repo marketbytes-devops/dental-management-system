@@ -10,6 +10,7 @@ import {
   ChevronRight,
   UserCheck
 } from "lucide-react";
+import { getPatientChart, addToothFinding } from "@/services/api";
 
 // Determine tooth classification type based on FDI tooth numbering
 const getToothType = (num) => {
@@ -498,6 +499,8 @@ export default function SmileCareChart({ patientToken, mode = "general" }) {
   const [rootOpacity, setRootOpacity] = useState(1.0);
   const [crossSectionOffset, setCrossSectionOffset] = useState(0.0);
   
+  const [chartData, setChartData] = useState(null);
+
   // State representation for the selected tooth's surfaces
   const [surfaces, setSurfaces] = useState({
     M: { condition: "sound", material: "none" },
@@ -512,23 +515,63 @@ export default function SmileCareChart({ patientToken, mode = "general" }) {
     { id: 2, date: "2026-05-10", doctor: "Dr. Rachel Green", type: "caries", desc: "Amalgam filling placed on Occlusal surface." }
   ]);
 
+  useEffect(() => {
+    if (patientToken) {
+      loadChart();
+    }
+  }, [patientToken]);
+
+  const loadChart = async () => {
+    try {
+      const data = await getPatientChart(patientToken);
+      setChartData(data);
+      // Pre-select tooth 36 or first available
+      if (data && data.teeth && data.teeth.length > 0) {
+        updateToothDisplay(data, 36);
+      }
+    } catch (err) {
+      console.error("Failed to load chart", err);
+    }
+  };
+
+  const updateToothDisplay = (data, num) => {
+    const tooth = data.teeth.find(t => t.tooth_number === num);
+    if (tooth) {
+      const newSurfaces = {
+        M: { condition: "sound", material: "none" },
+        D: { condition: "sound", material: "none" },
+        B: { condition: "sound", material: "none" },
+        L: { condition: "sound", material: "none" },
+        O: { condition: "sound", material: "none" }
+      };
+      
+      tooth.surfaces.forEach(s => {
+        newSurfaces[s.surface_code] = { condition: s.condition, material: s.material, id: s.id };
+      });
+      
+      setSurfaces(newSurfaces);
+      setFindingsHistory(tooth.findings.map(f => ({
+        id: f.id,
+        date: new Date(f.recorded_at).toLocaleDateString("en-IN"),
+        doctor: f.recorded_by,
+        type: f.finding_type,
+        desc: f.payload?.condition ? `Condition updated to ${f.payload.condition}` : f.finding_type
+      })));
+    }
+  };
+
   // Standard FDI tooth numbering mapping
   const upperTeeth = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
   const lowerTeeth = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
   const handleToothClick = (num) => {
     setSelectedTooth(num);
-    // Clear / mock different surfaces
-    setSurfaces({
-      M: { condition: num % 5 === 0 ? "caries" : "sound", material: "none" },
-      D: { condition: num % 7 === 0 ? "filled" : "sound", material: "none" },
-      B: { condition: "sound", material: "none" },
-      L: { condition: "sound", material: "none" },
-      O: { condition: num % 4 === 0 ? "crown" : "sound", material: "none" }
-    });
+    if (chartData) {
+      updateToothDisplay(chartData, num);
+    }
   };
 
-  const handleSurfaceAction = (surfCode, condType) => {
+  const handleSurfaceAction = async (surfCode, condType) => {
     setSurfaces(prev => ({
       ...prev,
       [surfCode]: {
@@ -537,15 +580,35 @@ export default function SmileCareChart({ patientToken, mode = "general" }) {
       }
     }));
     
-    // Log new finding locally
-    const newFind = {
-      id: Date.now(),
-      date: new Date().toLocaleDateString("en-IN"),
-      doctor: "Dr. Rachel Green",
-      type: condType,
-      desc: `Marked surface ${surfCode} of tooth ${selectedTooth} as ${condType}.`
-    };
-    setFindingsHistory(prev => [newFind, ...prev]);
+    // Attempt to save to DB
+    const surfaceId = surfaces[surfCode]?.id;
+    if (patientToken && surfaceId) {
+      try {
+        const payload = {
+          finding_type: "surface_condition",
+          specialty: mode,
+          payload: { condition: condType, surface: surfCode },
+          recorded_by: "Dr. Rachel Green", // Replace with real auth user later
+          surface_id: surfaceId
+        };
+        await addToothFinding(patientToken, selectedTooth, payload);
+        
+        // Log new finding locally
+        const newFind = {
+          id: Date.now(),
+          date: new Date().toLocaleDateString("en-IN"),
+          doctor: "Dr. Rachel Green",
+          type: condType,
+          desc: `Marked surface ${surfCode} of tooth ${selectedTooth} as ${condType}.`
+        };
+        setFindingsHistory(prev => [newFind, ...prev]);
+        
+        // Re-fetch to keep state strictly synced if needed, 
+        // but local update above handles visual feedback immediately.
+      } catch (err) {
+        console.error("Failed to save finding", err);
+      }
+    }
   };
 
   return (

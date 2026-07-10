@@ -1,17 +1,118 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getStaffList, getAllAppointments, getLabOrders } from "@/services/api";
 
 export default function AccountantPayroll() {
-  const [payroll, setPayroll] = useState([
+  const [payroll, setPayroll] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPayrollData = async () => {
+    try {
+      const [staffData, apptsData, labData] = await Promise.all([
+        getStaffList(),
+        getAllAppointments(),
+        getLabOrders()
+      ]);
+
+      const treatmentCosts = {
+        "checkup": 500,
+        "cleaning": 1000,
+        "root canal": 5000,
+        "crown": 8000,
+        "extraction": 1500,
+        "filling": 1200,
+        "consultation": 1500
+      };
+
+      const getGrossCost = (treatmentType) => {
+        const treatment = (treatmentType || "Consultation").toLowerCase();
+        for (const [key, cost] of Object.entries(treatmentCosts)) {
+          if (treatment.includes(key)) {
+            return cost;
+          }
+        }
+        return 1500;
+      };
+
+      const roleBaseSalaries = {
+        doctor: 120000,
+        labtech: 35000,
+        receptionist: 25000,
+        accountant: 40000,
+        admin: 50000
+      };
+
+      const mappedPayroll = (staffData || []).map((staff) => {
+        const primaryRole = (staff.roles && staff.roles[0] || "staff").toLowerCase();
+        const base = roleBaseSalaries[primaryRole] || 30000;
+
+        let incentive = 0;
+        if (primaryRole === "doctor") {
+          const completedAppts = (apptsData || []).filter(
+            (appt) =>
+              (appt.doctor_name || "").toLowerCase().includes(staff.name.toLowerCase()) &&
+              appt.status === "Completed"
+          );
+          incentive = completedAppts.reduce((sum, appt) => sum + Math.round(getGrossCost(appt.treatment_type) * 0.1), 0);
+        } else if (primaryRole === "labtech") {
+          const completedLabs = (labData || []).filter(
+            (o) => o.status === "Completed" || o.status === "Delivered"
+          );
+          incentive = completedLabs.length * 1000;
+        } else {
+          incentive = 0;
+        }
+
+        let displayRole = "Clinic Staff";
+        if (primaryRole === "doctor") displayRole = "Dentist";
+        else if (primaryRole === "labtech") displayRole = "Lab Technician";
+        else if (primaryRole === "receptionist") displayRole = "Receptionist";
+        else if (primaryRole === "accountant") displayRole = "Accountant";
+        else if (primaryRole === "admin") displayRole = "Administrator";
+
+        return {
+          id: staff.id,
+          name: staff.name,
+          role: displayRole,
+          base,
+          incentive,
+          status: "Pending"
+        };
+      });
+
+      setPayroll(mappedPayroll);
+    } catch (err) {
+      console.error("Failed to load payroll data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setTimeout(() => {
+      fetchPayrollData();
+    }, 0);
+  }, []);
+
+  const fallbackPayroll = [
     { id: 1, name: "Dr. Anoop Nair", role: "Sr. Dentist", base: 120000, incentive: 35000, status: "Paid" },
     { id: 2, name: "Dr. Priya Varma", role: "Orthodontist", base: 110000, incentive: 45000, status: "Pending" },
     { id: 3, name: "Sneha Thomas", role: "Receptionist", base: 25000, incentive: 2000, status: "Paid" },
     { id: 4, name: "Alen Joseph", role: "Lab Tech", base: 35000, incentive: 5000, status: "Pending" },
-  ]);
+  ];
+
+  const displayPayroll = payroll.length > 0 ? payroll : fallbackPayroll;
 
   const handlePay = (id) => {
-    setPayroll(prev => prev.map(p => p.id === id ? { ...p, status: "Paid" } : p));
+    setPayroll(prev => {
+      if (prev.length === 0) {
+        // If displaying fallback payroll, we need to populate state with it first before toggling
+        const initialized = fallbackPayroll.map(p => p.id === id ? { ...p, status: "Paid" } : p);
+        return initialized;
+      }
+      return prev.map(p => p.id === id ? { ...p, status: "Paid" } : p);
+    });
     alert("Payroll payout processed successfully.");
   };
 
@@ -39,7 +140,7 @@ export default function AccountantPayroll() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {payroll.map(p => {
+              {displayPayroll.map(p => {
                 const total = p.base + p.incentive;
                 return (
                   <tr key={p.id} className="text-sm text-gray-700 hover:bg-gray-50/50 transition-colors">
@@ -49,9 +150,8 @@ export default function AccountantPayroll() {
                     <td className="py-3.5 px-2 font-mono text-xs text-success font-medium">+₹{p.incentive.toLocaleString("en-IN")}</td>
                     <td className="py-3.5 px-2 font-mono text-xs font-black text-gray-900">₹{total.toLocaleString("en-IN")}</td>
                     <td className="py-3.5 px-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                        p.status === "Paid" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${p.status === "Paid" ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                        }`}>
                         {p.status}
                       </span>
                     </td>

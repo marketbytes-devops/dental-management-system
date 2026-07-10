@@ -1,83 +1,163 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function AccountantSettings() {
   const [settings, setSettings] = useState({
-    taxPercent: "18",
-    currency: "INR (₹)",
-    invoicePrefix: "INV-",
-    stripeActive: true
+    theme: "light",
+    accentColor: "#2563eb",
+    compactMode: false,
+    fontSize: "medium",
   });
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") || "light";
+    const savedCompact = localStorage.getItem("compactMode") === "true";
+    const savedFont = localStorage.getItem("fontSize") || "medium";
+
+    setSettings((prev) => ({
+      ...prev,
+      theme: savedTheme,
+      compactMode: savedCompact,
+      fontSize: savedFont,
+    }));
+  }, []);
 
   const handleSave = (e) => {
     e.preventDefault();
-    alert("Billing configurations updated successfully.");
+
+    localStorage.setItem("theme", settings.theme);
+    localStorage.setItem("compactMode", settings.compactMode);
+    localStorage.setItem("fontSize", settings.fontSize);
+
+    alert("Settings saved successfully.");
   };
 
+  const dark = settings.theme === "dark";
+
   return (
-    <div className="space-y-6 pb-10">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Billing Configurations</h1>
-        <p className="text-sm text-gray-500 mt-1">Configure tax brackets, invoice numbering format, and payment gateway rules.</p>
+    <div
+      className={`min-h-screen p-6 transition-colors duration-300 ${dark ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"
+        }`}
+    >
+      <div className="mb-6">
+        <h1 className="text-3xl font-extrabold">Appearance Settings</h1>
+        <p className={dark ? "text-gray-300 mt-1" : "text-gray-500 mt-1"}>
+          Customize the look and feel of your dashboard.
+        </p>
       </div>
 
-      <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm max-w-xl">
-        <h3 className="text-base font-extrabold text-gray-900 mb-4">Invoice & Gateways Settings</h3>
+      <div
+        className={`max-w-xl rounded-2xl p-6 shadow-sm border transition-colors ${dark
+            ? "bg-gray-800 border-gray-700"
+            : "bg-white border-gray-200"
+          }`}
+      >
+        <h3 className="text-lg font-bold mb-5">Display Preferences</h3>
 
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">GST Tax Rate (%)</label>
-              <input
-                type="number"
-                value={settings.taxPercent}
-                onChange={(e) => setSettings(prev => ({ ...prev, taxPercent: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">Invoice Prefix Code</label>
-              <input
-                type="text"
-                value={settings.invoicePrefix}
-                onChange={(e) => setSettings(prev => ({ ...prev, invoicePrefix: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-              />
-            </div>
-          </div>
+        <form onSubmit={handleSave} className="space-y-5">
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-500 uppercase">Currency Standard</label>
-            <select
-              value={settings.currency}
-              onChange={(e) => setSettings(prev => ({ ...prev, currency: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+          {/* Theme */}
+          <div>
+            <label
+              className={`block text-xs font-bold uppercase mb-2 ${dark ? "text-gray-300" : "text-gray-500"
+                }`}
             >
-              <option value="INR (₹)">INR (₹) - Indian Rupee</option>
-              <option value="USD ($)">USD ($) - United States Dollar</option>
-              <option value="EUR (€)">EUR (€) - Euro</option>
+              🌙 Theme
+            </label>
+
+            <select
+              value={settings.theme}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  theme: e.target.value,
+                }))
+              }
+              className={`w-full rounded-lg border px-3 py-2 ${dark
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-200 text-gray-900"
+                }`}
+            >
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
             </select>
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
+          {/* Accent Color */}
+          <div>
+            <label
+              className={`block text-xs font-bold uppercase mb-2 ${dark ? "text-gray-300" : "text-gray-500"
+                }`}
+            >
+              🎨 Accent Color
+            </label>
+
+            <input
+              type="color"
+              value={settings.accentColor}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  accentColor: e.target.value,
+                }))
+              }
+              className="h-10 w-16 rounded border cursor-pointer"
+            />
+          </div>
+
+          {/* Compact Mode */}
+          <div className="flex items-center gap-3">
             <input
               type="checkbox"
-              id="stripeActive"
-              checked={settings.stripeActive}
-              onChange={(e) => setSettings(prev => ({ ...prev, stripeActive: e.target.checked }))}
-              className="w-4 h-4 text-primary border-gray-200 rounded focus:ring-primary/20 accent-primary"
+              checked={settings.compactMode}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  compactMode: e.target.checked,
+                }))
+              }
+              className="h-4 w-4 accent-blue-600"
             />
-            <label htmlFor="stripeActive" className="text-xs font-bold text-gray-755 uppercase select-none cursor-pointer">
-              Enable Razorpay / Stripe Card Gateway Settlements
+
+            <label className={dark ? "text-white" : "text-gray-700"}>
+              🖥️ Enable Compact Mode
             </label>
+          </div>
+
+          {/* Font Size */}
+          <div>
+            <label
+              className={`block text-xs font-bold uppercase mb-2 ${dark ? "text-gray-300" : "text-gray-500"
+                }`}
+            >
+              🔤 Font Size
+            </label>
+
+            <select
+              value={settings.fontSize}
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  fontSize: e.target.value,
+                }))
+              }
+              className={`w-full rounded-lg border px-3 py-2 ${dark
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-200 text-gray-900"
+                }`}
+            >
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
           </div>
 
           <button
             type="submit"
-            className="px-5 py-2.5 bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer mt-2"
+            className="rounded-xl bg-blue-600 px-5 py-2.5 font-bold text-white hover:bg-blue-700"
           >
-            Save Configurations
+            Save Settings
           </button>
         </form>
       </div>

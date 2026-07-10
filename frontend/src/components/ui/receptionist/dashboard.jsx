@@ -3,11 +3,38 @@
 import { useState, useEffect } from "react";
 import { Calendar, CheckSquare, Hourglass, Stethoscope, Users } from "lucide-react";
 import { getTodayAppointments, getQueue, updateAppointmentStatus } from "@/services/api";
+import { getDoctors } from "@/services/api";
 
 export default function ReceptionistDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [queue, setQueue] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+
+
+  const fetchDoctorStats = async () => {
+    try {
+      const doctors = await getDoctors();
+
+      setStats({
+        total_doctors: doctors.length,
+        active_doctors: doctors.filter(
+          (doctor) => doctor.status !== "Off Duty"
+        ).length,
+      });
+    } catch (err) {
+      console.error("Failed to fetch doctors:", err);
+    }
+  };
+
+  const [stats, setStats] = useState({
+    total_doctors: 0,
+    active_doctors: 0,
+  });
+
+
+  useEffect(() => {
+    fetchDashboardData();
+    fetchDoctorStats();
+  }, []);
 
   // Fetch today's appointments and the live queue from backend
   const fetchDashboardData = async () => {
@@ -127,7 +154,9 @@ export default function ReceptionistDashboard() {
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Active Doctors</p>
-            <h3 className="text-2xl font-black text-gray-800">3</h3>
+            <h3 className="text-2xl font-black">
+              {stats.active_doctors} / {stats.total_doctors}
+            </h3>
             <p className="text-xs text-purple-650 font-semibold mt-1">On duty today</p>
           </div>
           <span className="bg-purple-50 p-3 rounded-xl text-purple-600 flex items-center justify-center shrink-0">
@@ -209,15 +238,13 @@ export default function ReceptionistDashboard() {
                       <span className="text-[9px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                         In: {formatCheckedInTime(q.checked_in_at)}
                       </span>
-                      <span className={`text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded ${
-                        q.priority === "Emergency" ? "bg-danger/10 text-danger animate-pulse" :
+                      <span className={`text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded ${q.priority === "Emergency" ? "bg-danger/10 text-danger animate-pulse" :
                         q.priority === "Urgent" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
-                      }`}>
+                        }`}>
                         {q.priority}
                       </span>
-                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
-                        q.status === "In Chair" ? "bg-purple-50 text-purple-650 border border-purple-100" : "bg-gray-100 text-gray-500"
-                      }`}>
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${q.status === "In Chair" ? "bg-purple-50 text-purple-650 border border-purple-100" : "bg-gray-100 text-gray-500"
+                        }`}>
                         {q.status}
                       </span>
                     </div>

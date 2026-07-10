@@ -584,6 +584,25 @@ def change_doctor_status_staff(
     return {"id": user.id, "status": status_map}
 
 
+@router.get("/staff")
+def get_staff_list(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    users = db.query(UserModel).order_by(UserModel.name.asc()).all()
+    result = []
+    for u in users:
+        result.append({
+            "id": u.id,
+            "name": u.name,
+            "username": u.username,
+            "email": u.email,
+            "roles": u.roles,
+            "status": u.status
+        })
+    return result
+
+
 
 
 

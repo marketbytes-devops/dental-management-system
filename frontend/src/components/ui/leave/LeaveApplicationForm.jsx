@@ -18,6 +18,15 @@ export default function LeaveApplicationForm({
   const [leaveType, setLeaveType] = useState("Annual Leave");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  
+  const getTodayDateString = () => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${year}-${month}-${day}`;
+  };
+  const todayStr = getTodayDateString();
   const [reason, setReason] = useState("");
   const [onCallDoctor, setOnCallDoctor] = useState("");
   const [doctorsList, setDoctorsList] = useState([]);
@@ -98,6 +107,14 @@ export default function LeaveApplicationForm({
 
     const start = new Date(startDate);
     const end = new Date(endDate);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (start < today) {
+      setErrorMsg("Leave start date cannot be in the past.");
+      return;
+    }
 
     if (end < start) {
       setErrorMsg("End Date cannot be before Start Date.");
@@ -181,6 +198,7 @@ export default function LeaveApplicationForm({
             <input
               type="date"
               value={startDate}
+              min={todayStr}
               onChange={(e) => setStartDate(e.target.value)}
               className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-805 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
               required
@@ -191,6 +209,7 @@ export default function LeaveApplicationForm({
             <input
               type="date"
               value={endDate}
+              min={startDate || todayStr}
               onChange={(e) => setEndDate(e.target.value)}
               className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-805 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
               required

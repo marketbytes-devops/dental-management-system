@@ -19,7 +19,8 @@ import {
   Archive,
   BookOpen,
   Map,
-  Clock
+  Clock,
+  Receipt
 } from "lucide-react";
 import { useDoctor } from "@/app/doctor/layout";
 import ToothChart from "@/components/ui/doctor/workspace/ToothChart";
@@ -31,7 +32,9 @@ import {
   createTreatmentPlan, 
   createTreatmentPlanStep, 
   updateTreatmentPlanStep,
-  downloadConsentPdf
+  downloadConsentPdf,
+  getProcedures,
+  createBillingRequest
 } from "@/services/api";
 
 const SPECIALTY_CONFIGS = {
@@ -230,6 +233,16 @@ export default function DoctorTreatmentPlanPage() {
   const [nextVisitProc, setNextVisitProc] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [steps, setSteps] = useState([]);
+
+  // Live Procedures Catalog
+  const [catalogProcedures, setCatalogProcedures] = useState([]);
+
+  useEffect(() => {
+    // Load procedures catalog on mount
+    getProcedures().then(data => {
+      setCatalogProcedures(data.filter(p => p.is_active));
+    }).catch(err => console.error("Failed to load procedures", err));
+  }, []);
 
   // Auto calculate future date for expected completion
   const calculateFutureDate = (val) => {
@@ -544,6 +557,33 @@ export default function DoctorTreatmentPlanPage() {
                 <Archive className="w-4 h-4" /> Archive Plan
               </button>
               <button
+                onClick={async () => {
+                  if(!confirm("Send the active procedures in this plan to the Accountant for billing?")) return;
+                  try {
+                    const completedSteps = steps.filter(s => s.status === "Completed" || s.status === "Planned");
+                    if(completedSteps.length === 0) return alert("No active steps to bill.");
+                    const total = completedSteps.reduce((sum, step) => sum + (step.cost || 0), 0);
+                    
+                    await createBillingRequest({
+                      patient_token: patientToken,
+                      doctor_name: typeof window !== "undefined" ? (JSON.parse(localStorage.getItem("staff_user"))?.name || "Doctor") : "Doctor",
+                      total_amount: total,
+                      procedures: completedSteps.map(s => ({
+                        title: s.title,
+                        cost: s.cost
+                      })),
+                      notes: "Sent from Clinical Workspace"
+                    });
+                    alert("Successfully sent to Accountant!");
+                  } catch(e) {
+                    alert("Failed to send billing request.");
+                  }
+                }}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-amber-500/20"
+              >
+                <Receipt className="w-4 h-4" /> Send to Accountant
+              </button>
+              <button
                 onClick={() => handleSavePlan("Active")}
                 className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-primary/10"
               >
@@ -569,29 +609,8 @@ export default function DoctorTreatmentPlanPage() {
         </div>
       </div>
 
-      {/* Patient Banner */}
-      {patient && (
-        <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-gray-400">Patient Name</span>
-            <p className="text-sm font-bold text-gray-800 mt-1">{patient.name}</p>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-gray-400">Patient ID / Token</span>
-            <p className="text-sm font-semibold text-gray-700 mt-1">{patient.token}</p>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-gray-400">Gender / Age</span>
-            <p className="text-sm font-semibold text-gray-700 mt-1">
-              {patient.gender} / {patient.date_of_birth ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} yrs` : "N/A"}
-            </p>
-          </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-gray-400">Phone Contact</span>
-            <p className="text-sm font-semibold text-gray-700 mt-1">{patient.phone}</p>
-          </div>
-        </div>
-      )}
+      
+          
 
       {/* SmileCare 3D Dental Charting Panel */}
       <SmileCareChart 
@@ -917,14 +936,24 @@ export default function DoctorTreatmentPlanPage() {
             <div className="p-4 bg-gray-50 border border-gray-150 rounded-xl space-y-3 pt-4">
               <span className="text-xs font-bold text-gray-800 uppercase tracking-wider block">Add Step / Procedure</span>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <input
-                  type="text"
-                  placeholder="Procedure Title (e.g. Lower Archwire)"
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <select
                   value={newStep.title}
-                  onChange={(e) => setNewStep({ ...newStep, title: e.target.value })}
-                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none"
-                />
+                  onChange={(e) => {
+                    const proc = catalogProcedures.find(p => p.name === e.target.value);
+                    setNewStep({ 
+                      ...newStep, 
+                      title: e.target.value,
+                      cost: proc ? proc.rate : 0 
+                    });
+                  }}
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none col-span-2"
+                >
+                  <option value="">-- Select Procedure from Catalog --</option>
+                  {catalogProcedures.map(p => (
+                    <option key={p.id} value={p.name}>{p.name} (₹{p.rate})</option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   placeholder="Details"

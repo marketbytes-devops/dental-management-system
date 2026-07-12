@@ -192,6 +192,23 @@ const SPECIALTY_CONFIGS = {
   }
 };
 
+const getPhaseNumber = (phaseStr) => {
+  if (!phaseStr) return "-";
+  const match = phaseStr.match(/Phase\s+(\d+)/i);
+  return match ? match[1] : phaseStr;
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return "Just now";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function DoctorTreatmentPlanPage() {
   const params = useParams();
   const router = useRouter();
@@ -236,6 +253,8 @@ export default function DoctorTreatmentPlanPage() {
 
   // Live Procedures Catalog
   const [catalogProcedures, setCatalogProcedures] = useState([]);
+  const [selectedParentProcName, setSelectedParentProcName] = useState("");
+  const [selectedSubProcId, setSelectedSubProcId] = useState("");
 
   useEffect(() => {
     // Load procedures catalog on mount
@@ -414,6 +433,8 @@ export default function DoctorTreatmentPlanPage() {
           phase: PHASES[0],
           sequence: steps.length + 1
         });
+        setSelectedParentProcName("");
+        setSelectedSubProcId("");
         loadData();
         
         if (enrichPatientTimeline) {
@@ -440,6 +461,8 @@ export default function DoctorTreatmentPlanPage() {
         phase: PHASES[0],
         sequence: steps.length + 2
       });
+      setSelectedParentProcName("");
+      setSelectedSubProcId("");
     }
   };
 
@@ -840,134 +863,190 @@ export default function DoctorTreatmentPlanPage() {
             <div className="space-y-4">
               {PHASES.map((phaseName) => {
                 const phaseSteps = steps.filter(s => s.phase === phaseName && s.status !== "Cancelled");
+                if (phaseSteps.length === 0) return null;
                 return (
                   <div key={phaseName} className="space-y-2">
                     <div className="bg-slate-100/70 p-2 rounded-lg border border-slate-150">
-                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">{phaseName}</span>
-                      {phaseSteps.length === 0 && (
-                        <span className="text-[10px] text-gray-400 italic ml-2">(No steps planned)</span>
-                      )}
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">{phaseName.split(":")[0]}</span>
                     </div>
 
-                    {phaseSteps.length > 0 && (
-                      <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="bg-gray-50 border-b border-gray-100 font-bold text-gray-500">
-                              <th className="p-2.5">Seq</th>
-                              <th className="p-2.5">Procedure</th>
-                              <th className="p-2.5">Notes</th>
-                              <th className="p-2.5">Consent</th>
-                              <th className="p-2.5 text-right">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 text-gray-700">
-                            {phaseSteps.map((step) => (
-                              <tr key={step.id || step.sequence} className="hover:bg-gray-50/20">
-                                <td className="p-2.5 font-bold text-gray-400">{step.sequence}</td>
-                                <td className="p-2.5">
-                                  <div className="font-bold text-gray-800">{step.title}</div>
-                                  {step.details && <div className="text-[10px] text-gray-400 mt-0.5">{step.details}</div>}
-                                </td>
-                                <td className="p-2.5">
-                                  <textarea
-                                    rows={1}
-                                    defaultValue={step.notes || ""}
-                                    onBlur={(e) => handleStepNotesChange(step.id, e.target.value)}
-                                    placeholder="Add clinical observation..."
-                                    className="w-full px-2 py-1 border border-gray-200 rounded text-[11px] focus:outline-none"
-                                  />
-                                </td>
-                                <td className="p-2.5">
-                                  {step.requires_consent ? (
-                                    step.consent_status === "Given" ? (
-                                      <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1 w-max">
-                                          🟢 Signed
-                                        </span>
-                                        {step.consent_id && (
-                                          <button
-                                            type="button"
-                                            onClick={() => handleViewConsentPdf(step.consent_id)}
-                                            className="text-[10px] font-black text-primary hover:underline flex items-center gap-0.5 w-max bg-transparent border-none cursor-pointer outline-none p-0"
-                                          >
-                                            📄 View Form
-                                          </button>
-                                        )}
-                                      </div>
-                                    ) : step.consent_status === "Pending" ? (
-                                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 flex items-center gap-1 w-max animate-pulse">
-                                        🟡 Awaiting
+                    <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-100 font-bold text-gray-500">
+                            <th className="p-2.5">Seq</th>
+                            <th className="p-2.5">Phase #</th>
+                            <th className="p-2.5">Date Added</th>
+                            <th className="p-2.5">Title</th>
+                            <th className="p-2.5">Details</th>
+                            <th className="p-2.5">Notes</th>
+                            <th className="p-2.5">Consent</th>
+                            <th className="p-2.5 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 text-gray-700">
+                          {phaseSteps.map((step) => (
+                            <tr key={step.id || step.sequence} className="hover:bg-gray-50/20">
+                              <td className="p-2.5 font-bold text-gray-400">{step.sequence}</td>
+                              <td className="p-2.5 font-bold text-gray-600">{getPhaseNumber(step.phase)}</td>
+                              <td className="p-2.5 font-mono text-gray-550 whitespace-nowrap">{formatDate(step.created_at)}</td>
+                              <td className="p-2.5 font-bold text-gray-800">{step.title}</td>
+                              <td className="p-2.5 text-gray-500 max-w-xs break-words">{step.details || "-"}</td>
+                              <td className="p-2.5">
+                                <textarea
+                                  rows={1}
+                                  defaultValue={step.notes || ""}
+                                  onBlur={(e) => handleStepNotesChange(step.id, e.target.value)}
+                                  placeholder="Add clinical observation..."
+                                  className="w-full px-2 py-1 border border-gray-200 rounded text-[11px] focus:outline-none"
+                                />
+                              </td>
+                              <td className="p-2.5">
+                                {step.requires_consent ? (
+                                  step.consent_status === "Given" ? (
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1 w-max">
+                                        🟢 Signed
                                       </span>
-                                    ) : (
-                                      <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 flex items-center gap-1 w-max">
-                                        🔴 Rejected
-                                      </span>
-                                    )
+                                      {step.consent_id && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleViewConsentPdf(step.consent_id)}
+                                          className="text-[10px] font-black text-primary hover:underline flex items-center gap-0.5 w-max bg-transparent border-none cursor-pointer outline-none p-0"
+                                        >
+                                          📄 View Form
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : step.consent_status === "Pending" ? (
+                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 flex items-center gap-1 w-max animate-pulse">
+                                      🟡 Awaiting
+                                    </span>
                                   ) : (
-                                    <span className="text-[10px] text-gray-400">None</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 text-right">
-                                  <select
-                                    value={step.status}
-                                    onChange={(e) => handleStepStatusChange(step.id, e.target.value)}
-                                    className="px-1 py-0.5 text-[10px] font-bold border rounded-md"
-                                  >
-                                    <option value="Planned">Planned</option>
-                                    <option value="Scheduled">Scheduled</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Completed">Completed</option>
-                                    <option value="Deferred">Deferred</option>
-                                  </select>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 flex items-center gap-1 w-max">
+                                      🔴 Rejected
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="text-[10px] text-gray-400">None</span>
+                                )}
+                              </td>
+                              <td className="p-2.5 text-right">
+                                <select
+                                  value={step.status}
+                                  onChange={(e) => handleStepStatusChange(step.id, e.target.value)}
+                                  className="px-1 py-0.5 text-[10px] font-bold border rounded-md"
+                                >
+                                  <option value="Planned">Planned</option>
+                                  <option value="Scheduled">Scheduled</option>
+                                  <option value="In Progress">In Progress</option>
+                                  <option value="Completed">Completed</option>
+                                  <option value="Deferred">Deferred</option>
+                                </select>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 );
               })}
+              {steps.filter(s => s.status !== "Cancelled").length === 0 && (
+                <div className="text-center py-8 text-xs text-gray-400 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                  No treatment steps planned yet. Use the form below to add procedures.
+                </div>
+              )}
             </div>
 
             {/* Add Step Builder Card */}
             <div className="p-4 bg-gray-50 border border-gray-150 rounded-xl space-y-3 pt-4">
               <span className="text-xs font-bold text-gray-800 uppercase tracking-wider block">Add Step / Procedure</span>
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="flex flex-wrap gap-3 items-center">
                 <select
-                  value={newStep.title}
+                  value={selectedParentProcName}
                   onChange={(e) => {
-                    const proc = catalogProcedures.find(p => p.name === e.target.value);
-                    setNewStep({ 
-                      ...newStep, 
-                      title: e.target.value,
-                      cost: proc ? proc.rate : 0 
-                    });
+                    const val = e.target.value;
+                    setSelectedParentProcName(val);
+                    const parentProc = catalogProcedures.find(p => p.name === val);
+                    const children = catalogProcedures.filter(p => p.parent_id === parentProc?.id);
+                    
+                    if (children.length > 0) {
+                      setSelectedSubProcId("");
+                      setNewStep({
+                        ...newStep,
+                        title: "",
+                        cost: 0
+                      });
+                    } else {
+                      setSelectedSubProcId("");
+                      setNewStep({
+                        ...newStep,
+                        title: val,
+                        cost: parentProc ? parentProc.rate : 0
+                      });
+                    }
                   }}
-                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none col-span-2"
+                  className="flex-1 min-w-[200px] px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none"
                 >
-                  <option value="">-- Select Procedure from Catalog --</option>
-                  {catalogProcedures.map(p => (
-                    <option key={p.id} value={p.name}>{p.name} (₹{p.rate})</option>
-                  ))}
+                  <option value="">-- Select Procedure --</option>
+                  {catalogProcedures
+                    .filter(p => {
+                      if (p.parent_id) return false;
+                      const userSpecs = (typeof window !== "undefined" && localStorage.getItem("user")) 
+                        ? (JSON.parse(localStorage.getItem("user")).specialties || [])
+                        : [];
+                      const specsToCheck = userSpecs.length > 0 ? userSpecs : [doctorSpecialty, "General Dentistry"];
+                      return specsToCheck.includes(p.specialty) || p.specialty === "General Dentistry" || !p.specialty;
+                    })
+                    .map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))
+                  }
                 </select>
+
+                {/* Sub-procedure dropdown */}
+                {selectedParentProcName && catalogProcedures.some(p => p.parent_id === catalogProcedures.find(parent => parent.name === selectedParentProcName)?.id) && (
+                  <select
+                    value={selectedSubProcId}
+                    onChange={(e) => {
+                      const childId = e.target.value;
+                      setSelectedSubProcId(childId);
+                      const childProc = catalogProcedures.find(c => c.id === parseInt(childId, 10));
+                      setNewStep({
+                        ...newStep,
+                        title: childProc ? childProc.name : "",
+                        cost: childProc ? childProc.rate : 0
+                      });
+                    }}
+                    className="flex-1 min-w-[150px] px-3 py-1.5 bg-white border border-primary text-primary font-semibold rounded-lg text-xs focus:outline-none animate-in fade-in duration-200"
+                  >
+                    <option value="">-- Choose Type / Option --</option>
+                    {catalogProcedures
+                      .filter(p => p.parent_id === catalogProcedures.find(parent => parent.name === selectedParentProcName)?.id)
+                      .map(p => (
+                        <option key={p.id} value={p.id}>{p.name.replace(`${selectedParentProcName} – `, "").replace(`${selectedParentProcName} - `, "")} (₹{p.rate})</option>
+                      ))
+                    }
+                  </select>
+                )}
+
                 <input
                   type="text"
                   placeholder="Details"
                   value={newStep.details}
                   onChange={(e) => setNewStep({ ...newStep, details: e.target.value })}
-                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none"
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none flex-1 min-w-[150px]"
                 />
+
                 <select
                   value={newStep.phase}
                   onChange={(e) => setNewStep({ ...newStep, phase: e.target.value })}
-                  className="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 focus:outline-none"
+                  className="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 focus:outline-none min-w-[100px]"
                 >
                   {PHASES.map(p => (
-                    <option key={p} value={p}>{p}</option>
+                    <option key={p} value={p}>{p.split(":")[0]}</option>
                   ))}
                 </select>
               </div>

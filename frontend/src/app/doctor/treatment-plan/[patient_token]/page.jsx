@@ -231,7 +231,6 @@ export default function DoctorTreatmentPlanPage() {
   }, []);
 
   const specConfig = SPECIALTY_CONFIGS[doctorSpecialty] || SPECIALTY_CONFIGS["General Dentistry"];
-  const PHASES = specConfig.phases;
   const PRESET_DIAGNOSES = specConfig.diagnoses;
   const PRESET_GOALS = specConfig.goals;
 
@@ -250,6 +249,7 @@ export default function DoctorTreatmentPlanPage() {
   const [nextVisitProc, setNextVisitProc] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [steps, setSteps] = useState([]);
+  const [sittings, setSittings] = useState(["Sitting 1"]);
 
   // Live Procedures Catalog
   const [catalogProcedures, setCatalogProcedures] = useState([]);
@@ -319,15 +319,15 @@ export default function DoctorTreatmentPlanPage() {
     notes: "",
     cost: 0,
     requires_consent: false,
-    phase: PHASES[0],
+    phase: "Sitting 1",
     sequence: 1
   });
 
   useEffect(() => {
-    if (PHASES && PHASES.length > 0) {
-      setNewStep(prev => ({ ...prev, phase: PHASES[0] }));
+    if (sittings && sittings.length > 0) {
+      setNewStep(prev => ({ ...prev, phase: sittings[0] }));
     }
-  }, [doctorSpecialty]);
+  }, [sittings]);
 
   const loadData = async () => {
     if (!patientToken) return;
@@ -353,7 +353,29 @@ export default function DoctorTreatmentPlanPage() {
         setNextVisitDate(draftOrActive.next_visit_date || "");
         setNextVisitProc(draftOrActive.next_visit_procedure || "");
         setAttachments(draftOrActive.attachments || []);
-        setSteps(draftOrActive.steps || []);
+        
+        const dbSteps = draftOrActive.steps || [];
+        setSteps(dbSteps);
+
+        // Derive unique sittings from steps in DB
+        const uniquePhases = Array.from(
+          new Set(
+            dbSteps
+              .filter(s => s.phase && s.status !== "Cancelled")
+              .map(s => s.phase)
+          )
+        );
+        if (uniquePhases.length > 0) {
+          uniquePhases.sort((a, b) => {
+            const numA = parseInt(a.replace(/^\D+/g, ""), 10);
+            const numB = parseInt(b.replace(/^\D+/g, ""), 10);
+            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+            return a.localeCompare(b);
+          });
+          setSittings(uniquePhases);
+        } else {
+          setSittings(["Sitting 1"]);
+        }
       } else {
         setActivePlan(null);
         setConditions("");
@@ -365,6 +387,7 @@ export default function DoctorTreatmentPlanPage() {
         setNextVisitProc("");
         setAttachments([]);
         setSteps([]);
+        setSittings(["Sitting 1"]);
       }
     } catch (err) {
       console.error("Error loading patient treatment details:", err);
@@ -430,7 +453,7 @@ export default function DoctorTreatmentPlanPage() {
           notes: "",
           cost: 0,
           requires_consent: false,
-          phase: PHASES[0],
+          phase: sittings[0] || "Sitting 1",
           sequence: steps.length + 1
         });
         setSelectedParentProcName("");
@@ -458,12 +481,23 @@ export default function DoctorTreatmentPlanPage() {
         notes: "",
         cost: 0,
         requires_consent: false,
-        phase: PHASES[0],
+        phase: sittings[0] || "Sitting 1",
         sequence: steps.length + 2
       });
       setSelectedParentProcName("");
       setSelectedSubProcId("");
     }
+  };
+
+  const handleAddSitting = () => {
+    setSittings(prev => {
+      const numbers = prev
+        .map(s => parseInt(s.replace(/^\D+/g, ""), 10))
+        .filter(n => !isNaN(n));
+      const maxNum = numbers.length > 0 ? Math.max(...numbers) : 0;
+      const nextNum = maxNum + 1;
+      return [...prev, `Sitting ${nextNum}`];
+    });
   };
 
   // Remove Step (Local / DB)
@@ -853,102 +887,121 @@ export default function DoctorTreatmentPlanPage() {
 
 
 
-          {/* Procedures and Phases Table */}
+          {/* Procedures and Sittings Table */}
           <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-xs font-black text-gray-850 uppercase tracking-wider">
-              Treatment Phases & Steps Timeline
-            </h3>
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+              <h3 className="text-xs font-black text-gray-850 uppercase tracking-wider">
+                Treatment Sittings & Steps Timeline
+              </h3>
+              <button
+                type="button"
+                onClick={handleAddSitting}
+                className="bg-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-lg hover:bg-primary/90 transition-all cursor-pointer"
+              >
+                + Add Sitting
+              </button>
+            </div>
 
-            {/* Loop through each phase */}
-            <div className="space-y-4">
-              {PHASES.map((phaseName) => {
-                const phaseSteps = steps.filter(s => s.phase === phaseName && s.status !== "Cancelled");
-                if (phaseSteps.length === 0) return null;
+            {/* Loop through each sitting */}
+            <div className="space-y-4 pt-2">
+              {sittings.map((sittingName) => {
+                const sittingSteps = steps.filter(s => s.phase === sittingName && s.status !== "Cancelled");
                 return (
-                  <div key={phaseName} className="space-y-2">
-                    <div className="bg-slate-100/70 p-2 rounded-lg border border-slate-150">
-                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">{phaseName.split(":")[0]}</span>
+                  <div key={sittingName} className="space-y-2">
+                    <div className="bg-slate-100/70 p-2 rounded-lg border border-slate-150 flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">{sittingName}</span>
+                      {sittingSteps.length === 0 && sittings.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setSittings(prev => prev.filter(s => s !== sittingName))}
+                          className="text-[10px] text-rose-600 font-bold hover:underline cursor-pointer"
+                        >
+                          Remove Sitting
+                        </button>
+                      )}
                     </div>
 
-                    <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-gray-50 border-b border-gray-100 font-bold text-gray-500">
-                            <th className="p-2.5">Seq</th>
-                            <th className="p-2.5">Phase #</th>
-                            <th className="p-2.5">Date Added</th>
-                            <th className="p-2.5">Title</th>
-                            <th className="p-2.5">Details</th>
-                            <th className="p-2.5">Notes</th>
-                            <th className="p-2.5">Consent</th>
-                            <th className="p-2.5 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 text-gray-700">
-                          {phaseSteps.map((step) => (
-                            <tr key={step.id || step.sequence} className="hover:bg-gray-50/20">
-                              <td className="p-2.5 font-bold text-gray-400">{step.sequence}</td>
-                              <td className="p-2.5 font-bold text-gray-600">{getPhaseNumber(step.phase)}</td>
-                              <td className="p-2.5 font-mono text-gray-550 whitespace-nowrap">{formatDate(step.created_at)}</td>
-                              <td className="p-2.5 font-bold text-gray-800">{step.title}</td>
-                              <td className="p-2.5 text-gray-500 max-w-xs break-words">{step.details || "-"}</td>
-                              <td className="p-2.5">
-                                <textarea
-                                  rows={1}
-                                  defaultValue={step.notes || ""}
-                                  onBlur={(e) => handleStepNotesChange(step.id, e.target.value)}
-                                  placeholder="Add clinical observation..."
-                                  className="w-full px-2 py-1 border border-gray-200 rounded text-[11px] focus:outline-none"
-                                />
-                              </td>
-                              <td className="p-2.5">
-                                {step.requires_consent ? (
-                                  step.consent_status === "Given" ? (
-                                    <div className="flex flex-col gap-1">
-                                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1 w-max">
-                                        🟢 Signed
-                                      </span>
-                                      {step.consent_id && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleViewConsentPdf(step.consent_id)}
-                                          className="text-[10px] font-black text-primary hover:underline flex items-center gap-0.5 w-max bg-transparent border-none cursor-pointer outline-none p-0"
-                                        >
-                                          📄 View Form
-                                        </button>
-                                      )}
-                                    </div>
-                                  ) : step.consent_status === "Pending" ? (
-                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 flex items-center gap-1 w-max animate-pulse">
-                                      🟡 Awaiting
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 flex items-center gap-1 w-max">
-                                      🔴 Rejected
-                                    </span>
-                                  )
-                                ) : (
-                                  <span className="text-[10px] text-gray-400">None</span>
-                                )}
-                              </td>
-                              <td className="p-2.5 text-right">
-                                <select
-                                  value={step.status}
-                                  onChange={(e) => handleStepStatusChange(step.id, e.target.value)}
-                                  className="px-1 py-0.5 text-[10px] font-bold border rounded-md"
-                                >
-                                  <option value="Planned">Planned</option>
-                                  <option value="Scheduled">Scheduled</option>
-                                  <option value="In Progress">In Progress</option>
-                                  <option value="Completed">Completed</option>
-                                  <option value="Deferred">Deferred</option>
-                                </select>
-                              </td>
+                    {sittingSteps.length === 0 ? (
+                      <div className="text-center py-4 text-xs text-gray-400 bg-gray-50/50 rounded-xl border border-dashed border-gray-100">
+                        No steps added to this sitting yet. Select this sitting below to add procedures.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-100 font-bold text-gray-500">
+                              <th className="p-2.5">Date Added</th>
+                              <th className="p-2.5">Title</th>
+                              <th className="p-2.5">Details</th>
+                              <th className="p-2.5">Notes</th>
+                              <th className="p-2.5">Consent</th>
+                              <th className="p-2.5 text-right">Action</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-gray-700">
+                            {sittingSteps.map((step) => (
+                              <tr key={step.id || step.sequence} className="hover:bg-gray-50/20">
+                                <td className="p-2.5 font-mono text-gray-550 whitespace-nowrap">{formatDate(step.created_at)}</td>
+                                <td className="p-2.5 font-bold text-gray-800">{step.title}</td>
+                                <td className="p-2.5 text-gray-500 max-w-xs break-words">{step.details || "-"}</td>
+                                <td className="p-2.5">
+                                  <textarea
+                                    rows={1}
+                                    defaultValue={step.notes || ""}
+                                    onBlur={(e) => handleStepNotesChange(step.id, e.target.value)}
+                                    placeholder="Add clinical observation..."
+                                    className="w-full px-2 py-1 border border-gray-200 rounded text-[11px] focus:outline-none"
+                                  />
+                                </td>
+                                <td className="p-2.5">
+                                  {step.requires_consent ? (
+                                    step.consent_status === "Given" ? (
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1 w-max">
+                                          🟢 Signed
+                                        </span>
+                                        {step.consent_id && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleViewConsentPdf(step.consent_id)}
+                                            className="text-[10px] font-black text-primary hover:underline flex items-center gap-0.5 w-max bg-transparent border-none cursor-pointer outline-none p-0"
+                                          >
+                                            📄 View Form
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : step.consent_status === "Pending" ? (
+                                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 flex items-center gap-1 w-max animate-pulse">
+                                        🟡 Awaiting
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 flex items-center gap-1 w-max">
+                                        🔴 Rejected
+                                      </span>
+                                    )
+                                  ) : (
+                                    <span className="text-[10px] text-gray-400">None</span>
+                                  )}
+                                </td>
+                                <td className="p-2.5 text-right">
+                                  <select
+                                    value={step.status}
+                                    onChange={(e) => handleStepStatusChange(step.id, e.target.value)}
+                                    className="px-1 py-0.5 text-[10px] font-bold border rounded-md"
+                                  >
+                                    <option value="Planned">Planned</option>
+                                    <option value="Scheduled">Scheduled</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Deferred">Deferred</option>
+                                  </select>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -994,11 +1047,7 @@ export default function DoctorTreatmentPlanPage() {
                   {catalogProcedures
                     .filter(p => {
                       if (p.parent_id) return false;
-                      const userSpecs = (typeof window !== "undefined" && localStorage.getItem("user")) 
-                        ? (JSON.parse(localStorage.getItem("user")).specialties || [])
-                        : [];
-                      const specsToCheck = userSpecs.length > 0 ? userSpecs : [doctorSpecialty, "General Dentistry"];
-                      return specsToCheck.includes(p.specialty) || p.specialty === "General Dentistry" || !p.specialty;
+                      return p.specialty === doctorSpecialty;
                     })
                     .map(p => (
                       <option key={p.id} value={p.name}>{p.name}</option>
@@ -1045,8 +1094,8 @@ export default function DoctorTreatmentPlanPage() {
                   onChange={(e) => setNewStep({ ...newStep, phase: e.target.value })}
                   className="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 focus:outline-none min-w-[100px]"
                 >
-                  {PHASES.map(p => (
-                    <option key={p} value={p}>{p.split(":")[0]}</option>
+                  {sittings.map(s => (
+                    <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
               </div>
@@ -1066,7 +1115,7 @@ export default function DoctorTreatmentPlanPage() {
                   disabled={!newStep.title.trim()}
                   className="px-4 py-1.5 bg-primary text-white font-bold rounded-lg hover:bg-primary/95 disabled:opacity-50 transition-colors cursor-pointer text-xs"
                 >
-                  Append Phase Step
+                  Add Step to Sitting
                 </button>
               </div>
             </div>

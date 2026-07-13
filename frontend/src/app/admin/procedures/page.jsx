@@ -97,6 +97,7 @@ export default function ProceduresPage() {
           description,
           rate: parseFloat(rate) || 0.0,
           parent_id: currentProc.parent_id,
+          specialty,
           is_active: isActive
         };
         await client.put(`/procedures/${currentProc.id}`, payload);
@@ -107,6 +108,7 @@ export default function ProceduresPage() {
           description,
           rate: hasSubProcedures ? 0.0 : (parseFloat(rate) || 0.0),
           parent_id: null,
+          specialty,
           is_active: isActive
         };
         const res = await client.post("/procedures", parentPayload);
@@ -121,6 +123,7 @@ export default function ProceduresPage() {
                 description: `Option for ${name}`,
                 rate: parseFloat(sub.rate) || 0.0,
                 parent_id: createdParentId,
+                specialty,
                 is_active: true
               };
               return client.post("/procedures", childPayload);

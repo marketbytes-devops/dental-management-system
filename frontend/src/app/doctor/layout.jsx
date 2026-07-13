@@ -519,6 +519,8 @@ export default function DoctorLayout({ children }) {
             procedure: q.procedure || "Consultation",
             chiefComplaint: q.chief_complaint || "Routine Checkup",
             medicalAlerts: q.medical_alerts || [],
+            priority: q.priority,
+            isEmergency: q.priority === "Emergency" || (q.chief_complaint && q.chief_complaint.includes("[UNVERIFIED EMERGENCY]")),
             teethChart: prev[q.token]?.teethChart || {},
             timeline: prev[q.token]?.timeline || [
               { date: new Date(q.checked_in_at).toLocaleDateString(), note: "Checked in", type: "Check-In" }

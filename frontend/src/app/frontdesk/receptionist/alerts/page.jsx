@@ -13,8 +13,9 @@ export default function ReceptionistAlertsPage() {
       setIsLoading(true);
       const queueData = await getQueue();
       const patientDict = {};
+      const emergencyQueue = queueData.filter(q => q.priority === "Emergency" || (q.chief_complaint && q.chief_complaint.includes("[UNVERIFIED EMERGENCY]")));
       
-      queueData.forEach(q => {
+      emergencyQueue.forEach(q => {
         patientDict[q.token] = {
           token: q.token,
           name: q.patient_name,

@@ -60,7 +60,7 @@ function Select({ children, ...props }) {
 }
 
 // ── appointment table ─────────────────────────────────────────────────────────
-function AppointmentTable({ rows, isLoading, emptyText, onCancel }) {
+function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmergency }) {
   if (isLoading)
     return (
       <div className="flex items-center justify-center gap-2 py-20 text-gray-400 text-sm">
@@ -109,12 +109,22 @@ function AppointmentTable({ rows, isLoading, emptyText, onCancel }) {
                 ) : app.status === "Cancelled" || app.status === "Completed" ? (
                   <span className="text-xs text-gray-400">{app.status}</span>
                 ) : (
-                  <button
-                    onClick={() => onCancel(app.id, app.patient?.name)}
-                    className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-100 transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
+                  <div className="flex gap-2 justify-end">
+                    {app.priority !== "Emergency" && (
+                      <button
+                        onClick={() => onElevateEmergency(app.id, app.patient?.name)}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg border border-red-600 transition cursor-pointer"
+                      >
+                        Elevate to Emergency
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onCancel(app.id, app.patient?.name)}
+                      className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-100 transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 )}
               </td>
             </tr>
@@ -274,6 +284,17 @@ export default function ReceptionistAppointments() {
       fetchData();
     } catch (err) {
       alert(err.message || "Failed to cancel.");
+    }
+  };
+
+  const handleElevateEmergency = async (id, name) => {
+    if (!window.confirm(`Elevate patient ${name}'s appointment to Emergency status?`)) return;
+    try {
+      await updateAppointmentStatus(id, { priority: "Emergency" });
+      alert(`Appointment for ${name} elevated to Emergency.`);
+      fetchData();
+    } catch (err) {
+      alert("Error elevating to emergency: " + (err.message || "Failed."));
     }
   };
 
@@ -495,6 +516,7 @@ export default function ReceptionistAppointments() {
                 : `No appointments scheduled for ${activeTab === "today" ? "today" : "tomorrow"}.`
             }
             onCancel={handleCancel}
+            onElevateEmergency={handleElevateEmergency}
           />
         </div>
       </div>

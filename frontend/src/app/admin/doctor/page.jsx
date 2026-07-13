@@ -1,18 +1,10 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
-import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw, Star } from "lucide-react";
+import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw, Star, X, Save } from "lucide-react";
 import client from "@/services/api";
 
 export default function DoctorManagementPage() {
-  const initialDoctors = [
-    { id: 1, name: "Dr. Anoop Nair", specialty: "Endodontics", operatory: "Operatory 1", shift: "09:00 AM - 05:00 PM", status: "On Duty", patientsCount: 5 },
-    { id: 2, name: "Dr. Sarah Jenkins", specialty: "Orthodontics", operatory: "Operatory 2", shift: "09:00 AM - 05:00 PM", status: "On Duty", patientsCount: 3 },
-    { id: 3, name: "Dr. James Kurt", specialty: "Oral Surgery", operatory: "Operatory 3", shift: "10:00 AM - 06:00 PM", status: "On Break", patientsCount: 1 },
-    { id: 4, name: "Dr. Lisa Wong", specialty: "Pediatric Dentistry", operatory: "Operatory 4", shift: "09:00 AM - 05:00 PM", status: "Off Duty", patientsCount: 0 },
-    { id: 5, name: "Dr. Marcus Vance", specialty: "Periodontics", operatory: "Operatory 5", shift: "11:00 AM - 07:00 PM", status: "On Duty", patientsCount: 4 },
-    { id: 6, name: "Dr. Jane Miller", specialty: "Prosthodontics", operatory: "Operatory 6", shift: "09:00 AM - 05:00 PM", status: "Off Duty", patientsCount: 0 },
-  ];
 
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +12,8 @@ export default function DoctorManagementPage() {
   const [filterSpecialty, setFilterSpecialty] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [expandedDoctorId, setExpandedDoctorId] = useState(null);
+
+  const [editingShiftDoc, setEditingShiftDoc] = useState(null);
 
   const fetchDoctors = async () => {
     setLoading(true);
@@ -29,14 +23,18 @@ export default function DoctorManagementPage() {
       const usersData = response.data;
       
       // Filter users who have the "Doctor" role
-      const doctorUsers = usersData.filter(user => 
-        user.roles && user.roles.some(role => role.toLowerCase() === "doctor")
-      );
+      const doctorUsers = usersData.filter(user => {
+        let r = user.roles;
+        if (typeof r === 'string') {
+          try { r = JSON.parse(r); } catch(e) { r = []; }
+        }
+        return r && Array.isArray(r) && r.some(role => role.toLowerCase() === "doctor");
+      });
 
       // 2. Fetch doctors roster to get active patient counts
       let rosterData = [];
       try {
-        const rosterResponse = await client.get("/admin/doctors");
+        const rosterResponse = await client.get("/auth/doctors");
         rosterData = rosterResponse.data;
       } catch (err) {
         console.error("Failed to load doctor roster stats:", err);
@@ -45,8 +43,12 @@ export default function DoctorManagementPage() {
       // 3. Map/Merge backend users and roster to doctor UI fields
       const mappedDoctors = doctorUsers.map((user, index) => {
         const rosterItem = rosterData.find(r => r.id === user.id);
-        const specialtyStr = user.specialties && user.specialties.length > 0 
-          ? user.specialties.join(", ") 
+        let specArr = user.specialties;
+        if (typeof specArr === 'string') {
+          try { specArr = JSON.parse(specArr); } catch(e) { specArr = []; }
+        }
+        const specialtyStr = specArr && Array.isArray(specArr) && specArr.length > 0 
+          ? specArr.join(", ") 
           : "General Dentistry";
           
         let defaultStatus = "On Duty";
@@ -58,7 +60,7 @@ export default function DoctorManagementPage() {
 
         return {
           id: user.id,
-          name: user.name.startsWith("Dr.") ? user.name : `Dr. ${user.name}`,
+          name: user.name ? (user.name.startsWith("Dr.") ? user.name : `Dr. ${user.name}`) : "Dr. Unknown",
           specialty: specialtyStr,
           operatory: user.chair_setup || (rosterItem ? rosterItem.operatory : `Operatory ${index + 1}`),
           shift: rosterItem ? rosterItem.shift : "09:00 AM - 05:00 PM",
@@ -69,14 +71,15 @@ export default function DoctorManagementPage() {
           address: user.address,
           licence_id: user.licence_id,
           chair_setup: user.chair_setup,
-          board: user.board
+          board: user.board,
+          working_hours: user.working_hours
         };
       });
       
       setDoctors(mappedDoctors);
     } catch (err) {
-      console.warn("Error loading doctors, falling back to dummy data:", err);
-      setDoctors(initialDoctors);
+      console.warn("Error loading doctors:", err);
+      setDoctors([]);
     } finally {
       setLoading(false);
     }
@@ -242,7 +245,18 @@ export default function DoctorManagementPage() {
                       <td className="py-4 px-6 font-bold text-gray-900">{doc.name}</td>
                       <td className="py-4 px-6 text-xs text-gray-600 font-semibold">{doc.specialty}</td>
                       <td className="py-4 px-6 font-mono text-xs text-primary font-bold">{doc.operatory}</td>
-                      <td className="py-4 px-6 text-xs text-gray-500 font-medium">{doc.shift}</td>
+                      <td className="py-4 px-6 text-xs text-gray-500 font-medium">
+                        {(() => {
+                          if (typeof doc.shift === 'object' && doc.shift !== null) {
+                            const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                            const todaySchedule = doc.shift[todayDay];
+                            if (todaySchedule) {
+                              return todaySchedule.is_off ? "Off Duty" : `${todaySchedule.start} - ${todaySchedule.end}`;
+                            }
+                          }
+                          return typeof doc.shift === 'string' ? doc.shift : "Not Scheduled";
+                        })()}
+                      </td>
                       <td className="py-4 px-6 font-mono text-xs text-gray-700 font-bold">{doc.patientsCount}</td>
                       <td className="py-4 px-6">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${getStatusColor(doc.status)}`}>
@@ -263,7 +277,7 @@ export default function DoctorManagementPage() {
                           {expandedDoctorId === doc.id ? "Hide Details" : "View Details"}
                         </button>
                         <button
-                          onClick={() => alert(`Modifying shift details for ${doc.name}...`)}
+                          onClick={() => setEditingShiftDoc(doc)}
                           className="px-3 py-1 bg-white hover:bg-gray-150 border border-gray-250 rounded-lg text-xs font-bold transition-all cursor-pointer outline-none"
                         >
                           Edit Shift
@@ -318,6 +332,17 @@ export default function DoctorManagementPage() {
         </div>
 
       </div>
+
+      {editingShiftDoc && (
+        <ShiftEditorModal 
+          doctor={editingShiftDoc} 
+          onClose={() => setEditingShiftDoc(null)} 
+          onSave={() => {
+            setEditingShiftDoc(null);
+            fetchDoctors();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -389,6 +414,121 @@ function DoctorReviewsPanel({ doctorName }) {
           No patient feedbacks submitted for {doctorName} yet.
         </div>
       )}
+    </div>
+  );
+}
+
+function ShiftEditorModal({ doctor, onClose, onSave }) {
+  const [loading, setLoading] = useState(false);
+  const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  
+  // Initialize from doctor.working_hours or default
+  const [schedule, setSchedule] = useState(() => {
+    if (doctor.working_hours && typeof doctor.working_hours === 'object') {
+      return doctor.working_hours;
+    }
+    const defaultSchedule = {};
+    daysOfWeek.forEach(day => {
+      defaultSchedule[day] = { is_off: false, start: "09:00 AM", end: "05:00 PM" };
+    });
+    return defaultSchedule;
+  });
+
+  const handleUpdate = (day, field, value) => {
+    setSchedule(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      await client.put(`/admin/users/${doctor.id}`, {
+        working_hours: schedule
+      });
+      onSave();
+    } catch (err) {
+      console.error("Failed to save working hours", err);
+      alert("Failed to save working hours.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 flex items-center justify-center animate-fade-in p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Edit Shift Schedule</h2>
+            <p className="text-xs text-gray-500 mt-1">{doctor.name}</p>
+          </div>
+          <button onClick={onClose} className="p-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl cursor-pointer transition-colors text-gray-500 hover:text-gray-900 outline-none">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          <div className="space-y-4">
+            {daysOfWeek.map(day => (
+              <div key={day} className={`flex items-center gap-4 p-4 rounded-xl border ${schedule[day]?.is_off ? 'bg-gray-50 border-gray-100 opacity-75' : 'bg-white border-gray-200'}`}>
+                <div className="w-32 font-bold text-sm text-gray-800">{day}</div>
+                
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={schedule[day]?.is_off || false} 
+                    onChange={(e) => handleUpdate(day, 'is_off', e.target.checked)}
+                    className="rounded text-primary focus:ring-primary h-4 w-4 border-gray-300"
+                  />
+                  <span className="text-xs font-semibold text-gray-600">Off Duty</span>
+                </label>
+
+                {!schedule[day]?.is_off && (
+                  <div className="flex items-center gap-2 ml-auto">
+                    <input 
+                      type="text" 
+                      value={schedule[day]?.start || ""} 
+                      onChange={(e) => handleUpdate(day, 'start', e.target.value)}
+                      placeholder="09:00 AM"
+                      className="w-24 px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-primary font-mono text-center"
+                    />
+                    <span className="text-xs text-gray-400 font-bold">to</span>
+                    <input 
+                      type="text" 
+                      value={schedule[day]?.end || ""} 
+                      onChange={(e) => handleUpdate(day, 'end', e.target.value)}
+                      placeholder="05:00 PM"
+                      className="w-24 px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-primary font-mono text-center"
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+          <button 
+            onClick={onClose}
+            className="px-5 py-2.5 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer outline-none"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={loading}
+            className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer outline-none flex items-center gap-2"
+          >
+            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {loading ? 'Saving...' : 'Save Schedule'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

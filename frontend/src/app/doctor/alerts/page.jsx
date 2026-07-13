@@ -59,6 +59,10 @@ export default function DoctorAlertsPage() {
     router.push("/doctor/workspace");
   };
 
+  const emergencyPatients = Object.fromEntries(
+    Object.entries(patients).filter(([_, p]) => p.isEmergency)
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -67,7 +71,7 @@ export default function DoctorAlertsPage() {
       </div>
 
       <AlertsTracker
-        patients={patients}
+        patients={emergencyPatients}
         activePatient={activePatient}
         activePatientToken={activePatientToken}
         onAddAlert={handleAddAlert}

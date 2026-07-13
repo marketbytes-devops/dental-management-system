@@ -45,14 +45,6 @@ const metadata = {
   title: 'My Notifications | Patient Portal',
   description: 'View your notifications, reminders, and post-care instructions.',
 };
-import {
-  getPatientNotifications,
-  markPatientNotificationAsRead,
-  markAllPatientNotificationsAsRead,
-  deletePatientNotification,
-  getPatientProfile,
-  getPatientTreatmentPlan
-} from '@/services/api';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);

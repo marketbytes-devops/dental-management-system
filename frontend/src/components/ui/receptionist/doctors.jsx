@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Calendar } from "lucide-react";
 import { getDoctors, updateDoctorStatus } from "@/services/api";
 
 const STATUS_MAP = {
@@ -116,7 +117,8 @@ export default function ReceptionistDoctors() {
         {filtered.map(d => {
           const s = STATUS_MAP[d.status] || STATUS_MAP["Off Duty"];
           const slots = d.slots || [];
-          const bookedCount = slots.filter(x => x.includes("(")).length;
+          const bookedSlots = slots.filter(x => x.includes("("));
+          const bookedCount = bookedSlots.length;
 
           return (
             <div key={d.id} className="bg-white border border-gray-100 rounded-xl overflow-hidden">
@@ -133,12 +135,22 @@ export default function ReceptionistDoctors() {
                       {initials(d.name)}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{d.name}</p>
-                      <p className="text-xs text-gray-500">{d.specialty} · {d.dept}</p>
+                      <p className="text-sm font-bold text-gray-900">{d.name}</p>
+                      <p className="text-[10px] text-gray-500 font-medium">{d.specialty} · {d.dept || d.operatory}</p>
+                      {d.shift && (
+                        <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {typeof d.shift === 'object' && d.shift[new Date().toLocaleDateString('en-US', { weekday: 'long' })]
+                            ? d.shift[new Date().toLocaleDateString('en-US', { weekday: 'long' })].is_off 
+                                ? "Off Duty Today" 
+                                : `${d.shift[new Date().toLocaleDateString('en-US', { weekday: 'long' })].start} - ${d.shift[new Date().toLocaleDateString('en-US', { weekday: 'long' })].end}`
+                            : typeof d.shift === 'string' ? d.shift : "09:00 AM - 05:00 PM"}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <button
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border cursor-pointer transition-opacity hover:opacity-75 ${s.pill}`}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-opacity hover:opacity-75 ${s.pill}`}
                   >
                     {s.label}
                   </button>
@@ -148,20 +160,21 @@ export default function ReceptionistDoctors() {
 
                 {/* Slots */}
                 <div>
-                  <p className="text-[11px] text-gray-600 uppercase tracking-wide mb-2">Today's slots</p>
-                  {slots.length === 0 ? (
-                    <p className="text-xs text-gray-600 italic">No slots today — absent or off duty.</p>
+                  <p className="text-[11px] text-gray-600 uppercase tracking-wide mb-2">Booked Patients</p>
+                  {bookedSlots.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No patients booked today.</p>
                   ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {slots.map((sl, i) => (
-                        <span key={i} className={`text-[11px] px-2 py-1 rounded-md border
-                          ${sl.includes("(")
-                            ? "bg-blue-50 text-blue-800 border-blue-200 font-medium"
-                            : "bg-gray-50 text-gray-500 border-gray-100"
-                          }`}>
-                          {sl}
-                        </span>
-                      ))}
+                    <div className="flex flex-col gap-1.5">
+                      {bookedSlots.map((sl, i) => {
+                        const timePart = sl.split("(")[0].trim();
+                        const patientPart = sl.split("-")[1]?.replace(")", "").trim() || "Patient";
+                        return (
+                          <div key={i} className="flex justify-between items-center bg-blue-50/50 text-blue-800 border border-blue-100 px-3 py-1.5 rounded-lg">
+                            <span className="text-[11px] font-bold font-mono">{timePart}</span>
+                            <span className="text-[11px] font-medium truncate max-w-[140px]">{patientPart}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

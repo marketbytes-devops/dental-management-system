@@ -135,10 +135,15 @@ export default function CheckInPage() {
     try {
       const queueRes = await client.get("/frontdesk/queue");
       const queueData = queueRes.data;
-      const index = queueData.findIndex(q => q.id === apptId);
-      if (index !== -1) {
+      
+      const currentAppt = queueData.find(q => q.id === apptId);
+      if (currentAppt) {
+        // Only count position against patients waiting for the same doctor
+        const doctorQueue = queueData.filter(q => q.doctor_name === currentAppt.doctor_name);
+        const index = doctorQueue.findIndex(q => q.id === apptId);
+        
         setQueueNo(index + 1);
-        setWaitTime(queueData[index].wait_time_estimate);
+        setWaitTime(currentAppt.wait_time_estimate);
       } else {
         setQueueNo(null);
         setWaitTime(null);
@@ -185,7 +190,12 @@ export default function CheckInPage() {
         priority: updatedAppt.priority
       });
       
-      setStep(3);
+      if (updatedAppt.status === "Waiting") {
+        await fetchQueueDetails(updatedAppt.id);
+        setStep(5);
+      } else {
+        setStep(3);
+      }
     } catch (err) {
       alert(err.message || "Failed to submit check-in request. Please try again.");
     }

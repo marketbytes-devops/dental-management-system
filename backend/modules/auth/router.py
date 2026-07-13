@@ -344,16 +344,24 @@ def match_doctor_appointment(doc_name: str, appt_doc_name: str) -> bool:
     return d_name in a_name or a_name in d_name
 
 
-def build_doctor_slots(db: Session, doc_name: str, doc_status: str, today_appointments) -> list:
+def build_doctor_slots(db: Session, doc_name: str, doc_status: str, today_appointments, working_hours: dict = None) -> list:
     if doc_status == "Off Duty" or doc_status == "Inactive" or doc_status == "Absent":
         return []
-        
-    base_slots = [
-        "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
-        "12:00 PM", "01:30 PM", "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM",
-        "04:00 PM", "04:30 PM", "05:00 PM"
-    ]
+
+    import datetime
+    day_of_week = datetime.date.today().strftime("%A")
+    start_time = "09:00 AM"
+    end_time = "05:00 PM"
     
+    if working_hours and isinstance(working_hours, dict):
+        today_hours = working_hours.get(day_of_week)
+        if today_hours:
+            if today_hours.get("is_off"):
+                return []
+            if today_hours.get("start") and today_hours.get("end"):
+                start_time = today_hours["start"]
+                end_time = today_hours["end"]
+
     def parse_to_minutes(t_str: str) -> int:
         try:
             parts = t_str.strip().upper().split()
@@ -368,6 +376,32 @@ def build_doctor_slots(db: Session, doc_name: str, doc_status: str, today_appoin
             return hr * 60 + mn
         except Exception:
             return 9999
+
+    def format_to_str(total_min: int) -> str:
+        hr = total_min // 60
+        mn = total_min % 60
+        ampm = "AM"
+        if hr >= 12:
+            ampm = "PM"
+            if hr > 12:
+                hr -= 12
+        if hr == 0:
+            hr = 12
+        return f"{hr:02d}:{mn:02d} {ampm}"
+
+    start_min = parse_to_minutes(start_time)
+    end_min = parse_to_minutes(end_time)
+    if start_min == 9999 or end_min == 9999 or start_min >= end_min:
+        start_min = 9 * 60
+        end_min = 17 * 60
+
+    base_slots = []
+    curr = start_min
+    while curr < end_min:
+        base_slots.append(format_to_str(curr))
+        curr += 30
+
+
             
     def format_time_str(t_str: str) -> str:
         try:
@@ -387,6 +421,8 @@ def build_doctor_slots(db: Session, doc_name: str, doc_status: str, today_appoin
             
     booked_slots = {}
     for appt in doc_appts:
+        if appt.status == "Cancelled":
+            continue
         pat_name = "Patient"
         if appt.patient_id:
             pat = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
@@ -395,7 +431,9 @@ def build_doctor_slots(db: Session, doc_name: str, doc_status: str, today_appoin
                 
         time_formatted = format_time_str(appt.appointment_time)
         minutes = parse_to_minutes(appt.appointment_time)
-        booked_slots[minutes] = f"{time_formatted} (Booked - {pat_name})"
+        if minutes not in booked_slots:
+            booked_slots[minutes] = []
+        booked_slots[minutes].append(pat_name)
         
     final_slots = []
     used_booked_minutes = set()
@@ -409,14 +447,18 @@ def build_doctor_slots(db: Session, doc_name: str, doc_status: str, today_appoin
                 break
                 
         if exact_booked_min is not None:
-            final_slots.append(booked_slots[exact_booked_min])
+            pat_names = ", ".join(booked_slots[exact_booked_min])
+            time_formatted = format_to_str(exact_booked_min)
+            final_slots.append(f"{time_formatted} (Booked - {pat_names})")
             used_booked_minutes.add(exact_booked_min)
         else:
             final_slots.append(b_slot)
             
-    for min_val, display_str in booked_slots.items():
+    for min_val, pat_names_list in booked_slots.items():
         if min_val not in used_booked_minutes:
-            final_slots.append(display_str)
+            pat_names = ", ".join(pat_names_list)
+            time_formatted = format_to_str(min_val)
+            final_slots.append(f"{time_formatted} (Booked - {pat_names})")
             
     def slot_sort_key(s_val: str) -> int:
         t_part = s_val.split("(")[0].strip()
@@ -474,7 +516,9 @@ def get_doctors_list(
         elif doc.status == "On Break":
             status_map = "On Break"
             
-        slots = build_doctor_slots(db, doc.name, status_map, today_appointments)
+        slots = build_doctor_slots(db, doc.name, status_map, today_appointments, doctor.working_hours if doctor else None)
+        
+        booked_count = len([s for s in slots if "(Booked" in s])
         
         roster.append({
             "id": doc.id,
@@ -482,9 +526,10 @@ def get_doctors_list(
             "specialty": doctor.specialty if (doctor and doctor.specialty) else (", ".join(doc.specialties) if doc.specialties else "General Dentistry"),
             "dept": doctor.chair_setup if (doctor and doctor.chair_setup) else f"Operatory {idx % 6 + 1}",
             "operatory": doctor.chair_setup if (doctor and doctor.chair_setup) else f"Operatory {idx % 6 + 1}",
-            "shift": "09:00 AM - 05:00 PM" if idx % 2 == 0 else "10:00 AM - 06:00 PM",
+            "shift": doctor.working_hours if doctor else None,
             "status": status_map,
-            "slots": slots
+            "slots": slots,
+            "patientsCount": booked_count
         })
         
     return roster

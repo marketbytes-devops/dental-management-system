@@ -470,10 +470,32 @@ export default function DoctorLayout({ children }) {
         time: q.appointment_time,
         status: q.status,
         priority: q.priority,
-        id: q.id
+        id: q.id,
+        chiefComplaint: q.chief_complaint
       }));
 
       setQueue(mappedQueue);
+      
+      // Trigger notifications for new emergencies
+      mappedQueue.forEach(q => {
+        const isEmergency = q.priority === "Emergency" || (q.chiefComplaint && q.chiefComplaint.includes("[UNVERIFIED EMERGENCY]"));
+        // Use a static property on window to track this across re-renders in the layout so we don't spam
+        if (isEmergency && typeof window !== "undefined") {
+          window._notifiedEmergencies = window._notifiedEmergencies || new Set();
+          if (!window._notifiedEmergencies.has(q.id)) {
+            window._notifiedEmergencies.add(q.id);
+            triggerNotification({
+              message: `🚨 Emergency Patient in Queue: Token ${q.token}`,
+              type: "alerts",
+              link: "/doctor/alerts",
+              dotColor: "red",
+              itemId: q.token,
+              patientId: q.token,
+              patientName: q.patient_name || q.token
+            });
+          }
+        }
+      });
 
       const inChairPatient = myQueue.find(q => q.status === "In Chair");
       if (inChairPatient) {

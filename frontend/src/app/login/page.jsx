@@ -19,9 +19,6 @@ import ToothIcon from "@/components/ui/shared/ToothIcon";
 import { login, getProfile } from "@/services/api";
 import { getPatientProfile } from "@/services/api";
 
-const dummyCredentials = {
-  patient: { identifier: "9876543210", email: "patient@example.com", password: "patient123" }
-};
 
 const roles = {
   patient: {
@@ -284,7 +281,7 @@ function LoginContent() {
                   setEmailId(e.target.value);
                   setAuthError("");
                 }}
-                placeholder={portalType === "patient" ? "eg. 9876543210 or patient@example.com" : "eg. doctor@example.com or admin"}
+                placeholder={portalType === "patient" ? "Username" : "Username"}
                 className="w-full bg-slate-900 border border-slate-700/60 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:border-primary transition-all text-white placeholder:text-slate-650"
               />
             </div>

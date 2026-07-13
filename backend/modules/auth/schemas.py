@@ -19,6 +19,7 @@ class UserCreate(BaseModel):
     licence_id: Optional[str] = None
     chair_setup: Optional[str] = None
     board: Optional[str] = None
+    working_hours: Optional[dict] = None
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -33,6 +34,7 @@ class UserUpdate(BaseModel):
     chair_setup: Optional[str] = None
     board: Optional[str] = None
     profile_picture: Optional[str] = None
+    working_hours: Optional[dict] = None
 
 
 class UserResponse(BaseModel):
@@ -50,6 +52,7 @@ class UserResponse(BaseModel):
     chair_setup: Optional[str] = None
     board: Optional[str] = None
     profile_picture: Optional[str] = None
+    working_hours: Optional[dict] = None
     created_at: datetime
 
     class Config:

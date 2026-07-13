@@ -5,6 +5,17 @@ import ToothIcon from "@/components/ui/shared/ToothIcon";
 import client from "@/services/api";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+const getShiftDisplay = (shift) => {
+  if (typeof shift === 'object' && shift !== null) {
+    const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const todaySchedule = shift[todayDay];
+    if (todaySchedule) {
+      return todaySchedule.is_off ? "Off Duty" : `${todaySchedule.start} - ${todaySchedule.end}`;
+    }
+  }
+  return typeof shift === 'string' ? shift : "Not Scheduled";
+};
+
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
     total_patients: 0,
@@ -71,7 +82,7 @@ export default function AdminDashboardPage() {
   const fetchDoctors = async () => {
     setDoctorsLoading(true);
     try {
-      const response = await client.get("/admin/doctors");
+      const response = await client.get("/auth/doctors");
       setDoctorsRoster(response.data);
     } catch (err) {
       console.error("Failed to fetch doctors roster", err);
@@ -346,7 +357,7 @@ export default function AdminDashboardPage() {
                         <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md">{doc.specialty}</span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700 font-medium">
-                        {doc.shift}
+                        {getShiftDisplay(doc.shift)}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
                         {doc.operatory}
@@ -449,7 +460,7 @@ export default function AdminDashboardPage() {
                 <p><strong>Specialty:</strong> {doctorScheduleData?.doctor?.specialty}</p>
               </div>
               <div className="mt-2 flex justify-between text-sm text-gray-600">
-                <p><strong>Shift:</strong> {doctorScheduleData?.doctor?.shift}</p>
+                <p><strong>Shift:</strong> {getShiftDisplay(doctorScheduleData?.doctor?.shift)}</p>
                 <p><strong>Date Generated:</strong> {new Date().toLocaleDateString()}</p>
               </div>
             </div>
@@ -475,7 +486,7 @@ export default function AdminDashboardPage() {
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Shift</p>
-                        <p className="text-sm font-medium text-gray-900">{doctorScheduleData.doctor.shift}</p>
+                        <p className="text-sm font-medium text-gray-900">{getShiftDisplay(doctorScheduleData.doctor.shift)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Operatory</p>
@@ -621,7 +632,7 @@ export default function AdminDashboardPage() {
 
             {/* Print Only Header */}
             <div className="hidden print:block p-8 border-b border-gray-200 mb-4">
-              <h1 className="text-2xl font-bold text-gray-900 text-center uppercase tracking-wide">Marketbytes Dental Clinic</h1>
+              <h1 className="text-2xl font-bold text-gray-900 text-center uppercase tracking-wide">Smilecare Dental Clinic</h1>
               <h2 className="text-xl text-gray-700 text-center mt-2">Appointment History Report</h2>
               <div className="mt-6 flex justify-between text-sm text-gray-600">
                 <p><strong>Patient Name:</strong> {historyModalPatient.name}</p>

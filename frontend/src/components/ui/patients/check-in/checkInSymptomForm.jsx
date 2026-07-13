@@ -163,7 +163,7 @@ export default function CheckInSymptomForm({ onSubmit, onBack }) {
             <AlertTriangle className="w-4 h-4" /> Is this a dental emergency?
           </span>
           <p className="text-[11px] text-gray-500">
-            Severe swelling, heavy bleeding, or uncontrolled pain.
+            If selected, please approach the front desk immediately. Queue priority will be granted upon verification.
           </p>
         </div>
         <label className="relative inline-flex items-center cursor-pointer">

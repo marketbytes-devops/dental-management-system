@@ -5,13 +5,6 @@ import { Calendar, CheckCircle2 } from "lucide-react";
 import { getDoctorLeaves, getDoctors, createAppointment } from "@/services/api";
 
 
-const TIME_SLOTS = [
-  "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM",
-  "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM",
-  "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
-  "4:00 PM", "4:30 PM", "5:00 PM",
-];
-
 const VISIT_REASONS = [
   "Consultation",
   "Follow-up Check-up",
@@ -98,6 +91,8 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
   const selectedDoctorObj = doctors.find((d) => d.name === form.doctor);
   const selectedDoctorSpecialty = selectedDoctorObj ? selectedDoctorObj.specialty : "";
   const specialtyDescription = SPECIALTY_DESCRIPTIONS[selectedDoctorSpecialty] || (selectedDoctorSpecialty ? `Provides comprehensive assessment and specialized dental care in ${selectedDoctorSpecialty}.` : "");
+  
+  const TIME_SLOTS = selectedDoctorObj ? (selectedDoctorObj.slots || []) : [];
 
   function validate() {
     const errs = {};
@@ -209,16 +204,24 @@ export default function BookAppointmentModal({ patientId, onClose, onBook }) {
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                   Time Slot <span className="text-danger">*</span>
                 </label>
-                <select
-                  value={form.time}
-                  onChange={(e) => handleChange("time", e.target.value)}
-                  className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.time ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
-                >
-                  <option value="">Select time…</option>
-                  {TIME_SLOTS.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+                {form.doctor ? (
+                  <select
+                    value={form.time}
+                    onChange={(e) => handleChange("time", e.target.value)}
+                    className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.time ? "border-danger/50 bg-danger/5" : "border-gray-200"}`}
+                  >
+                    <option value="">Select time…</option>
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={slot.time} value={slot.time} disabled={slot.is_full}>
+                        {slot.time} {slot.is_full ? "(Fully Booked)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select disabled className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-400">
+                    <option>Select doctor first...</option>
+                  </select>
+                )}
                 {errors.time && <p className="mt-1 text-xs text-danger">{errors.time}</p>}
               </div>
             </div>

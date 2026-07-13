@@ -30,13 +30,23 @@ export default function WaitingQueue() {
     }
   };
 
-  // Call patient to dental chair
   const handleCallToChair = async (id) => {
     try {
       await updateAppointmentStatus(id, { status: "In Chair" });
       fetchData();
     } catch (err) {
       alert("Error calling patient to chair: " + (err.message || "Failed."));
+    }
+  };
+
+  const handleElevateEmergency = async (id, name) => {
+    if (!window.confirm(`Elevate patient ${name} to Emergency status? This will bypass the waiting queue.`)) return;
+    try {
+      await updateAppointmentStatus(id, { priority: "Emergency" });
+      alert(`Patient ${name} elevated to Emergency.`);
+      fetchData();
+    } catch (err) {
+      alert("Error elevating to emergency: " + (err.message || "Failed."));
     }
   };
 
@@ -85,8 +95,13 @@ export default function WaitingQueue() {
                     className="text-sm text-gray-700 hover:bg-gray-50/50 transition-colors"
                   >
                     <td className="py-3.5 px-2">
-                      <div className="font-semibold text-gray-900">
+                      <div className="font-semibold text-gray-900 flex items-center gap-2">
                         {q.patient_name}
+                        {q.chief_complaint?.includes("[UNVERIFIED EMERGENCY]") && (
+                          <span className="bg-red-100 text-red-600 text-[10px] font-bold px-1.5 rounded" title="Patient claimed emergency during check-in">
+                            ⚠️ UNVERIFIED
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-gray-400">
                         {q.token} • {q.patient_phone}
@@ -122,20 +137,30 @@ export default function WaitingQueue() {
                         {q.status}
                       </span>
                     </td>
-                    <td className="py-3.5 px-2 text-right space-x-1.5">
+                    <td className="py-3.5 px-2 text-right space-x-1.5 flex justify-end">
                       {q.status === "Waiting" && (
-                        <button
-                          onClick={() => handleCallToChair(q.id)}
-                          className="px-2.5 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors font-bold cursor-pointer"
-                        >
-                          Call to Chair
-                        </button>
+                        <>
+                          {q.priority !== "Emergency" && (
+                            <button
+                              onClick={() => handleElevateEmergency(q.id, q.patient_name)}
+                              className="px-2.5 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors font-bold cursor-pointer"
+                            >
+                              Elevate to Emergency
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleCallToChair(q.id)}
+                            className="px-2.5 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors font-bold cursor-pointer"
+                          >
+                            Call to Chair
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => handleCheckout(q.id, q.patient_name)}
                         className="px-2.5 py-1 text-xs bg-success/10 text-success hover:bg-success/20 rounded-lg transition-colors font-bold cursor-pointer"
                       >
-                        Checkout / Bill
+                        Checkout
                       </button>
                     </td>
                   </tr>

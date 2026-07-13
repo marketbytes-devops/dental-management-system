@@ -68,7 +68,6 @@ def create_appointment(db: Session, appt_in: AppointmentCreate) -> AppointmentMo
     # 1. Validate date and time
     validate_appointment_date_time(appt_in.appointment_date, appt_in.appointment_time)
     
-    # 2. Check if patient exists
     patient = db.query(PatientModel).filter(PatientModel.id == appt_in.patient_id).first()
     if not patient:
         raise HTTPException(
@@ -76,7 +75,21 @@ def create_appointment(db: Session, appt_in: AppointmentCreate) -> AppointmentMo
             detail="Patient not found."
         )
 
-    # 3. Create appointment record
+    # 3. Enforce slot limit (max 3 per slot unless emergency)
+    if appt_in.priority != "Emergency":
+        slot_count = db.query(AppointmentModel).filter(
+            AppointmentModel.doctor_name == appt_in.doctor_name,
+            AppointmentModel.appointment_date == appt_in.appointment_date,
+            AppointmentModel.appointment_time == appt_in.appointment_time,
+            AppointmentModel.status != "Cancelled"
+        ).count()
+        if slot_count >= 3:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This time slot is fully booked (maximum 3 patients allowed). Please choose another time or specify Emergency."
+            )
+
+    # 4. Create appointment record
     db_appt = AppointmentModel(
         patient_id=appt_in.patient_id,
         doctor_name=appt_in.doctor_name,
@@ -145,14 +158,18 @@ def initiate_self_checkin(db: Session, appt_id: int, checkin_in: CheckInRequest)
             detail=f"Check-in opens 30 minutes before scheduled time. Please try again in {mins_remaining} minutes."
         )
 
-    # Generate 6 digit OTP
-    otp_code = str(random.randint(100000, 999999))
-    appt.otp = otp_code
-    appt.otp_status = "Pending" 
-    appt.status = "Pending OTP"
-    appt.symptoms = checkin_in.symptoms
     if checkin_in.is_emergency:
-        appt.priority = "Emergency"
+        appt.otp_status = "Bypassed"
+        appt.status = "Waiting"
+        appt.checked_in_at = current_time
+        appt.symptoms = f"[UNVERIFIED EMERGENCY] {checkin_in.symptoms or ''}"
+        appt.wait_time_estimate = calculate_wait_time(db, appt.doctor_name, current_time)
+    else:
+        otp_code = str(random.randint(100000, 999999))
+        appt.otp = otp_code
+        appt.otp_status = "Pending" 
+        appt.status = "Pending OTP"
+        appt.symptoms = checkin_in.symptoms
         
     db.commit()
     db.refresh(appt)
@@ -212,7 +229,10 @@ def verify_checkin_otp(db: Session, appt_id: int, otp_code: str) -> AppointmentM
     appt.otp_status = "Verified"
     appt.status = "Waiting"
     appt.checked_in_at = now
-    appt.wait_time_estimate = calculate_wait_time(db, appt.doctor_name, now)
+    if appt.priority == "Emergency":
+        appt.wait_time_estimate = 0
+    else:
+        appt.wait_time_estimate = calculate_wait_time(db, appt.doctor_name, now)
     
     db.commit()
     db.refresh(appt)
@@ -277,10 +297,19 @@ def recalculate_queue_times(db: Session, doctor_name: str):
             AppointmentModel.doctor_name == doctor_name,
             AppointmentModel.status == "Waiting"
         )
-    ).order_by(AppointmentModel.checked_in_at.asc()).all()
+    ).all()
     
-    for idx, appt in enumerate(waiting_patients):
-        appt.wait_time_estimate = idx * 10
+    priority_weights = {"Emergency": 3, "Urgent": 2, "Routine": 1}
+    sorted_appts = sorted(
+        waiting_patients,
+        key=lambda x: (-priority_weights.get(x.priority, 1), x.checked_in_at or x.created_at)
+    )
+    
+    for idx, appt in enumerate(sorted_appts):
+        if appt.priority == "Emergency":
+            appt.wait_time_estimate = 0
+        else:
+            appt.wait_time_estimate = idx * 10
     
     db.commit()
 
@@ -302,9 +331,10 @@ def update_appointment(db: Session, appt_id: int, appt_update: AppointmentUpdate
     if appt_update.treatment_type is not None:
         appt.treatment_type = appt_update.treatment_type
     if appt_update.priority is not None:
-        appt.priority = appt_update.priority
+        if appt.priority != appt_update.priority:
+            appt.priority = appt_update.priority
+            status_changed = True
         
-    status_changed = False
     if appt_update.status is not None:
         if appt.status != appt_update.status:
             appt.status = appt_update.status
@@ -313,7 +343,7 @@ def update_appointment(db: Session, appt_id: int, appt_update: AppointmentUpdate
     db.commit()
     db.refresh(appt)
     
-    if status_changed and appt.status in ["Completed", "Cancelled", "In Chair"]:
+    if status_changed:
         recalculate_queue_times(db, appt.doctor_name)
         
     return appt

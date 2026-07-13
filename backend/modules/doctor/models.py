@@ -16,6 +16,7 @@ class DoctorModel(Base):
     licence_id = Column(String, nullable=True)
     chair_setup = Column(String, nullable=True)
     board = Column(String, nullable=True)
+    working_hours = Column(JSON, nullable=True)
 
 
 class ReferralModel(Base):

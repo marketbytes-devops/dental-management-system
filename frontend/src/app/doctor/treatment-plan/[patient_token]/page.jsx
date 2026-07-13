@@ -192,6 +192,23 @@ const SPECIALTY_CONFIGS = {
   }
 };
 
+const getPhaseNumber = (phaseStr) => {
+  if (!phaseStr) return "-";
+  const match = phaseStr.match(/Phase\s+(\d+)/i);
+  return match ? match[1] : phaseStr;
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return "Just now";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function DoctorTreatmentPlanPage() {
   const params = useParams();
   const router = useRouter();
@@ -214,7 +231,6 @@ export default function DoctorTreatmentPlanPage() {
   }, []);
 
   const specConfig = SPECIALTY_CONFIGS[doctorSpecialty] || SPECIALTY_CONFIGS["General Dentistry"];
-  const PHASES = specConfig.phases;
   const PRESET_DIAGNOSES = specConfig.diagnoses;
   const PRESET_GOALS = specConfig.goals;
 
@@ -233,9 +249,12 @@ export default function DoctorTreatmentPlanPage() {
   const [nextVisitProc, setNextVisitProc] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [steps, setSteps] = useState([]);
+  const [sittings, setSittings] = useState(["Sitting 1"]);
 
   // Live Procedures Catalog
   const [catalogProcedures, setCatalogProcedures] = useState([]);
+  const [selectedParentProcName, setSelectedParentProcName] = useState("");
+  const [selectedSubProcId, setSelectedSubProcId] = useState("");
 
   useEffect(() => {
     // Load procedures catalog on mount
@@ -300,15 +319,15 @@ export default function DoctorTreatmentPlanPage() {
     notes: "",
     cost: 0,
     requires_consent: false,
-    phase: PHASES[0],
+    phase: "Sitting 1",
     sequence: 1
   });
 
   useEffect(() => {
-    if (PHASES && PHASES.length > 0) {
-      setNewStep(prev => ({ ...prev, phase: PHASES[0] }));
+    if (sittings && sittings.length > 0) {
+      setNewStep(prev => ({ ...prev, phase: sittings[0] }));
     }
-  }, [doctorSpecialty]);
+  }, [sittings]);
 
   const loadData = async () => {
     if (!patientToken) return;
@@ -334,7 +353,29 @@ export default function DoctorTreatmentPlanPage() {
         setNextVisitDate(draftOrActive.next_visit_date || "");
         setNextVisitProc(draftOrActive.next_visit_procedure || "");
         setAttachments(draftOrActive.attachments || []);
-        setSteps(draftOrActive.steps || []);
+        
+        const dbSteps = draftOrActive.steps || [];
+        setSteps(dbSteps);
+
+        // Derive unique sittings from steps in DB
+        const uniquePhases = Array.from(
+          new Set(
+            dbSteps
+              .filter(s => s.phase && s.status !== "Cancelled")
+              .map(s => s.phase)
+          )
+        );
+        if (uniquePhases.length > 0) {
+          uniquePhases.sort((a, b) => {
+            const numA = parseInt(a.replace(/^\D+/g, ""), 10);
+            const numB = parseInt(b.replace(/^\D+/g, ""), 10);
+            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+            return a.localeCompare(b);
+          });
+          setSittings(uniquePhases);
+        } else {
+          setSittings(["Sitting 1"]);
+        }
       } else {
         setActivePlan(null);
         setConditions("");
@@ -346,6 +387,7 @@ export default function DoctorTreatmentPlanPage() {
         setNextVisitProc("");
         setAttachments([]);
         setSteps([]);
+        setSittings(["Sitting 1"]);
       }
     } catch (err) {
       console.error("Error loading patient treatment details:", err);
@@ -411,9 +453,11 @@ export default function DoctorTreatmentPlanPage() {
           notes: "",
           cost: 0,
           requires_consent: false,
-          phase: PHASES[0],
+          phase: sittings[0] || "Sitting 1",
           sequence: steps.length + 1
         });
+        setSelectedParentProcName("");
+        setSelectedSubProcId("");
         loadData();
         
         if (enrichPatientTimeline) {
@@ -437,10 +481,23 @@ export default function DoctorTreatmentPlanPage() {
         notes: "",
         cost: 0,
         requires_consent: false,
-        phase: PHASES[0],
+        phase: sittings[0] || "Sitting 1",
         sequence: steps.length + 2
       });
+      setSelectedParentProcName("");
+      setSelectedSubProcId("");
     }
+  };
+
+  const handleAddSitting = () => {
+    setSittings(prev => {
+      const numbers = prev
+        .map(s => parseInt(s.replace(/^\D+/g, ""), 10))
+        .filter(n => !isNaN(n));
+      const maxNum = numbers.length > 0 ? Math.max(...numbers) : 0;
+      const nextNum = maxNum + 1;
+      return [...prev, `Sitting ${nextNum}`];
+    });
   };
 
   // Remove Step (Local / DB)
@@ -830,45 +887,63 @@ export default function DoctorTreatmentPlanPage() {
 
 
 
-          {/* Procedures and Phases Table */}
+          {/* Procedures and Sittings Table */}
           <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-xs font-black text-gray-850 uppercase tracking-wider">
-              Treatment Phases & Steps Timeline
-            </h3>
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+              <h3 className="text-xs font-black text-gray-850 uppercase tracking-wider">
+                Treatment Sittings & Steps Timeline
+              </h3>
+              <button
+                type="button"
+                onClick={handleAddSitting}
+                className="bg-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-lg hover:bg-primary/90 transition-all cursor-pointer"
+              >
+                + Add Sitting
+              </button>
+            </div>
 
-            {/* Loop through each phase */}
-            <div className="space-y-4">
-              {PHASES.map((phaseName) => {
-                const phaseSteps = steps.filter(s => s.phase === phaseName && s.status !== "Cancelled");
+            {/* Loop through each sitting */}
+            <div className="space-y-4 pt-2">
+              {sittings.map((sittingName) => {
+                const sittingSteps = steps.filter(s => s.phase === sittingName && s.status !== "Cancelled");
                 return (
-                  <div key={phaseName} className="space-y-2">
-                    <div className="bg-slate-100/70 p-2 rounded-lg border border-slate-150">
-                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">{phaseName}</span>
-                      {phaseSteps.length === 0 && (
-                        <span className="text-[10px] text-gray-400 italic ml-2">(No steps planned)</span>
+                  <div key={sittingName} className="space-y-2">
+                    <div className="bg-slate-100/70 p-2 rounded-lg border border-slate-150 flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">{sittingName}</span>
+                      {sittingSteps.length === 0 && sittings.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setSittings(prev => prev.filter(s => s !== sittingName))}
+                          className="text-[10px] text-rose-600 font-bold hover:underline cursor-pointer"
+                        >
+                          Remove Sitting
+                        </button>
                       )}
                     </div>
 
-                    {phaseSteps.length > 0 && (
+                    {sittingSteps.length === 0 ? (
+                      <div className="text-center py-4 text-xs text-gray-400 bg-gray-50/50 rounded-xl border border-dashed border-gray-100">
+                        No steps added to this sitting yet. Select this sitting below to add procedures.
+                      </div>
+                    ) : (
                       <div className="overflow-x-auto border border-gray-100 rounded-xl">
                         <table className="w-full text-left border-collapse text-xs">
                           <thead>
                             <tr className="bg-gray-50 border-b border-gray-100 font-bold text-gray-500">
-                              <th className="p-2.5">Seq</th>
-                              <th className="p-2.5">Procedure</th>
+                              <th className="p-2.5">Date Added</th>
+                              <th className="p-2.5">Title</th>
+                              <th className="p-2.5">Details</th>
                               <th className="p-2.5">Notes</th>
                               <th className="p-2.5">Consent</th>
                               <th className="p-2.5 text-right">Action</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 text-gray-700">
-                            {phaseSteps.map((step) => (
+                            {sittingSteps.map((step) => (
                               <tr key={step.id || step.sequence} className="hover:bg-gray-50/20">
-                                <td className="p-2.5 font-bold text-gray-400">{step.sequence}</td>
-                                <td className="p-2.5">
-                                  <div className="font-bold text-gray-800">{step.title}</div>
-                                  {step.details && <div className="text-[10px] text-gray-400 mt-0.5">{step.details}</div>}
-                                </td>
+                                <td className="p-2.5 font-mono text-gray-550 whitespace-nowrap">{formatDate(step.created_at)}</td>
+                                <td className="p-2.5 font-bold text-gray-800">{step.title}</td>
+                                <td className="p-2.5 text-gray-500 max-w-xs break-words">{step.details || "-"}</td>
                                 <td className="p-2.5">
                                   <textarea
                                     rows={1}
@@ -930,44 +1005,97 @@ export default function DoctorTreatmentPlanPage() {
                   </div>
                 );
               })}
+              {steps.filter(s => s.status !== "Cancelled").length === 0 && (
+                <div className="text-center py-8 text-xs text-gray-400 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                  No treatment steps planned yet. Use the form below to add procedures.
+                </div>
+              )}
             </div>
 
             {/* Add Step Builder Card */}
             <div className="p-4 bg-gray-50 border border-gray-150 rounded-xl space-y-3 pt-4">
               <span className="text-xs font-bold text-gray-800 uppercase tracking-wider block">Add Step / Procedure</span>
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="flex flex-wrap gap-3 items-center">
                 <select
-                  value={newStep.title}
+                  value={selectedParentProcName}
                   onChange={(e) => {
-                    const proc = catalogProcedures.find(p => p.name === e.target.value);
-                    setNewStep({ 
-                      ...newStep, 
-                      title: e.target.value,
-                      cost: proc ? proc.rate : 0 
-                    });
+                    const val = e.target.value;
+                    setSelectedParentProcName(val);
+                    const parentProc = catalogProcedures.find(p => p.name === val);
+                    const children = catalogProcedures.filter(p => p.parent_id === parentProc?.id);
+                    
+                    if (children.length > 0) {
+                      setSelectedSubProcId("");
+                      setNewStep({
+                        ...newStep,
+                        title: "",
+                        cost: 0
+                      });
+                    } else {
+                      setSelectedSubProcId("");
+                      setNewStep({
+                        ...newStep,
+                        title: val,
+                        cost: parentProc ? parentProc.rate : 0
+                      });
+                    }
                   }}
-                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none col-span-2"
+                  className="flex-1 min-w-[200px] px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none"
                 >
-                  <option value="">-- Select Procedure from Catalog --</option>
-                  {catalogProcedures.map(p => (
-                    <option key={p.id} value={p.name}>{p.name} (₹{p.rate})</option>
-                  ))}
+                  <option value="">-- Select Procedure --</option>
+                  {catalogProcedures
+                    .filter(p => {
+                      if (p.parent_id) return false;
+                      return p.specialty === doctorSpecialty;
+                    })
+                    .map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))
+                  }
                 </select>
+
+                {/* Sub-procedure dropdown */}
+                {selectedParentProcName && catalogProcedures.some(p => p.parent_id === catalogProcedures.find(parent => parent.name === selectedParentProcName)?.id) && (
+                  <select
+                    value={selectedSubProcId}
+                    onChange={(e) => {
+                      const childId = e.target.value;
+                      setSelectedSubProcId(childId);
+                      const childProc = catalogProcedures.find(c => c.id === parseInt(childId, 10));
+                      setNewStep({
+                        ...newStep,
+                        title: childProc ? childProc.name : "",
+                        cost: childProc ? childProc.rate : 0
+                      });
+                    }}
+                    className="flex-1 min-w-[150px] px-3 py-1.5 bg-white border border-primary text-primary font-semibold rounded-lg text-xs focus:outline-none animate-in fade-in duration-200"
+                  >
+                    <option value="">-- Choose Type / Option --</option>
+                    {catalogProcedures
+                      .filter(p => p.parent_id === catalogProcedures.find(parent => parent.name === selectedParentProcName)?.id)
+                      .map(p => (
+                        <option key={p.id} value={p.id}>{p.name.replace(`${selectedParentProcName} – `, "").replace(`${selectedParentProcName} - `, "")} (₹{p.rate})</option>
+                      ))
+                    }
+                  </select>
+                )}
+
                 <input
                   type="text"
                   placeholder="Details"
                   value={newStep.details}
                   onChange={(e) => setNewStep({ ...newStep, details: e.target.value })}
-                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none"
+                  className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none flex-1 min-w-[150px]"
                 />
+
                 <select
                   value={newStep.phase}
                   onChange={(e) => setNewStep({ ...newStep, phase: e.target.value })}
-                  className="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 focus:outline-none"
+                  className="px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 focus:outline-none min-w-[100px]"
                 >
-                  {PHASES.map(p => (
-                    <option key={p} value={p}>{p}</option>
+                  {sittings.map(s => (
+                    <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
               </div>
@@ -987,7 +1115,7 @@ export default function DoctorTreatmentPlanPage() {
                   disabled={!newStep.title.trim()}
                   className="px-4 py-1.5 bg-primary text-white font-bold rounded-lg hover:bg-primary/95 disabled:opacity-50 transition-colors cursor-pointer text-xs"
                 >
-                  Append Phase Step
+                  Add Step to Sitting
                 </button>
               </div>
             </div>

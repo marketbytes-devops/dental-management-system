@@ -106,16 +106,6 @@ export default function LeaveManagement({ role = "doctor" }) {
             Apply for leave time off, check balances, and coordinate with clinic-wide schedules.
           </p>
         </div>
-
-        {role === "admin" && (
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Active Profile Info */}
-            <div className="bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl text-left text-xs">
-              <p className="font-bold text-gray-900">{staffName}</p>
-              <p className="text-[10px] text-gray-400 font-semibold">{permissions.label} • {userId}</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Main Tabs Navigation */}

@@ -9,6 +9,8 @@ class ProcedureModel(Base):
     name = Column(String, index=True, nullable=False)
     description = Column(String, nullable=True)
     rate = Column(Float, nullable=False, default=0.0)
+    parent_id = Column(Integer, nullable=True)
+    specialty = Column(String, default="General Dentistry")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -119,6 +119,22 @@ try:
             add_inv_col_if_missing("batch_number", "VARCHAR")
             add_inv_col_if_missing("unit_price", "FLOAT")
 
+            # Also check procedures table
+            if engine.dialect.name == "sqlite":
+                proc_col_query = conn.execute(text("PRAGMA table_info(procedures);")).fetchall()
+                existing_proc_cols = [row[1] for row in proc_col_query]
+            else:
+                proc_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='procedures';")).fetchall()
+                existing_proc_cols = [row[0] for row in proc_col_query]
+
+            if "parent_id" not in existing_proc_cols:
+                conn.execute(text("ALTER TABLE procedures ADD COLUMN parent_id INTEGER;"))
+                print("Added column parent_id to procedures table.")
+
+            if "specialty" not in existing_proc_cols:
+                conn.execute(text("ALTER TABLE procedures ADD COLUMN specialty VARCHAR DEFAULT 'General Dentistry';"))
+                print("Added column specialty to procedures table.")
+
             print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")

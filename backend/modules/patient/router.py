@@ -48,16 +48,22 @@ router = APIRouter(prefix="/patient", tags=["patient"])
 @router.get("/doctors-list")
 def get_available_doctors(db: Session = Depends(get_db)):
     """Public endpoint for the patient portal to list doctors for appointment booking."""
+    from modules.auth.models import UserModel
     doctors = db.query(DoctorModel).filter(DoctorModel.status != "Inactive").all()
-    return [
-        {
+    
+    result = []
+    for doc in doctors:
+        user = db.query(UserModel).filter(UserModel.id == doc.user_id).first()
+        profile_picture = user.profile_picture if user else None
+        
+        result.append({
             "id": doc.id,
             "name": doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}",
             "specialty": doc.specialty or "General Dentistry",
             "status": "On Duty" if doc.status == "Active" else doc.status,
-        }
-        for doc in doctors
-    ]
+            "profile_picture": profile_picture
+        })
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -539,16 +545,22 @@ router = APIRouter(prefix="/patient", tags=["patient"])
 @router.get("/doctors-list")
 def get_available_doctors(db: Session = Depends(get_db)):
     """Public endpoint for the patient portal to list doctors for appointment booking."""
+    from modules.auth.models import UserModel
     doctors = db.query(DoctorModel).filter(DoctorModel.status != "Inactive").all()
-    return [
-        {
+    
+    result = []
+    for doc in doctors:
+        user = db.query(UserModel).filter(UserModel.id == doc.user_id).first()
+        profile_picture = user.profile_picture if user else None
+        
+        result.append({
             "id": doc.id,
             "name": doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}",
             "specialty": doc.specialty or "General Dentistry",
             "status": "On Duty" if doc.status == "Active" else doc.status,
-        }
-        for doc in doctors
-    ]
+            "profile_picture": profile_picture
+        })
+    return result
 
 
 # ---------------------------------------------------------------------------

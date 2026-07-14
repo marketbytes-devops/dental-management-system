@@ -23,6 +23,8 @@ export default function DoctorWorkspaceRootPage() {
     
     if (procedure.includes("root canal")) {
       router.replace("/doctor/workspace/endodontics");
+    } else if (procedure.includes("orthodontic") || procedure.includes("braces") || procedure.includes("aligner")) {
+      router.replace("/doctor/workspace/orthodontics");
     } else if (procedure.includes("crown")) {
       router.replace("/doctor/workspace/prosthodontics");
     } else if (procedure.includes("extraction") || procedure.includes("surgery")) {

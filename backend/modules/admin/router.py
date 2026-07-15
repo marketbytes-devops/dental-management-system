@@ -32,6 +32,7 @@ def get_users(db: Session = Depends(get_db)):
                 user.licence_id = doctor.licence_id
                 user.chair_setup = doctor.chair_setup
                 user.board = doctor.board
+                user.working_hours = doctor.working_hours
             else:
                 user.dob = None
                 user.phone = None
@@ -39,6 +40,7 @@ def get_users(db: Session = Depends(get_db)):
                 user.licence_id = None
                 user.chair_setup = None
                 user.board = None
+                user.working_hours = None
         else:
             user.dob = None
             user.phone = None
@@ -46,6 +48,7 @@ def get_users(db: Session = Depends(get_db)):
             user.licence_id = None
             user.chair_setup = None
             user.board = None
+            user.working_hours = None
     return users
 
 @router.post("/users", response_model=UserResponse)
@@ -95,7 +98,8 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
             address=user_data.address,
             licence_id=user_data.licence_id,
             chair_setup=user_data.chair_setup,
-            board=user_data.board
+            board=user_data.board,
+            working_hours=getattr(user_data, 'working_hours', None)
         )
         db.add(new_doctor)
         db.commit()
@@ -107,6 +111,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
         new_user.licence_id = new_doctor.licence_id
         new_user.chair_setup = new_doctor.chair_setup
         new_user.board = new_doctor.board
+        new_user.working_hours = new_doctor.working_hours
     else:
         new_user.dob = None
         new_user.phone = None
@@ -114,6 +119,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
         new_user.licence_id = None
         new_user.chair_setup = None
         new_user.board = None
+        new_user.working_hours = None
 
     return new_user
 
@@ -143,6 +149,7 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
         user.licence_id = doctor.licence_id
         user.chair_setup = doctor.chair_setup
         user.board = doctor.board
+        user.working_hours = doctor.working_hours
     else:
         user.dob = None
         user.phone = None
@@ -150,6 +157,7 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
         user.licence_id = None
         user.chair_setup = None
         user.board = None
+        user.working_hours = None
         
     return user
 
@@ -230,6 +238,8 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
             doctor.chair_setup = user_data.chair_setup  # type: ignore
         if user_data.board is not None:
             doctor.board = user_data.board  # type: ignore
+        if getattr(user_data, 'working_hours', None) is not None:
+            doctor.working_hours = user_data.working_hours
             
         db.commit()
         db.refresh(doctor)
@@ -240,6 +250,7 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
         user.licence_id = doctor.licence_id
         user.chair_setup = doctor.chair_setup
         user.board = doctor.board
+        user.working_hours = doctor.working_hours
     else:
         doctor = db.query(DoctorModel).filter(DoctorModel.user_id == user.id).first()
         if doctor:
@@ -251,6 +262,7 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
         user.licence_id = None
         user.chair_setup = None
         user.board = None
+        user.working_hours = None
 
     return user
 
@@ -533,8 +545,8 @@ def get_doctor_schedule(doctor_id: int, db: Session = Depends(get_db)):
             "name": doc_name,
             "specialty": specialty,
             "phone": doctor.phone if doctor else "N/A",
-            "operatory": f"Operatory {(doctor_id % 6) + 1}",
-            "shift": "09:00 AM - 05:00 PM"
+            "operatory": doctor.chair_setup if (doctor and doctor.chair_setup) else f"Operatory {(doctor_id % 6) + 1}",
+            "shift": doctor.working_hours if doctor else None
         },
         "appointments": appt_list
     }

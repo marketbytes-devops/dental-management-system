@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Bell, HelpCircle, Sparkles, Share2, Microscope, AlertTriangle, Calendar, CreditCard, ClipboardList, Info } from "lucide-react";
-import { useDoctor } from "@/app/doctor/layout";
+import { useDoctor } from "@/app/(dashboards)/doctor/layout";
 import { updateAuthStatus, getPatientNotifications, markPatientNotificationAsRead } from "@/services/api";
 
 export default function Navbar() {

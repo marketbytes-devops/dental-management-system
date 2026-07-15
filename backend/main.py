@@ -14,6 +14,8 @@ from modules.treatment_plan.router import router as treatment_plan_router
 from modules.complaint.router import router as complaint_router
 from modules.smilecare.router import router as smilecare_router
 from modules.doctor.router import router as doctor_router
+from modules.procedures.router import router as procedures_router
+from modules.billing.router import router as billing_router
 
 
 
@@ -30,6 +32,8 @@ from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
 from modules.complaint.models import ComplaintModel
+from modules.procedures.models import ProcedureModel
+from modules.billing.models import BillingRequestModel
 from modules.auth.service import hash_password
 
 
@@ -115,6 +119,22 @@ try:
             add_inv_col_if_missing("batch_number", "VARCHAR")
             add_inv_col_if_missing("unit_price", "FLOAT")
 
+            # Also check procedures table
+            if engine.dialect.name == "sqlite":
+                proc_col_query = conn.execute(text("PRAGMA table_info(procedures);")).fetchall()
+                existing_proc_cols = [row[1] for row in proc_col_query]
+            else:
+                proc_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='procedures';")).fetchall()
+                existing_proc_cols = [row[0] for row in proc_col_query]
+
+            if "parent_id" not in existing_proc_cols:
+                conn.execute(text("ALTER TABLE procedures ADD COLUMN parent_id INTEGER;"))
+                print("Added column parent_id to procedures table.")
+
+            if "specialty" not in existing_proc_cols:
+                conn.execute(text("ALTER TABLE procedures ADD COLUMN specialty VARCHAR DEFAULT 'General Dentistry';"))
+                print("Added column specialty to procedures table.")
+
             print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")
@@ -162,6 +182,8 @@ app.include_router(treatment_plan_router)
 app.include_router(complaint_router)
 app.include_router(smilecare_router)
 app.include_router(doctor_router)
+app.include_router(procedures_router)
+app.include_router(billing_router)
 
 
 

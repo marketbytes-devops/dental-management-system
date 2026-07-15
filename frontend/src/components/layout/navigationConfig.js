@@ -54,6 +54,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Doctor Schedules", href: "/admin/doctor", icon: Stethoscope },
     { name: "Patient Directory", href: "/admin/patients", icon: Users },
     { name: "Lab Module", href: "/admin/lab-module", icon: Microscope },
+    { name: "Procedures Catalog", href: "/admin/procedures", icon: ClipboardList },
     { name: "Leave Management", href: "/admin/leave", icon: Calendar },
     { name: "Complaints", href: "/admin/complaints", icon: MessageSquare }
   ],
@@ -89,8 +90,8 @@ export const ROLE_NAV_ITEMS = {
     { name: "Check-In / Check-Out", href: "/frontdesk/receptionist/checkin", icon: CheckSquare },
     { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: Stethoscope },
     { name: "Waiting Queue", href: "/frontdesk/receptionist/queue", icon: Hourglass },
-    { name: "Communications", href: "/frontdesk/receptionist/communication", icon: Phone },
     { name: "Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },
+    { name: "Medical Alerts", href: "/frontdesk/receptionist/alerts", icon: AlertTriangle },
     { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },
     { name: "Leave Management", href: "/frontdesk/receptionist/leave", icon: Calendar },
     { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },

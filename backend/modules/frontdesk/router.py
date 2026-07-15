@@ -17,6 +17,7 @@ from .communication_models import CommunicationLogModel
 from .communication_schemas import CommunicationSendRequest, CommunicationLogResponse
 from modules.patient.models import PatientModel, PatientNotificationModel
 from modules.auth.models import UserModel
+from modules.doctor.models import DoctorModel
 from .service import (
     create_appointment,
     get_today_appointments,
@@ -359,14 +360,116 @@ def get_public_doctors(date: str = None, db: Session = Depends(get_db)):
         on_leave_set = {uid[0] for uid in on_leave_user_ids}
         doctors = [doc for doc in doctors if doc.id not in on_leave_set]
         
+    import datetime
+    
+    date_obj = datetime.date.fromisoformat(date) if date else datetime.date.today()
+    day_of_week = date_obj.strftime("%A")
+    
     result = []
     for doc in doctors:
         specialty = ", ".join(doc.specialties) if doc.specialties else "General Dentistry"
         name = doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}"
+        
+        # Determine shift from working_hours
+        start_time = "09:00 AM"
+        end_time = "05:00 PM"
+        is_off = False
+        
+        doctor_details = db.query(DoctorModel).filter(DoctorModel.user_id == doc.id).first()
+        if doctor_details and doctor_details.working_hours:
+            today_hours = doctor_details.working_hours.get(day_of_week)
+            if today_hours:
+                is_off = today_hours.get("is_off", False)
+                if today_hours.get("start") and today_hours.get("end"):
+                    start_time = today_hours["start"]
+                    end_time = today_hours["end"]
+                    
+        if is_off:
+            continue
+            
+        def parse_to_minutes(t_str: str) -> int:
+            try:
+                parts = t_str.strip().upper().split()
+                time_parts = parts[0].split(":")
+                hr = int(time_parts[0])
+                mn = int(time_parts[1]) if len(time_parts) > 1 else 0
+                ampm = parts[1] if len(parts) > 1 else "AM"
+                if ampm == "PM" and hr != 12:
+                    hr += 12
+                elif ampm == "AM" and hr == 12:
+                    hr = 0
+                return hr * 60 + mn
+            except Exception:
+                return 9999
+
+        def format_to_str(total_min: int) -> str:
+            hr = total_min // 60
+            mn = total_min % 60
+            ampm = "AM"
+            if hr >= 12:
+                ampm = "PM"
+                if hr > 12:
+                    hr -= 12
+            if hr == 0:
+                hr = 12
+            return f"{hr:02d}:{mn:02d} {ampm}"
+            
+        start_min = parse_to_minutes(start_time)
+        end_min = parse_to_minutes(end_time)
+        if start_min == 9999 or end_min == 9999 or start_min >= end_min:
+            start_min = 9 * 60
+            end_min = 17 * 60
+            
+        base_slots = []
+        curr = start_min
+        while curr < end_min:
+            base_slots.append(format_to_str(curr))
+            curr += 30
+            
+        # Get appointments for this doctor on the date
+        doc_name_clean = doc.name.replace("Dr.", "").strip()
+        doc_appts = db.query(AppointmentModel).filter(
+            AppointmentModel.doctor_name.ilike(f"%{doc_name_clean}%"),
+            AppointmentModel.appointment_date == date_obj,
+            AppointmentModel.status != "Cancelled"
+        ).all()
+        
+        slot_counts = {}
+        for appt in doc_appts:
+            try:
+                parts = appt.appointment_time.strip().upper().split()
+                time_parts = parts[0].split(":")
+                hr = int(time_parts[0])
+                mn = int(time_parts[1]) if len(time_parts) > 1 else 0
+                ampm = parts[1] if len(parts) > 1 else "AM"
+                fmt_time = f"{hr:02d}:{mn:02d} {ampm}"
+                slot_counts[fmt_time] = slot_counts.get(fmt_time, 0) + 1
+            except:
+                pass
+                
+        slots_with_availability = []
+        for s in base_slots:
+            count = slot_counts.get(s, 0)
+            # Find the nearest slot if exact match not found
+            if count == 0:
+                # Basic check for slight variations
+                s_min = parse_to_minutes(s)
+                for a_time, a_count in slot_counts.items():
+                    if abs(parse_to_minutes(a_time) - s_min) < 15:
+                        count += a_count
+            
+            slots_with_availability.append({
+                "time": s,
+                "booked": count,
+                "available": count < 3,
+                "is_full": count >= 3
+            })
+
         result.append({
             "id": doc.id,
             "name": name,
-            "specialty": specialty
+            "specialty": specialty,
+            "slots": slots_with_availability
         })
     return result
 

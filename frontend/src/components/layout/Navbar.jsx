@@ -88,10 +88,10 @@ export default function Navbar() {
           const parsed = JSON.parse(staffUser);
           setTimeout(() => {
             setCurrentUser(parsed);
-            
+
             const roles = parsed.roles || [];
             const rawRole = roles.length > 0 ? roles[0] : (parsed.role || "");
-            
+
             const normalizeRole = (r) => {
               if (!r) return "";
               const val = r.toLowerCase().trim();
@@ -173,8 +173,8 @@ export default function Navbar() {
     if (role === "doctor") {
       const doctorFirstName = currentUser.name.replace("Dr. ", "").split(" ")[0];
       userGreetingName = `Dr. ${doctorFirstName}`;
-      userSubtitle = currentUser.specialties && currentUser.specialties.length > 0 
-        ? currentUser.specialties.join(", ") 
+      userSubtitle = currentUser.specialties && currentUser.specialties.length > 0
+        ? currentUser.specialties.join(", ")
         : "Specialist Dentist";
     } else if (role === "admin") {
       userGreetingName = "Admin";
@@ -202,9 +202,9 @@ export default function Navbar() {
 
         <div className="hidden md:flex items-center bg-gray-50 rounded-lg px-3 py-1.5 border border-gray-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary w-80 transition-all">
           <Search className="text-gray-400 mr-2 w-4 h-4 shrink-0" />
-          <input 
-            type="text" 
-            placeholder="Search patients, doctors, appointments..." 
+          <input
+            type="text"
+            placeholder="Search patients, doctors, appointments..."
             className="bg-transparent border-none outline-none text-sm w-full placeholder:text-gray-400"
           />
         </div>
@@ -214,15 +214,14 @@ export default function Navbar() {
         {/* Doctor-specific clinical notifications popover */}
         {role === "doctor" ? (
           <>
-            <button 
+            <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center cursor-pointer outline-none"
             >
               <Bell className={`w-5 h-5 transition-transform ${bellAnimating ? "animate-bell-ring text-primary" : ""}`} />
               {unreadCount > 0 && (
-                <span className={`absolute top-1 right-1 w-2.5 h-2.5 rounded-full border border-white ${
-                  bellDotColor === "green" ? "bg-success animate-dot-pulse-green" : "bg-danger animate-dot-pulse-red"
-                }`} />
+                <span className={`absolute top-1 right-1 w-2.5 h-2.5 rounded-full border border-white ${bellDotColor === "green" ? "bg-success animate-dot-pulse-green" : "bg-danger animate-dot-pulse-red"
+                  }`} />
               )}
             </button>
 
@@ -234,7 +233,7 @@ export default function Navbar() {
                     {unreadCount} New
                   </span>
                 </div>
-                
+
                 <div className="space-y-2 max-h-[240px] overflow-y-auto">
                   {notifications.map(notif => {
                     const getNotifIcon = () => {
@@ -251,18 +250,17 @@ export default function Navbar() {
                     };
 
                     return (
-                      <Link 
+                      <Link
                         key={notif.id}
                         href={notif.link}
                         onClick={() => {
                           if (markAsRead) markAsRead(notif.id);
                           setShowNotifications(false);
                         }}
-                        className={`block p-2.5 rounded-xl border border-transparent transition-all text-xs relative ${
-                          notif.status === "unread" 
-                            ? "bg-gray-50/80 hover:bg-gray-50 border-gray-100 font-semibold" 
+                        className={`block p-2.5 rounded-xl border border-transparent transition-all text-xs relative ${notif.status === "unread"
+                            ? "bg-gray-50/80 hover:bg-gray-50 border-gray-100 font-semibold"
                             : "hover:bg-gray-50"
-                        }`}
+                          }`}
                       >
                         <div className="flex justify-between items-start">
                           <p className="font-bold text-gray-800 flex items-center gap-1.5 capitalize">
@@ -270,9 +268,8 @@ export default function Navbar() {
                             {notif.type} notification
                           </p>
                           {notif.status === "unread" && (
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${
-                              notif.dotColor === "green" ? "bg-success animate-pulse" : "bg-danger animate-pulse"
-                            }`} />
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${notif.dotColor === "green" ? "bg-success animate-pulse" : "bg-danger animate-pulse"
+                              }`} />
                           )}
                         </div>
                         <p className="text-[11px] text-gray-600 mt-1 leading-normal font-normal">
@@ -287,7 +284,7 @@ export default function Navbar() {
                   )}
                 </div>
                 <div className="pt-2 border-t border-gray-100 text-center">
-                  <Link 
+                  <Link
                     href="/doctor/notifications"
                     onClick={() => setShowNotifications(false)}
                     className="text-xs font-bold text-primary hover:underline block cursor-pointer"
@@ -299,7 +296,7 @@ export default function Navbar() {
             )}
           </>
         ) : role === "patient" ? (
-          <Link 
+          <Link
             href="/patient/notifications"
             className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center cursor-pointer outline-none animate-fade-in"
             title="My Notifications"
@@ -322,15 +319,14 @@ export default function Navbar() {
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-xs font-bold text-gray-700 cursor-pointer outline-none"
             >
-              <span className={`w-2.5 h-2.5 rounded-full ${
-                currentStatus === "Active" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
-                currentStatus === "On Break" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-gray-400"
-              }`} />
+              <span className={`w-2.5 h-2.5 rounded-full ${currentStatus === "Active" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+                  currentStatus === "On Break" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-gray-400"
+                }`} />
               {currentStatus === "Active" ? "On Duty" :
-               currentStatus === "On Break" ? "On Break" : "Off Duty"}
+                currentStatus === "On Break" ? "On Break" : "Off Duty"}
               <span className="text-[8px] text-gray-400">▼</span>
             </button>
-            
+
             {showStatusDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-150 rounded-2xl shadow-xl z-50 p-1.5 space-y-0.5 animate-fade-in">
                 <button

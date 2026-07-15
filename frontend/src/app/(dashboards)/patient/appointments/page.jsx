@@ -6,6 +6,7 @@ import MyAppointmentList from "@/components/features/patients/appointments/myApp
 import BookAppointmentModal from "@/components/features/patients/appointments/bookAppointmentModal";
 import RescheduleModal from "@/components/features/patients/appointments/rescheduleModal";
 import { Calendar } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { getPatientProfile, getPatientAppointments, updateAppointmentStatus } from "@/services/api";
 
 export default function PatientAppointmentsPage() {
@@ -15,6 +16,8 @@ export default function PatientAppointmentsPage() {
     const [patientId, setPatientId] = useState(null);
     const [showBookModal, setShowBookModal] = useState(false);
     const [rescheduleTarget, setRescheduleTarget] = useState(null); // appointment obj
+    const searchParams = useSearchParams();
+    const [prefilledBooking, setPrefilledBooking] = useState(null);
 
     const fetchPatientAppointments = async (pId) => {
         try {
@@ -52,10 +55,21 @@ export default function PatientAppointmentsPage() {
                 setError(err.message || "An error occurred.");
             } finally {
                 setLoading(false);
+                
+                // Check if we need to auto-open the booking modal
+                if (searchParams.get("action") === "book") {
+                    setPrefilledBooking({
+                        doctorId: searchParams.get("doctorId"),
+                        date: searchParams.get("date"),
+                        time: searchParams.get("time"),
+                        autoSubmit: true,
+                    });
+                    setShowBookModal(true);
+                }
             }
         }
         initAppointments();
-    }, []);
+    }, [searchParams]);
 
     // ── Handlers ──────────────────────────────────────────────────────────────
     function handleBook(newAppt) {
@@ -202,7 +216,15 @@ export default function PatientAppointmentsPage() {
             {showBookModal && (
                 <BookAppointmentModal
                     patientId={patientId}
-                    onClose={() => setShowBookModal(false)}
+                    initialData={prefilledBooking}
+                    onClose={() => {
+                        setShowBookModal(false);
+                        setPrefilledBooking(null);
+                        // Optional: clean up URL
+                        if (searchParams.get("action") === "book") {
+                            window.history.replaceState(null, "", "/patient/appointments");
+                        }
+                    }}
                     onBook={handleBook}
                 />
             )}

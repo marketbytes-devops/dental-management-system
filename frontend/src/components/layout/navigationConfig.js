@@ -87,7 +87,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Dashboard", href: "/frontdesk/receptionist/dashboard", icon: BarChart3 },
     { name: "Appointments", href: "/frontdesk/receptionist/appointments", icon: Calendar },
     { name: "Registrations", href: "/frontdesk/receptionist/patients", icon: UserPlus },
-    { name: "Check-In / Check-Out", href: "/frontdesk/receptionist/checkin", icon: CheckSquare },
+    { name: "Daily Transactions", href: "/frontdesk/receptionist/transactions", icon: Receipt },
     { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: Stethoscope },
     { name: "Waiting Queue", href: "/frontdesk/receptionist/queue", icon: Hourglass },
     { name: "Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },

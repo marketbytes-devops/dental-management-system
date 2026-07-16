@@ -43,6 +43,7 @@ class AppointmentResponse(AppointmentBase):
     wait_time_estimate: int
     checked_in_at: Optional[datetime] = None
     symptoms: Optional[str] = None
+    payment_status: Optional[str] = "Unpaid"
     created_at: datetime
 
     class Config:
@@ -54,6 +55,10 @@ class CheckInRequest(BaseModel):
 
 class OtpVerificationRequest(BaseModel):
     otp: str
+
+class PaymentRequest(BaseModel):
+    amount: float = 100.0
+    payment_method: str = "Cash"
 
 class QueueItemResponse(BaseModel):
     id: int
@@ -72,3 +77,14 @@ class QueueItemResponse(BaseModel):
     procedure: Optional[str] = "Consultation"
     chief_complaint: Optional[str] = None
 
+class TransactionResponse(BaseModel):
+    id: int
+    appointment_id: int
+    patient_id: int
+    amount: float
+    payment_method: str
+    transaction_date: datetime
+    collected_by: Optional[str] = None
+
+    class Config:
+        from_attributes = True

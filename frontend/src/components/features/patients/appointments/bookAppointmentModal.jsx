@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, CheckCircle2, ChevronRight, ArrowLeft } from "lucide-react";
-import { getDoctorLeaves, getAvailableDoctors, createAppointment } from "@/services/api";
+import { getDoctorLeaves, getAvailableDoctors, createAppointment, payConsultation } from "@/services/api";
 
 const VISIT_REASONS = [
   "Consultation",
-  "Follow-up Check-up",
-  "Routine Check-up"
+  "Routine check-up",
+  "Follow-up checkup"
 ];
 
 const SPECIALTY_DESCRIPTIONS = {
@@ -44,6 +44,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
   
   // Track if we are auto-submitting from a redirect
   const [autoSubmitting, setAutoSubmitting] = useState(!!initialData?.autoSubmit);
+  const [createdApptId, setCreatedApptId] = useState(null);
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -138,6 +139,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
 
       setSubmitting(false);
       setAutoSubmitting(false);
+      setCreatedApptId(data.id);
       setStep(4);
 
       const newAppt = {
@@ -230,6 +232,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
       });
 
       setSubmitting(false);
+      setCreatedApptId(data.id);
       setStep(4); // Success step
 
       const newAppt = {
@@ -248,6 +251,17 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
       setSubmitting(false);
     }
   }
+
+  const handlePayNow = async () => {
+    if (!createdApptId) return;
+    try {
+      await payConsultation(createdApptId, { amount: 100.0, payment_method: "Online" });
+      alert("Payment successful! You have been added to the queue for your appointment day.");
+      onClose();
+    } catch (err) {
+      alert("Payment failed: " + err.message);
+    }
+  };
 
   if (autoSubmitting) {
     return (
@@ -469,7 +483,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                   Pay Later
                 </button>
                 <button 
-                  onClick={() => { alert("Redirecting to payment gateway..."); onClose(); }} 
+                  onClick={handlePayNow} 
                   className="flex-1 py-3.5 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/30 focus:ring-2 focus:ring-primary/50"
                 >
                   Pay Consultation Charges

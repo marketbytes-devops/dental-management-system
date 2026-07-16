@@ -10,7 +10,7 @@ import {
   getFrontdeskDoctors, 
   updateAppointmentStatus, 
   createAppointment, 
-  directCheckin 
+  payConsultation 
 } from "@/services/api";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ function Select({ children, ...props }) {
 }
 
 // ── appointment table ─────────────────────────────────────────────────────────
-function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmergency }) {
+function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmergency, onPayConsultation }) {
   if (isLoading)
     return (
       <div className="flex items-center justify-center gap-2 py-20 text-gray-400 text-sm">
@@ -110,12 +110,12 @@ function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmerg
                   <span className="text-xs text-gray-400">{app.status}</span>
                 ) : (
                   <div className="flex gap-2 justify-end">
-                    {app.priority !== "Emergency" && (
+                    {app.status === "Confirmed" && app.payment_status !== "Paid" && (
                       <button
-                        onClick={() => onElevateEmergency(app.id, app.patient?.name)}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg border border-red-600 transition cursor-pointer"
+                        onClick={() => onPayConsultation(app.id, app.patient?.name)}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg border border-green-600 transition cursor-pointer shadow-sm shadow-green-600/20"
                       >
-                        Elevate to Emergency
+                        Payment
                       </button>
                     )}
                     <button
@@ -136,12 +136,86 @@ function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmerg
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
+
+function PaymentModal({ isOpen, onClose, onConfirm, patientName }) {
+  const [method, setMethod] = useState("Cash");
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-gray-100">
+        
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 tracking-tight">Payment Collection</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Consultation & Registration Fees</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 transition bg-white border border-gray-200 rounded-lg p-1.5 hover:bg-gray-50">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          
+          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6 flex justify-between items-center">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Patient</p>
+              <p className="font-bold text-gray-900 mt-0.5">{patientName}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount Due</p>
+              <p className="text-xl font-extrabold text-gray-900 mt-0.5">?100.00</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Select Payment Method</label>
+              <div className="grid grid-cols-3 gap-3">
+                {["Cash", "Card", "Online"].map(m => (
+                  <button
+                    key={m}
+                    onClick={() => setMethod(m)}
+                    className={"py-2.5 px-3 rounded-xl border text-sm font-semibold transition-all " + (
+                      method === m 
+                      ? "border-blue-600 bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-600" 
+                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                    )}
+                  >
+                    {m === "Online" ? "UPI / Net" : m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition shadow-sm">
+            Cancel
+          </button>
+          <button onClick={() => onConfirm(method)} className="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+            Confirm Payment
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 export default function ReceptionistAppointments() {
   const [appointments, setAppointments] = useState([]);
   const [tomorrowAppointments, setTomorrowAppointments] = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [paymentModal, setPaymentModal] = useState({ isOpen: false, id: null, name: "" });
 
   // booking form
   const [searchPatient, setSearchPatient] = useState("");
@@ -153,15 +227,17 @@ export default function ReceptionistAppointments() {
   const [tableSearch, setTableSearch] = useState("");
 
   const TODAY = new Date().toISOString().split("T")[0];
-  const TYPES = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
+  const TYPES = ["Consultation", "Routine check-up", "Follow-up checkup"];
+
+  const getCurrentFormattedTime = () => {
+    return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
 
   const [form, setForm] = useState({
-    appointment_time: "09:00 AM",
+    appointment_time: getCurrentFormattedTime(),
     appointment_date: TODAY,
     doctor_name: "",
     treatment_type: "Consultation",
-    priority: "Routine",
-    directCheckIn: false,
   });
 
   const [doctorLeaves, setDoctorLeaves] = useState([]);
@@ -298,6 +374,21 @@ export default function ReceptionistAppointments() {
     }
   };
 
+  const handlePayConsultationClick = (id, name) => {
+    setPaymentModal({ isOpen: true, id, name });
+  };
+
+  const handlePayConsultationConfirm = async (method) => {
+    try {
+      await payConsultation(paymentModal.id, { amount: 100.0, payment_method: method });
+      alert(`Payment collected via ${method}! ${paymentModal.name} has been added to the queue.`);
+      setPaymentModal({ isOpen: false, id: null, name: "" });
+      fetchData();
+    } catch (err) {
+      alert(err.message || "Payment failed.");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedPatient) { alert("Please select a registered patient."); return; }
@@ -309,19 +400,15 @@ export default function ReceptionistAppointments() {
         appointment_date: form.appointment_date,
         appointment_time: form.appointment_time,
         treatment_type: form.treatment_type,
-        status: form.directCheckIn ? "Waiting" : "Confirmed",
-        priority: form.priority,
+        status: "Confirmed",
+        priority: "Routine",
       });
 
       let msg = `Appointment booked for ${selectedPatient.name}!`;
-      if (form.directCheckIn) {
-        const checkinData = await directCheckin(data.id, form.priority, form.doctor_name);
-        msg += ` Checked in. Est. wait: ${checkinData.wait_time_estimate} mins.`;
-      }
       alert(msg);
       setSelectedPatient(null);
       setSearchPatient("");
-      setForm({ appointment_time: "09:00 AM", appointment_date: TODAY, doctor_name: doctors[0]?.name ?? "", treatment_type: "Consultation", priority: "Routine", directCheckIn: false });
+      setForm({ appointment_time: getCurrentFormattedTime(), appointment_date: TODAY, doctor_name: doctors[0]?.name ?? "", treatment_type: "Consultation" });
       fetchData();
     } catch (err) {
       alert(err.message || "Booking failed.");
@@ -333,6 +420,12 @@ export default function ReceptionistAppointments() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 space-y-6">
+      <PaymentModal
+        isOpen={paymentModal.isOpen}
+        onClose={() => setPaymentModal({ isOpen: false, id: null, name: "" })}
+        onConfirm={handlePayConsultationConfirm}
+        patientName={paymentModal.name}
+      />
 
       {/* header */}
       <div>
@@ -388,12 +481,6 @@ export default function ReceptionistAppointments() {
               <Input type="date" value={form.appointment_date} min={TODAY} onChange={(e) => setForm((f) => ({ ...f, appointment_date: e.target.value }))} required />
             </div>
 
-            {/* Time */}
-            <div>
-              <FieldLabel required>Time</FieldLabel>
-              <Input type="text" placeholder="e.g. 11:30 AM" value={form.appointment_time} onChange={(e) => setForm((f) => ({ ...f, appointment_time: e.target.value }))} required />
-            </div>
-
             {/* Doctor */}
             <div>
               <FieldLabel>Doctor</FieldLabel>
@@ -403,14 +490,10 @@ export default function ReceptionistAppointments() {
               </Select>
             </div>
 
-            {/* Priority */}
+            {/* Time */}
             <div>
-              <FieldLabel>Priority</FieldLabel>
-              <Select value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}>
-                <option value="Routine">Routine</option>
-                <option value="Urgent">Urgent</option>
-                <option value="Emergency">Emergency</option>
-              </Select>
+              <FieldLabel required>Time</FieldLabel>
+              <Input type="text" placeholder="e.g. 11:30 AM" value={form.appointment_time} onChange={(e) => setForm((f) => ({ ...f, appointment_time: e.target.value }))} required />
             </div>
 
             {/* Treatment */}
@@ -421,15 +504,8 @@ export default function ReceptionistAppointments() {
               </Select>
             </div>
 
-            {/* Check-in + submit */}
+            {/* Submit */}
             <div className="flex flex-col gap-3 justify-end">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input type="checkbox" checked={form.directCheckIn}
-                  onChange={(e) => setForm((f) => ({ ...f, directCheckIn: e.target.checked }))}
-                  className="w-4 h-4 accent-blue-600"
-                />
-                <span className="text-sm text-gray-700 font-medium">Direct Check-In</span>
-              </label>
               <button type="submit"
                 className="py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[.98] text-white text-sm font-bold rounded-xl transition cursor-pointer"
               >
@@ -517,6 +593,7 @@ export default function ReceptionistAppointments() {
             }
             onCancel={handleCancel}
             onElevateEmergency={handleElevateEmergency}
+            onPayConsultation={handlePayConsultationClick}
           />
         </div>
       </div>

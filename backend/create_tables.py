@@ -15,7 +15,6 @@ from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
-from modules.complaint.models import ComplaintModel, ComplaintStatusLogModel
 from modules.smilecare.models import DentalChartModel, ToothModel, ToothSurfaceModel, ClinicalFindingModel
 
 

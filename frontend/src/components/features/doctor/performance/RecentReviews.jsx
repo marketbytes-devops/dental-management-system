@@ -26,7 +26,6 @@ export default function RecentReviews({ reviews }) {
               <div key={rev.id} className="p-3.5 bg-gray-50/50 hover:bg-gray-50 border border-gray-100 rounded-xl transition-all">
                 <div className="flex justify-between items-start mb-1.5">
                   <div>
-                    <span className="text-xs font-bold text-gray-800 block">{rev.patient_name || "Patient"}</span>
                     <span className="text-[9px] text-gray-400 font-semibold">
                       {rev.date}
                     </span>

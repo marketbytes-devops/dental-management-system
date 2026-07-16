@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useDoctor } from "@/app/(dashboards)/doctor/layout";
 import PatientSummaryBanner from "./PatientSummaryBanner";
 import ToothChart from "./ToothChart";
@@ -17,7 +17,8 @@ import {
   Pill, 
   Microscope, 
   TrendingUp, 
-  Share2
+  Share2,
+  Search
 } from "lucide-react";
 
 const parseCustomDate = (dateStr) => {
@@ -105,6 +106,56 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
     referrals
   } = useDoctor();
 
+  // Specialty mapping configuration to procedures/treatments
+  const SPECIALTY_PROCEDURES = {
+    general: ["general dentistry", "consultation", "routine check-up", "follow-up check-up", "teeth cleaning", "scaling & polishing", "dental filling", "composite filling", "amalgam filling", "scaling and polishing", "teeth cleaning / polishing", "fluoride treatment", "sealants (pit and fissure)", "teeth whitening", "night guard / occlusal splint"],
+    endodontics: ["endodontics", "root canal", "rct", "pulpotomy", "apicoectomy", "root canal treatment (rct)", "root canal treatment (rct) - single sitting", "root canal treatment (rct) - multiple sitting", "root canal retreatment"],
+    orthodontics: ["orthodontics", "orthodontic", "braces", "braces - metal", "braces - self-ligating", "braces - ceramic", "clear aligners", "palatal expander (rme)", "space maintainer", "habit-breaking appliance", "retainer-only treatment", "retainer fitting", "orthodontic consultation"],
+    periodontics: ["periodontics", "deep cleaning", "gum surgery", "scaling and root planing", "periodontal maintenance"],
+    surgery: ["oral surgery", "surgery", "simple extraction", "surgical extraction (impacted tooth, wisdom tooth)", "orthognathic surgery", "tooth extraction", "wisdom tooth removal", "dental implant surgery", "biopsy"],
+    prosthodontics: ["prosthodontics", "crown – single tooth", "bridge (multi-tooth)", "complete denture (full set)", "partial denture (removable)", "implant-supported crown/bridge", "veneers", "crown fitting", "bridge installation", "denture adjustment"]
+  };
+
+  const isPatientForSpecialty = (patient, specId) => {
+    if (!patient || !specId) return false;
+    const proc = (patient.procedure || "").toLowerCase();
+    const validProcs = SPECIALTY_PROCEDURES[specId] || [];
+    return validProcs.some(val => proc.includes(val) || val.includes(proc));
+  };
+
+  const searchParams = useSearchParams();
+  const urlPatientToken = searchParams.get("patientToken");
+
+  // Sync url patientToken with context viewing patient
+  useEffect(() => {
+    setViewingPatientToken(urlPatientToken || "");
+  }, [urlPatientToken, setViewingPatientToken]);
+
+  const effectiveViewingPatient = (urlPatientToken && patients[urlPatientToken] && isPatientForSpecialty(patients[urlPatientToken], specialtyId)) 
+    ? patients[urlPatientToken] 
+    : null;
+  const effectiveActivePatientToken = isPatientForSpecialty(patients[activePatientToken], specialtyId) ? activePatientToken : "";
+
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Redirect to correct workspace specialty page if loaded patient doesn't match current specialtyId
+  useEffect(() => {
+    if (urlPatientToken && patients[urlPatientToken]) {
+      const pt = patients[urlPatientToken];
+      const proc = (pt.procedure || "").toLowerCase();
+      let targetSpecialty = "general";
+      for (const [specId, procs] of Object.entries(SPECIALTY_PROCEDURES)) {
+        if (procs.some(val => proc.includes(val) || val.includes(proc))) {
+          targetSpecialty = specId;
+          break;
+        }
+      }
+      if (targetSpecialty !== specialtyId) {
+        router.replace(`/doctor/workspace/${targetSpecialty}?patientToken=${urlPatientToken}`);
+      }
+    }
+  }, [urlPatientToken, specialtyId, router, patients]);
+
   // Selected active tab section
   const [activeKpiSection, setActiveKpiSection] = useState("diagnosis");
 
@@ -114,10 +165,9 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
   const [showNewLabForm, setShowNewLabForm] = useState(false);
   const [showNewPrescriptionForm, setShowNewPrescriptionForm] = useState(false);
   const [expandedNotes, setExpandedNotes] = useState({});
-
   // Reset active tab and compose states when patient changes
   useEffect(() => {
-    if (viewingPatient?.token) {
+    if (effectiveViewingPatient?.token) {
       setActiveKpiSection("diagnosis");
       setShowNewDiagForm(false);
       setShowNewRefForm(false);
@@ -125,10 +175,20 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
       setShowNewPrescriptionForm(false);
       setExpandedNotes({});
     }
-  }, [viewingPatient?.token]);
+  }, [effectiveViewingPatient?.token]);
 
-  if (!viewingPatient) {
-    const patientList = Object.values(patients || {});
+  if (!effectiveViewingPatient) {
+    const patientList = Object.values(patients || {})
+      .filter(pt => isPatientForSpecialty(pt, specialtyId))
+      .filter(pt => {
+        if (!searchTerm.trim()) return true;
+        const term = searchTerm.toLowerCase();
+        return (
+          (pt.name || "").toLowerCase().includes(term) ||
+          (pt.token || "").toLowerCase().includes(term) ||
+          (pt.procedure || "").toLowerCase().includes(term)
+        );
+      });
     return (
       <div className="bg-white border border-gray-150 rounded-3xl shadow-sm p-12 text-center max-w-2xl mx-auto space-y-6 animate-fadeIn my-8 text-left">
         <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-2xl mx-auto">
@@ -136,9 +196,31 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
         </div>
         <div className="space-y-2 text-center">
           <h3 className="text-xl font-bold text-gray-900">No Patient in Chair</h3>
-          <p className="text-sm text-gray-550 max-w-md mx-auto">
+          <p className="text-sm text-gray-555 max-w-md mx-auto">
             Select a patient from the directory below to view their historical clinical sheet or manage their records.
           </p>
+        </div>
+
+        {/* Patient Directory Search Bar */}
+        <div className="relative w-full max-w-md mx-auto">
+          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+            <Search className="w-4 h-4 text-gray-400" />
+          </span>
+          <input
+            type="text"
+            placeholder="Search patient name, token ID, or procedure..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 transition-all placeholder-gray-400"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {patientList.length > 0 ? (
@@ -148,7 +230,9 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
               {patientList.map((pt) => (
                 <button
                   key={pt.token}
-                  onClick={() => setViewingPatientToken(pt.token)}
+                  onClick={() => {
+                    router.push(`/doctor/workspace/${specialtyId}?patientToken=${pt.token}`);
+                  }}
                   className="w-full flex items-center justify-between p-3.5 bg-gray-50 hover:bg-primary/5 border border-gray-100 hover:border-primary/20 rounded-xl transition-all cursor-pointer text-left outline-none"
                 >
                   <div className="flex items-center gap-3">
@@ -168,30 +252,34 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
             </div>
           </div>
         ) : (
-          <p className="text-xs text-gray-505 italic text-center">No patients registered in the directory.</p>
+          <p className="text-xs text-gray-505 italic text-center">
+            {searchTerm ? "No matching patients found in the directory." : "No patients registered in the directory."}
+          </p>
         )}
       </div>
     );
   }
 
   const handleReturnToActivePatient = () => {
-    setViewingPatientToken(activePatientToken);
+    if (effectiveActivePatientToken) {
+      router.push(`/doctor/workspace/${specialtyId}?patientToken=${effectiveActivePatientToken}`);
+    }
   };
 
   const handleGoBack = () => {
-    router.push("/doctor/dashboard");
+    router.push(`/doctor/workspace/${specialtyId}`);
   };
 
   // 1. Calculate Patient Statistics for Tabs
-  const patientOrders = labOrders?.filter(o => o.patient_token === viewingPatient.token) || [];
+  const patientOrders = labOrders?.filter(o => o.patient_token === effectiveViewingPatient.token) || [];
   
-  const diagnosisNotes = viewingPatient.timeline?.filter(event => 
+  const diagnosisNotes = effectiveViewingPatient.timeline?.filter(event => 
     event.type === "Clinical Note" || event.type === "Consultation" || event.type === "Diagnosis" || event.type === "Treatment"
   ) || [];
 
-  const patientRefs = referrals?.filter(r => r.patientToken === viewingPatient.token || r.patient_token === viewingPatient.token) || [];
+  const patientRefs = referrals?.filter(r => r.patientToken === effectiveViewingPatient.token || r.patient_token === effectiveViewingPatient.token) || [];
 
-  const prescriptionEvents = viewingPatient.timeline?.filter(event => 
+  const prescriptionEvents = effectiveViewingPatient.timeline?.filter(event => 
     event.type === "Prescription"
   ) || [];
 
@@ -199,7 +287,7 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
   const totalDiagnosisNotes = diagnosisNotes.length;
   const totalPrescriptions = prescriptionEvents.length;
   const totalLabOrders = patientOrders.length;
-  const planStepsProgress = viewingPatient.planStepsProgress || "Nill";
+  const planStepsProgress = effectiveViewingPatient.planStepsProgress || "Nill";
   const totalReferrals = patientRefs.length;
 
   // Tab definitions
@@ -215,8 +303,8 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
     <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden animate-fade-in pb-10">
       {/* Patient Summary & Safety Banner */}
       <PatientSummaryBanner
-        viewingPatient={viewingPatient}
-        activePatientToken={activePatientToken}
+        viewingPatient={effectiveViewingPatient}
+        activePatientToken={effectiveActivePatientToken}
         completedPatientHistory={completedPatientHistory}
         onViewPreviousPatient={handleViewPreviousPatient}
         onCallNextPatient={handleCallNextPatient}
@@ -432,6 +520,25 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
                                 <p className="text-xs font-semibold text-gray-750 leading-relaxed whitespace-pre-wrap">{parsed.consultationNote}</p>
                               </div>
                             )}
+
+                            {/* Prescribed Medications */}
+                            {note.medications && note.medications.length > 0 && (
+                              <div className="space-y-2 md:col-span-2 text-left pt-4 border-t border-gray-150 animate-fadeIn">
+                                <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block">Prescribed Medications</span>
+                                <div className="divide-y divide-gray-100 bg-gray-50 border border-gray-100 rounded-xl overflow-hidden mt-1">
+                                  {note.medications.map((med, mIdx) => (
+                                    <div key={med.id || mIdx} className="flex justify-between items-center p-3 text-xs font-semibold text-gray-700 hover:bg-gray-100/50">
+                                      <div className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                        <span>
+                                          <strong className="text-gray-900 font-bold">{med.medicine}</strong> ({med.schedule} • {med.timing} • {med.duration})
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -452,7 +559,26 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
                         <span className="text-[10px] text-primary font-bold">{isExpanded ? "Collapse ▲" : "View Details ▼"}</span>
                       </div>
                       {isExpanded ? (
-                        <p className="text-xs font-bold text-gray-805 mt-2 whitespace-pre-wrap leading-relaxed">{note.note}</p>
+                        <>
+                          <p className="text-xs font-bold text-gray-850 mt-2 whitespace-pre-wrap leading-relaxed">{note.note}</p>
+                          {note.medications && note.medications.length > 0 && (
+                            <div className="space-y-2 text-left pt-4 border-t border-gray-150 animate-fadeIn">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider block">Prescribed Medications</span>
+                              <div className="divide-y divide-gray-100 bg-gray-50 border border-gray-100 rounded-xl overflow-hidden mt-1">
+                                {note.medications.map((med, mIdx) => (
+                                  <div key={med.id || mIdx} className="flex justify-between items-center p-3 text-xs font-semibold text-gray-700 hover:bg-gray-100/50">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                                      <span>
+                                        <strong className="text-gray-900 font-bold">{med.medicine}</strong> ({med.schedule} • {med.timing} • {med.duration})
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <p className="text-xs font-semibold text-gray-450 mt-1 truncate max-w-xl">{note.note}</p>
                       )}

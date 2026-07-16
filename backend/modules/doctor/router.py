@@ -119,7 +119,7 @@ def get_doctor_performance(
     for f in feedbacks[:5]:
         recent_reviews.append({
             "id": f.id,
-            "patient_name": f.patient_name,
+            "patient_name": "Anonymous",
             "rating": f.rating,
             "feedback_text": f.feedback_text,
             "date": f.created_at.strftime("%b %d, %Y") if f.created_at else "Recently"

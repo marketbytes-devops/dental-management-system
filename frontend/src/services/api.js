@@ -528,43 +528,6 @@ export const updateReferral = async (refId, referralData) => {
 };
 
 // ==========================================
-// 9. Complaints API Endpoints
-// ==========================================
-
-export const submitComplaint = async (complaintData) => {
-  const response = await client.post("/complaints", complaintData);
-  return response.data;
-};
-
-export const getMyComplaints = async () => {
-  const response = await client.get("/complaints/my");
-  return response.data;
-};
-
-export const getAllComplaints = async () => {
-  const response = await client.get("/complaints");
-  return response.data;
-};
-
-export const updateComplaintStatus = async (id, status, note = null) => {
-  const response = await client.patch(`/complaints/${id}/status`, { status, note });
-  return response.data;
-};
-
-export const reopenComplaint = async (id, reason) => {
-  const response = await client.post(`/complaints/${id}/reopen`, { reason });
-  return response.data;
-};
-
-export const getComplaintLogs = async (id) => {
-  const response = await client.get(`/complaints/${id}/logs`);
-  return response.data;
-};
-
-
-
-
-// ==========================================
 // 9. Patient Notifications & Doctor Feedback (New)
 // ==========================================
 

@@ -7,15 +7,15 @@ export default function KpiCards({
   activePatientToken,
   totalWaiting,
   totalAlerts,
-  activeLabCount,
-  hasUrgentInQueue
+  hasUrgentInQueue,
+  activePatientHref = "/doctor/workspace"
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* Card 1: Active Patient */}
       {activePatientToken ? (
         <Link
-          href="/doctor/workspace"
+          href={activePatientHref}
           className="text-left block w-full rounded-2xl p-5 shadow-sm border border-gray-100 hover:border-primary/30 bg-white transition-all relative overflow-hidden group cursor-pointer outline-none"
         >
           <div className="absolute top-0 right-0 w-20 h-20 rounded-bl-full -mr-4 -mt-4 bg-primary/5"></div>
@@ -70,21 +70,6 @@ export default function KpiCards({
         </h3>
         <p className="text-xs mt-3 font-semibold text-danger">
           Safety alert warnings
-        </p>
-      </Link>
-
-      {/* Card 4: Pending Dental Labs */}
-      <Link
-        href="/doctor/labs"
-        className="text-left block w-full rounded-2xl p-5 shadow-sm border transition-all relative overflow-hidden group cursor-pointer outline-none bg-white border-gray-100 hover:border-warning/30"
-      >
-        <div className="absolute top-0 right-0 w-20 h-20 rounded-bl-full -mr-4 -mt-4 bg-warning/5"></div>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pending Dental Labs</p>
-        <h3 className="text-2xl font-black mt-1.5 text-gray-900">
-          {activeLabCount} Orders
-        </h3>
-        <p className="text-xs mt-3 font-semibold text-warning">
-          Crowns, Bridges, Veneers
         </p>
       </Link>
     </div>

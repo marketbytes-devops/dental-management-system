@@ -6,7 +6,43 @@ import { useDoctor } from "@/app/(dashboards)/doctor/layout";
 import DashboardHeader from "@/components/features/doctor/dashboard/DashboardHeader";
 import KpiCards from "@/components/features/doctor/dashboard/KpiCards";
 import { getDoctorDashboardAppointments } from "@/services/api";
-import { ArrowRight, Calendar } from "lucide-react";
+import { 
+  ArrowRight, 
+  Calendar, 
+  Stethoscope, 
+  Pill, 
+  Award, 
+  ShieldAlert, 
+  Scissors, 
+  Sparkles 
+} from "lucide-react";
+
+const SPECIALTY_MAP = {
+  "General Dentistry": "general",
+  "Endodontics": "endodontics",
+  "Orthodontics": "orthodontics",
+  "Periodontics": "periodontics",
+  "Oral Surgery": "surgery",
+  "Prosthodontics": "prosthodontics"
+};
+
+const SPECIALTY_DETAILS = {
+  general: { label: "General Dentistry", icon: Stethoscope },
+  endodontics: { label: "Endodontics", icon: Pill },
+  orthodontics: { label: "Orthodontics", icon: Award },
+  periodontics: { label: "Periodontics", icon: ShieldAlert },
+  surgery: { label: "Oral Surgery", icon: Scissors },
+  prosthodontics: { label: "Prosthodontics", icon: Sparkles }
+};
+
+const SPECIALTY_PROCEDURES = {
+  general: ["general dentistry", "consultation", "routine check-up", "follow-up check-up", "teeth cleaning", "scaling & polishing", "dental filling", "composite filling", "amalgam filling", "scaling and polishing", "teeth cleaning / polishing", "fluoride treatment", "sealants (pit and fissure)", "teeth whitening", "night guard / occlusal splint"],
+  endodontics: ["endodontics", "root canal", "rct", "pulpotomy", "apicoectomy", "root canal treatment (rct)", "root canal treatment (rct) - single sitting", "root canal treatment (rct) - multiple sitting", "root canal retreatment"],
+  orthodontics: ["orthodontics", "orthodontic", "braces", "braces - metal", "braces - self-ligating", "braces - ceramic", "clear aligners", "palatal expander (rme)", "space maintainer", "habit-breaking appliance", "retainer-only treatment", "retainer fitting", "orthodontic consultation"],
+  periodontics: ["periodontics", "deep cleaning", "gum surgery", "scaling and root planing", "periodontal maintenance"],
+  surgery: ["oral surgery", "surgery", "simple extraction", "surgical extraction (impacted tooth, wisdom tooth)", "orthognathic surgery", "tooth extraction", "wisdom tooth removal", "dental implant surgery", "biopsy"],
+  prosthodontics: ["prosthodontics", "crown – single tooth", "bridge (multi-tooth)", "complete denture (full set)", "partial denture (removable)", "implant-supported crown/bridge", "veneers", "crown fitting", "bridge installation", "denture adjustment"]
+};
 
 export default function DoctorDashboardPage() {
   const {
@@ -15,7 +51,8 @@ export default function DoctorDashboardPage() {
     labOrders,
     activePatient,
     hasUrgentInQueue,
-    currentDoctorName
+    currentDoctorName,
+    patients = {}
   } = useDoctor();
 
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
@@ -23,6 +60,9 @@ export default function DoctorDashboardPage() {
   const [appointmentFilter, setAppointmentFilter] = useState("today");
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+
+  const [doctorSpecialties, setDoctorSpecialties] = useState([]);
+  const [selectedSpecialty, setSelectedSpecialty] = useState("general");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -32,6 +72,13 @@ export default function DoctorDashboardPage() {
           const user = JSON.parse(savedUser);
           const isIncomplete = !user.dob || !user.phone || !user.address || !user.licence_id || !user.chair_setup || !user.board;
           setIsProfileIncomplete(isIncomplete);
+
+          const specs = user.specialties || ["General Dentistry"];
+          const mappedSpecs = specs.map(s => SPECIALTY_MAP[s] || "general");
+          setDoctorSpecialties(mappedSpecs);
+          if (mappedSpecs.length > 0) {
+            setSelectedSpecialty(mappedSpecs[0]);
+          }
         } catch (e) {
           console.error(e);
         }
@@ -61,11 +108,34 @@ export default function DoctorDashboardPage() {
     return () => { isMounted = false; };
   }, [currentDoctorName, appointmentFilter]);
 
+  const isPatientForSpecialty = (patient, specId) => {
+    if (!patient || !specId) return false;
+    const proc = (patient.procedure || "").toLowerCase();
+    const validProcs = SPECIALTY_PROCEDURES[specId] || [];
+    return validProcs.some(val => proc.includes(val) || val.includes(proc));
+  };
+
+  // Filter active patient by selected specialty
+  const activePatientForSpec = isPatientForSpecialty(activePatient, selectedSpecialty) ? activePatient : null;
+  const activePatientTokenForSpec = activePatientForSpec ? activePatientToken : "";
+
+  // Filter queue by selected specialty
+  const filteredQueue = queue.filter(q => {
+    const pt = patients[q.token];
+    return isPatientForSpecialty(pt, selectedSpecialty);
+  });
+
   // Metrics
-  const totalWaiting = queue.filter(q => q.status === "Waiting").length;
+  const totalWaiting = filteredQueue.filter(q => q.status === "Waiting").length;
   // Fallback for totalAlerts since patients dictionary was removed
   const totalAlerts = 0; 
-  const activeLabCount = labOrders.filter(l => l.status !== "Delivered").length;
+
+  // Filter appointments list by selected specialty
+  const filteredAppointments = appointments.filter(appt => {
+    const treatment = (appt.treatment_type || "").toLowerCase();
+    const validProcs = SPECIALTY_PROCEDURES[selectedSpecialty] || [];
+    return validProcs.some(val => treatment.includes(val) || val.includes(treatment));
+  });
 
   // Generate past 6 months for the dropdown
   const getRecentMonths = () => {
@@ -104,14 +174,42 @@ export default function DoctorDashboardPage() {
         </div>
       )}
 
+      {/* Specialty Tabs Switcher */}
+      {doctorSpecialties.length > 1 && (
+        <div className="flex flex-wrap gap-2.5 pb-2 border-b border-gray-100">
+          {doctorSpecialties.map((specId) => {
+            const specInfo = SPECIALTY_DETAILS[specId];
+            if (!specInfo) return null;
+            const Icon = specInfo.icon;
+            const isActive = selectedSpecialty === specId;
+
+            return (
+              <button
+                key={specId}
+                type="button"
+                onClick={() => setSelectedSpecialty(specId)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-2xl border transition-all cursor-pointer outline-none hover:scale-102 ${
+                  isActive
+                    ? "bg-primary/10 text-primary border-primary/20 shadow-xs"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50/80"
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {specInfo.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* KPI Cards */}
       <KpiCards
-        activePatientName={activePatient?.name}
-        activePatientToken={activePatientToken}
+        activePatientName={activePatientForSpec?.name}
+        activePatientToken={activePatientTokenForSpec}
         totalWaiting={totalWaiting}
         totalAlerts={totalAlerts}
-        activeLabCount={activeLabCount}
         hasUrgentInQueue={hasUrgentInQueue}
+        activePatientHref={activePatientTokenForSpec ? `/doctor/workspace/${selectedSpecialty}?patientToken=${activePatientTokenForSpec}` : `/doctor/workspace/${selectedSpecialty}`}
       />
 
       {/* Appointments Section */}
@@ -169,7 +267,7 @@ export default function DoctorDashboardPage() {
                 <tr>
                   <td colSpan="6" className="px-6 py-8 text-center text-gray-400">Loading appointments...</td>
                 </tr>
-              ) : appointments.length === 0 ? (
+              ) : filteredAppointments.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center">
@@ -179,7 +277,7 @@ export default function DoctorDashboardPage() {
                   </td>
                 </tr>
               ) : (
-                appointments.map((appt) => (
+                filteredAppointments.map((appt) => (
                   <tr key={appt.id} className="hover:bg-gray-50/80 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{appt.patient_name}</div>

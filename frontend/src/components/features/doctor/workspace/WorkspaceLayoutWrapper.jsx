@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useDoctor } from "@/app/(dashboards)/doctor/layout";
 import PatientSummaryBanner from "./PatientSummaryBanner";
 import ToothChart from "./ToothChart";
@@ -17,7 +17,8 @@ import {
   Pill, 
   Microscope, 
   TrendingUp, 
-  Share2
+  Share2,
+  Search
 } from "lucide-react";
 
 const parseCustomDate = (dateStr) => {
@@ -122,8 +123,38 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
     return validProcs.some(val => proc.includes(val) || val.includes(proc));
   };
 
-  const effectiveViewingPatient = isPatientForSpecialty(viewingPatient, specialtyId) ? viewingPatient : null;
+  const searchParams = useSearchParams();
+  const urlPatientToken = searchParams.get("patientToken");
+
+  // Sync url patientToken with context viewing patient
+  useEffect(() => {
+    setViewingPatientToken(urlPatientToken || "");
+  }, [urlPatientToken, setViewingPatientToken]);
+
+  const effectiveViewingPatient = (urlPatientToken && patients[urlPatientToken] && isPatientForSpecialty(patients[urlPatientToken], specialtyId)) 
+    ? patients[urlPatientToken] 
+    : null;
   const effectiveActivePatientToken = isPatientForSpecialty(patients[activePatientToken], specialtyId) ? activePatientToken : "";
+
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Redirect to correct workspace specialty page if loaded patient doesn't match current specialtyId
+  useEffect(() => {
+    if (urlPatientToken && patients[urlPatientToken]) {
+      const pt = patients[urlPatientToken];
+      const proc = (pt.procedure || "").toLowerCase();
+      let targetSpecialty = "general";
+      for (const [specId, procs] of Object.entries(SPECIALTY_PROCEDURES)) {
+        if (procs.some(val => proc.includes(val) || val.includes(proc))) {
+          targetSpecialty = specId;
+          break;
+        }
+      }
+      if (targetSpecialty !== specialtyId) {
+        router.replace(`/doctor/workspace/${targetSpecialty}?patientToken=${urlPatientToken}`);
+      }
+    }
+  }, [urlPatientToken, specialtyId, router, patients]);
 
   // Selected active tab section
   const [activeKpiSection, setActiveKpiSection] = useState("diagnosis");
@@ -147,7 +178,17 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
   }, [effectiveViewingPatient?.token]);
 
   if (!effectiveViewingPatient) {
-    const patientList = Object.values(patients || {}).filter(pt => isPatientForSpecialty(pt, specialtyId));
+    const patientList = Object.values(patients || {})
+      .filter(pt => isPatientForSpecialty(pt, specialtyId))
+      .filter(pt => {
+        if (!searchTerm.trim()) return true;
+        const term = searchTerm.toLowerCase();
+        return (
+          (pt.name || "").toLowerCase().includes(term) ||
+          (pt.token || "").toLowerCase().includes(term) ||
+          (pt.procedure || "").toLowerCase().includes(term)
+        );
+      });
     return (
       <div className="bg-white border border-gray-150 rounded-3xl shadow-sm p-12 text-center max-w-2xl mx-auto space-y-6 animate-fadeIn my-8 text-left">
         <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-2xl mx-auto">
@@ -160,6 +201,28 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
           </p>
         </div>
 
+        {/* Patient Directory Search Bar */}
+        <div className="relative w-full max-w-md mx-auto">
+          <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+            <Search className="w-4 h-4 text-gray-400" />
+          </span>
+          <input
+            type="text"
+            placeholder="Search patient name, token ID, or procedure..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 transition-all placeholder-gray-400"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
         {patientList.length > 0 ? (
           <div className="space-y-3">
             <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Patient Directory</label>
@@ -167,7 +230,9 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
               {patientList.map((pt) => (
                 <button
                   key={pt.token}
-                  onClick={() => setViewingPatientToken(pt.token)}
+                  onClick={() => {
+                    router.push(`/doctor/workspace/${specialtyId}?patientToken=${pt.token}`);
+                  }}
                   className="w-full flex items-center justify-between p-3.5 bg-gray-50 hover:bg-primary/5 border border-gray-100 hover:border-primary/20 rounded-xl transition-all cursor-pointer text-left outline-none"
                 >
                   <div className="flex items-center gap-3">
@@ -187,18 +252,22 @@ export default function WorkspaceLayoutWrapper({ specialtyId, children }) {
             </div>
           </div>
         ) : (
-          <p className="text-xs text-gray-505 italic text-center">No patients registered in the directory.</p>
+          <p className="text-xs text-gray-505 italic text-center">
+            {searchTerm ? "No matching patients found in the directory." : "No patients registered in the directory."}
+          </p>
         )}
       </div>
     );
   }
 
   const handleReturnToActivePatient = () => {
-    setViewingPatientToken(effectiveActivePatientToken);
+    if (effectiveActivePatientToken) {
+      router.push(`/doctor/workspace/${specialtyId}?patientToken=${effectiveActivePatientToken}`);
+    }
   };
 
   const handleGoBack = () => {
-    router.push("/doctor/dashboard");
+    router.push(`/doctor/workspace/${specialtyId}`);
   };
 
   // 1. Calculate Patient Statistics for Tabs

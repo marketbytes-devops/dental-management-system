@@ -83,10 +83,10 @@ def create_appointment(db: Session, appt_in: AppointmentCreate) -> AppointmentMo
             AppointmentModel.appointment_time == appt_in.appointment_time,
             AppointmentModel.status != "Cancelled"
         ).count()
-        if slot_count >= 3:
+        if slot_count >= 2:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This time slot is fully booked (maximum 3 patients allowed). Please choose another time or specify Emergency."
+                detail="This time slot is fully booked (maximum 2 patients allowed). Please choose another time or specify Emergency."
             )
 
     # 4. Create appointment record

@@ -209,6 +209,11 @@ export const getAvailableDoctors = async () => {
   return response.data;
 };
 
+export const getDoctorAvailableSlots = async (doctorId, date) => {
+  const response = await client.get(`/patient/doctors/${doctorId}/available-slots?date=${encodeURIComponent(date)}`);
+  return response.data;
+};
+
 // ==========================================
 // 4. Appointments & Queue API Endpoints
 // ==========================================

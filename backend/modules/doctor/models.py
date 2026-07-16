@@ -36,3 +36,17 @@ class ReferralModel(Base):
     referral_type = Column(String, default="Internal")
     external_facility = Column(String, nullable=True)
 
+
+class DoctorShiftModel(Base):
+    __tablename__ = "doctor_shifts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(Integer, ForeignKey("doctors.id", ondelete="CASCADE"), nullable=False)
+    
+    # Flexible scheduling: can specify a day of the week (e.g. "Monday") OR a specific date
+    day_of_week = Column(String, nullable=True) # e.g. Monday, Tuesday...
+    specific_date = Column(String, nullable=True) # e.g. 2026-10-12
+    
+    start_time = Column(String, nullable=False) # e.g. "09:00"
+    end_time = Column(String, nullable=False)   # e.g. "15:00"
+    slot_duration = Column(Integer, default=30) # in minutes

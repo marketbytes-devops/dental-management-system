@@ -11,7 +11,6 @@ from modules.frontdesk.router import router as frontdesk_router
 from modules.lab.router import router as lab_router
 from modules.leave.router import router as leave_router
 from modules.treatment_plan.router import router as treatment_plan_router
-from modules.complaint.router import router as complaint_router
 from modules.smilecare.router import router as smilecare_router
 from modules.doctor.router import router as doctor_router
 from modules.procedures.router import router as procedures_router
@@ -31,7 +30,6 @@ from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
-from modules.complaint.models import ComplaintModel
 from modules.procedures.models import ProcedureModel
 from modules.billing.models import BillingRequestModel
 from modules.auth.service import hash_password
@@ -179,7 +177,6 @@ app.include_router(frontdesk_router)
 app.include_router(lab_router)
 app.include_router(leave_router)
 app.include_router(treatment_plan_router)
-app.include_router(complaint_router)
 app.include_router(smilecare_router)
 app.include_router(doctor_router)
 app.include_router(procedures_router)

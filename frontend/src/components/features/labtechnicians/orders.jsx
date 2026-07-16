@@ -814,7 +814,7 @@ export default function LabOrders() {
 
   const BOARD_COLUMNS = activeCategory === "Dental Prosthetics" ? [
     { id: "Submitted", label: "Submitted & Flagged", statuses: ["Submitted", "submitted", "Flagged", "flagged", "Pending", "returned_for_rework", "Returned for Rework"] },
-    { id: "ConfirmedSent", label: "Doctor Confirmed & Sent", statuses: ["Pending Doctor Confirmation", "Pending Doctor Review", "Confirmed", "confirmed", "Doctor Accepted", "Order Sent to Lab", "Sent to Lab", "In Progress", "Accepted", "received_by_lab", "in_design", "in_fabrication", "quality_check"] },
+    { id: "ConfirmedSent", label: "Confirmed & Sent", statuses: ["Pending Doctor Confirmation", "Pending Doctor Review", "Confirmed", "confirmed", "Doctor Accepted", "Order Sent to Lab", "Sent to Lab", "In Progress", "Accepted", "received_by_lab", "in_design", "in_fabrication", "quality_check"] },
     { id: "ReceivedFitted", label: "Received & Fitted", statuses: ["Order Received", "Received from Lab", "received_from_lab", "Fitted", "fitted"] },
     { id: "Completed", label: "Completed", statuses: ["Completed", "completed"] }
   ] : [
@@ -1556,50 +1556,13 @@ export default function LabOrders() {
                   />
                 </div>
 
-                {/* ── SECTION 5: Send to Doctor / Dispatch button ── */}
-                {["Pending Doctor Review", "Pending Doctor Confirmation"].includes(currentCase.status) ? (
-                  <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200/60 rounded-2xl">
-                    <span className="text-lg shrink-0">⏳</span>
-                    <div>
-                      <p className="text-xs font-bold text-amber-800">Awaiting Doctor Confirmation</p>
-                      <p className="text-[10px] text-amber-600/80 mt-0.5 leading-relaxed">
-                        This order has been sent to {currentCase.dentist}. Waiting for them to review and confirm before it is dispatched.
-                      </p>
-                    </div>
-                  </div>
-                ) : ["Confirmed", "Doctor Accepted"].includes(currentCase.status) ? (
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3 p-4 bg-success/5 border border-success/20 rounded-2xl">
-                      <span className="w-5 h-5 rounded-full bg-success flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="text-white text-[9px] font-black">✓</span>
-                      </span>
-                      <div>
-                        <p className="text-xs font-bold text-success">Doctor Confirmed — Ready to Dispatch</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">
-                          {currentCase.dentist} has reviewed and confirmed this order. You can now physically send the package.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const ok = await updateDbStatus(currentCase.id, "Order Sent to Lab");
-                        if (ok) {
-                          triggerToast(`Case ${currentCase.id} marked as Order Sent to Lab.`);
-                        } else {
-                          triggerToast("Failed to update status.", "error");
-                        }
-                      }}
-                      className="w-full py-3.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Truck className="w-4 h-4" /> Mark as Sent to Lab
-                    </button>
-                  </div>
-                ) : ["Sent to Lab", "Order Sent to Lab", "Order Received", "Completed", "Returned for Rework"].includes(currentCase.status) ? (
+                {/* ── SECTION 5: Dispatch button ── */}
+                {["Sent to Lab", "Order Sent to Lab", "Order Received", "Completed", "Returned for Rework"].includes(currentCase.status) ? (
                   <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
                     <span className="text-lg shrink-0">📦</span>
                     <div>
                       <p className="text-xs font-bold text-primary">Dispatched &amp; Sent to External Lab</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">
+                      <p className="text-[10px] text-gray-550 mt-0.5 leading-relaxed">
                         This order has been physically sent to {selectedLabPartner ? LAB_PARTNERS[selectedLabPartner]?.name : "the lab"}.
                       </p>
                     </div>
@@ -1611,17 +1574,16 @@ export default function LabOrders() {
                         triggerToast("Please enter a delivery address.", "error");
                         return;
                       }
-                      const ok = await updateDbStatus(currentCase.id, "Pending Doctor Confirmation");
+                      const ok = await updateDbStatus(currentCase.id, "Order Sent to Lab");
                       if (ok) {
-                        triggerToast(`Order sent to ${currentCase.dentist} for confirmation.`);
+                        triggerToast(`Case ${currentCase.id} marked as Order Sent to Lab.`);
                       } else {
-                        triggerToast("Failed to send. Please try again.", "error");
+                        triggerToast("Failed to update status.", "error");
                       }
                     }}
-                    className="w-full py-3.5 bg-primary hover:bg-primary/90 text-white font-extrabold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Truck className="w-4 h-4" />
-                    Send to Doctor for Confirmation
+                    <Truck className="w-4 h-4" /> Mark as Sent to Lab
                   </button>
                 )}
 

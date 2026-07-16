@@ -135,7 +135,7 @@ export default function DoctorProfile({ params }) {
                   <img
                     src={`http://localhost:8000${doctor.profile_picture}`}
                     alt={doctor.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    className="w-full h-full object-cover object-[center_80%] group-hover:scale-110 transition-transform duration-500"
                   />
                 ) : (
                   <User className="w-24 h-24 text-slate-300 group-hover:scale-110 transition-transform duration-500" />

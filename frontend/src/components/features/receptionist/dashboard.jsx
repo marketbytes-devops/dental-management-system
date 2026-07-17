@@ -8,6 +8,7 @@ import { getDoctors } from "@/services/api";
 export default function ReceptionistDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [queue, setQueue] = useState([]);
+  const [queueFilter, setQueueFilter] = useState("All");
 
 
   const fetchDoctorStats = async () => {
@@ -101,6 +102,17 @@ export default function ReceptionistDashboard() {
   // Wait time calculation description: 10 mins per waiting patient ahead
   const waitingPatientsCount = queue.filter(q => q.status === "Waiting").length;
   const estimatedLoungeWait = waitingPatientsCount * 10;
+
+  // Queue filtering logic
+  const uniqueDoctors = Array.from(new Set(queue.map(q => q.doctor_name))).filter(Boolean);
+  const queueByDoctor = uniqueDoctors.map(doc => ({
+    name: doc,
+    count: queue.filter(q => q.doctor_name === doc).length
+  })).sort((a, b) => b.count - a.count);
+
+  const filteredQueue = queueFilter === "All" 
+    ? queue 
+    : queue.filter(q => q.doctor_name === queueFilter);
 
   return (
     <div className="space-y-6 pb-10">
@@ -216,53 +228,111 @@ export default function ReceptionistDashboard() {
         </div>
 
         {/* Live Queue (4 cols) */}
-        <div className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
-          <div>
-            <h3 className="text-base font-extrabold text-gray-900">Live Waiting Queue</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Patients waiting in receptionist lounge</p>
+        <div className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col max-h-[600px]">
+          <div className="shrink-0">
+            <h3 className="text-base font-extrabold text-gray-900 flex items-center justify-between">
+              Live Waiting Queue
+              <span className="bg-warning/10 text-warning px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold">
+                {waitingPatientsCount} Waiting
+              </span>
+            </h3>
+            <p className="text-xs text-gray-400 mt-1">Filter by assigned doctor</p>
+            
+            {/* Filter Pills */}
+            <div className="flex flex-wrap gap-2 mt-3 pb-1">
+              <button 
+                onClick={() => setQueueFilter("All")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  queueFilter === "All" 
+                    ? "bg-gray-900 text-white shadow-md" 
+                    : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
+                }`}
+              >
+                All
+                <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${queueFilter === "All" ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}>
+                  {queue.length}
+                </span>
+              </button>
+              {queueByDoctor.map(doc => (
+                <button
+                  key={doc.name}
+                  onClick={() => setQueueFilter(doc.name)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    queueFilter === doc.name 
+                      ? "bg-primary text-white shadow-md shadow-primary/20" 
+                      : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
+                  }`}
+                >
+                  <span className="truncate max-w-[80px]" title={doc.name}>
+                    {doc.name.replace("Dr. ", "")}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${queueFilter === doc.name ? "bg-white/20 text-white" : "bg-gray-200 text-gray-600"}`}>
+                    {doc.count}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-            {queue.length === 0 ? (
-              <div className="text-center py-12 border border-dashed border-gray-200 rounded-xl flex flex-col items-center">
+          <div className="space-y-3 overflow-y-auto pr-1 flex-1 min-h-0 scrollbar-thin scrollbar-thumb-gray-200">
+            {filteredQueue.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-gray-200 rounded-2xl flex flex-col items-center bg-gray-50/50">
                 <Users className="w-8 h-8 text-gray-300" />
-                <p className="text-xs text-gray-400 mt-2 font-bold">Lounge is currently empty.</p>
+                <p className="text-xs text-gray-400 mt-2 font-bold">
+                  {queueFilter === "All" ? "Lounge is currently empty." : "No patients waiting for this doctor."}
+                </p>
               </div>
             ) : (
-              queue.map(q => (
-                <div key={q.id} className="p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors flex justify-between items-center">
-                  <div>
-                    <h4 className="text-sm font-extrabold text-gray-800">{q.patient_name}</h4>
-                    <p className="text-[10px] text-gray-450 mt-0.5">Assigned: {q.doctor_name}</p>
-                    <div className="flex flex-wrap gap-1.5 items-center mt-1.5">
-                      <span className="text-[9px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                        In: {formatCheckedInTime(q.checked_in_at)}
-                      </span>
-                      <span className={`text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded ${q.priority === "Emergency" ? "bg-danger/10 text-danger animate-pulse" :
-                        q.priority === "Urgent" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
-                        }`}>
-                        {q.priority}
-                      </span>
-                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${q.status === "In Chair" ? "bg-purple-50 text-purple-650 border border-purple-100" : "bg-gray-100 text-gray-500"
-                        }`}>
-                        {q.status}
-                      </span>
+              filteredQueue.map(q => (
+                <div key={q.id} className="p-4 bg-white border border-gray-100 rounded-2xl hover:shadow-md hover:border-primary/30 transition-all group flex flex-col gap-3 relative overflow-hidden">
+                  {/* Decorative side bar for status */}
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                    q.status === "In Chair" ? "bg-purple-500" : 
+                    q.priority === "Emergency" ? "bg-danger" : 
+                    "bg-success"
+                  }`}></div>
+                  
+                  <div className="flex justify-between items-start pl-2">
+                    <div>
+                      <h4 className="text-sm font-extrabold text-gray-900 group-hover:text-primary transition-colors">{q.patient_name}</h4>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Stethoscope className="w-3 h-3 text-gray-400" />
+                        <p className="text-[10px] font-semibold text-gray-500">{q.doctor_name}</p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => handleRemoveFromQueue(q.id, q.patient_name)}
+                      className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-danger hover:bg-danger/10 rounded-lg transition-colors cursor-pointer outline-none"
+                      title="Remove from queue"
+                    >
+                      ✕
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleRemoveFromQueue(q.id, q.patient_name)}
-                    className="p-1 text-gray-400 hover:text-danger rounded-lg transition-colors cursor-pointer text-lg outline-none"
-                    title="Remove from queue"
-                  >
-                    ×
-                  </button>
+                  
+                  <div className="flex flex-wrap gap-2 items-center pl-2">
+                    <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded-md flex items-center gap-1">
+                      <Hourglass className="w-3 h-3" />
+                      {formatCheckedInTime(q.checked_in_at)}
+                    </span>
+                    <span className={`text-[10px] uppercase tracking-wider font-extrabold px-2 py-1 rounded-md ${
+                      q.priority === "Emergency" ? "bg-danger/10 text-danger animate-pulse" :
+                      q.priority === "Urgent" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
+                    }`}>
+                      {q.priority}
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-md ml-auto ${
+                      q.status === "In Chair" ? "bg-purple-50 text-purple-650 border border-purple-100" : "bg-gray-100 text-gray-600"
+                    }`}>
+                      {q.status}
+                    </span>
+                  </div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="pt-2 text-center border-t border-gray-100">
-            <p className="text-[10px] text-gray-400 italic">Queue updates automatically when a doctor calls the next patient.</p>
+          <div className="pt-3 shrink-0 text-center border-t border-gray-100">
+            <p className="text-[10px] text-gray-400 font-medium">Queue updates automatically in real-time.</p>
           </div>
         </div>
       </div>

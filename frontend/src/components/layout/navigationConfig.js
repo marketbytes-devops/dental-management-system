@@ -85,7 +85,6 @@ export const ROLE_NAV_ITEMS = {
     { name: "Registrations", href: "/frontdesk/receptionist/patients", icon: UserPlus },
     { name: "Daily Transactions", href: "/frontdesk/receptionist/transactions", icon: Receipt },
     { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: Stethoscope },
-    { name: "Waiting Queue", href: "/frontdesk/receptionist/queue", icon: Hourglass },
     { name: "Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },
     { name: "Medical Alerts", href: "/frontdesk/receptionist/alerts", icon: AlertTriangle },
     { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },

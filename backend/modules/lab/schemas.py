@@ -99,6 +99,7 @@ class LabOrderStatusUpdate(BaseModel):
     vendor_id: Optional[int] = None
     lab_name: Optional[str] = None
     tech_notes: Optional[str] = None
+    attachments: Optional[Any] = None
 
 class LabOrderEdit(BaseModel):
     order_category: Optional[str] = None

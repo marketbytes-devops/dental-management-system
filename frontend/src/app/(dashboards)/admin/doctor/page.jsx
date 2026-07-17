@@ -429,7 +429,7 @@ function ShiftEditorModal({ doctor, onClose, onSave }) {
     }
     const defaultSchedule = {};
     daysOfWeek.forEach(day => {
-      defaultSchedule[day] = { is_off: false, start: "09:00 AM", end: "05:00 PM" };
+      defaultSchedule[day] = { is_off: false, start: "09:00 AM", end: "05:00 PM", break_start: "01:00 PM", break_end: "01:30 PM" };
     });
     return defaultSchedule;
   });
@@ -442,6 +442,25 @@ function ShiftEditorModal({ doctor, onClose, onSave }) {
         [field]: value
       }
     }));
+  };
+
+  const applyDefaultBreaks = () => {
+    setSchedule(prev => {
+      const next = { ...prev };
+      daysOfWeek.forEach(day => {
+        if (!next[day].is_off) {
+          const start = next[day].start || "";
+          if (start.includes("AM") || start.startsWith("0") || start.startsWith("10") || start.startsWith("11")) {
+            next[day].break_start = "12:00 PM";
+            next[day].break_end = "12:30 PM";
+          } else {
+            next[day].break_start = "03:00 PM";
+            next[day].break_end = "03:30 PM";
+          }
+        }
+      });
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -467,9 +486,17 @@ function ShiftEditorModal({ doctor, onClose, onSave }) {
             <h2 className="text-lg font-bold text-gray-900">Edit Shift Schedule</h2>
             <p className="text-xs text-gray-500 mt-1">{doctor.name}</p>
           </div>
-          <button onClick={onClose} className="p-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl cursor-pointer transition-colors text-gray-500 hover:text-gray-900 outline-none">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={applyDefaultBreaks} 
+              className="text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-lg transition-colors border border-primary/20"
+            >
+              Apply Default Breaks
+            </button>
+            <button onClick={onClose} className="p-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl cursor-pointer transition-colors text-gray-500 hover:text-gray-900 outline-none">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
@@ -505,6 +532,24 @@ function ShiftEditorModal({ doctor, onClose, onSave }) {
                       placeholder="05:00 PM"
                       className="w-24 px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-primary font-mono text-center"
                     />
+                    <div className="border-l border-gray-200 pl-2 ml-1 flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-bold text-gray-400">Break:</span>
+                      <input 
+                        type="text" 
+                        value={schedule[day]?.break_start || ""} 
+                        onChange={(e) => handleUpdate(day, 'break_start', e.target.value)}
+                        placeholder="01:00 PM"
+                        className="w-20 px-2 py-1 text-[10px] bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-primary font-mono text-center"
+                      />
+                      <span className="text-[10px] text-gray-400 font-bold">-</span>
+                      <input 
+                        type="text" 
+                        value={schedule[day]?.break_end || ""} 
+                        onChange={(e) => handleUpdate(day, 'break_end', e.target.value)}
+                        placeholder="01:30 PM"
+                        className="w-20 px-2 py-1 text-[10px] bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-primary font-mono text-center"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

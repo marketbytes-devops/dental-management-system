@@ -250,6 +250,224 @@ export default function DoctorTreatmentPlanPage() {
   const [attachments, setAttachments] = useState([]);
   const [steps, setSteps] = useState([]);
   const [sittings, setSittings] = useState(["Sitting 1"]);
+  const [showTeethChart, setShowTeethChart] = useState(false);
+
+  // Orthodontic Consultation Sheet Fields
+  const [orthoActiveTab, setOrthoActiveTab] = useState("history");
+  const [orthoChiefComplaint, setOrthoChiefComplaint] = useState("");
+  const [preNatalHistory, setPreNatalHistory] = useState("");
+  const [postNatalHistory, setPostNatalHistory] = useState("");
+  const [childhoodDiseases, setChildhoodDiseases] = useState("");
+  const [habitsInjuries, setHabitsInjuries] = useState("");
+  const [geneticHistory, setGeneticHistory] = useState("");
+  const [generalHistory, setGeneralHistory] = useState("");
+  const [pubertalStatus, setPubertalStatus] = useState("");
+  const [physicalStatus, setPhysicalStatus] = useState("");
+  const [headShape, setHeadShape] = useState("mesocephalic");
+  const [facialForm, setFacialForm] = useState("mesoprosopic");
+  const [facialDivergence, setFacialDivergence] = useState("straight");
+  const [interLabialGap, setInterLabialGap] = useState("");
+  const [lipPostureTonicity, setLipPostureTonicity] = useState("normal");
+  const [mentoLabialSulcus, setMentoLabialSulcus] = useState("normal");
+  const [vto, setVto] = useState("positive");
+  const [lipCompetence, setLipCompetence] = useState("competent");
+  const [mucogingivalJunction, setMucogingivalJunction] = useState("");
+  const [frenalUpper, setFrenalUpper] = useState("normal");
+  const [frenalLower, setFrenalLower] = useState("normal");
+  const [tongue, setTongue] = useState("normal");
+  const [oralMucosa, setOralMucosa] = useState("normal");
+  const [teethPresent, setTeethPresent] = useState("");
+  const [uneruptedTeeth, setUneruptedTeeth] = useState("");
+  const [missingTeeth, setMissingTeeth] = useState("");
+  const [teethSizeFormTexture, setTeethSizeFormTexture] = useState("");
+  const [caries, setCaries] = useState("");
+  const [endoTreatedTeeth, setEndoTreatedTeeth] = useState("");
+  const [wearFacets, setWearFacets] = useState("");
+  const [maxArchShape, setMaxArchShape] = useState("u-shaped");
+  const [maxArchSymmetry, setMaxArchSymmetry] = useState("symmetric");
+  const [maxArchAlignment, setMaxArchAlignment] = useState("aligned");
+  const [mandArchShape, setMandArchShape] = useState("u-shaped");
+  const [mandArchSymmetry, setMandArchSymmetry] = useState("symmetric");
+  const [mandArchAlignment, setMandArchAlignment] = useState("aligned");
+  const [maxillaMandibleRelationship, setMaxillaMandibleRelationship] = useState("");
+  const [maxOpening, setMaxOpening] = useState("");
+  const [freewaySpace, setFreewaySpace] = useState("");
+  const [curveOfSpee, setCurveOfSpee] = useState("");
+  const [midlineUpper, setMidlineUpper] = useState("aligned");
+  const [midlineLower, setMidlineLower] = useState("aligned");
+  const [apRelationship, setApRelationship] = useState("");
+  const [molarRelationship, setMolarRelationship] = useState("class1");
+  const [canineRelationship, setCanineRelationship] = useState("class1");
+  const [overjet, setOverjet] = useState("");
+  const [overbite, setOverbite] = useState("");
+  const [crossbite, setCrossbite] = useState("no");
+  const [ackermanVennDiagram, setAckermanVennDiagram] = useState("");
+  const [treatmentPlan, setTreatmentPlan] = useState("");
+
+  const serializeOrthoData = () => {
+    return JSON.stringify({
+      isOrthoSheet: true,
+      orthoChiefComplaint,
+      preNatalHistory,
+      postNatalHistory,
+      childhoodDiseases,
+      habitsInjuries,
+      geneticHistory,
+      generalHistory,
+      pubertalStatus,
+      physicalStatus,
+      headShape,
+      facialForm,
+      facialDivergence,
+      interLabialGap,
+      lipPostureTonicity,
+      mentoLabialSulcus,
+      vto,
+      lipCompetence,
+      mucogingivalJunction,
+      frenalUpper,
+      frenalLower,
+      tongue,
+      oralMucosa,
+      teethPresent,
+      uneruptedTeeth,
+      missingTeeth,
+      teethSizeFormTexture,
+      caries,
+      endoTreatedTeeth,
+      wearFacets,
+      maxArchShape,
+      maxArchSymmetry,
+      maxArchAlignment,
+      mandArchShape,
+      mandArchSymmetry,
+      mandArchAlignment,
+      maxillaMandibleRelationship,
+      maxOpening,
+      freewaySpace,
+      curveOfSpee,
+      midlineUpper,
+      midlineLower,
+      apRelationship,
+      molarRelationship,
+      canineRelationship,
+      overjet,
+      overbite,
+      crossbite,
+      ackermanVennDiagram,
+      treatmentPlan
+    });
+  };
+
+  const parseOrthoData = (dataStr) => {
+    try {
+      const parsed = JSON.parse(dataStr);
+      if (parsed && parsed.isOrthoSheet) {
+        setOrthoChiefComplaint(parsed.orthoChiefComplaint || "");
+        setPreNatalHistory(parsed.preNatalHistory || "");
+        setPostNatalHistory(parsed.postNatalHistory || "");
+        setChildhoodDiseases(parsed.childhoodDiseases || "");
+        setHabitsInjuries(parsed.habitsInjuries || "");
+        setGeneticHistory(parsed.geneticHistory || "");
+        setGeneralHistory(parsed.generalHistory || "");
+        setPubertalStatus(parsed.pubertalStatus || "");
+        setPhysicalStatus(parsed.physicalStatus || "");
+        setHeadShape(parsed.headShape || "mesocephalic");
+        setFacialForm(parsed.facialForm || "mesoprosopic");
+        setFacialDivergence(parsed.facialDivergence || "straight");
+        setInterLabialGap(parsed.interLabialGap || "");
+        setLipPostureTonicity(parsed.lipPostureTonicity || "normal");
+        setMentoLabialSulcus(parsed.mentoLabialSulcus || "normal");
+        setVto(parsed.vto || "positive");
+        setLipCompetence(parsed.lipCompetence || "competent");
+        setMucogingivalJunction(parsed.mucogingivalJunction || "");
+        setFrenalUpper(parsed.frenalUpper || "normal");
+        setFrenalLower(parsed.frenalLower || "normal");
+        setTongue(parsed.tongue || "normal");
+        setOralMucosa(parsed.oralMucosa || "normal");
+        setTeethPresent(parsed.teethPresent || "");
+        setUneruptedTeeth(parsed.uneruptedTeeth || "");
+        setMissingTeeth(parsed.missingTeeth || "");
+        setTeethSizeFormTexture(parsed.teethSizeFormTexture || "");
+        setCaries(parsed.caries || "");
+        setEndoTreatedTeeth(parsed.endoTreatedTeeth || "");
+        setWearFacets(parsed.wearFacets || "");
+        setMaxArchShape(parsed.maxArchShape || "u-shaped");
+        setMaxArchSymmetry(parsed.maxArchSymmetry || "symmetric");
+        setMaxArchAlignment(parsed.maxArchAlignment || "aligned");
+        setMandArchShape(parsed.mandArchShape || "u-shaped");
+        setMandArchSymmetry(parsed.mandArchSymmetry || "symmetric");
+        setMandArchAlignment(parsed.mandArchAlignment || "aligned");
+        setMaxillaMandibleRelationship(parsed.maxillaMandibleRelationship || "");
+        setMaxOpening(parsed.maxOpening || "");
+        setFreewaySpace(parsed.freewaySpace || "");
+        setCurveOfSpee(parsed.curveOfSpee || "");
+        setMidlineUpper(parsed.midlineUpper || "aligned");
+        setMidlineLower(parsed.midlineLower || "aligned");
+        setApRelationship(parsed.apRelationship || "");
+        setMolarRelationship(parsed.molarRelationship || "class1");
+        setCanineRelationship(parsed.canineRelationship || "class1");
+        setOverjet(parsed.overjet || "");
+        setOverbite(parsed.overbite || "");
+        setCrossbite(parsed.crossbite || "no");
+        setAckermanVennDiagram(parsed.ackermanVennDiagram || "");
+        setTreatmentPlan(parsed.treatmentPlan || "");
+        return;
+      }
+    } catch (e) {
+      // not JSON or not Ortho
+    }
+    // fallback
+    setOrthoChiefComplaint(dataStr || "");
+    setPreNatalHistory("");
+    setPostNatalHistory("");
+    setChildhoodDiseases("");
+    setHabitsInjuries("");
+    setGeneticHistory("");
+    setGeneralHistory("");
+    setPubertalStatus("");
+    setPhysicalStatus("");
+    setHeadShape("mesocephalic");
+    setFacialForm("mesoprosopic");
+    setFacialDivergence("straight");
+    setInterLabialGap("");
+    setLipPostureTonicity("normal");
+    setMentoLabialSulcus("normal");
+    setVto("positive");
+    setLipCompetence("competent");
+    setMucogingivalJunction("");
+    setFrenalUpper("normal");
+    setFrenalLower("normal");
+    setTongue("normal");
+    setOralMucosa("normal");
+    setTeethPresent("");
+    setUneruptedTeeth("");
+    setMissingTeeth("");
+    setTeethSizeFormTexture("");
+    setCaries("");
+    setEndoTreatedTeeth("");
+    setWearFacets("");
+    setMaxArchShape("u-shaped");
+    setMaxArchSymmetry("symmetric");
+    setMaxArchAlignment("aligned");
+    setMandArchShape("u-shaped");
+    setMandArchSymmetry("symmetric");
+    setMandArchAlignment("aligned");
+    setMaxillaMandibleRelationship("");
+    setMaxOpening("");
+    setFreewaySpace("");
+    setCurveOfSpee("");
+    setMidlineUpper("aligned");
+    setMidlineLower("aligned");
+    setApRelationship("");
+    setMolarRelationship("class1");
+    setCanineRelationship("class1");
+    setOverjet("");
+    setOverbite("");
+    setCrossbite("no");
+    setAckermanVennDiagram("");
+    setTreatmentPlan("");
+  };
 
   // Live Procedures Catalog
   const [catalogProcedures, setCatalogProcedures] = useState([]);
@@ -345,7 +563,9 @@ export default function DoctorTreatmentPlanPage() {
       const draftOrActive = planData.find(p => p.status === "Active") || planData.find(p => p.status === "Draft");
       if (draftOrActive) {
         setActivePlan(draftOrActive);
-        setConditions(draftOrActive.current_conditions || "");
+        const cond = draftOrActive.current_conditions || "";
+        setConditions(cond);
+        parseOrthoData(cond);
         setDiagnoses(draftOrActive.diagnoses || []);
         setGoals(draftOrActive.treatment_objectives || []);
         setDuration(draftOrActive.estimated_duration || "12 months");
@@ -379,6 +599,7 @@ export default function DoctorTreatmentPlanPage() {
       } else {
         setActivePlan(null);
         setConditions("");
+        parseOrthoData("");
         setDiagnoses([]);
         setGoals([]);
         setDuration("12 months");
@@ -402,9 +623,10 @@ export default function DoctorTreatmentPlanPage() {
 
   // Saves Draft or Updates current plan details
   const handleSavePlan = async (statusType = "Draft") => {
+    const finalConditions = doctorSpecialty === "Orthodontics" ? serializeOrthoData() : conditions;
     const payload = {
       patient_token: patientToken,
-      current_conditions: conditions || "No current conditions specified.",
+      current_conditions: finalConditions || "No current conditions specified.",
       diagnoses,
       treatment_objectives: goals,
       estimated_duration: duration,
@@ -669,11 +891,673 @@ export default function DoctorTreatmentPlanPage() {
       
           
 
-      {/* SmileCare 3D Dental Charting Panel */}
-      <SmileCareChart 
-        patientToken={patientToken} 
-        mode="endo" 
-      />
+      {/* 3D Dental Chart Toggle and Panel */}
+      <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">
+              Interactive 3D Teeth Model
+            </h3>
+            <p className="text-[10px] text-gray-500 mt-0.5 font-medium">
+              Toggle to view the 3D dental charting system.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowTeethChart(!showTeethChart)}
+            className="px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-gray-700 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            {showTeethChart ? "👁️ Hide 3D Model" : "👁️ Show 3D Model"}
+          </button>
+        </div>
+        {showTeethChart && (
+          <div className="pt-4 border-t border-gray-100">
+            <SmileCareChart 
+              patientToken={patientToken} 
+              mode="endo" 
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Orthodontics Digital Consultation Sheet */}
+      {doctorSpecialty === "Orthodontics" && (
+        <div className="bg-white border border-gray-150 rounded-2xl p-6 shadow-sm space-y-6">
+          <div className="border-b border-gray-100 pb-4">
+            <h3 className="text-sm font-black text-gray-880 uppercase tracking-wider flex items-center gap-2">
+              📋 Orthodontic Consultation Sheet
+            </h3>
+            <p className="text-[10px] text-gray-500 font-semibold mt-0.5">
+              Complete the comprehensive case history and diagnostic analysis for orthodontic treatment formulation.
+            </p>
+          </div>
+          
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar gap-2 bg-gray-50/50 p-1.5 rounded-xl">
+            {[
+              { id: "history", label: "History & Profile" },
+              { id: "extraoral", label: "Extra-Oral Exam" },
+              { id: "intraoral", label: "Intra-Oral & Tissue" },
+              { id: "occlusion", label: "Arch & Occlusion" },
+              { id: "plan", label: "Ackerman & Plan" }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setOrthoActiveTab(tab.id)}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                  orthoActiveTab === tab.id
+                    ? "bg-white text-primary border border-gray-150 shadow-sm"
+                    : "text-gray-550 hover:text-gray-850 hover:bg-gray-100/50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          
+          {/* Tab Contents */}
+          <div className="pt-2">
+            {/* History Tab */}
+            {orthoActiveTab === "history" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Chief Complaint</label>
+                  <textarea
+                    value={orthoChiefComplaint}
+                    onChange={(e) => setOrthoChiefComplaint(e.target.value)}
+                    placeholder="Describe patient's malocclusion complaint or aesthetic concerns..."
+                    rows="2"
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Pre-Natal History</label>
+                  <input
+                    type="text"
+                    value={preNatalHistory}
+                    onChange={(e) => setPreNatalHistory(e.target.value)}
+                    placeholder="Maternal health, medication during pregnancy..."
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Post-Natal History</label>
+                  <input
+                    type="text"
+                    value={postNatalHistory}
+                    onChange={(e) => setPostNatalHistory(e.target.value)}
+                    placeholder="Milestones, feeding habits, trauma..."
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Childhood Diseases</label>
+                  <input
+                    type="text"
+                    value={childhoodDiseases}
+                    onChange={(e) => setChildhoodDiseases(e.target.value)}
+                    placeholder="Rickets, allergies, systemic conditions..."
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Habits / Injuries</label>
+                  <input
+                    type="text"
+                    value={habitsInjuries}
+                    onChange={(e) => setHabitsInjuries(e.target.value)}
+                    placeholder="Thumb sucking, tongue thrusting, mouth breathing..."
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Familial/Genetic History of Malocclusion</label>
+                  <input
+                    type="text"
+                    value={geneticHistory}
+                    onChange={(e) => setGeneticHistory(e.target.value)}
+                    placeholder="Similar skeletal malocclusion patterns in family..."
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">General Medical History</label>
+                  <input
+                    type="text"
+                    value={generalHistory}
+                    onChange={(e) => setGeneralHistory(e.target.value)}
+                    placeholder="Bleeding disorders, cardiac conditions..."
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Pubertal Growth Status</label>
+                  <input
+                    type="text"
+                    value={pubertalStatus}
+                    onChange={(e) => setPubertalStatus(e.target.value)}
+                    placeholder="Peak height velocity, skeletal maturity index..."
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Physical Status</label>
+                  <input
+                    type="text"
+                    value={physicalStatus}
+                    onChange={(e) => setPhysicalStatus(e.target.value)}
+                    placeholder="Height, weight, overall physical development..."
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Extra-Oral Tab */}
+            {orthoActiveTab === "extraoral" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fadeIn">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Shape of the Head</label>
+                  <select 
+                    value={headShape}
+                    onChange={(e) => setHeadShape(e.target.value)}
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none cursor-pointer"
+                  >
+                    <option value="mesocephalic">Mesocephalic (Normal head shape)</option>
+                    <option value="dolichocephalic">Dolichocephalic (Long, narrow head)</option>
+                    <option value="brachycephalic">Brachycephalic (Short, wide head)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Facial Form</label>
+                  <select 
+                    value={facialForm}
+                    onChange={(e) => setFacialForm(e.target.value)}
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none cursor-pointer"
+                  >
+                    <option value="mesoprosopic">Mesoprosopic (Normal average form)</option>
+                    <option value="leptoprosopic">Leptoprosopic (Long, narrow face)</option>
+                    <option value="euryprosopic">Euryprosopic (Broad, short face)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Facial Divergence</label>
+                  <select 
+                    value={facialDivergence}
+                    onChange={(e) => setFacialDivergence(e.target.value)}
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none cursor-pointer"
+                  >
+                    <option value="straight">Straight / Orthognathic</option>
+                    <option value="anterior">Anterior Divergent (Proclined)</option>
+                    <option value="posterior">Posterior Divergent (Retroclined)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Inter Labial Gap (mm)</label>
+                  <input
+                    type="number"
+                    value={interLabialGap}
+                    onChange={(e) => setInterLabialGap(e.target.value)}
+                    placeholder="Normal is 1 - 2mm"
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Lip Posture and Tonicity</label>
+                  <select 
+                    value={lipPostureTonicity}
+                    onChange={(e) => setLipPostureTonicity(e.target.value)}
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none cursor-pointer"
+                  >
+                    <option value="normal">Normal Tone</option>
+                    <option value="flaccid">Flaccid (Hypotonic)</option>
+                    <option value="tense">Tense (Hypertonic)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Mento Labial Sulcus</label>
+                  <select 
+                    value={mentoLabialSulcus}
+                    onChange={(e) => setMentoLabialSulcus(e.target.value)}
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none cursor-pointer"
+                  >
+                    <option value="normal">Normal depth</option>
+                    <option value="deep">Deep sulcus</option>
+                    <option value="shallow">Shallow/Flat sulcus</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">V T O (Visual Treatment Objective)</label>
+                  <select 
+                    value={vto}
+                    onChange={(e) => setVto(e.target.value)}
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none cursor-pointer"
+                  >
+                    <option value="positive">Positive (profile improves with mandibular advancement)</option>
+                    <option value="negative">Negative (profile worsens)</option>
+                    <option value="neutral">Neutral (no change)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Lip Competence</label>
+                  <select 
+                    value={lipCompetence}
+                    onChange={(e) => setLipCompetence(e.target.value)}
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none cursor-pointer"
+                  >
+                    <option value="competent">Competent (Lips meet without strain)</option>
+                    <option value="incompetent">Incompetent (Significant strain required)</option>
+                    <option value="potentially_competent">Potentially Competent (Blocked by teeth)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+            
+            {/* Intra-Oral & Tissue Tab */}
+            {orthoActiveTab === "intraoral" && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="bg-gray-50 border border-gray-150 p-4 rounded-xl space-y-4">
+                  <span className="text-xs font-bold text-gray-700 block border-b border-gray-200 pb-1.5">Intra-Oral Soft Tissue Details</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Position of Mucogingival Junction</label>
+                      <input
+                        type="text"
+                        value={mucogingivalJunction}
+                        onChange={(e) => setMucogingivalJunction(e.target.value)}
+                        placeholder="Adequate/Inadequate attached gingiva..."
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Frenal Attachment (Upper Arch)</label>
+                      <select 
+                        value={frenalUpper}
+                        onChange={(e) => setFrenalUpper(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="normal">Normal insertion</option>
+                        <option value="high">High/Abnormal insertion (diastema risk)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Frenal Attachment (Lower Arch)</label>
+                      <select 
+                        value={frenalLower}
+                        onChange={(e) => setFrenalLower(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="normal">Normal insertion</option>
+                        <option value="high">High/Abnormal insertion</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Tongue Position / Size</label>
+                      <select 
+                        value={tongue}
+                        onChange={(e) => setTongue(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="normal">Normal size & function</option>
+                        <option value="macroglossia">Macroglossia (Large tongue)</option>
+                        <option value="tongue_tie">Tongue Tie (Ankyloglossia)</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Oral Mucosa Remarks</label>
+                      <input
+                        type="text"
+                        value={oralMucosa}
+                        onChange={(e) => setOralMucosa(e.target.value)}
+                        placeholder="Healthy, lesions, signs of irritation, mucosal bands..."
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 border border-gray-150 p-4 rounded-xl space-y-4">
+                  <span className="text-xs font-bold text-gray-700 block border-b border-gray-200 pb-1.5">Hard Tissue & Dental Analysis</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Number of Teeth Present</label>
+                      <input
+                        type="number"
+                        value={teethPresent}
+                        onChange={(e) => setTeethPresent(e.target.value)}
+                        placeholder="e.g. 28"
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Number of Unerupted Teeth</label>
+                      <input
+                        type="number"
+                        value={uneruptedTeeth}
+                        onChange={(e) => setUneruptedTeeth(e.target.value)}
+                        placeholder="e.g. 4 (third molars)"
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Supernumerary / Missing Teeth</label>
+                      <input
+                        type="text"
+                        value={missingTeeth}
+                        onChange={(e) => setMissingTeeth(e.target.value)}
+                        placeholder="e.g. Congenitally missing #12, #22"
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Size, Form & Texture of Teeth</label>
+                      <input
+                        type="text"
+                        value={teethSizeFormTexture}
+                        onChange={(e) => setTeethSizeFormTexture(e.target.value)}
+                        placeholder="Peg-shaped laterals, microdontia, fluorosis spots..."
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Caries Findings</label>
+                      <input
+                        type="text"
+                        value={caries}
+                        onChange={(e) => setCaries(e.target.value)}
+                        placeholder="e.g. Pit and fissure caries on #36, #46"
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Endodontically Treated Teeth</label>
+                      <input
+                        type="text"
+                        value={endoTreatedTeeth}
+                        onChange={(e) => setEndoTreatedTeeth(e.target.value)}
+                        placeholder="e.g. RCT completed on #11"
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Occlusal Wear Facets</label>
+                      <input
+                        type="text"
+                        value={wearFacets}
+                        onChange={(e) => setWearFacets(e.target.value)}
+                        placeholder="Bruxism facets on canines/premolars..."
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Arch & Occlusion Tab */}
+            {orthoActiveTab === "occlusion" && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="bg-gray-50 border border-gray-150 p-4 rounded-xl space-y-4">
+                  <span className="text-xs font-bold text-gray-700 block border-b border-gray-200 pb-1.5">Maxillary Arch Profile</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Arch Shape</label>
+                      <select 
+                        value={maxArchShape}
+                        onChange={(e) => setMaxArchShape(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="u-shaped">U-Shaped (Normal shape)</option>
+                        <option value="v-shaped">V-Shaped (Constricted anteriorly)</option>
+                        <option value="square">Square Arch (Broad anteriorly)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Arch Symmetry</label>
+                      <select 
+                        value={maxArchSymmetry}
+                        onChange={(e) => setMaxArchSymmetry(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="symmetric">Symmetric</option>
+                        <option value="asymmetric">Asymmetric (Unilateral constriction)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Arch Alignment</label>
+                      <select 
+                        value={maxArchAlignment}
+                        onChange={(e) => setMaxArchAlignment(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="aligned">Aligned (No spacing/crowding)</option>
+                        <option value="crowded">Crowded (Imbricated anteriorly)</option>
+                        <option value="spaced">Spaced (Diastemas present)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 border border-gray-150 p-4 rounded-xl space-y-4">
+                  <span className="text-xs font-bold text-gray-700 block border-b border-gray-200 pb-1.5">Mandibular Arch Profile</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Arch Shape</label>
+                      <select 
+                        value={mandArchShape}
+                        onChange={(e) => setMandArchShape(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="u-shaped">U-Shaped (Normal shape)</option>
+                        <option value="v-shaped">V-Shaped</option>
+                        <option value="square">Square Arch</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Arch Symmetry</label>
+                      <select 
+                        value={mandArchSymmetry}
+                        onChange={(e) => setMandArchSymmetry(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="symmetric">Symmetric</option>
+                        <option value="asymmetric">Asymmetric</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Arch Alignment</label>
+                      <select 
+                        value={mandArchAlignment}
+                        onChange={(e) => setMandArchAlignment(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="aligned">Aligned</option>
+                        <option value="crowded">Crowded</option>
+                        <option value="spaced">Spaced</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 border border-gray-150 p-4 rounded-xl space-y-4">
+                  <span className="text-xs font-bold text-gray-700 block border-b border-gray-200 pb-1.5">Skeletal & Dentofacial Relationships</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Relationship of Maxilla to Mandible</label>
+                      <input
+                        type="text"
+                        value={maxillaMandibleRelationship}
+                        onChange={(e) => setMaxillaMandibleRelationship(e.target.value)}
+                        placeholder="ANB Angle, Skeletal Class I/II/III..."
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Max. Jaw Opening (mm)</label>
+                      <input
+                        type="number"
+                        value={maxOpening}
+                        onChange={(e) => setMaxOpening(e.target.value)}
+                        placeholder="Normal is 40 - 50mm"
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Freeway Space (mm)</label>
+                      <input
+                        type="number"
+                        value={freewaySpace}
+                        onChange={(e) => setFreewaySpace(e.target.value)}
+                        placeholder="Normal is 2 - 3mm"
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Curve of Spee Depth</label>
+                      <input
+                        type="text"
+                        value={curveOfSpee}
+                        onChange={(e) => setCurveOfSpee(e.target.value)}
+                        placeholder="Normal, flat, deep (mm value)..."
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Dental Midline (Maxillary)</label>
+                      <select 
+                        value={midlineUpper}
+                        onChange={(e) => setMidlineUpper(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="aligned">Aligned with facial midline</option>
+                        <option value="left_1mm">Shifted Left 1mm</option>
+                        <option value="left_2mm">Shifted Left 2mm</option>
+                        <option value="right_1mm">Shifted Right 1mm</option>
+                        <option value="right_2mm">Shifted Right 2mm</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Dental Midline (Mandibular)</label>
+                      <select 
+                        value={midlineLower}
+                        onChange={(e) => setMidlineLower(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="aligned">Aligned with maxillary midline</option>
+                        <option value="left_1mm">Shifted Left 1mm</option>
+                        <option value="left_2mm">Shifted Left 2mm</option>
+                        <option value="right_1mm">Shifted Right 1mm</option>
+                        <option value="right_2mm">Shifted Right 2mm</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 border border-gray-150 p-4 rounded-xl space-y-4">
+                  <span className="text-xs font-bold text-gray-700 block border-b border-gray-200 pb-1.5">Occlusal Relationships</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Antero-Posterior Skeletal Relation</label>
+                      <input
+                        type="text"
+                        value={apRelationship}
+                        onChange={(e) => setApRelationship(e.target.value)}
+                        placeholder="Skeletal Class II Div 1 etc..."
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Molar Relationship</label>
+                      <select 
+                        value={molarRelationship}
+                        onChange={(e) => setMolarRelationship(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="class1">Angle's Class I (Normal)</option>
+                        <option value="class2">Angle's Class II (Distoclusion)</option>
+                        <option value="class3">Angle's Class III (Mesioclusion)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Canine Relationship</label>
+                      <select 
+                        value={canineRelationship}
+                        onChange={(e) => setCanineRelationship(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="class1">Class I Canine relation</option>
+                        <option value="class2">Class II Canine relation</option>
+                        <option value="class3">Class III Canine relation</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Incisor Overjet (mm)</label>
+                      <input
+                        type="number"
+                        value={overjet}
+                        onChange={(e) => setOverjet(e.target.value)}
+                        placeholder="Normal is 2 - 3mm"
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Vertical Overbite (mm)</label>
+                      <input
+                        type="number"
+                        value={overbite}
+                        onChange={(e) => setOverbite(e.target.value)}
+                        placeholder="Normal is 1 - 2mm"
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 block mb-1">Transverse Relationship (Cross Bite)</label>
+                      <select 
+                        value={crossbite}
+                        onChange={(e) => setCrossbite(e.target.value)}
+                        className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-white focus:border-primary focus:outline-none cursor-pointer"
+                      >
+                        <option value="no">No Cross Bite detected</option>
+                        <option value="unilateral_right">Unilateral Cross Bite (Right)</option>
+                        <option value="unilateral_left">Unilateral Cross Bite (Left)</option>
+                        <option value="bilateral">Bilateral Cross Bite</option>
+                        <option value="scissors_bite">Scissors Bite (Brodie Bite)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Ackerman & Plan Tab */}
+            {orthoActiveTab === "plan" && (
+              <div className="space-y-4 animate-fadeIn">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Ackerman & Profit Venn Diagram Analysis</label>
+                  <textarea
+                    value={ackermanVennDiagram}
+                    onChange={(e) => setAckermanVennDiagram(e.target.value)}
+                    placeholder="Analyze 5 characteristics: Alignment, Profile, Transverse, AP, Vertical relations..."
+                    rows="4"
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">Proposed Treatment Plan Options</label>
+                  <textarea
+                    value={treatmentPlan}
+                    onChange={(e) => setTreatmentPlan(e.target.value)}
+                    placeholder="Formulate orthodontic extraction/non-extraction therapy details, anchorage type, sequence..."
+                    rows="4"
+                    className="w-full text-xs font-semibold border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 focus:bg-white focus:border-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Forms Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -681,18 +1565,20 @@ export default function DoctorTreatmentPlanPage() {
         {/* LEFT COLUMN: DIAGNOSIS & OBJECTIVES */}
         <div className="space-y-6">
           {/* Current Conditions */}
-          <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-3">
-            <h3 className="text-xs font-black text-gray-850 uppercase tracking-wider flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-primary" /> Current Condition Findings
-            </h3>
-            <textarea
-              rows={3}
-              value={conditions}
-              onChange={(e) => setConditions(e.target.value)}
-              placeholder="Document summary dental findings..."
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            />
-          </div>
+          {doctorSpecialty !== "Orthodontics" && (
+            <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-3">
+              <h3 className="text-xs font-black text-gray-855 uppercase tracking-wider flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4 text-primary" /> Current Condition Findings
+              </h3>
+              <textarea
+                rows={3}
+                value={conditions}
+                onChange={(e) => setConditions(e.target.value)}
+                placeholder="Document summary dental findings..."
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+          )}
 
           {/* Diagnoses List */}
           <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">

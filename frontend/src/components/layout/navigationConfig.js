@@ -73,6 +73,7 @@ export const ROLE_NAV_ITEMS = {
       ]
     },
     { name: "Live Queue", href: "/doctor/queue", icon: Users },
+    { name: "Pending Labs", href: "/doctor/labs", icon: Microscope },
     { name: "Referrals", href: "/doctor/referrals", icon: Share2 },
     { name: "Notifications", href: "/doctor/notifications", icon: Bell },
     { name: "Leave Management", href: "/doctor/leave", icon: Calendar },

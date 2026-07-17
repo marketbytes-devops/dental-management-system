@@ -1,5 +1,5 @@
 # models.py - database table definitions
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Float
 from sqlalchemy.sql import func
 from database import Base
 
@@ -19,5 +19,16 @@ class AppointmentModel(Base):
     wait_time_estimate = Column(Integer, default=0)  # in minutes
     checked_in_at = Column(DateTime(timezone=True), nullable=True)
     symptoms = Column(String, nullable=True)
+    payment_status = Column(String, default="Unpaid")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+class TransactionModel(Base):
+    __tablename__ = "transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    payment_method = Column(String, nullable=False) # Cash, Card, Online
+    transaction_date = Column(DateTime(timezone=True), server_default=func.now())
+    collected_by = Column(String, nullable=True)

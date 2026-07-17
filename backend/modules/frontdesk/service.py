@@ -3,10 +3,10 @@ import random
 import logging
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from fastapi import HTTPException, status
-from .models import AppointmentModel
-from .schemas import AppointmentCreate, AppointmentUpdate, CheckInRequest
+from .models import AppointmentModel, TransactionModel
+from .schemas import AppointmentCreate, AppointmentUpdate, CheckInRequest, PaymentRequest
 from modules.patient.models import PatientModel
 from twilio_service import send_sms
 
@@ -238,6 +238,58 @@ def verify_checkin_otp(db: Session, appt_id: int, otp_code: str) -> AppointmentM
     db.refresh(appt)
     return appt
 
+
+def process_consultation_payment(db: Session, appt_id: int, payment_in: PaymentRequest) -> AppointmentModel:
+    appt = db.query(AppointmentModel).filter(AppointmentModel.id == appt_id).first()
+    if not appt:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Appointment not found."
+        )
+    
+    if appt.payment_status == "Paid":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Consultation charge already paid."
+        )
+
+    now = datetime.now()
+    appt.payment_status = "Paid"
+    appt.otp_status = "Bypassed"
+    appt.status = "Waiting"
+    appt.checked_in_at = now
+    
+    today = date.today()
+    if appt.appointment_date == today:
+        if appt.priority == "Emergency":
+            appt.wait_time_estimate = 0
+        else:
+            appt.wait_time_estimate = calculate_wait_time(db, appt.doctor_name, now)
+    else:
+        appt.wait_time_estimate = 0
+
+    new_transaction = TransactionModel(
+        appointment_id=appt.id,
+        patient_id=appt.patient_id,
+        amount=payment_in.amount,
+        payment_method=payment_in.payment_method,
+        collected_by="receptionist" if payment_in.payment_method != "Online" else "patient_online"
+    )
+    db.add(new_transaction)
+
+    db.commit()
+    db.refresh(appt)
+    
+    patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    if patient and patient.phone:
+        sms_body = (
+            f"SmileCare Dental: Payment of Rs. {payment_in.amount} received for consultation on "
+            f"{appt.appointment_date} with {appt.doctor_name}. You are added to the queue."
+        )
+        send_sms(patient.phone, sms_body)
+    
+    return appt
+
 def direct_checkin_bypass(db: Session, appt_id: int, priority: str = "Routine", doctor_name: str = None) -> AppointmentModel:
     """Directly checks in patient bypassing OTP. Used for walk-ins or emergency overrides."""
     appt = db.query(AppointmentModel).filter(AppointmentModel.id == appt_id).first()
@@ -347,3 +399,10 @@ def update_appointment(db: Session, appt_id: int, appt_update: AppointmentUpdate
         recalculate_queue_times(db, appt.doctor_name)
         
     return appt
+
+def get_daily_transactions(db: Session):
+    today = date.today()
+    transactions = db.query(TransactionModel).filter(
+        func.date(TransactionModel.transaction_date) == today
+    ).order_by(TransactionModel.transaction_date.desc()).all()
+    return transactions

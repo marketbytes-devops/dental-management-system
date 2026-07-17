@@ -110,8 +110,7 @@ export default function LabOrderForm({ onSubmitLabOrder, initialOrder, onCancel 
     }
   };
 
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
+  const executeFormSubmit = (statusValue) => {
     setValidationErrors([]);
 
     // Construct unified payload representing current states
@@ -120,6 +119,7 @@ export default function LabOrderForm({ onSubmitLabOrder, initialOrder, onCancel 
       priority,
       due_date: dueDate,
       notes: specialNotes,
+      status: statusValue,
       patient_token: initialOrder?.patientToken || initialOrder?.patient_token || doctorCtx?.viewingPatient?.token || ""
     };
 
@@ -170,12 +170,12 @@ export default function LabOrderForm({ onSubmitLabOrder, initialOrder, onCancel 
         </div>
       </div>
 
-      <form onSubmit={handleFormSubmit} className="p-6 space-y-6">
+      <form onSubmit={(e) => e.preventDefault()} className="p-6 space-y-6">
         {/* Universal Fields Block */}
         <div className="space-y-4">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Universal Case details</p>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Read-only Patient field */}
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-500 uppercase tracking-wide block">Patient (Encounter)</label>
@@ -198,18 +198,6 @@ export default function LabOrderForm({ onSubmitLabOrder, initialOrder, onCancel 
                 <option value="High">High</option>
                 <option value="Urgent">Urgent</option>
               </select>
-            </div>
-
-            {/* Due Date field */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-wide block">Expected Due Date</label>
-              <input
-                type="date"
-                required
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              />
             </div>
           </div>
 
@@ -596,12 +584,40 @@ export default function LabOrderForm({ onSubmitLabOrder, initialOrder, onCancel 
               Cancel
             </button>
           )}
-          <button
-            type="submit"
-            className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-primary/10 cursor-pointer"
-          >
-            {initialOrder ? "Save Specs Changes" : "Submit Lab Order Request"}
-          </button>
+          {(!initialOrder || initialOrder.status === "Draft") ? (
+            <>
+              <button
+                type="button"
+                onClick={() => executeFormSubmit("Draft")}
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-255 text-gray-700 font-extrabold rounded-xl text-xs transition-all cursor-pointer border border-gray-200"
+              >
+                Save as Draft
+              </button>
+              <button
+                type="button"
+                onClick={() => executeFormSubmit("Pending Review")}
+                className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-primary/10 cursor-pointer"
+              >
+                Submit for Review
+              </button>
+            </>
+          ) : initialOrder.status === "Revision Requested" ? (
+            <button
+              type="button"
+              onClick={() => executeFormSubmit("Pending Review")}
+              className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-primary/10 cursor-pointer"
+            >
+              Resubmit for Review
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => executeFormSubmit(initialOrder.status)}
+              className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-xs transition-all shadow-md shadow-primary/10 cursor-pointer"
+            >
+              Save Specs Changes
+            </button>
+          )}
         </div>
       </form>
     </div>

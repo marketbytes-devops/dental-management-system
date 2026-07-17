@@ -56,9 +56,13 @@ export const ROLE_NAV_ITEMS = {
     { name: "Patient Directory", href: "/admin/patients", icon: Users },
     { name: "Lab Module", href: "/admin/lab-module", icon: Microscope },
     { name: "Procedures Catalog", href: "/admin/procedures", icon: ClipboardList },
+<<<<<<< HEAD
     { name: "Leave Management", href: "/admin/leave", icon: Calendar },
     { name: "Complaints", href: "/admin/complaints", icon: MessageSquare },
     { name: "Support Portal", href: "/admin/support", icon: LifeBuoy }
+=======
+    { name: "Leave Management", href: "/admin/leave", icon: Calendar }
+>>>>>>> b19526322af00fe24b917eb80fdfc6acbd62dfe3
   ],
   doctor: [
     { name: "Dashboard", href: "/doctor/dashboard", icon: Home },
@@ -76,20 +80,23 @@ export const ROLE_NAV_ITEMS = {
       ]
     },
     { name: "Live Queue", href: "/doctor/queue", icon: Users },
-    { name: "Medical Alerts", href: "/doctor/alerts", icon: AlertTriangle },
     { name: "Pending Labs", href: "/doctor/labs", icon: Microscope },
     { name: "Referrals", href: "/doctor/referrals", icon: Share2 },
     { name: "Notifications", href: "/doctor/notifications", icon: Bell },
     { name: "Leave Management", href: "/doctor/leave", icon: Calendar },
     { name: "My Performance", href: "/doctor/performance", icon: TrendingUp },
+<<<<<<< HEAD
     { name: "My Profile", href: "/doctor/profile", icon: User },
     { name: "Support Portal", href: "/doctor/support", icon: LifeBuoy }
+=======
+    { name: "My Profile", href: "/doctor/profile", icon: User }
+>>>>>>> b19526322af00fe24b917eb80fdfc6acbd62dfe3
   ],
   receptionist: [
     { name: "Dashboard", href: "/frontdesk/receptionist/dashboard", icon: BarChart3 },
     { name: "Appointments", href: "/frontdesk/receptionist/appointments", icon: Calendar },
     { name: "Registrations", href: "/frontdesk/receptionist/patients", icon: UserPlus },
-    { name: "Check-In / Check-Out", href: "/frontdesk/receptionist/checkin", icon: CheckSquare },
+    { name: "Daily Transactions", href: "/frontdesk/receptionist/transactions", icon: Receipt },
     { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: Stethoscope },
     { name: "Waiting Queue", href: "/frontdesk/receptionist/queue", icon: Hourglass },
     { name: "Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },
@@ -98,8 +105,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Leave Management", href: "/frontdesk/receptionist/leave", icon: Calendar },
     { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },
     { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings },
-    { name: "My Profile", href: "/frontdesk/receptionist/profile", icon: User },
-    { name: "Complaint Box", href: "/frontdesk/receptionist/complaints", icon: MessageSquare }
+    { name: "My Profile", href: "/frontdesk/receptionist/profile", icon: User }
   ],
   accountant: [
     { name: "Dashboard", href: "/frontdesk/accountant/dashboard", icon: BarChart3 },
@@ -116,8 +122,12 @@ export const ROLE_NAV_ITEMS = {
     { name: "Leave Management", href: "/frontdesk/accountant/leave", icon: Calendar },
     { name: "Audit Logs", href: "/frontdesk/accountant/audit", icon: Search },
     { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings },
+<<<<<<< HEAD
     { name: "My Profile", href: "/frontdesk/accountant/profile", icon: User },
     { name: "Support Portal", href: "/frontdesk/accountant/support", icon: LifeBuoy }
+=======
+    { name: "My Profile", href: "/frontdesk/accountant/profile", icon: User }
+>>>>>>> b19526322af00fe24b917eb80fdfc6acbd62dfe3
   ],
   "lab tech": [
     { name: "Dashboard", href: "/labtechnicians/dashboard", icon: BarChart3 },
@@ -127,8 +137,12 @@ export const ROLE_NAV_ITEMS = {
     { name: "Notifications", href: "/labtechnicians/notifications", icon: Bell },
     { name: "Leave Management", href: "/labtechnicians/leave", icon: Calendar },
     { name: "Settings", href: "/labtechnicians/settings", icon: Settings },
+<<<<<<< HEAD
     { name: "My Profile", href: "/labtechnicians/profile", icon: User },
     { name: "Support Portal", href: "/labtechnicians/support", icon: LifeBuoy }
+=======
+    { name: "My Profile", href: "/labtechnicians/profile", icon: User }
+>>>>>>> b19526322af00fe24b917eb80fdfc6acbd62dfe3
   ],
   patient: [
     { name: "My Dashboard", href: "/patient/dashboard", icon: Home },

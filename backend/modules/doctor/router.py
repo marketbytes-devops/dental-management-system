@@ -4,6 +4,8 @@ from database import get_db
 from modules.frontdesk.models import AppointmentModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
 from modules.patient.models import DoctorFeedbackModel
+from modules.doctor.models import DoctorShiftModel
+from modules.doctor.schemas import DoctorShiftCreate, DoctorShiftResponse
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
@@ -119,7 +121,7 @@ def get_doctor_performance(
     for f in feedbacks[:5]:
         recent_reviews.append({
             "id": f.id,
-            "patient_name": f.patient_name,
+            "patient_name": "Anonymous",
             "rating": f.rating,
             "feedback_text": f.feedback_text,
             "date": f.created_at.strftime("%b %d, %Y") if f.created_at else "Recently"
@@ -192,3 +194,24 @@ def get_doctor_appointments(doctor_name: str, filter: str = "today", db: Session
         })
         
     return result
+
+@router.post("/{doctor_id}/shifts", response_model=DoctorShiftResponse)
+def create_doctor_shift(doctor_id: int, shift_data: DoctorShiftCreate, db: Session = Depends(get_db)):
+    # Create a new shift
+    db_shift = DoctorShiftModel(
+        doctor_id=doctor_id,
+        day_of_week=shift_data.day_of_week,
+        specific_date=shift_data.specific_date,
+        start_time=shift_data.start_time,
+        end_time=shift_data.end_time,
+        slot_duration=shift_data.slot_duration
+    )
+    db.add(db_shift)
+    db.commit()
+    db.refresh(db_shift)
+    return db_shift
+
+@router.get("/{doctor_id}/shifts", response_model=list[DoctorShiftResponse])
+def get_doctor_shifts(doctor_id: int, db: Session = Depends(get_db)):
+    shifts = db.query(DoctorShiftModel).filter(DoctorShiftModel.doctor_id == doctor_id).all()
+    return shifts

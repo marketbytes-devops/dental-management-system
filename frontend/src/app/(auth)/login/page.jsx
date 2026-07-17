@@ -126,8 +126,18 @@ function LoginContent() {
         localStorage.setItem("patient_email", patientProfile.email);
         localStorage.setItem("patient_profile_picture", patientProfile.profile_picture || "");
 
+        // Check for appointment booking parameters
+        const bookingDoctorId = searchParams.get("doctorId");
+        const bookingDate = searchParams.get("date");
+        const bookingTime = searchParams.get("time");
+
         setIsSubmitting(false);
-        router.push("/patient/dashboard");
+
+        if (bookingDoctorId && bookingDate && bookingTime) {
+          router.push(`/patient/appointments?action=book&doctorId=${bookingDoctorId}&date=${bookingDate}&time=${bookingTime}`);
+        } else {
+          router.push("/patient/dashboard");
+        }
       } else {
         // Clear patient items to avoid layout/sidebar contamination
         localStorage.removeItem("patient_jwt_token");

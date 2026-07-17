@@ -56,7 +56,7 @@ export default function LabOrdersTable({
                 const pt = patients[order.patientToken || order.patient_token];
                 const isProsthetic = order.order_category === "Prosthetic" || order.orderCategory === "Prosthetic";
                 const missingFields = validateOrderFields(order);
-                const isEditable = ["Submitted", "submitted", "Confirmed", "confirmed", "Ordered", "ordered", "Flagged", "flagged", "Pending", "Pending Review", "Pending Doctor Review", "Pending Doctor Confirmation"].includes(order.status);
+                const isEditable = ["Draft", "Revision Requested", "Submitted", "submitted", "Pending", "Pending Review"].includes(order.status);
                 
                 return (
                   <tr 
@@ -110,33 +110,29 @@ export default function LabOrdersTable({
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
                         ["Delivered", "completed", "Completed", "Order Received", "Received from Lab"].includes(order.status)
                           ? "bg-success/15 text-success border-success/20"
-                          : ["Ready", "shipped", "Ready / Shipped", "Doctor Accepted", "Confirmed"].includes(order.status)
+                          : ["Ready", "shipped", "Ready / Shipped", "Doctor Accepted", "Confirmed", "Confirmed by Tech", "Sent to Lab"].includes(order.status)
                           ? "bg-primary/10 text-primary border-primary/20"
+                          : order.status === "Revision Requested"
+                          ? "bg-rose-50 text-rose-700 border-rose-100"
                           : "bg-warning/10 text-warning border-warning/20"
                       }`}>
-                        {["Pending Doctor Review", "Pending Doctor Confirmation"].includes(order.status)
-                          ? "Pending Doctor Confirmation"
-                          : ["Confirmed", "Doctor Accepted"].includes(order.status)
-                          ? "Doctor Accepted"
-                          : ["Sent to Lab", "Order Sent to Lab"].includes(order.status)
-                          ? "Order Sent to Lab"
-                          : ["Received from Lab", "Order Received"].includes(order.status)
-                          ? "Order Received"
+                        {order.status === "Pending Review"
+                          ? "Pending Tech Review"
                           : order.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {["Pending Doctor Review", "Pending Doctor Confirmation"].includes(order.status) && (
+                        {order.status === "Confirmed by Tech" && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setReviewingOrder(order); }}
                             className="px-2.5 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-[10px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
-                            Review &amp; Confirm
+                            Review &amp; Approve
                           </button>
                         )}
-                        {isEditable && !["Pending Doctor Review", "Pending Doctor Confirmation"].includes(order.status) && (
+                        {isEditable && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setEditingOrder(order); }}
                             className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
@@ -144,7 +140,7 @@ export default function LabOrdersTable({
                             Edit
                           </button>
                         )}
-                        {order.status !== "Delivered" && order.status !== "Completed" && !["Pending Doctor Review", "Pending Doctor Confirmation"].includes(order.status) && (
+                        {order.status !== "Delivered" && order.status !== "Completed" && order.status !== "Confirmed by Tech" && order.status !== "Pending Review" && order.status !== "Revision Requested" && (
                           <button
                             onClick={(e) => { e.stopPropagation(); onMarkLabDelivered(order.id); }}
                             className="px-2.5 py-1.5 bg-success/10 hover:bg-success/15 text-success text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
@@ -213,7 +209,6 @@ export default function LabOrdersTable({
                     <div><p className="text-gray-400 font-medium">Material</p><p className="font-bold text-gray-800 mt-0.5">{reviewingOrder.material || "—"}</p></div>
                     <div><p className="text-gray-400 font-medium">Tooth / Quadrant</p><p className="font-bold text-gray-800 mt-0.5">{reviewingOrder.tooth_number || reviewingOrder.toothQuadrant ? `#${reviewingOrder.tooth_number || reviewingOrder.toothQuadrant}` : "—"}</p></div>
                     <div><p className="text-gray-400 font-medium">Shade</p><p className="font-bold text-amber-800 mt-0.5">{reviewingOrder.shade || "—"}</p></div>
-                    <div><p className="text-gray-400 font-medium">Due Date</p><p className="font-bold text-red-600 mt-0.5">{reviewingOrder.due_date || reviewingOrder.dueDate || "—"}</p></div>
                     <div><p className="text-gray-400 font-medium">Priority</p><p className="font-bold text-gray-800 mt-0.5">{reviewingOrder.priority || "—"}</p></div>
                   </>
                 ) : (
@@ -221,7 +216,6 @@ export default function LabOrdersTable({
                     <div><p className="text-gray-400 font-medium">Test Type</p><p className="font-bold text-gray-800 mt-0.5">{reviewingOrder.test_type || "—"}</p></div>
                     <div><p className="text-gray-400 font-medium">Sample Type</p><p className="font-bold text-gray-800 mt-0.5">{reviewingOrder.sample_type || "—"}</p></div>
                     <div className="col-span-2"><p className="text-gray-400 font-medium">Reason for Test</p><p className="font-bold text-gray-700 mt-0.5">{reviewingOrder.reason_for_test || "—"}</p></div>
-                    <div><p className="text-gray-400 font-medium">Due Date</p><p className="font-bold text-red-600 mt-0.5">{reviewingOrder.due_date || reviewingOrder.dueDate || "—"}</p></div>
                   </>
                 )}
                 {reviewingOrder.notes && (
@@ -232,19 +226,44 @@ export default function LabOrdersTable({
                 )}
               </div>
 
+              {reviewingOrder.tech_notes && (
+                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl mb-4">
+                  <p className="text-[10px] font-black text-blue-700 uppercase tracking-wider">Technician Comments</p>
+                  <p className="text-xs text-blue-900 mt-1 italic font-semibold leading-relaxed">
+                    &ldquo;{reviewingOrder.tech_notes}&rdquo;
+                  </p>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-2">
                 <button
-                  onClick={() => { setEditingOrder(reviewingOrder); setReviewingOrder(null); }}
-                  className="flex-1 py-2.5 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+                  onClick={async () => {
+                    const reason = prompt("Enter instructions for the revision request:");
+                    if (!reason) return;
+                    setConfirmLoading(true);
+                    try {
+                      await updateLabOrderStatus(reviewingOrder.id, {
+                        status: "Revision Requested",
+                        tech_notes: `Doctor requested revision: ${reason}`
+                      });
+                      if (fetchLabOrders) fetchLabOrders();
+                      setReviewingOrder(null);
+                    } catch (e) {
+                      console.error(e);
+                    } finally {
+                      setConfirmLoading(false);
+                    }
+                  }}
+                  className="flex-1 py-2.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors cursor-pointer"
                 >
-                  Edit Specs First
+                  Request Revision
                 </button>
                 <button
                   disabled={confirmLoading}
                   onClick={async () => {
                     setConfirmLoading(true);
                     try {
-                      await updateLabOrderStatus(reviewingOrder.id, { status: "Doctor Accepted" });
+                      await updateLabOrderStatus(reviewingOrder.id, { status: "Sent to Lab" });
                       if (fetchLabOrders) fetchLabOrders();
                       setReviewingOrder(null);
                     } catch (e) {
@@ -255,7 +274,7 @@ export default function LabOrdersTable({
                   }}
                   className="flex-[2] py-2.5 text-xs font-extrabold text-white bg-primary hover:bg-primary/90 rounded-xl transition-colors shadow-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
                 >
-                  {confirmLoading ? "Confirming…" : "✓ Confirm & Send to Lab"}
+                  {confirmLoading ? "Confirming…" : "✓ Approve & Send to Lab"}
                 </button>
               </div>
             </div>

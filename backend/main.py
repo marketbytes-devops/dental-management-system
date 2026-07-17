@@ -11,7 +11,6 @@ from modules.frontdesk.router import router as frontdesk_router
 from modules.lab.router import router as lab_router
 from modules.leave.router import router as leave_router
 from modules.treatment_plan.router import router as treatment_plan_router
-from modules.complaint.router import router as complaint_router
 from modules.smilecare.router import router as smilecare_router
 from modules.doctor.router import router as doctor_router
 from modules.procedures.router import router as procedures_router
@@ -31,7 +30,6 @@ from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
-from modules.complaint.models import ComplaintModel
 from modules.procedures.models import ProcedureModel
 from modules.billing.models import BillingRequestModel
 from modules.auth.service import hash_password
@@ -83,6 +81,8 @@ try:
             add_col_if_missing("result_document_url", "VARCHAR")
             add_col_if_missing("is_rework", "BOOLEAN DEFAULT FALSE")
             add_col_if_missing("original_case_id", "VARCHAR")
+            add_col_if_missing("tech_notes", "VARCHAR")
+            add_col_if_missing("email_sent_at", "VARCHAR")
 
             # Also check patient_consents table
             if engine.dialect.name == "sqlite":
@@ -155,6 +155,42 @@ try:
         )
         db.add(admin_user)
         db.commit()
+    
+    # Seed default lab vendors if table is empty
+    vendor_count = db.query(LabVendorModel).count()
+    if vendor_count == 0:
+        default_vendors = [
+            LabVendorModel(
+                name="Apex Dental Laboratories",
+                contact_person="Rajesh Kumar",
+                phone="+91 40 2345 6789",
+                email="apex@dentalab.com",
+                average_tat_days=5,
+                pricing_list={"Zirconia Crown": 3500, "E-max Veneer": 4500},
+                rating=4.8
+            ),
+            LabVendorModel(
+                name="Precision Milling Centre",
+                contact_person="Amit Sharma",
+                phone="+91 40 6678 9012",
+                email="precision@millingcentre.com",
+                average_tat_days=3,
+                pricing_list={"CAD-CAM Milling": 2000, "PMMA Temporary": 1200},
+                rating=4.7
+            ),
+            LabVendorModel(
+                name="City Path Labs",
+                contact_person="Srinivas Rao",
+                phone="+91 40 4456 7890",
+                email="citypath@pathlabs.com",
+                average_tat_days=2,
+                pricing_list={"CBC": 500, "Biopsy": 1500},
+                rating=4.5
+            )
+        ]
+        db.add_all(default_vendors)
+        db.commit()
+        print("Default lab vendors seeded successfully.")
 except Exception as e:
     print(f"Error seeding default admin: {e}")
 finally:
@@ -179,7 +215,6 @@ app.include_router(frontdesk_router)
 app.include_router(lab_router)
 app.include_router(leave_router)
 app.include_router(treatment_plan_router)
-app.include_router(complaint_router)
 app.include_router(smilecare_router)
 app.include_router(doctor_router)
 app.include_router(procedures_router)

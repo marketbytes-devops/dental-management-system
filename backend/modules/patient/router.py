@@ -13,7 +13,13 @@ from dependencies import get_current_user
 from modules.doctor.models import DoctorModel
 from shared.utils.pdf_generator import generate_consent_pdf
 
-from .models import PatientConsent, PatientModel, ClinicalNoteModel
+from .models import (
+    PatientConsent, 
+    PatientModel, 
+    ClinicalNoteModel,
+    PatientNotificationModel,
+    DoctorFeedbackModel
+)
 from .schemas import (
     ConsentRequest,
     ConsentResponse,
@@ -29,6 +35,9 @@ from .schemas import (
     ReferralUpdate,
     ClinicalNoteCreate,
     ClinicalNoteResponse,
+    PatientNotificationResponse,
+    DoctorFeedbackCreate,
+    DoctorFeedbackResponse,
 )
 from .service import (
     change_patient_password,
@@ -64,6 +73,119 @@ def get_available_doctors(db: Session = Depends(get_db)):
             "profile_picture": profile_picture
         })
     return result
+
+@router.get("/doctors/{doctor_id}/available-slots")
+def get_doctor_available_slots(doctor_id: int, date: str, db: Session = Depends(get_db)):
+    """Public endpoint to get available time slots for a doctor on a specific date."""
+    from modules.doctor.models import DoctorModel, DoctorShiftModel
+    from modules.frontdesk.models import AppointmentModel
+    from modules.leave.models import LeaveRequestModel
+    from datetime import datetime, timedelta
+
+    doctor = db.query(DoctorModel).filter(DoctorModel.id == doctor_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    try:
+        dt = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    day_name = dt.strftime("%A")
+
+    # Read working_hours from the doctor model
+    working_hours = doctor.working_hours or {}
+    schedule = working_hours.get(day_name, {})
+    
+    if schedule.get("is_off", True):
+        return {"date": date, "available_slots": []}
+
+    # Check if the doctor is on leave
+    is_on_leave = db.query(LeaveRequestModel).filter(
+        LeaveRequestModel.user_id == doctor.user_id,
+        LeaveRequestModel.status == "Approved",
+        LeaveRequestModel.start_date <= date,
+        LeaveRequestModel.end_date >= date
+    ).first()
+
+    if is_on_leave:
+        return {"date": date, "available_slots": []}
+
+    # Generate slots
+    slots = []
+    
+    def parse_time_to_minutes(time_str):
+        if not time_str:
+            return None
+        try:
+            time_obj = datetime.strptime(time_str.strip(), "%I:%M %p")
+            return time_obj.hour * 60 + time_obj.minute
+        except ValueError:
+            return None
+
+    def minutes_to_time_str(mins):
+        hr = mins // 60
+        mn = mins % 60
+        ampm = "AM" if hr < 12 else "PM"
+        display_hr = hr if hr <= 12 else hr - 12
+        if display_hr == 0:
+            display_hr = 12
+        return f"{display_hr:02d}:{mn:02d} {ampm}"
+
+    start_min = parse_time_to_minutes(schedule.get("start", "09:00 AM")) or (9 * 60)
+    end_min = parse_time_to_minutes(schedule.get("end", "05:00 PM")) or (17 * 60)
+    
+    break_start_min = parse_time_to_minutes(schedule.get("break_start"))
+    break_end_min = parse_time_to_minutes(schedule.get("break_end"))
+
+    duration = 30
+    current = start_min
+    
+    while current + duration <= end_min:
+        # Check if this slot overlaps with break
+        slot_end = current + duration
+        is_break = False
+        if break_start_min is not None and break_end_min is not None:
+            # If slot overlaps with break period
+            if (current < break_end_min) and (slot_end > break_start_min):
+                is_break = True
+                
+        if not is_break:
+            slots.append(minutes_to_time_str(current))
+            
+        current += duration
+
+    # Get appointments for this doctor on this date
+    appointments = db.query(AppointmentModel).filter(
+        AppointmentModel.doctor_name == doctor.name,
+        AppointmentModel.appointment_date == dt.date(),
+        AppointmentModel.status != "Cancelled"
+    ).all()
+
+    # Count appointments per slot
+    slot_counts = {}
+    for appt in appointments:
+        time_str = appt.appointment_time
+        try:
+            if "AM" in time_str or "PM" in time_str:
+                appt_min = parse_time_to_minutes(time_str)
+            else:
+                time_obj = datetime.strptime(time_str.strip(), "%H:%M")
+                appt_min = time_obj.hour * 60 + time_obj.minute
+                
+            if appt_min is not None:
+                std_time = minutes_to_time_str(appt_min)
+                slot_counts[std_time] = slot_counts.get(std_time, 0) + 1
+        except Exception:
+            continue
+
+    # Filter available slots (limit 2 per slot)
+    available = []
+    for s in slots:
+        is_full = slot_counts.get(s, 0) >= 2
+        available.append({"time": s, "is_full": is_full})
+
+    return {"date": date, "available_slots": available}
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +259,7 @@ def upload_patient_profile_picture(
     os.makedirs("static/uploads", exist_ok=True)
     
     # Save the file
-    ext = os.path.splitext(file.filename)[1]
+    ext = os.path.splitext(file.filename)[1]            #type:ignore
     filename = f"patient_{patient_id}_{int(datetime.datetime.now().timestamp())}{ext}"
     file_path = os.path.join("static/uploads", filename)
     
@@ -153,7 +275,7 @@ def upload_patient_profile_picture(
             except Exception:
                 pass
                 
-    patient.profile_picture = f"/static/uploads/{filename}"
+    patient.profile_picture = f"/static/uploads/{filename}"     #type:ignore
     db.commit()
     db.refresh(patient)
     
@@ -320,7 +442,7 @@ def sign_consent(
     # Generate PDF
     pdf_path = generate_consent_pdf(
         title=consent.title,     #type:ignore
-        body_text=consent.content or "",
+        body_text=consent.content or "",      
         signature_data=req.signature_data,
         patient_name=patient.name,
     )
@@ -494,49 +616,6 @@ def update_referral_route(
     db.commit()
     db.refresh(ref)
     return ref
-# router.py - all /patient/* endpoints
-import os
-import datetime
-from typing import List
-
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
-
-from database import get_db
-from dependencies import get_current_user
-from modules.doctor.models import DoctorModel
-from shared.utils.pdf_generator import generate_consent_pdf
-
-from .models import (
-    PatientModel, PatientConsent, PatientNotificationModel, DoctorFeedbackModel
-)
-from .schemas import (
-    ConsentRequest,
-    ConsentResponse,
-    ConsentSignRequest,
-    PasswordChangeRequest,
-    PatientCreate,
-    PatientResponse,
-    PatientUpdate,
-    PrescriptionCreate,
-    PrescriptionResponse,
-    ReferralCreate,
-    ReferralResponse,
-    PatientNotificationResponse,
-    DoctorFeedbackCreate,
-    DoctorFeedbackResponse,
-)
-from .service import (
-    change_patient_password,
-    create_patient,
-    get_patient_by_email,
-    get_patient_by_phone,
-    update_patient_profile,
-)
-
-router = APIRouter(prefix="/patient", tags=["patient"])
-
 
 # ---------------------------------------------------------------------------
 # Public: doctor listing (no auth)
@@ -929,6 +1008,39 @@ def get_referrals_route(
     from modules.doctor.models import ReferralModel
     ref_list = db.query(ReferralModel).filter(ReferralModel.patient_token == patient.token).order_by(ReferralModel.date.desc()).all()
     return ref_list
+
+
+@router.get("/referrals/all", response_model=List[ReferralResponse])
+def get_all_referrals_route(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    from modules.doctor.models import ReferralModel
+    ref_list = db.query(ReferralModel).order_by(ReferralModel.date.desc()).all()
+    return ref_list
+
+
+@router.put("/referrals/{ref_id}", response_model=ReferralResponse)
+def update_referral_route(
+    ref_id: str,
+    req: ReferralUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    from modules.doctor.models import ReferralModel
+    ref = db.query(ReferralModel).filter(ReferralModel.id == ref_id).first()
+    if not ref:
+        raise HTTPException(status_code=404, detail="Referral not found")
+    
+    ref.status = req.status
+    if req.my_consultation_notes is not None:
+        ref.my_consultation_notes = req.my_consultation_notes
+    if req.my_medications is not None:
+        ref.my_medications = req.my_medications
+        
+    db.commit()
+    db.refresh(ref)
+    return ref
 
 
 @router.get("/oral-health-details")

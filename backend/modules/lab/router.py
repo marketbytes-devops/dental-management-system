@@ -144,8 +144,8 @@ def create_lab_order(
         random_suffix = f"{random.randint(1, 999):03d}"
         case_id = f"CASE-2026-{random_suffix}"
 
-    initial_status = "Submitted"
-    if order_data.order_category in ["Diagnostic", "Blood Work", "Pathology", "Blood Work / Pathology"]:
+    initial_status = order_data.status or "Pending Review"
+    if order_data.order_category in ["Diagnostic", "Blood Work", "Pathology", "Blood Work / Pathology"] and not order_data.status:
         initial_status = "Ordered"
 
     new_order = LabOrderModel(
@@ -182,7 +182,9 @@ def create_lab_order(
         rejection_category=order_data.rejection_category,
         is_rework=order_data.is_rework or False,
         original_case_id=order_data.original_case_id,
-        stage=order_data.stage or "New Cases"
+        stage=order_data.stage or "New Cases",
+        tech_notes=order_data.tech_notes,
+        email_sent_at=order_data.email_sent_at
     )
 
     db.add(new_order)
@@ -234,15 +236,16 @@ def create_lab_order(
     db.add(audit)
     
     # 4. Generate notification for Lab Technician
-    notif = LabNotificationModel(
-        recipient_role="lab tech",
-        type="Orders",
-        title="New Lab Order Received",
-        desc=f"Case {case_id} has been registered by {dentist_name} for patient {patient_name}.",
-        read=False
-    )
-    db.add(notif)
-    db.commit()
+    if initial_status == "Pending Review":
+        notif = LabNotificationModel(
+            recipient_role="lab tech",
+            type="Orders",
+            title="New Lab Order Submitted for Review",
+            desc=f"Case {case_id} has been submitted for review by Dr. {dentist_name} for patient {patient_name}.",
+            read=False
+        )
+        db.add(notif)
+        db.commit()
 
     return serialize_order(new_order)
 
@@ -277,23 +280,109 @@ def update_lab_order_status(
         raise HTTPException(status_code=404, detail="Lab order not found")
 
     old_status = order.status
-    order.status = status_data.status  # type: ignore
+    new_status = status_data.status
+    order.status = new_status  # type: ignore
+
     if status_data.result_document_url:
         order.result_document_url = status_data.result_document_url  # type: ignore
-        
-    if status_data.status in ["Rejected", "returned_for_rework", "Flagged"]:
-        order.rejection_reason = status_data.rejection_reason  # type: ignore
+
+    if status_data.vendor_id is not None:
+        order.vendor_id = status_data.vendor_id
+    if status_data.lab_name is not None:
+        order.lab_name = status_data.lab_name
+    if status_data.tech_notes is not None:
+        order.tech_notes = status_data.tech_notes
+
+    if new_status in ["Rejected", "returned_for_rework", "Flagged", "Revision Requested"]:
+        order.rejection_reason = status_data.rejection_reason or status_data.tech_notes
     else:
         order.rejection_reason = None  # type: ignore
         
     if status_data.rejection_category:
         order.rejection_category = status_data.rejection_category  # type: ignore
 
-    if status_data.status == "returned_for_rework":
+    if new_status == "returned_for_rework":
         order.is_rework = True
         if not order.original_case_id:
             order.original_case_id = order_id
+
+    # Handle workflow step 5: "On doctor approval (Sent to Lab), send email to the external lab"
+    if new_status == "Sent to Lab":
+        vendor_email = "labs@smilecare.com"
         
+        # 1. Lookup vendor email
+        if order.vendor_id:
+            vendor = db.query(LabVendorModel).filter(LabVendorModel.id == order.vendor_id).first()
+            if vendor and vendor.email:
+                vendor_email = vendor.email
+        elif order.lab_name:
+            # Fallback if selected lab partner has a name match
+            vendor = db.query(LabVendorModel).filter(LabVendorModel.name.ilike(f"%{order.lab_name}%")).first()
+            if vendor and vendor.email:
+                vendor_email = vendor.email
+
+        # 2. Gather measurements, doctor notes, attachments
+        measurements = []
+        if order.order_category == "Prosthetic":
+            measurements.append(f"Quadrant/Tooth: {order.tooth_quadrant or order.prosthetic_type or 'N/A'}")
+            measurements.append(f"Margin Design: {order.margin_design or 'N/A'}")
+            measurements.append(f"Impression Type: {order.impression_type or 'N/A'}")
+            measurements.append(f"Material: {order.material or 'N/A'}")
+            measurements.append(f"Shade: {order.shade or 'N/A'}")
+        else:
+            measurements.append(f"Test Type: {order.test_type or 'N/A'}")
+            measurements.append(f"Sample Type: {order.sample_type or 'N/A'}")
+            measurements.append(f"Reason: {order.reason_for_test or 'N/A'}")
+
+        attachment_urls = []
+        if order.attachments:
+            if isinstance(order.attachments, list):
+                for att in order.attachments:
+                    if isinstance(att, dict) and att.get("url"):
+                        attachment_urls.append(att.get("url"))
+                    elif isinstance(att, str):
+                        attachment_urls.append(att)
+
+        # 3. Simulate email sending
+        from datetime import datetime
+        order.email_sent_at = datetime.utcnow().isoformat()
+        
+        email_body = f"""
+========================================================================
+[SIMULATED EMAIL DISPATCH]
+To: {vendor_email}
+Subject: New Lab Order Request: Case {order.id}
+Timestamp: {order.email_sent_at}
+------------------------------------------------------------------------
+Dear Lab Partner,
+
+Please fabricate the following dental case request.
+
+Patient Name: {order.patient_name}
+Ordering Dentist: {order.dentist_name}
+Dentist Contact: {order.dentist_contact}
+
+Case Details / Measurements:
+- Category: {order.order_category}
+{chr(10).join('- ' + m for m in measurements)}
+
+Doctor's Notes:
+"{order.notes or 'None'}"
+
+Technician's Notes:
+"{order.tech_notes or 'None'}"
+
+Attachments:
+{chr(10).join('- ' + a for a in attachment_urls) if attachment_urls else 'No attachments uploaded.'}
+
+Please confirm receipt and expected completion date.
+
+Regards,
+SmileCare Lab Management System
+========================================================================
+"""
+        print(email_body, flush=True)
+
     db.commit()
     db.refresh(order)
 
@@ -303,56 +392,70 @@ def update_lab_order_status(
     audit = LabAuditTrailModel(
         order_id=order_id,
         user_name=user_name,
-        action=f"Status changed to: {status_data.status}",
-        note=f"From {old_status}. Reason: {status_data.rejection_reason}" if status_data.status in ["Rejected", "returned_for_rework", "Flagged"] else f"From {old_status}."
+        action=f"Status changed to: {new_status}",
+        note=f"From {old_status}."
     )
     db.add(audit)
 
     # Generate notification
-    if status_data.status in ["Confirmed", "Doctor Accepted"]:
+    if new_status == "Pending Review":
         notif = LabNotificationModel(
             recipient_role="lab tech",
             type="Orders",
-            title="Lab Order Confirmed by Doctor",
-            desc=f"Case {order_id} has been reviewed and confirmed by {user_name}.",
+            title="Lab Order Submitted for Review",
+            desc=f"Case {order_id} has been submitted for review by Dr. {user_name}.",
             read=False
         )
-    else:
-        desc = f"Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} has been updated to '{status_data.status}' by Lab Technician."
-        if status_data.status in ["Rejected", "Flagged"] and status_data.rejection_reason:
-            desc += f" Note/Reason: {status_data.rejection_reason}"
+        db.add(notif)
+    elif new_status == "Confirmed by Tech":
         notif = LabNotificationModel(
             recipient_role="doctor",
             type="labs",
-            title=f"Lab Case {order_id} Updated",
-            desc=desc,
+            title="Lab Order Confirmed by Tech",
+            desc=f"Case {order_id} has been confirmed by lab technician. Ready for external send approval.",
             read=False
         )
-    db.add(notif)
+        db.add(notif)
+    elif new_status == "Revision Requested":
+        notif = LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title="Revision Requested for Lab Case",
+            desc=f"Tech has requested a revision on Case {order_id}. Tech Notes: {status_data.tech_notes or order.rejection_reason}",
+            read=False
+        )
+        db.add(notif)
+    elif new_status == "Sent to Lab":
+        notif = LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title="Lab Order Sent to External Lab",
+            desc=f"Case {order_id} approved. Pre-filled dispatch email successfully sent to the external lab.",
+            read=False
+        )
+        db.add(notif)
+    else:
+        if new_status in ["Confirmed", "Doctor Accepted"]:
+            notif = LabNotificationModel(
+                recipient_role="lab tech",
+                type="Orders",
+                title="Lab Order Confirmed by Doctor",
+                desc=f"Case {order_id} has been reviewed and confirmed by {user_name}.",
+                read=False
+            )
+        else:
+            desc = f"Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} has been updated to '{new_status}' by Lab Technician."
+            if status_data.rejection_reason:
+                desc += f" Note/Reason: {status_data.rejection_reason}"
+            notif = LabNotificationModel(
+                recipient_role="doctor",
+                type="labs",
+                title=f"Lab Case {order_id} Updated",
+                desc=desc,
+                read=False
+            )
+        db.add(notif)
     db.commit()
-
-    # Trigger patient notification for lab updates
-    if order.patient_token and status_data.status in ["Dispatched", "Delivered", "Ready", "Completed", "shipped", "fitted", "completed"]:
-        status_map = {
-            "Dispatched": "dispatched",
-            "Delivered": "delivered",
-            "Ready": "ready for fitting",
-            "Completed": "completed",
-            "shipped": "shipped",
-            "fitted": "ready for fitting",
-            "completed": "completed"
-        }
-        status_lbl = status_map.get(status_data.status, status_data.status.lower())
-        patient_notif = PatientNotificationModel(
-            patient_token=order.patient_token,
-            sender_role="lab tech",
-            type="lab_delivery",
-            title="Dental Prosthetic Update",
-            message=f"Your custom dental prosthetic ({order.prosthetic_type}) is {status_lbl}.",
-            read=False
-        )
-        db.add(patient_notif)
-        db.commit()
 
     return serialize_order(order)
 
@@ -368,7 +471,7 @@ def edit_lab_order(
         raise HTTPException(status_code=404, detail="Lab order not found")
 
     # Lock direct edits once Sent to Lab or later
-    if order.status not in ["Submitted", "submitted", "Confirmed", "confirmed", "Doctor Accepted", "doctor_accepted", "Ordered", "ordered", "Flagged", "flagged", "Pending", "Pending Review", "Pending Doctor Review", "Pending Doctor Confirmation"]:
+    if order.status not in ["Draft", "draft", "Revision Requested", "revision_requested", "Submitted", "submitted", "Confirmed", "confirmed", "Doctor Accepted", "doctor_accepted", "Ordered", "ordered", "Flagged", "flagged", "Pending", "Pending Review", "Pending Doctor Review", "Pending Doctor Confirmation"]:
         raise HTTPException(
             status_code=403,
             detail="Direct edits are locked once order is Sent to Lab or later. Please use Return for Correction."
@@ -520,6 +623,16 @@ def edit_lab_order(
             user_name=user_name,
             action="Order Edited",
             note=f"Modified fields: {', '.join(changes)}"
+        ))
+        db.commit()
+
+    if "status" in changes and order.status == "Pending Review":
+        db.add(LabNotificationModel(
+            recipient_role="lab tech",
+            type="Orders",
+            title="Lab Order Submitted for Review",
+            desc=f"Case {order_id} has been submitted for review by Dr. {user_name}.",
+            read=False
         ))
         db.commit()
 

@@ -49,6 +49,8 @@ class LabOrderModel(Base):
     expected_return_date = Column(String, nullable=True)
     external_cost = Column(Integer, default=0)
     stage = Column(String, default="New Cases")
+    tech_notes = Column(String, nullable=True)
+    email_sent_at = Column(String, nullable=True)
 
     prosthetic_detail = relationship("ProstheticCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")
     pathology_detail = relationship("PathologyCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")

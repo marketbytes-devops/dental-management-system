@@ -667,6 +667,33 @@ export default function LabOrders() {
     const hasMissing = missing.length > 0;
     
     if (isProsthetic) {
+      if (order.status === "Pending Review") {
+        return (
+          <button
+            onClick={() => {
+              setSelectedOrder(order);
+              setIsDrawerOpen(true);
+            }}
+            className="px-2.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Review &amp; Route
+          </button>
+        );
+      }
+      if (order.status === "Revision Requested") {
+        return (
+          <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded border border-rose-100">
+            Awaiting Doctor Revision
+          </span>
+        );
+      }
+      if (order.status === "Confirmed by Tech") {
+        return (
+          <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded border border-blue-100">
+            Awaiting Doctor Approval
+          </span>
+        );
+      }
       if (order.status === "submitted" || order.status === "Submitted" || order.status === "Pending" || order.status === "Flagged" || order.status === "flagged") {
         return (
           <div className="flex gap-2 items-center flex-wrap">
@@ -813,8 +840,8 @@ export default function LabOrders() {
   };
 
   const BOARD_COLUMNS = activeCategory === "Dental Prosthetics" ? [
-    { id: "Submitted", label: "Submitted & Flagged", statuses: ["Submitted", "submitted", "Flagged", "flagged", "Pending", "returned_for_rework", "Returned for Rework"] },
-    { id: "ConfirmedSent", label: "Doctor Confirmed & Sent", statuses: ["Pending Doctor Confirmation", "Pending Doctor Review", "Confirmed", "confirmed", "Doctor Accepted", "Order Sent to Lab", "Sent to Lab", "In Progress", "Accepted", "received_by_lab", "in_design", "in_fabrication", "quality_check"] },
+    { id: "Submitted", label: "Submitted & Flagged", statuses: ["Pending Review", "Revision Requested", "Submitted", "submitted", "Flagged", "flagged", "Pending", "returned_for_rework", "Returned for Rework"] },
+    { id: "ConfirmedSent", label: "Confirmed & Sent", statuses: ["Confirmed by Tech", "Pending Doctor Confirmation", "Pending Doctor Review", "Confirmed", "confirmed", "Doctor Accepted", "Order Sent to Lab", "Sent to Lab", "In Progress", "Accepted", "received_by_lab", "in_design", "in_fabrication", "quality_check"] },
     { id: "ReceivedFitted", label: "Received & Fitted", statuses: ["Order Received", "Received from Lab", "received_from_lab", "Fitted", "fitted"] },
     { id: "Completed", label: "Completed", statuses: ["Completed", "completed"] }
   ] : [
@@ -1556,50 +1583,87 @@ export default function LabOrders() {
                   />
                 </div>
 
-                {/* ── SECTION 5: Send to Doctor / Dispatch button ── */}
-                {["Pending Doctor Review", "Pending Doctor Confirmation"].includes(currentCase.status) ? (
-                  <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200/60 rounded-2xl">
-                    <span className="text-lg shrink-0">⏳</span>
+                {/* ── SECTION 5: Workflow Action Buttons ── */}
+                {currentCase.status === "Revision Requested" ? (
+                  <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl flex items-start gap-2.5">
+                    <span className="text-base shrink-0">📝</span>
                     <div>
-                      <p className="text-xs font-bold text-amber-800">Awaiting Doctor Confirmation</p>
-                      <p className="text-[10px] text-amber-600/80 mt-0.5 leading-relaxed">
-                        This order has been sent to {currentCase.dentist}. Waiting for them to review and confirm before it is dispatched.
+                      <p className="text-xs font-bold">Revision Requested</p>
+                      <p className="text-[10px] text-rose-600/80 mt-0.5 leading-relaxed">
+                        Waiting for Dr. {currentCase.dentist || "the doctor"} to review notes and resubmit case.
                       </p>
                     </div>
                   </div>
-                ) : ["Confirmed", "Doctor Accepted"].includes(currentCase.status) ? (
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3 p-4 bg-success/5 border border-success/20 rounded-2xl">
-                      <span className="w-5 h-5 rounded-full bg-success flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="text-white text-[9px] font-black">✓</span>
-                      </span>
-                      <div>
-                        <p className="text-xs font-bold text-success">Doctor Confirmed — Ready to Dispatch</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">
-                          {currentCase.dentist} has reviewed and confirmed this order. You can now physically send the package.
-                        </p>
-                      </div>
-                    </div>
+                ) : currentCase.status === "Pending Review" ? (
+                  <div className="flex gap-3">
                     <button
                       onClick={async () => {
-                        const ok = await updateDbStatus(currentCase.id, "Order Sent to Lab");
-                        if (ok) {
-                          triggerToast(`Case ${currentCase.id} marked as Order Sent to Lab.`);
-                        } else {
-                          triggerToast("Failed to update status.", "error");
+                        if (!labNotes) {
+                          triggerToast("Please add comments explaining the revision request.", "error");
+                          return;
+                        }
+                        const body = {
+                          status: "Revision Requested",
+                          tech_notes: labNotes
+                        };
+                        try {
+                          await updateLabOrderStatus(currentCase.id, body);
+                          triggerToast(`Revision requested on Case ${currentCase.id}.`);
+                          setIsDrawerOpen(false);
+                          fetchOrders();
+                        } catch (err) {
+                          console.error(err);
+                          triggerToast("Failed to request revision.", "error");
                         }
                       }}
-                      className="w-full py-3.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                      className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-xl text-xs transition-all cursor-pointer text-center"
                     >
-                      <Truck className="w-4 h-4" /> Mark as Sent to Lab
+                      Request Revision
                     </button>
+                    <button
+                      onClick={async () => {
+                        const vendorIdMap = {
+                          apex: 1,
+                          precision: 2,
+                          citypath: 3
+                        };
+                        const body = {
+                          status: "Confirmed by Tech",
+                          vendor_id: vendorIdMap[selectedLabPartner] || 1,
+                          lab_name: LAB_PARTNERS[selectedLabPartner]?.name || "Apex Dental Laboratories",
+                          tech_notes: labNotes
+                        };
+                        try {
+                          await updateLabOrderStatus(currentCase.id, body);
+                          triggerToast(`Case ${currentCase.id} confirmed and routed to Doctor.`);
+                          setIsDrawerOpen(false);
+                          fetchOrders();
+                        } catch (err) {
+                          console.error(err);
+                          triggerToast("Failed to confirm case.", "error");
+                        }
+                      }}
+                      className="flex-1 py-3 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-xs transition-all shadow-md cursor-pointer text-center flex items-center justify-center gap-1.5"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Confirm &amp; Route
+                    </button>
+                  </div>
+                ) : currentCase.status === "Confirmed by Tech" ? (
+                  <div className="p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-2xl flex items-start gap-2.5">
+                    <span className="text-base shrink-0">⏳</span>
+                    <div>
+                      <p className="text-xs font-bold">Confirmed by Lab Technician</p>
+                      <p className="text-[10px] text-blue-600/80 mt-0.5 leading-relaxed">
+                        Awaiting doctor review &amp; confirmation to send pre-filled email to {LAB_PARTNERS[selectedLabPartner]?.name || "the lab"}.
+                      </p>
+                    </div>
                   </div>
                 ) : ["Sent to Lab", "Order Sent to Lab", "Order Received", "Completed", "Returned for Rework"].includes(currentCase.status) ? (
                   <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
                     <span className="text-lg shrink-0">📦</span>
                     <div>
                       <p className="text-xs font-bold text-primary">Dispatched &amp; Sent to External Lab</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">
+                      <p className="text-[10px] text-gray-555 mt-0.5 leading-relaxed">
                         This order has been physically sent to {selectedLabPartner ? LAB_PARTNERS[selectedLabPartner]?.name : "the lab"}.
                       </p>
                     </div>
@@ -1611,17 +1675,16 @@ export default function LabOrders() {
                         triggerToast("Please enter a delivery address.", "error");
                         return;
                       }
-                      const ok = await updateDbStatus(currentCase.id, "Pending Doctor Confirmation");
+                      const ok = await updateDbStatus(currentCase.id, "Order Sent to Lab");
                       if (ok) {
-                        triggerToast(`Order sent to ${currentCase.dentist} for confirmation.`);
+                        triggerToast(`Case ${currentCase.id} marked as Order Sent to Lab.`);
                       } else {
-                        triggerToast("Failed to send. Please try again.", "error");
+                        triggerToast("Failed to update status.", "error");
                       }
                     }}
-                    className="w-full py-3.5 bg-primary hover:bg-primary/90 text-white font-extrabold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Truck className="w-4 h-4" />
-                    Send to Doctor for Confirmation
+                    <Truck className="w-4 h-4" /> Mark as Sent to Lab
                   </button>
                 )}
 

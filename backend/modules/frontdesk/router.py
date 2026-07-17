@@ -5,12 +5,14 @@ from typing import List, Optional
 from datetime import date,timedelta
 from database import get_db
 from .schemas import (
+    TransactionResponse,
     AppointmentCreate,
     AppointmentResponse,
     AppointmentUpdate,
     CheckInRequest,
     OtpVerificationRequest,
-    QueueItemResponse
+    QueueItemResponse,
+    PaymentRequest
 )
 from .models import AppointmentModel
 from .communication_models import CommunicationLogModel
@@ -27,7 +29,9 @@ from .service import (
     send_checkin_otp,
     verify_checkin_otp,
     direct_checkin_bypass,
-    update_appointment_status
+    update_appointment_status,
+    process_consultation_payment,
+    get_daily_transactions
 )
 from dependencies import get_current_user
 
@@ -218,6 +222,12 @@ def verify_otp(id: int, verify_in: OtpVerificationRequest, db: Session = Depends
     appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
     return appt
 
+@router.post("/appointments/{id}/pay-consultation", response_model=AppointmentResponse)
+def pay_consultation_route(id: int, payment_in: PaymentRequest, db: Session = Depends(get_db)):
+    appt = process_consultation_payment(db, appt_id=id, payment_in=payment_in)
+    appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    return appt
+
 @router.post("/appointments/{id}/direct-checkin", response_model=AppointmentResponse)
 def direct_checkin(
     id: int, 
@@ -301,7 +311,9 @@ def call_patient(id: int, status_str: str = "In Chair", db: Session = Depends(ge
 
 @router.get("/queue", response_model=List[QueueItemResponse])
 def get_live_queue(db: Session = Depends(get_db)):
+    today = date.today()
     active_appointments = db.query(AppointmentModel).filter(
+        AppointmentModel.appointment_date <= today,
         AppointmentModel.status.in_(["Waiting", "In Chair"])
     ).all()
     
@@ -556,3 +568,7 @@ def get_patient_communications(
         .all()
     )
     return logs
+
+@router.get("/transactions/today", response_model=List[TransactionResponse])
+def fetch_daily_transactions(db: Session = Depends(get_db)):
+    return get_daily_transactions(db)

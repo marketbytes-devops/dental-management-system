@@ -101,6 +101,7 @@ export default function DoctorLayout({ children }) {
       const mapped = data.map(o => ({
         id: o.id,
         patientToken: o.patient_token,
+        patient_token: o.patient_token,
         patient_name: o.patient_name,
         dentist_name: o.dentist_name,
         dentist_contact: o.dentist_contact,
@@ -125,6 +126,19 @@ export default function DoctorLayout({ children }) {
         sampleCollectedConfirm: o.sample_collected_confirm,
         sample_collected_confirm: o.sample_collected_confirm,
         is_rework: o.is_rework,
+        fabrication_type: o.fabrication_type || o.prosthetic_type,
+        scan_file: o.scan_file,
+        scanFile: o.scan_file,
+        physical_mold_sent: o.physical_mold_sent,
+        opposing_bite_scan: o.opposing_bite_scan,
+        physical_opposing_mold_sent: o.physical_opposing_mold_sent,
+        bite_registration: o.bite_registration,
+        try_in_stage_required: o.try_in_stage_required,
+        implant_system: o.implant_system,
+        reference_photo: o.reference_photo,
+        tech_notes: o.tech_notes,
+        email_sent_at: o.email_sent_at,
+        vendor_id: o.vendor_id,
         item: o.order_category === "Diagnostic"
           ? `Diagnostic: ${o.test_type || "Lab Work"}`
           : (o.material ? `${o.prosthetic_type} (${o.material}, Shade ${o.shade})` : `${o.prosthetic_type} (Shade ${o.shade})`),
@@ -759,7 +773,10 @@ export default function DoctorLayout({ children }) {
         }
       }));
 
-      showNotification(`Lab order submitted to ${payload.lab_name}.`);
+      const statusMsg = payload.status === "Draft"
+        ? "Lab case saved as draft."
+        : "Lab case submitted for technician review.";
+      showNotification(statusMsg);
       fetchLabOrders();
     } catch (err) {
       console.error("Error submitting lab order:", err);

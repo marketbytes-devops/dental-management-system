@@ -50,6 +50,7 @@ class LabOrderCreate(BaseModel):
     # Restorative/Prosthetic details
     tooth_number: Optional[str] = None
     fabrication_type: Optional[str] = None
+    prosthetic_type: Optional[str] = None
     scan_file: Optional[str] = None
     material: Optional[str] = None
     shade: Optional[str] = None
@@ -86,12 +87,18 @@ class LabOrderCreate(BaseModel):
     is_rework: Optional[bool] = False
     original_case_id: Optional[str] = None
     stage: Optional[str] = "New Cases"
+    status: Optional[str] = "Pending Review"
+    tech_notes: Optional[str] = None
+    email_sent_at: Optional[str] = None
 
 class LabOrderStatusUpdate(BaseModel):
     status: str
     rejection_reason: Optional[str] = None
     result_document_url: Optional[str] = None
     rejection_category: Optional[str] = None
+    vendor_id: Optional[int] = None
+    lab_name: Optional[str] = None
+    tech_notes: Optional[str] = None
 
 class LabOrderEdit(BaseModel):
     order_category: Optional[str] = None
@@ -105,6 +112,7 @@ class LabOrderEdit(BaseModel):
     # Restorative/Prosthetic details
     tooth_number: Optional[str] = None
     fabrication_type: Optional[str] = None
+    prosthetic_type: Optional[str] = None
     scan_file: Optional[str] = None
     material: Optional[str] = None
     shade: Optional[str] = None
@@ -136,6 +144,8 @@ class LabOrderEdit(BaseModel):
     is_rework: Optional[bool] = None
     original_case_id: Optional[str] = None
     stage: Optional[str] = None
+    tech_notes: Optional[str] = None
+    email_sent_at: Optional[str] = None
 
 class LabOrderResponse(BaseModel):
     id: str
@@ -191,6 +201,8 @@ class LabOrderResponse(BaseModel):
     is_rework: Optional[bool] = False
     original_case_id: Optional[str] = None
     stage: Optional[str] = "New Cases"
+    tech_notes: Optional[str] = None
+    email_sent_at: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -209,6 +209,11 @@ export const getAvailableDoctors = async () => {
   return response.data;
 };
 
+export const getDoctorAvailableSlots = async (doctorId, date) => {
+  const response = await client.get(`/patient/doctors/${doctorId}/available-slots?date=${encodeURIComponent(date)}`);
+  return response.data;
+};
+
 // ==========================================
 // 4. Appointments & Queue API Endpoints
 // ==========================================
@@ -233,6 +238,11 @@ export const directCheckin = async (id, priority, doctorName) => {
     url += `?${params.join("&")}`;
   }
   const response = await client.post(url);
+  return response.data;
+};
+
+export const payConsultation = async (id, paymentData) => {
+  const response = await client.post(`/frontdesk/appointments/${id}/pay-consultation`, paymentData);
   return response.data;
 };
 
@@ -528,43 +538,6 @@ export const updateReferral = async (refId, referralData) => {
 };
 
 // ==========================================
-// 9. Complaints API Endpoints
-// ==========================================
-
-export const submitComplaint = async (complaintData) => {
-  const response = await client.post("/complaints", complaintData);
-  return response.data;
-};
-
-export const getMyComplaints = async () => {
-  const response = await client.get("/complaints/my");
-  return response.data;
-};
-
-export const getAllComplaints = async () => {
-  const response = await client.get("/complaints");
-  return response.data;
-};
-
-export const updateComplaintStatus = async (id, status, note = null) => {
-  const response = await client.patch(`/complaints/${id}/status`, { status, note });
-  return response.data;
-};
-
-export const reopenComplaint = async (id, reason) => {
-  const response = await client.post(`/complaints/${id}/reopen`, { reason });
-  return response.data;
-};
-
-export const getComplaintLogs = async (id) => {
-  const response = await client.get(`/complaints/${id}/logs`);
-  return response.data;
-};
-
-
-
-
-// ==========================================
 // 9. Patient Notifications & Doctor Feedback (New)
 // ==========================================
 
@@ -661,3 +634,12 @@ export const createBillingRequest = async (billingData) => {
   const response = await client.post("/billing/request", billingData);
   return response.data;
 };
+<<<<<<< HEAD
+=======
+
+
+export const getDailyTransactions = async () => {
+  const response = await client.get("/frontdesk/transactions/today");
+  return response.data;
+};
+>>>>>>> b19526322af00fe24b917eb80fdfc6acbd62dfe3

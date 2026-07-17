@@ -41,7 +41,8 @@ import {
   Sparkles,
   User,
   Package,
-  MessageSquare
+  MessageSquare,
+  LifeBuoy
 } from "lucide-react";
 
 import ToothIcon from "@/components/ui/shared/ToothIcon";
@@ -56,7 +57,8 @@ export const ROLE_NAV_ITEMS = {
     { name: "Lab Module", href: "/admin/lab-module", icon: Microscope },
     { name: "Procedures Catalog", href: "/admin/procedures", icon: ClipboardList },
     { name: "Leave Management", href: "/admin/leave", icon: Calendar },
-    { name: "Complaints", href: "/admin/complaints", icon: MessageSquare }
+    { name: "Complaints", href: "/admin/complaints", icon: MessageSquare },
+    { name: "Support Portal", href: "/admin/support", icon: LifeBuoy }
   ],
   doctor: [
     { name: "Dashboard", href: "/doctor/dashboard", icon: Home },
@@ -81,7 +83,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Leave Management", href: "/doctor/leave", icon: Calendar },
     { name: "My Performance", href: "/doctor/performance", icon: TrendingUp },
     { name: "My Profile", href: "/doctor/profile", icon: User },
-    { name: "Complaint Box", href: "/doctor/complaints", icon: MessageSquare }
+    { name: "Support Portal", href: "/doctor/support", icon: LifeBuoy }
   ],
   receptionist: [
     { name: "Dashboard", href: "/frontdesk/receptionist/dashboard", icon: BarChart3 },
@@ -115,7 +117,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Audit Logs", href: "/frontdesk/accountant/audit", icon: Search },
     { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings },
     { name: "My Profile", href: "/frontdesk/accountant/profile", icon: User },
-    { name: "Complaint Box", href: "/frontdesk/accountant/complaints", icon: MessageSquare }
+    { name: "Support Portal", href: "/frontdesk/accountant/support", icon: LifeBuoy }
   ],
   "lab tech": [
     { name: "Dashboard", href: "/labtechnicians/dashboard", icon: BarChart3 },
@@ -126,7 +128,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Leave Management", href: "/labtechnicians/leave", icon: Calendar },
     { name: "Settings", href: "/labtechnicians/settings", icon: Settings },
     { name: "My Profile", href: "/labtechnicians/profile", icon: User },
-    { name: "Complaint Box", href: "/labtechnicians/complaints", icon: MessageSquare }
+    { name: "Support Portal", href: "/labtechnicians/support", icon: LifeBuoy }
   ],
   patient: [
     { name: "My Dashboard", href: "/patient/dashboard", icon: Home },

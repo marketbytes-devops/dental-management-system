@@ -26,7 +26,6 @@ class LabOrderModel(Base):
     priority = Column(String, default="Medium")
     status = Column(String, default="submitted")
     notes = Column(String, nullable=True)
-    due_date = Column(String, nullable=True)
     lab_name = Column(String, nullable=True)
     rejection_reason = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

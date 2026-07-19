@@ -214,7 +214,6 @@ def create_lab_order(
         priority=order_data.priority,
         status=initial_status,
         notes=order_data.notes,
-        due_date=order_data.due_date or "2026-06-15",
         rejection_reason=None,
         
         # Extended fields
@@ -614,9 +613,6 @@ def edit_lab_order(
     if edit_data.priority is not None:
         order.priority = edit_data.priority  # type: ignore
         changes.append("priority")
-    if edit_data.due_date is not None:
-        order.due_date = edit_data.due_date  # type: ignore
-        changes.append("due_date")
     if edit_data.notes is not None:
         order.notes = edit_data.notes  # type: ignore
         changes.append("notes")

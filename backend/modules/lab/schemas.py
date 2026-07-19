@@ -66,7 +66,6 @@ class LabOrderCreate(BaseModel):
 
     priority: Optional[str] = "Medium"
     notes: Optional[str] = None
-    due_date: Optional[str] = None
     lab_name: Optional[str] = None
     
     # Metadata fields
@@ -105,7 +104,6 @@ class LabOrderEdit(BaseModel):
     order_category: Optional[str] = None
     order_details: Optional[Any] = None
     priority: Optional[str] = None
-    due_date: Optional[str] = None
     notes: Optional[str] = None
     lab_name: Optional[str] = None
     status: Optional[str] = None
@@ -160,7 +158,6 @@ class LabOrderResponse(BaseModel):
     priority: str
     status: str
     notes: Optional[str] = None
-    due_date: Optional[str] = None
     lab_name: Optional[str] = None
     rejection_reason: Optional[str] = None
     created_at: Optional[datetime] = None

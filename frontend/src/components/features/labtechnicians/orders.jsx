@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   ClipboardList, 
   Hourglass, 
@@ -25,7 +25,8 @@ import {
   Microscope,
   FileText,
   Paperclip,
-  Flag
+  Flag,
+  Mail
 } from "lucide-react";
 import { getLabOrders, updateLabOrderStatus, updateLabOrder, getLabVendors, uploadLabFile } from "@/services/api";
 import { validateLabOrderFields } from "@/services/labValidation";
@@ -51,7 +52,7 @@ export default function LabOrders() {
         material: o.material || "Zirconia",
         shade: o.shade || "A2",
         priority: o.priority || "Medium",
-        dueDate: o.due_date || "2026-06-15",
+        orderDate: o.created_at ? o.created_at.split("T")[0] : "2026-06-10",
         status: o.status,
         notes: o.notes || "",
         rejectionReason: o.rejection_reason || "",
@@ -122,9 +123,6 @@ export default function LabOrders() {
     if (!order.labName && !order.lab_name && !order.external_lab_name) {
       missing.push("Lab partner selection");
     }
-    if (!order.dueDate && !order.due_date) {
-      missing.push("Due date");
-    }
     return missing;
   };
 
@@ -159,6 +157,14 @@ export default function LabOrders() {
   const [reworkNote, setReworkNote] = useState("");
   const [reworkFiles, setReworkFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [expandedPatients, setExpandedPatients] = useState({});
+
+  const togglePatientExpand = (patientName) => {
+    setExpandedPatients((prev) => ({
+      ...prev,
+      [patientName]: !prev[patientName],
+    }));
+  };
 
   // Dispatch Modal States
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
@@ -263,7 +269,7 @@ export default function LabOrders() {
     type: selectedOrder.prostheticType,
     material: selectedOrder.material,
     priority: selectedOrder.priority,
-    dueDate: selectedOrder.dueDate,
+    orderDate: selectedOrder.orderDate,
     shade: selectedOrder.shade,
     status: selectedOrder.status,
     notes: selectedOrder.notes,
@@ -392,8 +398,8 @@ export default function LabOrders() {
     prostheticType: "",
     material: "",
     shade: "",
-    priority: "",
-    dueDate: "",
+    priority: "Medium",
+    orderDate: "",
     notes: ""
   });
 
@@ -445,15 +451,15 @@ export default function LabOrders() {
     if (dateFilter !== "") {
       const today = new Date("2026-06-10");
       result = result.filter((o) => {
-        const orderDate = new Date(o.dueDate);
-        const timeDiff = orderDate.getTime() - today.getTime();
+        const orderDate = new Date(o.orderDate);
+        const timeDiff = today.getTime() - orderDate.getTime();
         const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
 
         if (dateFilter === "Today") {
-          return o.dueDate === "2026-06-10";
-        } else if (dateFilter === "Next 7 Days") {
+          return o.orderDate === "2026-06-10";
+        } else if (dateFilter === "Last 7 Days") {
           return daysDiff >= 0 && daysDiff <= 7;
-        } else if (dateFilter === "Next 30 Days") {
+        } else if (dateFilter === "Last 30 Days") {
           return daysDiff >= 0 && daysDiff <= 30;
         }
         return true;
@@ -954,7 +960,6 @@ export default function LabOrders() {
       material: order.material,
       shade: order.shade,
       priority: order.priority,
-      dueDate: order.dueDate,
       notes: order.notes
     });
     setIsEditModalOpen(true);
@@ -968,7 +973,6 @@ export default function LabOrders() {
         material: editFormData.material,
         shade: editFormData.shade,
         priority: editFormData.priority,
-        due_date: editFormData.dueDate,
         notes: editFormData.notes
       });
       if (selectedOrder && selectedOrder.id === editFormData.id) {
@@ -978,7 +982,6 @@ export default function LabOrders() {
           material: editFormData.material,
           shade: editFormData.shade,
           priority: editFormData.priority,
-          dueDate: editFormData.dueDate,
           notes: editFormData.notes
         }));
       }
@@ -1236,112 +1239,197 @@ export default function LabOrders() {
               onChange={(e) => setDateFilter(e.target.value)}
               className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-700 min-w-[130px]"
             >
-              <option value="">All Due Dates</option>
+              <option value="">All Order Dates</option>
               <option value="Today">Today (June 10)</option>
-              <option value="Next 7 Days">Next 7 Days</option>
-              <option value="Next 30 Days">Next 30 Days</option>
+              <option value="Last 7 Days">Last 7 Days</option>
+              <option value="Last 30 Days">Last 30 Days</option>
             </select>
           </div>
         </div>
 
-        {viewMode === "table" ? (
-          <div className="overflow-x-auto border border-gray-100 rounded-xl">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50/70 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  <th className="px-6 py-4">Case ID</th>
-                  <th className="px-6 py-4">Patient Name</th>
-                  <th className="px-6 py-4">Dentist</th>
-                  <th className="px-6 py-4">Prosthetic Specs</th>
-                  <th className="px-6 py-4">Priority</th>
-                  <th className="px-6 py-4">Due Date</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
-                {filteredOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" className="px-6 py-10 text-center text-gray-450">
-                      <div className="flex flex-col items-center justify-center space-y-2">
-                        <Search className="w-8 h-8 text-gray-300" />
-                        <p className="font-semibold text-base text-gray-750">No lab orders found</p>
-                        <p className="text-xs text-gray-400">Try adjusting your filters or search term.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredOrders.map((order) => (
-                    <tr 
-                      key={order.id} 
-                      className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
-                      onClick={() => openDetailsDrawer(order)}
+        {viewMode === "table" ? (() => {
+          // Group orders by patient
+          const groupedPatients = filteredOrders.reduce((acc, order) => {
+            const pName = order.patientName || "Unknown Patient";
+            if (!acc[pName]) {
+              acc[pName] = {
+                name: pName,
+                dentists: new Set(),
+                orders: [],
+                newOrdersCount: 0
+              };
+            }
+            acc[pName].orders.push(order);
+            if (order.dentistName) {
+              acc[pName].dentists.add(order.dentistName);
+            }
+            if (["Pending Review", "pending_review", "Returned for Rework", "returned_for_rework"].includes(order.status)) {
+              acc[pName].newOrdersCount += 1;
+            }
+            return acc;
+          }, {});
+
+          const patientRows = Object.values(groupedPatients);
+
+          return (
+            <div className="space-y-4">
+              {patientRows.length === 0 ? (
+                <div className="bg-white border border-gray-150 rounded-2xl p-10 text-center text-gray-450">
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <Search className="w-8 h-8 text-gray-300" />
+                    <p className="font-semibold text-base text-gray-750">No lab orders found</p>
+                    <p className="text-xs text-gray-400">Try adjusting your filters or search term.</p>
+                  </div>
+                </div>
+              ) : (
+                patientRows.map((patient) => {
+                  const isExpanded = !!expandedPatients[patient.name];
+                  const firstLetter = patient.name.charAt(0).toUpperCase();
+                  return (
+                    <div 
+                      key={patient.name}
+                      className={`bg-white border rounded-2xl shadow-sm transition-all duration-300 overflow-hidden ${
+                        isExpanded ? "border-indigo-200 ring-2 ring-indigo-50" : "border-gray-150 hover:border-indigo-150 hover:shadow-md"
+                      }`}
                     >
-                      <td className="px-6 py-4 font-bold text-gray-900 text-xs group-hover:text-primary transition-colors">
-                        {order.id}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-800">
-                        {order.patientName}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        <div>
-                          <p className="font-medium text-gray-800">{order.dentistName}</p>
-                          <p className="text-xs text-gray-400">{order.dentistContact}</p>
+                      {/* Header row */}
+                      <div 
+                        onClick={() => togglePatientExpand(patient.name)}
+                        className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none text-left"
+                      >
+                        {/* Left: Avatar & Patient Name */}
+                        <div className="flex items-center gap-3.5 flex-1 min-w-[200px]">
+                          <div className="relative w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-black text-indigo-750 text-sm shrink-0">
+                            {firstLetter}
+                            {patient.newOrdersCount > 0 && (
+                              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-extrabold text-gray-900 text-sm leading-tight">{patient.name}</h3>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Patient Profile</p>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        <div>
-                          {order.orderCategory === "Prosthetic" ? (
-                            <>
-                              <p className="font-semibold text-gray-750 text-xs">{order.prostheticType}</p>
-                              <p className="text-[11px] text-gray-400">{order.material} (Shade: {order.shade})</p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="font-semibold text-gray-750 text-xs">{order.orderCategory}</p>
-                              <p className="text-[11px] text-gray-400 truncate max-w-[150px]">{JSON.stringify(order.orderDetails)}</p>
-                            </>
-                          )}
+
+                        {/* Middle Left: Dentist info */}
+                        <div className="flex-1 min-w-[150px]">
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ordering Dentist(s)</p>
+                          <p className="text-xs text-gray-700 font-extrabold mt-0.5">
+                            {Array.from(patient.dentists).join(", ") || "N/A"}
+                          </p>
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${getPriorityStyle(order.priority)}`}>
-                          {order.priority}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-600 font-medium">
-                        {order.dueDate === "2026-06-10" ? (
-                          <span className="text-danger font-semibold flex items-center gap-1">
-                            Today
-                          </span>
-                        ) : (
-                          order.dueDate
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${getStatusDotColor(order.status)}`}></span>
-                          <span className="text-sm font-semibold text-gray-700">{getStatusLabel(order.status)}</span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end items-center gap-1.5 flex-wrap">
-                          {renderOrderActions(order)}
-                          <button 
-                            onClick={() => openDetailsDrawer(order)}
-                            className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-100 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                          >
-                            View Details
-                          </button>
+
+                        {/* Middle Right: Total Orders badge */}
+                        <div className="w-20">
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Cases</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-700 text-xs font-black rounded-md">
+                              {patient.orders.length}
+                            </span>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        ) : (
+
+                        {/* Right: Status callout & Chevron */}
+                        <div className="flex items-center justify-between md:justify-end gap-6 md:w-60">
+                          <div className="text-left md:text-right">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Recent Activity</p>
+                            {patient.newOrdersCount > 0 ? (
+                              <span className="text-red-500 font-extrabold text-xs flex items-center md:justify-end gap-1.5 mt-0.5">
+                                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
+                                {patient.newOrdersCount} new order{patient.newOrdersCount > 1 ? "s" : ""}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 font-bold text-xs block mt-0.5">
+                                No new activity
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="text-gray-400 hover:text-indigo-650 transition-colors p-1.5 bg-gray-50 rounded-xl shrink-0">
+                            <ChevronRight className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? "rotate-90 text-indigo-650" : ""}`} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded section: nested details table */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-100 bg-gray-50/30 p-5 text-left">
+                          <div className="bg-white border border-gray-150 rounded-xl overflow-hidden shadow-inner">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                  <tr className="bg-gray-50/70 border-b border-gray-150 font-black text-gray-500 uppercase tracking-wider text-[10px]">
+                                    <th className="px-4 py-3">Case ID</th>
+                                    <th className="px-4 py-3">Prosthetic Specs</th>
+                                    <th className="px-4 py-3">Priority</th>
+                                    <th className="px-4 py-3">Order Date</th>
+                                    <th className="px-4 py-3">Status</th>
+                                    <th className="px-4 py-3 text-right">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {patient.orders.map((order) => (
+                                    <tr 
+                                      key={order.id} 
+                                      onClick={() => openDetailsDrawer(order)}
+                                      className="hover:bg-gray-50/70 transition-colors cursor-pointer group"
+                                    >
+                                      <td className="px-4 py-3.5 font-bold text-gray-900 group-hover:text-primary transition-colors">
+                                        {order.id}
+                                      </td>
+                                      <td className="px-4 py-3.5">
+                                        {order.orderCategory === "Prosthetic" ? (
+                                          <div>
+                                            <p className="font-semibold text-gray-750">{order.prostheticType}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5">{order.material} (Shade: {order.shade})</p>
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <p className="font-semibold text-gray-750">{order.orderCategory}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[200px]">{JSON.stringify(order.orderDetails)}</p>
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3.5">
+                                        <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide ${getPriorityStyle(order.priority)}`}>
+                                          {order.priority}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3.5 text-gray-650 font-medium">
+                                        {order.orderDate}
+                                      </td>
+                                      <td className="px-4 py-3.5">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className={`w-2 h-2 rounded-full ${getStatusDotColor(order.status)}`}></span>
+                                          <span className="font-semibold text-gray-750">{getStatusLabel(order.status)}</span>
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex justify-end items-center gap-1.5 flex-wrap">
+                                          {renderOrderActions(order)}
+                                          <button 
+                                            onClick={() => openDetailsDrawer(order)}
+                                            className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-150 hover:text-gray-750 rounded-lg text-[10px] font-bold transition-all cursor-pointer border border-gray-100"
+                                          >
+                                            View Details
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          );
+        })() : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
             {BOARD_COLUMNS.map((column) => {
               const columnOrders = filteredOrders.filter((o) =>
@@ -1392,9 +1480,9 @@ export default function LabOrders() {
                           
                           <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2.5">
                             <div className="flex flex-col">
-                              <span className="text-[9px] text-gray-400 uppercase tracking-wider">Due Date</span>
-                              <span className={`text-[11px] font-bold ${order.dueDate === "2026-06-10" ? "text-danger" : "text-gray-600"}`}>
-                                {order.dueDate}
+                              <span className="text-[9px] text-gray-400 uppercase tracking-wider">Order Date</span>
+                              <span className="text-[11px] font-bold text-gray-650">
+                                {order.orderDate}
                               </span>
                             </div>
                             
@@ -1562,30 +1650,18 @@ export default function LabOrders() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Priority</label>
-                    <select 
-                      value={editFormData.priority}
-                      onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 bg-white"
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Urgent">Urgent</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Due Date</label>
-                    <input 
-                      type="date" 
-                      required
-                      value={editFormData.dueDate}
-                      onChange={(e) => setEditFormData({ ...editFormData, dueDate: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Priority</label>
+                  <select 
+                    value={editFormData.priority}
+                    onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 bg-white"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
                 </div>
 
                 <div>

@@ -1100,6 +1100,11 @@ def get_oral_health_details(
         # Compute deductions
         total_deduction = 0
         for diag in diagnoses:
+            if isinstance(diag, dict):
+                diag = diag.get("condition") or diag.get("name") or str(diag)
+            elif not isinstance(diag, str):
+                diag = str(diag)
+                
             diag_lower = diag.lower()
             penalty = 0
             name = diag
@@ -1184,6 +1189,13 @@ def get_oral_health_details(
     tips.append("Stay hydrated and rinse your mouth with water after meals to clear food residues.")
     tips.append("Schedule a routine dental examination and clean-up every 6 months.")
 
+    updated_at_val = None
+    if active_plan and active_plan.created_at:
+        try:
+            updated_at_val = active_plan.created_at.isoformat()
+        except AttributeError:
+            updated_at_val = str(active_plan.created_at)
+
     return {
         "score": final_score,
         "label": label,
@@ -1192,7 +1204,7 @@ def get_oral_health_details(
         "tips": tips[:4],  # limit to top 4 tips
         "completion_rate": completion_rate,
         "total_steps": total_steps,
-        "updated_at": active_plan.created_at.isoformat() if active_plan and active_plan.created_at else None
+        "updated_at": updated_at_val
     }
 
 

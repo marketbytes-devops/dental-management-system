@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, CheckSquare, Hourglass, Stethoscope, Users } from "lucide-react";
+import { Calendar, CheckSquare, Hourglass, Stethoscope, Users, AlertTriangle, Activity, X, Phone, User as UserIcon } from "lucide-react";
 import { getTodayAppointments, getQueue, updateAppointmentStatus } from "@/services/api";
 import { getDoctors } from "@/services/api";
 
@@ -9,6 +9,8 @@ export default function ReceptionistDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [queue, setQueue] = useState([]);
   const [queueFilter, setQueueFilter] = useState("All");
+  const [emergencyPatients, setEmergencyPatients] = useState([]);
+  const [selectedEmergency, setSelectedEmergency] = useState(null);
 
 
   const fetchDoctorStats = async () => {
@@ -44,8 +46,17 @@ export default function ReceptionistDashboard() {
         getTodayAppointments(),
         getQueue()
       ]);
+      const emergencyData = queueData.filter(q => q.priority === "Emergency" || (q.chief_complaint && q.chief_complaint.includes("[UNVERIFIED EMERGENCY]")));
+      setEmergencyPatients(emergencyData);
+      
       setAppointments(apptsData);
       setQueue(queueData);
+      
+      if (selectedEmergency) {
+        const stillExists = emergencyData.find(e => e.id === selectedEmergency.id);
+        if (!stillExists) setSelectedEmergency(null);
+        else setSelectedEmergency(stillExists);
+      }
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
     }
@@ -336,6 +347,118 @@ export default function ReceptionistDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Emergency Notifications */}
+      {emergencyPatients.length > 0 && (
+        <div className="mt-6 space-y-4">
+          <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-danger animate-pulse" />
+            Emergency Alerts ({emergencyPatients.length})
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-3">
+              {emergencyPatients.map(patient => (
+                <div 
+                  key={patient.id}
+                  onClick={() => setSelectedEmergency(patient.id === selectedEmergency?.id ? null : patient)}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer shadow-sm relative overflow-hidden group ${
+                    selectedEmergency?.id === patient.id 
+                      ? 'bg-danger/5 border-danger shadow-danger/20' 
+                      : 'bg-white border-danger/20 hover:border-danger/50'
+                  }`}
+                >
+                  <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-danger"></div>
+                  <div className="pl-2 flex justify-between items-start">
+                    <div>
+                      <h4 className="text-sm font-black text-gray-900 flex items-center gap-2">
+                        {patient.patient_name}
+                        <span className="w-2 h-2 rounded-full bg-danger animate-pulse"></span>
+                      </h4>
+                      <p className="text-xs text-gray-500 font-semibold mt-1">Waiting for {patient.doctor_name || 'Assignment'}</p>
+                    </div>
+                    <span className="text-[10px] font-extrabold bg-danger text-white px-2 py-1 rounded-lg uppercase tracking-widest">
+                      Action Required
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Detailed Emergency View */}
+            {selectedEmergency && (
+              <div className="lg:col-span-2 bg-white rounded-3xl border border-gray-150 shadow-lg p-6 relative animate-fade-in">
+                <button 
+                  onClick={() => setSelectedEmergency(null)}
+                  className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-14 h-14 bg-danger/10 text-danger rounded-2xl flex items-center justify-center shrink-0">
+                    <Activity className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-gray-900">{selectedEmergency.patient_name}</h2>
+                    <div className="flex items-center gap-3 mt-1 text-sm font-semibold text-gray-500">
+                      <span className="flex items-center gap-1"><UserIcon className="w-4 h-4" /> {selectedEmergency.gender || 'Unknown'}, {selectedEmergency.age || 'N/A'} yrs</span>
+                      <span className="flex items-center gap-1"><Phone className="w-4 h-4" /> {selectedEmergency.patient_phone || 'No Contact'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-150">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Chief Complaint / Procedure</p>
+                      <p className="text-sm font-semibold text-gray-900">{selectedEmergency.procedure || selectedEmergency.chief_complaint || "Immediate Consultation Required"}</p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-150">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Checked In At</p>
+                      <p className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                        <Hourglass className="w-4 h-4 text-warning" />
+                        {formatCheckedInTime(selectedEmergency.checked_in_at)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="bg-red-50/50 p-5 rounded-2xl border border-danger/20 h-full">
+                      <p className="text-[10px] font-bold text-danger uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Medical Alerts & Warnings
+                      </p>
+                      {selectedEmergency.medical_alerts && selectedEmergency.medical_alerts.length > 0 ? (
+                        <ul className="space-y-2">
+                          {selectedEmergency.medical_alerts.map((alert, idx) => (
+                            <li key={idx} className="text-xs font-black text-danger bg-white px-3 py-2 rounded-xl shadow-sm border border-danger/10">
+                              • {alert}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="text-center py-6 bg-white/60 rounded-xl border border-dashed border-danger/20">
+                          <p className="text-xs font-bold text-danger/60">No specific medical flags provided.</p>
+                          <p className="text-[10px] font-semibold text-gray-500 mt-1">Verify with patient immediately.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                   <button 
+                     className="px-6 py-2.5 bg-gray-900 hover:bg-black text-white text-sm font-bold rounded-xl transition-all shadow-md flex items-center gap-2"
+                     onClick={() => window.location.href = `/frontdesk/receptionist/patients?search=${selectedEmergency.token}`}
+                   >
+                     Open Full Profile
+                   </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

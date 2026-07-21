@@ -135,6 +135,22 @@ try:
                 conn.execute(text("ALTER TABLE procedures ADD COLUMN specialty VARCHAR DEFAULT 'General Dentistry';"))
                 print("Added column specialty to procedures table.")
 
+            # Also check treatment_plans table
+            if engine.dialect.name == "sqlite":
+                tp_col_query = conn.execute(text("PRAGMA table_info(treatment_plans);")).fetchall()
+                existing_tp_cols = [row[1] for row in tp_col_query]
+            else:
+                tp_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='treatment_plans';")).fetchall()
+                existing_tp_cols = [row[0] for row in tp_col_query]
+
+            def add_tp_col_if_missing(col_name, col_type):
+                if col_name not in existing_tp_cols:
+                    conn.execute(text(f"ALTER TABLE treatment_plans ADD COLUMN {col_name} {col_type};"))
+                    print(f"Added column {col_name} to treatment_plans table.")
+
+            add_tp_col_if_missing("next_visit_date", "VARCHAR")
+            add_tp_col_if_missing("next_visit_procedure", "VARCHAR")
+
             print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")

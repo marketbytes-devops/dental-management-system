@@ -99,6 +99,8 @@ export const ROLE_NAV_ITEMS = {
     { name: "Insurance Claims", href: "/frontdesk/accountant/claims", icon: Shield },
     { name: "Expenses & Payroll", href: "/frontdesk/accountant/expenses", icon: TrendingDown },
     { name: "Financial Reports", href: "/frontdesk/accountant/reports", icon: FileText },
+    { name: "Leave Management", href: "/frontdesk/accountant/leave", icon: Calendar },
+    { name: "Support Requests", href: "/frontdesk/accountant/support", icon: Headphones },
     { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings },
     { name: "My Profile", href: "/frontdesk/accountant/profile", icon: User }
   ],

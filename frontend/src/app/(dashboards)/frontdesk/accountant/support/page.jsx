@@ -1,8 +1,7 @@
 "use client";
 
-import ReceptionistSupport from "@/components/features/receptionist/support";
+import SupportPortal from "@/components/features/shared/SupportPortal";
 
 export default function AccountantSupportPage() {
-    // The support component can be reused across roles
-    return <ReceptionistSupport />;
+    return <SupportPortal />;
 }

@@ -15,6 +15,7 @@ from modules.smilecare.router import router as smilecare_router
 from modules.doctor.router import router as doctor_router
 from modules.procedures.router import router as procedures_router
 from modules.billing.router import router as billing_router
+from modules.payment.router import router as payment_router
 
 
 
@@ -32,6 +33,7 @@ from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
 from modules.procedures.models import ProcedureModel
 from modules.billing.models import BillingRequestModel
+from modules.payment.models import ConsultationPaymentModel
 from modules.auth.service import hash_password
 
 
@@ -235,6 +237,7 @@ app.include_router(smilecare_router)
 app.include_router(doctor_router)
 app.include_router(procedures_router)
 app.include_router(billing_router)
+app.include_router(payment_router)
 
 
 

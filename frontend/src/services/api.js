@@ -640,3 +640,31 @@ export const getDailyTransactions = async () => {
   const response = await client.get("/frontdesk/transactions/today");
   return response.data;
 };
+
+
+// ==========================================
+// 12. Payment (Razorpay) API Endpoints
+// ==========================================
+
+/**
+ * Creates a Razorpay order for the ₹100 consultation booking fee.
+ * @param {number} appointmentId - The newly-created appointment ID
+ * @returns {{ razorpay_order_id, amount, currency, key_id, appointment_id }}
+ */
+export const createPaymentOrder = async (appointmentId) => {
+  const response = await client.post("/payment/create-order", {
+    appointment_id: appointmentId,
+    amount: 100.0,
+  });
+  return response.data;
+};
+
+/**
+ * Verifies the Razorpay payment signature on the backend.
+ * @param {{ appointment_id, razorpay_order_id, razorpay_payment_id, razorpay_signature }} payload
+ */
+export const verifyPayment = async (payload) => {
+  const response = await client.post("/payment/verify", payload);
+  return response.data;
+};
+

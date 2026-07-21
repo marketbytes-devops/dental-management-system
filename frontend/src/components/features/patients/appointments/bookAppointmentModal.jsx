@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, CheckCircle2, ChevronRight, ArrowLeft } from "lucide-react";
-import { getDoctorLeaves, getAvailableDoctors, createAppointment, payConsultation } from "@/services/api";
+import { getDoctorLeaves, getAvailableDoctors, createAppointment, createPaymentOrder, verifyPayment } from "@/services/api";
 
 const VISIT_REASONS = [
   "Consultation",
@@ -45,6 +45,9 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
   // Track if we are auto-submitting from a redirect
   const [autoSubmitting, setAutoSubmitting] = useState(!!initialData?.autoSubmit);
   const [createdApptId, setCreatedApptId] = useState(null);
+  // Payment state: idle | loading | success | error
+  const [paymentState, setPaymentState] = useState("idle");
+  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -254,12 +257,74 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
 
   const handlePayNow = async () => {
     if (!createdApptId) return;
+    setPaymentState("loading");
+    setPaymentError("");
+
     try {
-      await payConsultation(createdApptId, { amount: 100.0, payment_method: "Online" });
-      alert("Payment successful! You have been added to the queue for your appointment day.");
-      onClose();
+      // Step 1: Create order on backend → get Razorpay order details
+      const order = await createPaymentOrder(createdApptId);
+
+      // Step 2: Dynamically load the Razorpay checkout script
+      await new Promise((resolve, reject) => {
+        if (window.Razorpay) return resolve();
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
+        document.body.appendChild(script);
+      });
+
+      // Step 3: Open the Razorpay payment popup
+      const patientName =
+        typeof window !== "undefined"
+          ? localStorage.getItem("patient_name") || "Patient"
+          : "Patient";
+
+      await new Promise((resolve, reject) => {
+        const options = {
+          key: order.key_id,
+          amount: order.amount,           // already in paise
+          currency: order.currency,
+          name: "SmileCare Dental Clinic",
+          description: "Consultation Booking Fee",
+          order_id: order.razorpay_order_id,
+          prefill: {
+            name: patientName,
+          },
+          theme: { color: "#4f46e5" },
+          modal: {
+            // If user closes the popup, treat as cancelled (not an error)
+            ondismiss: () => {
+              setPaymentState("idle");
+              resolve(); // don't reject — let the user retry
+            },
+          },
+          handler: async (response) => {
+            try {
+              // Step 4: Verify payment signature on the backend
+              await verifyPayment({
+                appointment_id: createdApptId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              setPaymentState("success");
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on("payment.failed", (response) => {
+          reject(new Error(response.error?.description || "Payment failed"));
+        });
+        rzp.open();
+      });
     } catch (err) {
-      alert("Payment failed: " + err.message);
+      setPaymentState("error");
+      setPaymentError(err.message || "Payment could not be completed. Please try again.");
     }
   };
 
@@ -452,9 +517,11 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
               <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mb-6">
                 <CheckCircle2 className="w-10 h-10 text-success" />
               </div>
-              <h3 className="text-2xl font-extrabold text-gray-900 mb-6">Appointment Confirmed!</h3>
-              
-              <div className="w-full max-w-sm bg-gray-50 p-5 rounded-2xl text-left space-y-3 mb-8 border border-gray-200 shadow-sm">
+              <h3 className="text-2xl font-extrabold text-gray-900 mb-2">Appointment Confirmed!</h3>
+              <p className="text-sm text-gray-500 mb-6">Please pay ₹100 to secure your slot.</p>
+
+              {/* Appointment Summary Card */}
+              <div className="w-full max-w-sm bg-gray-50 p-5 rounded-2xl text-left space-y-3 mb-6 border border-gray-200 shadow-sm">
                 <div className="flex justify-between items-center border-b border-gray-200 pb-3">
                   <span className="text-gray-500 font-semibold text-sm">Patient Name</span>
                   <span className="text-gray-900 font-bold text-sm">
@@ -469,26 +536,65 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                   <span className="text-gray-500 font-semibold text-sm">Date</span>
                   <span className="text-gray-900 font-bold text-sm">{form.date}</span>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-3">
                   <span className="text-gray-500 font-semibold text-sm">Time</span>
                   <span className="text-gray-900 font-bold text-sm">{form.time}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-semibold text-sm">Consultation Fee</span>
+                  <span className="text-primary font-extrabold text-sm">₹100.00</span>
+                </div>
               </div>
 
-              <div className="flex gap-4 w-full max-w-sm">
-                <button 
-                  onClick={onClose} 
-                  className="flex-1 py-3.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all focus:ring-2 focus:ring-gray-200"
-                >
-                  Pay Later
-                </button>
-                <button 
-                  onClick={handlePayNow} 
-                  className="flex-1 py-3.5 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/30 focus:ring-2 focus:ring-primary/50"
-                >
-                  Pay Consultation Charges
-                </button>
-              </div>
+              {/* Payment Error */}
+              {paymentState === "error" && (
+                <div className="w-full max-w-sm mb-4 px-4 py-3 bg-danger/10 border border-danger/20 rounded-xl text-left">
+                  <p className="text-danger text-sm font-semibold">⚠ {paymentError}</p>
+                </div>
+              )}
+
+              {/* Payment Success */}
+              {paymentState === "success" ? (
+                <div className="w-full max-w-sm flex flex-col items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center">
+                    <CheckCircle2 className="w-8 h-8 text-success" />
+                  </div>
+                  <p className="text-success font-extrabold text-lg">Payment Successful!</p>
+                  <p className="text-gray-500 text-sm">₹100 paid · Slot confirmed</p>
+                  <button
+                    onClick={onClose}
+                    className="w-full py-3 text-sm font-bold text-white bg-success rounded-xl hover:bg-success/90 transition-all shadow-md"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                /* Pay / Pay Later buttons */
+                <div className="flex gap-4 w-full max-w-sm">
+                  <button
+                    onClick={onClose}
+                    className="flex-1 py-3.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
+                  >
+                    Pay Later
+                  </button>
+                  <button
+                    onClick={handlePayNow}
+                    disabled={paymentState === "loading"}
+                    className="flex-1 py-3.5 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/30 disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {paymentState === "loading" ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Processing...
+                      </>
+                    ) : paymentState === "error" ? (
+                      "Retry Payment"
+                    ) : (
+                      "Pay ₹100 Now"
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

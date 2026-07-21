@@ -16,6 +16,7 @@ from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
 from modules.smilecare.models import DentalChartModel, ToothModel, ToothSurfaceModel, ClinicalFindingModel
+from modules.billing.models import BillingRequestModel, InvoiceModel, PaymentModel, ExpenseModel, InsuranceClaimModel
 
 
 def main():

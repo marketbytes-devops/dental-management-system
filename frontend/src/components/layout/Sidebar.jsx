@@ -156,18 +156,20 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
       <div className="h-16 border-b border-gray-100 flex items-center justify-between px-4">
 
         <div className="flex items-center gap-2 overflow-hidden">
-          <ToothIcon className="w-6 h-6 text-primary shrink-0" />
-
-          {!isMinimized && (
+          {!pathname?.startsWith("/frontdesk") && (
             <>
-              <span className="font-bold text-lg text-primary">
-                SmileCare
-              </span>
-
-              {roleLabel && (
-                <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary uppercase">
-                  {roleLabel}
-                </span>
+              <ToothIcon className="w-6 h-6 text-primary shrink-0" />
+              {!isMinimized && (
+                <>
+                  <span className="font-bold text-lg text-primary">
+                    SmileCare
+                  </span>
+                  {roleLabel && (
+                    <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary uppercase">
+                      {roleLabel}
+                    </span>
+                  )}
+                </>
               )}
             </>
           )}

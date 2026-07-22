@@ -100,6 +100,10 @@ try:
 
             add_consent_col_if_missing("patient_id", "INTEGER")
             add_consent_col_if_missing("doctor_id", "INTEGER")
+            add_consent_col_if_missing("doctor_name", "VARCHAR")
+            add_consent_col_if_missing("procedure_name", "VARCHAR")
+            add_consent_col_if_missing("custom_details", "TEXT")
+            add_consent_col_if_missing("uploaded_document_path", "VARCHAR")
             add_consent_col_if_missing("content", "VARCHAR")
             add_consent_col_if_missing("signing_method", "VARCHAR")
             add_consent_col_if_missing("pdf_file_path", "VARCHAR")

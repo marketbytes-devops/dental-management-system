@@ -25,6 +25,7 @@ import {
 import { useDoctor } from "@/app/(dashboards)/doctor/layout";
 import ToothChart from "@/components/features/doctor/workspace/ToothChart";
 import SmileCareChart from "@/components/features/doctor/workspace/smilecare/SmileCareChart";
+import CustomConsentModal from "@/components/features/doctor/workspace/CustomConsentModal";
 import { 
   getPatientByToken,
   getPatientTreatmentPlan, 
@@ -34,7 +35,8 @@ import {
   updateTreatmentPlanStep,
   downloadConsentPdf,
   getProcedures,
-  createBillingRequest
+  createBillingRequest,
+  createCustomConsent
 } from "@/services/api";
 
 const SPECIALTY_CONFIGS = {
@@ -213,7 +215,7 @@ export default function DoctorTreatmentPlanPage() {
   const params = useParams();
   const router = useRouter();
   const patientToken = params.patient_token;
-  const { enrichPatientTimeline, viewingPatient, handleToggleToothState } = useDoctor() || {};
+  const { enrichPatientTimeline, viewingPatient, handleToggleToothState, currentDoctorName } = useDoctor() || {};
 
   const [doctorSpecialty, setDoctorSpecialty] = useState("General Dentistry");
 
@@ -251,6 +253,8 @@ export default function DoctorTreatmentPlanPage() {
   const [steps, setSteps] = useState([]);
   const [sittings, setSittings] = useState(["Sitting 1"]);
   const [showTeethChart, setShowTeethChart] = useState(false);
+  const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
+  const [customConsentPayload, setCustomConsentPayload] = useState(null);
 
   // Orthodontic Consultation Sheet Fields
   const [orthoActiveTab, setOrthoActiveTab] = useState("history");
@@ -643,10 +647,34 @@ export default function DoctorTreatmentPlanPage() {
         await updateTreatmentPlan(activePlan.id, payload);
       } else {
         // Create new plan
-        await createTreatmentPlan({
+        const createdPlan = await createTreatmentPlan({
           ...payload,
           steps: steps.map((s, idx) => ({ ...s, sequence: idx + 1 }))
         });
+
+        // Dispatch custom consents configured for steps
+        if (createdPlan && createdPlan.steps) {
+          for (let i = 0; i < steps.length; i++) {
+            const s = steps[i];
+            if (s.requires_consent && s.custom_consent) {
+              const createdStep = createdPlan.steps[i] || createdPlan.steps.find(cs => cs.title === s.title);
+              try {
+                await createCustomConsent({
+                  patient_token: patientToken,
+                  patient_name: patient?.name,
+                  doctor_name: currentDoctorName || createdPlan.doctor_name || "Doctor",
+                  procedure_name: s.custom_consent.procedure_name || s.title,
+                  title: s.custom_consent.title,
+                  custom_details: s.custom_consent.custom_details,
+                  treatment_plan_id: createdPlan.id,
+                  step_id: createdStep ? createdStep.id : 0
+                });
+              } catch (err) {
+                console.error("Failed to create custom consent for step:", err);
+              }
+            }
+          }
+        }
       }
 
       alert(`Plan successfully saved as ${statusType}!`);
@@ -668,7 +696,26 @@ export default function DoctorTreatmentPlanPage() {
     if (activePlan) {
       // Append step to active plan in DB
       try {
-        await createTreatmentPlanStep(activePlan.id, newStep);
+        const createdStep = await createTreatmentPlanStep(activePlan.id, newStep);
+
+        // If step requires consent and has custom consent payload
+        if (newStep.requires_consent && customConsentPayload) {
+          try {
+            await createCustomConsent({
+              patient_token: patientToken,
+              patient_name: patient?.name,
+              doctor_name: currentDoctorName || activePlan?.doctor_name || "Doctor",
+              procedure_name: customConsentPayload.procedure_name || newStep.title,
+              title: customConsentPayload.title,
+              custom_details: customConsentPayload.custom_details,
+              treatment_plan_id: activePlan.id,
+              step_id: createdStep.id
+            });
+          } catch (consentErr) {
+            console.error("Error creating custom consent record:", consentErr);
+          }
+        }
+
         setNewStep({
           title: "",
           details: "",
@@ -678,6 +725,7 @@ export default function DoctorTreatmentPlanPage() {
           phase: sittings[0] || "Sitting 1",
           sequence: steps.length + 1
         });
+        setCustomConsentPayload(null);
         setSelectedParentProcName("");
         setSelectedSubProcId("");
         loadData();
@@ -693,6 +741,7 @@ export default function DoctorTreatmentPlanPage() {
       // Local addition for a new draft plan
       setSteps([...steps, {
         ...newStep,
+        custom_consent: customConsentPayload,
         id: Date.now(), // temporary local ID
         consent_status: newStep.requires_consent ? "Pending" : "Not Required",
         status: "Planned"
@@ -706,6 +755,7 @@ export default function DoctorTreatmentPlanPage() {
         phase: sittings[0] || "Sitting 1",
         sequence: steps.length + 2
       });
+      setCustomConsentPayload(null);
       setSelectedParentProcName("");
       setSelectedSubProcId("");
     }
@@ -1991,9 +2041,26 @@ export default function DoctorTreatmentPlanPage() {
                   <input
                     type="checkbox"
                     checked={newStep.requires_consent}
-                    onChange={(e) => setNewStep({ ...newStep, requires_consent: e.target.checked })}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (checked) {
+                        if (!newStep.title.trim()) {
+                          alert("Please select or enter a Procedure Title before configuring consent details.");
+                          return;
+                        }
+                        setIsConsentModalOpen(true);
+                      } else {
+                        setNewStep({ ...newStep, requires_consent: false });
+                        setCustomConsentPayload(null);
+                      }
+                    }}
                   />
                   Requires Patient Consent
+                  {newStep.requires_consent && customConsentPayload && (
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 ml-1">
+                      ✓ Custom Form Configured
+                    </span>
+                  )}
                 </label>
                 <button
                   type="button"
@@ -2012,6 +2079,20 @@ export default function DoctorTreatmentPlanPage() {
 
       </div>
 
+      {/* Custom Consent Modal */}
+      <CustomConsentModal
+        isOpen={isConsentModalOpen}
+        onClose={() => setIsConsentModalOpen(false)}
+        onConfirm={(payload) => {
+          setCustomConsentPayload(payload);
+          setNewStep(prev => ({ ...prev, requires_consent: true }));
+          setIsConsentModalOpen(false);
+        }}
+        patientName={patient?.name || ""}
+        patientToken={patientToken}
+        doctorName={currentDoctorName || activePlan?.doctor_name || "Doctor"}
+        procedureName={newStep.title}
+      />
     </div>
   );
 }

@@ -177,6 +177,33 @@ export const getSignedConsents = async () => {
   return response.data;
 };
 
+export const createCustomConsent = async (consentData) => {
+  const response = await client.post("/patient/consents/custom-request", consentData);
+  return response.data;
+};
+
+export const getAllConsentsForStaff = async (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.search) query.append("search", params.search);
+  if (params.status_filter) query.append("status_filter", params.status_filter);
+  if (params.doctor_name) query.append("doctor_name", params.doctor_name);
+  if (params.patient_token) query.append("patient_token", params.patient_token);
+  
+  const queryString = query.toString();
+  const url = queryString ? `/patient/consents/all-staff?${queryString}` : "/patient/consents/all-staff";
+  const response = await client.get(url);
+  return response.data;
+};
+
+export const uploadSignedConsentFile = async (consentId, formData) => {
+  const response = await client.post(`/patient/consents/${consentId}/upload-signed`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
 export const signConsentDocument = async (id, signatureData) => {
   const response = await client.post(`/patient/consents/${id}/sign`, signatureData);
   return response.data;

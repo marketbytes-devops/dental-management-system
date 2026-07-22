@@ -151,8 +151,30 @@ def create_treatment_plan(
             status="Planned"
         )
         db.add(step)
+        db.commit()
+        db.refresh(step)
 
-    db.commit()
+        if s_in.requires_consent:
+            existing = db.query(PatientConsentModel).filter(PatientConsentModel.step_id == step.id).first()
+            if not existing:
+                content = make_consent_content(patient.name, doctor_name, step.title, step.details)
+                consent = PatientConsentModel(
+                    patient_id=patient.id,
+                    patient_token=plan_in.patient_token,
+                    doctor_name=doctor_name,
+                    procedure_name=step.title,
+                    treatment_plan_id=new_plan.id,
+                    step_id=step.id,
+                    title=f"Consent Form: {step.title}",
+                    content=content,
+                    status="PENDING"
+                )
+                db.add(consent)
+                db.commit()
+                db.refresh(consent)
+
+                step.consent_id = consent.id
+                db.commit()
 
     # Fetch steps and set on return object
     new_plan.steps = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.plan_id == new_plan.id).all()
@@ -315,27 +337,35 @@ def add_step_to_plan(
     db.commit()
     db.refresh(step)
 
-    # If plan is already Active, generate consent instantly
-    if plan.status == "Active" and step.requires_consent:
-        patient = db.query(PatientModel).filter(PatientModel.token == plan.patient_token).first()
-        patient_name = patient.name if patient else "Patient"
-        
-        consent = PatientConsentModel(
-            patient_id=patient.id if patient else None,
-            patient_token=plan.patient_token,
-            treatment_plan_id=plan.id,
-            step_id=step.id,
-            title=f"Consent Form: {step.title}",
-            content=make_consent_content(patient_name, plan.doctor_name, step.title, step.details),
-            status="PENDING"
-        )
-        db.add(consent)
-        db.commit()
-        db.refresh(consent)
-        
-        step.consent_id = consent.id
-        db.commit()
-        db.refresh(step)
+    # Generate consent instantly if step requires consent and no consent exists yet
+    if step.requires_consent and not step.consent_id:
+        existing = db.query(PatientConsentModel).filter(PatientConsentModel.step_id == step.id).first()
+        if not existing:
+            patient = db.query(PatientModel).filter(PatientModel.token == plan.patient_token).first()
+            patient_name = patient.name if patient else "Patient"
+            
+            consent = PatientConsentModel(
+                patient_id=patient.id if patient else None,
+                patient_token=plan.patient_token,
+                doctor_name=plan.doctor_name,
+                procedure_name=step.title,
+                treatment_plan_id=plan.id,
+                step_id=step.id,
+                title=f"Consent Form: {step.title}",
+                content=make_consent_content(patient_name, plan.doctor_name, step.title, step.details),
+                status="PENDING"
+            )
+            db.add(consent)
+            db.commit()
+            db.refresh(consent)
+            
+            step.consent_id = consent.id
+            db.commit()
+            db.refresh(step)
+        else:
+            step.consent_id = existing.id
+            db.commit()
+            db.refresh(step)
 
     return step
 

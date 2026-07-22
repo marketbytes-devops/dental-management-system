@@ -15,6 +15,7 @@ from modules.smilecare.router import router as smilecare_router
 from modules.doctor.router import router as doctor_router
 from modules.procedures.router import router as procedures_router
 from modules.billing.router import router as billing_router
+from modules.payment.router import router as payment_router
 
 
 
@@ -32,6 +33,7 @@ from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
 from modules.procedures.models import ProcedureModel
 from modules.billing.models import BillingRequestModel
+from modules.payment.models import ConsultationPaymentModel
 from modules.auth.service import hash_password
 
 
@@ -135,6 +137,22 @@ try:
                 conn.execute(text("ALTER TABLE procedures ADD COLUMN specialty VARCHAR DEFAULT 'General Dentistry';"))
                 print("Added column specialty to procedures table.")
 
+            # Also check treatment_plans table
+            if engine.dialect.name == "sqlite":
+                tp_col_query = conn.execute(text("PRAGMA table_info(treatment_plans);")).fetchall()
+                existing_tp_cols = [row[1] for row in tp_col_query]
+            else:
+                tp_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='treatment_plans';")).fetchall()
+                existing_tp_cols = [row[0] for row in tp_col_query]
+
+            def add_tp_col_if_missing(col_name, col_type):
+                if col_name not in existing_tp_cols:
+                    conn.execute(text(f"ALTER TABLE treatment_plans ADD COLUMN {col_name} {col_type};"))
+                    print(f"Added column {col_name} to treatment_plans table.")
+
+            add_tp_col_if_missing("next_visit_date", "VARCHAR")
+            add_tp_col_if_missing("next_visit_procedure", "VARCHAR")
+
             print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")
@@ -219,6 +237,7 @@ app.include_router(smilecare_router)
 app.include_router(doctor_router)
 app.include_router(procedures_router)
 app.include_router(billing_router)
+app.include_router(payment_router)
 
 
 

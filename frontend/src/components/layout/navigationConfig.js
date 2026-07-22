@@ -41,7 +41,8 @@ import {
   Sparkles,
   User,
   Package,
-  MessageSquare
+  MessageSquare,
+  LifeBuoy
 } from "lucide-react";
 
 import ToothIcon from "@/components/ui/shared/ToothIcon";
@@ -55,7 +56,9 @@ export const ROLE_NAV_ITEMS = {
     { name: "Patient Directory", href: "/admin/patients", icon: Users },
     { name: "Lab Module", href: "/admin/lab-module", icon: Microscope },
     { name: "Procedures Catalog", href: "/admin/procedures", icon: ClipboardList },
-    { name: "Leave Management", href: "/admin/leave", icon: Calendar }
+    { name: "Leave Management", href: "/admin/leave", icon: Calendar },
+    { name: "Complaints", href: "/admin/complaints", icon: MessageSquare },
+    { name: "Support Portal", href: "/admin/support", icon: LifeBuoy }
   ],
   doctor: [
     { name: "Dashboard", href: "/doctor/dashboard", icon: Home },
@@ -77,7 +80,8 @@ export const ROLE_NAV_ITEMS = {
     { name: "Notifications", href: "/doctor/notifications", icon: Bell },
     { name: "Leave Management", href: "/doctor/leave", icon: Calendar },
     { name: "My Performance", href: "/doctor/performance", icon: TrendingUp },
-    { name: "My Profile", href: "/doctor/profile", icon: User }
+    { name: "My Profile", href: "/doctor/profile", icon: User },
+    { name: "Support Portal", href: "/doctor/support", icon: LifeBuoy }
   ],
   receptionist: [
     { name: "Dashboard", href: "/frontdesk/receptionist/dashboard", icon: BarChart3 },
@@ -85,9 +89,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Registrations", href: "/frontdesk/receptionist/patients", icon: UserPlus },
     { name: "Daily Transactions", href: "/frontdesk/receptionist/transactions", icon: Receipt },
     { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: Stethoscope },
-    { name: "Waiting Queue", href: "/frontdesk/receptionist/queue", icon: Hourglass },
     { name: "Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },
-    { name: "Medical Alerts", href: "/frontdesk/receptionist/alerts", icon: AlertTriangle },
     { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },
     { name: "Leave Management", href: "/frontdesk/receptionist/leave", icon: Calendar },
     { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },
@@ -96,20 +98,13 @@ export const ROLE_NAV_ITEMS = {
   ],
   accountant: [
     { name: "Dashboard", href: "/frontdesk/accountant/dashboard", icon: BarChart3 },
-    { name: "Invoices", href: "/frontdesk/accountant/invoices", icon: Receipt },
-    { name: "Payments", href: "/frontdesk/accountant/payments", icon: CreditCard },
+    { name: "Billing & Payments", href: "/frontdesk/accountant/billing", icon: Receipt },
     { name: "Insurance Claims", href: "/frontdesk/accountant/claims", icon: Shield },
-    { name: "Claim Verification", href: "/frontdesk/accountant/claim-verification", icon: ShieldCheck },
-    { name: "Revenue", href: "/frontdesk/accountant/revenue", icon: TrendingUp },
-    { name: "Expenses", href: "/frontdesk/accountant/expenses", icon: TrendingDown },
-    { name: "Refunds", href: "/frontdesk/accountant/refunds", icon: Undo2 },
-    { name: "Outstanding Dues", href: "/frontdesk/accountant/dues", icon: AlertCircle },
-    { name: "Payroll", href: "/frontdesk/accountant/payroll", icon: Banknote },
-    { name: "Reports", href: "/frontdesk/accountant/reports", icon: FileText },
-    { name: "Leave Management", href: "/frontdesk/accountant/leave", icon: Calendar },
-    { name: "Audit Logs", href: "/frontdesk/accountant/audit", icon: Search },
+    { name: "Expenses & Payroll", href: "/frontdesk/accountant/expenses", icon: TrendingDown },
+    { name: "Financial Reports", href: "/frontdesk/accountant/reports", icon: FileText },
     { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings },
-    { name: "My Profile", href: "/frontdesk/accountant/profile", icon: User }
+    { name: "My Profile", href: "/frontdesk/accountant/profile", icon: User },
+    { name: "Support Portal", href: "/frontdesk/accountant/support", icon: LifeBuoy }
   ],
   "lab tech": [
     { name: "Dashboard", href: "/labtechnicians/dashboard", icon: BarChart3 },
@@ -119,7 +114,8 @@ export const ROLE_NAV_ITEMS = {
     { name: "Notifications", href: "/labtechnicians/notifications", icon: Bell },
     { name: "Leave Management", href: "/labtechnicians/leave", icon: Calendar },
     { name: "Settings", href: "/labtechnicians/settings", icon: Settings },
-    { name: "My Profile", href: "/labtechnicians/profile", icon: User }
+    { name: "My Profile", href: "/labtechnicians/profile", icon: User },
+    { name: "Support Portal", href: "/labtechnicians/support", icon: LifeBuoy }
   ],
   patient: [
     { name: "My Dashboard", href: "/patient/dashboard", icon: Home },

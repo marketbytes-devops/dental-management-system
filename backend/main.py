@@ -33,7 +33,7 @@ from modules.leave.models import LeaveRequestModel
 from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepModel
 from modules.procedures.models import ProcedureModel
 from modules.billing.models import BillingRequestModel
-from modules.payment.models import ConsultationPaymentModel
+from modules.payment.models import ConsultationPaymentModel, ClinicSettingModel
 from modules.auth.service import hash_password
 
 
@@ -162,6 +162,27 @@ try:
             add_tp_col_if_missing("next_visit_date", "VARCHAR")
             add_tp_col_if_missing("next_visit_procedure", "VARCHAR")
 
+            # Also check consultation_payments table
+            if engine.dialect.name == "sqlite":
+                pay_col_query = conn.execute(text("PRAGMA table_info(consultation_payments);")).fetchall()
+                existing_pay_cols = [row[1] for row in pay_col_query]
+            else:
+                pay_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='consultation_payments';")).fetchall()
+                existing_pay_cols = [row[0] for row in pay_col_query]
+
+            def add_pay_col_if_missing(col_name, col_type):
+                if col_name not in existing_pay_cols:
+                    conn.execute(text(f"ALTER TABLE consultation_payments ADD COLUMN {col_name} {col_type};"))
+                    print(f"Added column {col_name} to consultation_payments table.")
+
+            add_pay_col_if_missing("patient_token", "VARCHAR")
+            add_pay_col_if_missing("patient_name", "VARCHAR")
+            add_pay_col_if_missing("doctor_name", "VARCHAR")
+            add_pay_col_if_missing("payment_method", "VARCHAR DEFAULT 'Cash'")
+            add_pay_col_if_missing("receptionist_name", "VARCHAR")
+            add_pay_col_if_missing("shift_id", "INTEGER")
+            add_pay_col_if_missing("is_reconciled", "BOOLEAN DEFAULT FALSE")
+
             print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")
@@ -234,6 +255,19 @@ try:
         db.add_all(default_prices)
         db.commit()
         print("Default Admin Lab pricing catalog seeded successfully.")
+
+    # Seed default clinic consultation fee settings if empty
+    settings_count = db.query(ClinicSettingModel).count()
+    if settings_count == 0:
+        default_settings = [
+            ClinicSettingModel(setting_key="general_consultation_fee", setting_value="500.0", description="Default General Dentist Consultation Fee (INR)"),
+            ClinicSettingModel(setting_key="specialist_consultation_fee", setting_value="800.0", description="Default Specialist Doctor Consultation Fee (INR)"),
+            ClinicSettingModel(setting_key="followup_consultation_fee", setting_value="300.0", description="Follow-up Re-evaluation Fee (INR)"),
+            ClinicSettingModel(setting_key="online_booking_fee", setting_value="100.0", description="Online Portal Booking Fee Deposit (INR)"),
+        ]
+        db.add_all(default_settings)
+        db.commit()
+        print("Default clinic consultation fee tariffs seeded successfully.")
 
 except Exception as e:
     print(f"Error seeding default admin: {e}")

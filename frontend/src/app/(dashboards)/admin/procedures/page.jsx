@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, Loader2, CheckCircle, XCircle, Eye } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader2, CheckCircle, XCircle, Eye, DollarSign, Save } from "lucide-react";
 import client from "@/services/api"; // Axios client
 
 export default function ProceduresPage() {
@@ -42,6 +42,16 @@ export default function ProceduresPage() {
     }));
   };
 
+  // Tariff configuration state
+  const [tariffs, setTariffs] = useState({
+    general_consultation_fee: 500,
+    specialist_consultation_fee: 800,
+    followup_consultation_fee: 300,
+    online_booking_fee: 100
+  });
+  const [savingTariffs, setSavingTariffs] = useState(false);
+  const [tariffSuccessMsg, setTariffSuccessMsg] = useState(null);
+
   const fetchProcedures = async () => {
     setLoading(true);
     try {
@@ -54,9 +64,41 @@ export default function ProceduresPage() {
     }
   };
 
+  const fetchTariffs = async () => {
+    try {
+      const res = await client.get("/payment/consultation-fees");
+      setTariffs(res.data);
+    } catch (err) {
+      console.error("Failed to fetch consultation tariffs", err);
+    }
+  };
+
   useEffect(() => {
     fetchProcedures();
+    fetchTariffs();
   }, []);
+
+  const handleSaveTariffs = async (e) => {
+    e.preventDefault();
+    setSavingTariffs(true);
+    try {
+      const payload = {
+        general_consultation_fee: parseFloat(tariffs.general_consultation_fee) || 500,
+        specialist_consultation_fee: parseFloat(tariffs.specialist_consultation_fee) || 800,
+        followup_consultation_fee: parseFloat(tariffs.followup_consultation_fee) || 300,
+        online_booking_fee: parseFloat(tariffs.online_booking_fee) || 100
+      };
+      await client.put("/payment/consultation-fees", payload);
+      setTariffSuccessMsg("Consultation tariffs updated successfully!");
+      setTimeout(() => setTariffSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error("Failed to update consultation tariffs", err);
+      alert("Failed to update consultation tariffs.");
+    } finally {
+      setSavingTariffs(false);
+    }
+  };
+
 
   const openModal = (proc = null) => {
     setCurrentProc(proc);
@@ -190,6 +232,90 @@ export default function ProceduresPage() {
           <Plus className="w-4 h-4" /> Add Procedure
         </button>
       </div>
+
+      {/* Consultation Tariff Configuration Card */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4">
+        <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+              <DollarSign className="w-5 h-5" />
+            </span>
+            <div>
+              <h2 className="text-base font-black text-gray-900">Clinic Consultation Fee Tariffs</h2>
+              <p className="text-xs text-gray-500">Configure default consultation rates applied across Receptionist check-in and Online Booking.</p>
+            </div>
+          </div>
+        </div>
+
+        {tariffSuccessMsg && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{tariffSuccessMsg}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveTariffs} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">General Dentist Fee (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={tariffs.general_consultation_fee}
+              onChange={(e) => setTariffs(prev => ({ ...prev, general_consultation_fee: e.target.value }))}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Specialist Doctor Fee (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={tariffs.specialist_consultation_fee}
+              onChange={(e) => setTariffs(prev => ({ ...prev, specialist_consultation_fee: e.target.value }))}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Follow-up Re-evaluation (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={tariffs.followup_consultation_fee}
+              onChange={(e) => setTariffs(prev => ({ ...prev, followup_consultation_fee: e.target.value }))}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Online Booking Deposit (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={tariffs.online_booking_fee}
+              onChange={(e) => setTariffs(prev => ({ ...prev, online_booking_fee: e.target.value }))}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+            />
+          </div>
+
+          <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
+            <button
+              type="submit"
+              disabled={savingTariffs}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {savingTariffs ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{savingTariffs ? "Saving Tariffs..." : "Save Consultation Tariffs"}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
 
       <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-sm">
         {loading ? (

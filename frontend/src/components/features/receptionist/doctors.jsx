@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
 import { getDoctors, updateDoctorStatus } from "@/services/api";
+import { parseDoctorSpecialties } from "@/utils/specialtyUtils";
+
 
 const STATUS_MAP = {
   "Available": { key: "available", label: "Available", accent: "bg-green-500", avatar: "bg-green-50 text-green-800", pill: "bg-green-50 text-green-800 border-green-300" },
@@ -136,7 +138,7 @@ export default function ReceptionistDoctors() {
                     </div>
                     <div>
                       <p className="text-sm font-bold text-gray-900">{d.name}</p>
-                      <p className="text-[10px] text-gray-500 font-medium">{d.specialty} · {d.dept || d.operatory}</p>
+                      <p className="text-[10px] text-gray-500 font-medium">{parseDoctorSpecialties(d).join(" · ")} · {d.dept || d.operatory}</p>
                       {d.shift && (
                         <p className="text-[10px] text-gray-400 mt-0.5 flex items-center gap-1">
                           <Calendar className="w-3 h-3" />

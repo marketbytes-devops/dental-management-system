@@ -695,3 +695,14 @@ export const verifyPayment = async (payload) => {
   return response.data;
 };
 
+export const getConsultationFees = async () => {
+  const response = await client.get("/payment/consultation-fees");
+  return response.data;
+};
+
+export const updateConsultationFees = async (tariffData) => {
+  const response = await client.put("/payment/consultation-fees", tariffData);
+  return response.data;
+};
+
+

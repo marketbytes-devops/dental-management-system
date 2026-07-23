@@ -133,13 +133,18 @@ try:
                 proc_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='procedures';")).fetchall()
                 existing_proc_cols = [row[0] for row in proc_col_query]
 
-            if "parent_id" not in existing_proc_cols:
-                conn.execute(text("ALTER TABLE procedures ADD COLUMN parent_id INTEGER;"))
-                print("Added column parent_id to procedures table.")
+            def add_proc_col_if_missing(col_name, col_type):
+                if col_name not in existing_proc_cols:
+                    conn.execute(text(f"ALTER TABLE procedures ADD COLUMN {col_name} {col_type};"))
+                    print(f"Added column {col_name} to procedures table.")
 
-            if "specialty" not in existing_proc_cols:
-                conn.execute(text("ALTER TABLE procedures ADD COLUMN specialty VARCHAR DEFAULT 'General Dentistry';"))
-                print("Added column specialty to procedures table.")
+            add_proc_col_if_missing("parent_id", "INTEGER")
+            add_proc_col_if_missing("specialty", "VARCHAR DEFAULT 'General Dentistry'")
+            add_proc_col_if_missing("code", "VARCHAR")
+            add_proc_col_if_missing("base_cost", "FLOAT DEFAULT 0.0")
+            add_proc_col_if_missing("lab_required", "BOOLEAN DEFAULT FALSE")
+            add_proc_col_if_missing("default_lab_fee", "FLOAT DEFAULT 0.0")
+            add_proc_col_if_missing("tax_category", "VARCHAR DEFAULT 'Exempt'")
 
             # Also check treatment_plans table
             if engine.dialect.name == "sqlite":
@@ -213,6 +218,23 @@ try:
         db.add_all(default_vendors)
         db.commit()
         print("Default lab vendors seeded successfully.")
+
+    # Seed default Admin Lab pricing catalog if empty
+    from modules.lab.models import LabItemPriceModel
+    pricing_count = db.query(LabItemPriceModel).count()
+    if pricing_count == 0:
+        default_prices = [
+            LabItemPriceModel(item_name="PFM Crown", category="Prosthetic", material_tier="Standard", vendor_cost=1500.0, clinic_markup_pct=60.0, patient_price=2400.0, warranty_months=24),
+            LabItemPriceModel(item_name="Monolithic Zirconia Crown", category="Prosthetic", material_tier="Premium", vendor_cost=3500.0, clinic_markup_pct=50.0, patient_price=5250.0, warranty_months=60),
+            LabItemPriceModel(item_name="Layered E-Max Veneer", category="Prosthetic", material_tier="Elite", vendor_cost=4500.0, clinic_markup_pct=50.0, patient_price=6750.0, warranty_months=60),
+            LabItemPriceModel(item_name="Clear Aligner Set (Per Arch)", category="Orthodontic", material_tier="Premium", vendor_cost=12000.0, clinic_markup_pct=40.0, patient_price=16800.0, warranty_months=12),
+            LabItemPriceModel(item_name="Custom Titanium Abutment", category="Surgical", material_tier="Premium", vendor_cost=4000.0, clinic_markup_pct=50.0, patient_price=6000.0, warranty_months=36),
+            LabItemPriceModel(item_name="Oral Biopsy Histopathology", category="Pathology", material_tier="Standard", vendor_cost=1200.0, clinic_markup_pct=25.0, patient_price=1500.0, warranty_months=0),
+        ]
+        db.add_all(default_prices)
+        db.commit()
+        print("Default Admin Lab pricing catalog seeded successfully.")
+
 except Exception as e:
     print(f"Error seeding default admin: {e}")
 finally:

@@ -13,8 +13,13 @@ export default function ProceduresPage() {
 
   // Form state
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [rate, setRate] = useState("");
+  const [baseCost, setBaseCost] = useState("0");
+  const [labRequired, setLabRequired] = useState(false);
+  const [defaultLabFee, setDefaultLabFee] = useState("0");
+  const [taxCategory, setTaxCategory] = useState("Exempt");
   const [specialty, setSpecialty] = useState("General Dentistry");
   const [isActive, setIsActive] = useState(true);
   const [hasSubProcedures, setHasSubProcedures] = useState(false);
@@ -57,16 +62,26 @@ export default function ProceduresPage() {
     setCurrentProc(proc);
     if (proc) {
       setName(proc.name);
+      setCode(proc.code || "");
       setDescription(proc.description || "");
       setRate(proc.rate.toString());
+      setBaseCost(proc.base_cost ? proc.base_cost.toString() : "0");
+      setLabRequired(proc.lab_required || false);
+      setDefaultLabFee(proc.default_lab_fee ? proc.default_lab_fee.toString() : "0");
+      setTaxCategory(proc.tax_category || "Exempt");
       setSpecialty(proc.specialty || "General Dentistry");
       setIsActive(proc.is_active);
       setHasSubProcedures(false);
       setSubProcedures([{ name: "", rate: "" }]);
     } else {
       setName("");
+      setCode("");
       setDescription("");
       setRate("");
+      setBaseCost("0");
+      setLabRequired(false);
+      setDefaultLabFee("0");
+      setTaxCategory("Exempt");
       setSpecialty("General Dentistry");
       setIsActive(true);
       setHasSubProcedures(false);
@@ -94,8 +109,13 @@ export default function ProceduresPage() {
         // Edit mode (simple edit)
         const payload = {
           name,
+          code,
           description,
           rate: parseFloat(rate) || 0.0,
+          base_cost: parseFloat(baseCost) || 0.0,
+          lab_required: labRequired,
+          default_lab_fee: parseFloat(defaultLabFee) || 0.0,
+          tax_category: taxCategory,
           parent_id: currentProc.parent_id,
           specialty,
           is_active: isActive
@@ -105,8 +125,13 @@ export default function ProceduresPage() {
         // Create mode
         const parentPayload = {
           name,
+          code,
           description,
           rate: hasSubProcedures ? 0.0 : (parseFloat(rate) || 0.0),
+          base_cost: parseFloat(baseCost) || 0.0,
+          lab_required: labRequired,
+          default_lab_fee: parseFloat(defaultLabFee) || 0.0,
+          tax_category: taxCategory,
           parent_id: null,
           specialty,
           is_active: isActive
@@ -254,16 +279,28 @@ export default function ProceduresPage() {
             </div>
             
             <form onSubmit={handleSave} className="p-6 space-y-4 text-left overflow-y-auto flex-1">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Procedure Name</label>
-                <input 
-                  required
-                  type="text" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                  placeholder="e.g. Braces"
-                />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Procedure Name</label>
+                  <input 
+                    required
+                    type="text" 
+                    value={name} 
+                    onChange={e => setName(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-800"
+                    placeholder="e.g. Braces"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">CDT Code</label>
+                  <input 
+                    type="text" 
+                    value={code} 
+                    onChange={e => setCode(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-800"
+                    placeholder="e.g. D2740"
+                  />
+                </div>
               </div>
               
               <div>
@@ -272,44 +309,104 @@ export default function ProceduresPage() {
                   rows="2"
                   value={description} 
                   onChange={e => setDescription(e.target.value)} 
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs text-gray-800"
                   placeholder="Short description of the procedure"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Clinical Specialty</label>
-                <select 
-                  value={specialty} 
-                  onChange={e => setSpecialty(e.target.value)} 
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-700"
-                >
-                  <option value="General Dentistry">General Dentistry</option>
-                  <option value="Orthodontics">Orthodontics</option>
-                  <option value="Endodontics">Endodontics</option>
-                  <option value="Oral Surgery">Oral Surgery</option>
-                  <option value="Periodontics">Periodontics</option>
-                  <option value="Prosthodontics">Prosthodontics</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Clinical Specialty</label>
+                  <select 
+                    value={specialty} 
+                    onChange={e => setSpecialty(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-700"
+                  >
+                    <option value="General Dentistry">General Dentistry</option>
+                    <option value="Orthodontics">Orthodontics</option>
+                    <option value="Endodontics">Endodontics</option>
+                    <option value="Oral Surgery">Oral Surgery</option>
+                    <option value="Periodontics">Periodontics</option>
+                    <option value="Prosthodontics">Prosthodontics</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Tax Category</label>
+                  <select 
+                    value={taxCategory} 
+                    onChange={e => setTaxCategory(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-700"
+                  >
+                    <option value="Exempt">Exempt (0%)</option>
+                    <option value="Standard">Standard Medical Tax</option>
+                    <option value="Cosmetic">Cosmetic Service (Full Tax)</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Standard Rate (₹)</label>
-                <input 
-                  required={!hasSubProcedures}
-                  disabled={hasSubProcedures}
-                  type="number" 
-                  min="0"
-                  step="0.01"
-                  value={hasSubProcedures ? "0" : rate} 
-                  onChange={e => setRate(e.target.value)} 
-                  className={`w-full px-3 py-2 border rounded-xl focus:ring-2 outline-none ${
-                    hasSubProcedures 
-                      ? "bg-gray-100 border-gray-200 text-gray-400 focus:ring-transparent cursor-not-allowed" 
-                      : "bg-gray-50 border-gray-200 focus:ring-primary/20 focus:border-primary"
-                  }`}
-                  placeholder={hasSubProcedures ? "N/A (Derived from options)" : "e.g. 5000"}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Patient Rate (₹)</label>
+                  <input 
+                    required={!hasSubProcedures}
+                    disabled={hasSubProcedures}
+                    type="number" 
+                    min="0"
+                    step="0.01"
+                    value={hasSubProcedures ? "0" : rate} 
+                    onChange={e => setRate(e.target.value)} 
+                    className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none ${
+                      hasSubProcedures 
+                        ? "bg-gray-100 border-gray-200 text-gray-400 focus:ring-transparent cursor-not-allowed" 
+                        : "bg-gray-50 border-gray-200 focus:ring-primary/20 focus:border-primary text-gray-800"
+                    }`}
+                    placeholder={hasSubProcedures ? "Derived" : "e.g. 5000"}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Clinic Base Cost (₹)</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    step="0.01"
+                    value={baseCost} 
+                    onChange={e => setBaseCost(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    placeholder="e.g. 1500"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox"
+                    id="labRequired"
+                    checked={labRequired}
+                    onChange={e => setLabRequired(e.target.checked)}
+                    className="w-4 h-4 text-primary rounded focus:ring-primary cursor-pointer"
+                  />
+                  <label htmlFor="labRequired" className="text-xs font-bold text-slate-800 cursor-pointer">
+                    Requires Dental Lab Fabrication / Order
+                  </label>
+                </div>
+
+                {labRequired && (
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 mb-1">Estimated Default Lab Fee (₹)</label>
+                    <input 
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={defaultLabFee}
+                      onChange={e => setDefaultLabFee(e.target.value)}
+                      placeholder="e.g. 2000"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:border-primary"
+                    />
+                  </div>
+                )}
               </div>
 
 

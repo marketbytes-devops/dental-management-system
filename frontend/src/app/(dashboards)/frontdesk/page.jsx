@@ -13,7 +13,7 @@ export default function FrontDeskLandingPage() {
         try {
           const parsed = JSON.parse(staffUser);
           const roles = (parsed.roles || []).map(r => r.toLowerCase());
-          
+
           if (roles.includes("receptionist") || roles.includes("admin")) {
             router.replace("/frontdesk/receptionist/dashboard");
           } else if (roles.includes("accountant")) {

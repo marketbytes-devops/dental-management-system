@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, Loader2, CheckCircle, XCircle, Eye } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader2, CheckCircle, XCircle, Eye, DollarSign, Save } from "lucide-react";
 import client from "@/services/api"; // Axios client
 
 export default function ProceduresPage() {
@@ -13,8 +13,13 @@ export default function ProceduresPage() {
 
   // Form state
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [rate, setRate] = useState("");
+  const [baseCost, setBaseCost] = useState("0");
+  const [labRequired, setLabRequired] = useState(false);
+  const [defaultLabFee, setDefaultLabFee] = useState("0");
+  const [taxCategory, setTaxCategory] = useState("Exempt");
   const [specialty, setSpecialty] = useState("General Dentistry");
   const [isActive, setIsActive] = useState(true);
   const [hasSubProcedures, setHasSubProcedures] = useState(false);
@@ -37,6 +42,16 @@ export default function ProceduresPage() {
     }));
   };
 
+  // Tariff configuration state
+  const [tariffs, setTariffs] = useState({
+    general_consultation_fee: 500,
+    specialist_consultation_fee: 800,
+    followup_consultation_fee: 300,
+    online_booking_fee: 100
+  });
+  const [savingTariffs, setSavingTariffs] = useState(false);
+  const [tariffSuccessMsg, setTariffSuccessMsg] = useState(null);
+
   const fetchProcedures = async () => {
     setLoading(true);
     try {
@@ -49,24 +64,66 @@ export default function ProceduresPage() {
     }
   };
 
+  const fetchTariffs = async () => {
+    try {
+      const res = await client.get("/payment/consultation-fees");
+      setTariffs(res.data);
+    } catch (err) {
+      console.error("Failed to fetch consultation tariffs", err);
+    }
+  };
+
   useEffect(() => {
     fetchProcedures();
+    fetchTariffs();
   }, []);
+
+  const handleSaveTariffs = async (e) => {
+    e.preventDefault();
+    setSavingTariffs(true);
+    try {
+      const payload = {
+        general_consultation_fee: parseFloat(tariffs.general_consultation_fee) || 500,
+        specialist_consultation_fee: parseFloat(tariffs.specialist_consultation_fee) || 800,
+        followup_consultation_fee: parseFloat(tariffs.followup_consultation_fee) || 300,
+        online_booking_fee: parseFloat(tariffs.online_booking_fee) || 100
+      };
+      await client.put("/payment/consultation-fees", payload);
+      setTariffSuccessMsg("Consultation tariffs updated successfully!");
+      setTimeout(() => setTariffSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error("Failed to update consultation tariffs", err);
+      alert("Failed to update consultation tariffs.");
+    } finally {
+      setSavingTariffs(false);
+    }
+  };
+
 
   const openModal = (proc = null) => {
     setCurrentProc(proc);
     if (proc) {
       setName(proc.name);
+      setCode(proc.code || "");
       setDescription(proc.description || "");
       setRate(proc.rate.toString());
+      setBaseCost(proc.base_cost ? proc.base_cost.toString() : "0");
+      setLabRequired(proc.lab_required || false);
+      setDefaultLabFee(proc.default_lab_fee ? proc.default_lab_fee.toString() : "0");
+      setTaxCategory(proc.tax_category || "Exempt");
       setSpecialty(proc.specialty || "General Dentistry");
       setIsActive(proc.is_active);
       setHasSubProcedures(false);
       setSubProcedures([{ name: "", rate: "" }]);
     } else {
       setName("");
+      setCode("");
       setDescription("");
       setRate("");
+      setBaseCost("0");
+      setLabRequired(false);
+      setDefaultLabFee("0");
+      setTaxCategory("Exempt");
       setSpecialty("General Dentistry");
       setIsActive(true);
       setHasSubProcedures(false);
@@ -94,8 +151,13 @@ export default function ProceduresPage() {
         // Edit mode (simple edit)
         const payload = {
           name,
+          code,
           description,
           rate: parseFloat(rate) || 0.0,
+          base_cost: parseFloat(baseCost) || 0.0,
+          lab_required: labRequired,
+          default_lab_fee: parseFloat(defaultLabFee) || 0.0,
+          tax_category: taxCategory,
           parent_id: currentProc.parent_id,
           specialty,
           is_active: isActive
@@ -105,8 +167,13 @@ export default function ProceduresPage() {
         // Create mode
         const parentPayload = {
           name,
+          code,
           description,
           rate: hasSubProcedures ? 0.0 : (parseFloat(rate) || 0.0),
+          base_cost: parseFloat(baseCost) || 0.0,
+          lab_required: labRequired,
+          default_lab_fee: parseFloat(defaultLabFee) || 0.0,
+          tax_category: taxCategory,
           parent_id: null,
           specialty,
           is_active: isActive
@@ -165,6 +232,90 @@ export default function ProceduresPage() {
           <Plus className="w-4 h-4" /> Add Procedure
         </button>
       </div>
+
+      {/* Consultation Tariff Configuration Card */}
+      <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm space-y-4">
+        <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+              <DollarSign className="w-5 h-5" />
+            </span>
+            <div>
+              <h2 className="text-base font-black text-gray-900">Clinic Consultation Fee Tariffs</h2>
+              <p className="text-xs text-gray-500">Configure default consultation rates applied across Receptionist check-in and Online Booking.</p>
+            </div>
+          </div>
+        </div>
+
+        {tariffSuccessMsg && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{tariffSuccessMsg}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveTariffs} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">General Dentist Fee (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={tariffs.general_consultation_fee}
+              onChange={(e) => setTariffs(prev => ({ ...prev, general_consultation_fee: e.target.value }))}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Specialist Doctor Fee (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={tariffs.specialist_consultation_fee}
+              onChange={(e) => setTariffs(prev => ({ ...prev, specialist_consultation_fee: e.target.value }))}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Follow-up Re-evaluation (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={tariffs.followup_consultation_fee}
+              onChange={(e) => setTariffs(prev => ({ ...prev, followup_consultation_fee: e.target.value }))}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Online Booking Deposit (₹)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={tariffs.online_booking_fee}
+              onChange={(e) => setTariffs(prev => ({ ...prev, online_booking_fee: e.target.value }))}
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+            />
+          </div>
+
+          <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
+            <button
+              type="submit"
+              disabled={savingTariffs}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {savingTariffs ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{savingTariffs ? "Saving Tariffs..." : "Save Consultation Tariffs"}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
 
       <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-sm">
         {loading ? (
@@ -254,16 +405,28 @@ export default function ProceduresPage() {
             </div>
             
             <form onSubmit={handleSave} className="p-6 space-y-4 text-left overflow-y-auto flex-1">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Procedure Name</label>
-                <input 
-                  required
-                  type="text" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                  placeholder="e.g. Braces"
-                />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Procedure Name</label>
+                  <input 
+                    required
+                    type="text" 
+                    value={name} 
+                    onChange={e => setName(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-800"
+                    placeholder="e.g. Braces"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">CDT Code</label>
+                  <input 
+                    type="text" 
+                    value={code} 
+                    onChange={e => setCode(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-800"
+                    placeholder="e.g. D2740"
+                  />
+                </div>
               </div>
               
               <div>
@@ -272,44 +435,104 @@ export default function ProceduresPage() {
                   rows="2"
                   value={description} 
                   onChange={e => setDescription(e.target.value)} 
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs text-gray-800"
                   placeholder="Short description of the procedure"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Clinical Specialty</label>
-                <select 
-                  value={specialty} 
-                  onChange={e => setSpecialty(e.target.value)} 
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-700"
-                >
-                  <option value="General Dentistry">General Dentistry</option>
-                  <option value="Orthodontics">Orthodontics</option>
-                  <option value="Endodontics">Endodontics</option>
-                  <option value="Oral Surgery">Oral Surgery</option>
-                  <option value="Periodontics">Periodontics</option>
-                  <option value="Prosthodontics">Prosthodontics</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Clinical Specialty</label>
+                  <select 
+                    value={specialty} 
+                    onChange={e => setSpecialty(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-700"
+                  >
+                    <option value="General Dentistry">General Dentistry</option>
+                    <option value="Orthodontics">Orthodontics</option>
+                    <option value="Endodontics">Endodontics</option>
+                    <option value="Oral Surgery">Oral Surgery</option>
+                    <option value="Periodontics">Periodontics</option>
+                    <option value="Prosthodontics">Prosthodontics</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Tax Category</label>
+                  <select 
+                    value={taxCategory} 
+                    onChange={e => setTaxCategory(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-xs font-semibold text-gray-700"
+                  >
+                    <option value="Exempt">Exempt (0%)</option>
+                    <option value="Standard">Standard Medical Tax</option>
+                    <option value="Cosmetic">Cosmetic Service (Full Tax)</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Standard Rate (₹)</label>
-                <input 
-                  required={!hasSubProcedures}
-                  disabled={hasSubProcedures}
-                  type="number" 
-                  min="0"
-                  step="0.01"
-                  value={hasSubProcedures ? "0" : rate} 
-                  onChange={e => setRate(e.target.value)} 
-                  className={`w-full px-3 py-2 border rounded-xl focus:ring-2 outline-none ${
-                    hasSubProcedures 
-                      ? "bg-gray-100 border-gray-200 text-gray-400 focus:ring-transparent cursor-not-allowed" 
-                      : "bg-gray-50 border-gray-200 focus:ring-primary/20 focus:border-primary"
-                  }`}
-                  placeholder={hasSubProcedures ? "N/A (Derived from options)" : "e.g. 5000"}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Patient Rate (₹)</label>
+                  <input 
+                    required={!hasSubProcedures}
+                    disabled={hasSubProcedures}
+                    type="number" 
+                    min="0"
+                    step="0.01"
+                    value={hasSubProcedures ? "0" : rate} 
+                    onChange={e => setRate(e.target.value)} 
+                    className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none ${
+                      hasSubProcedures 
+                        ? "bg-gray-100 border-gray-200 text-gray-400 focus:ring-transparent cursor-not-allowed" 
+                        : "bg-gray-50 border-gray-200 focus:ring-primary/20 focus:border-primary text-gray-800"
+                    }`}
+                    placeholder={hasSubProcedures ? "Derived" : "e.g. 5000"}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Clinic Base Cost (₹)</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    step="0.01"
+                    value={baseCost} 
+                    onChange={e => setBaseCost(e.target.value)} 
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    placeholder="e.g. 1500"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox"
+                    id="labRequired"
+                    checked={labRequired}
+                    onChange={e => setLabRequired(e.target.checked)}
+                    className="w-4 h-4 text-primary rounded focus:ring-primary cursor-pointer"
+                  />
+                  <label htmlFor="labRequired" className="text-xs font-bold text-slate-800 cursor-pointer">
+                    Requires Dental Lab Fabrication / Order
+                  </label>
+                </div>
+
+                {labRequired && (
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 mb-1">Estimated Default Lab Fee (₹)</label>
+                    <input 
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={defaultLabFee}
+                      onChange={e => setDefaultLabFee(e.target.value)}
+                      placeholder="e.g. 2000"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:border-primary"
+                    />
+                  </div>
+                )}
               </div>
 
 

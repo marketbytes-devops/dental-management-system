@@ -3,6 +3,8 @@
 import { useState, useEffect, Fragment } from "react";
 import { Stethoscope, Calendar, Search, Filter, ShieldAlert, RefreshCw, Star, X, Save } from "lucide-react";
 import client from "@/services/api";
+import { getAllUniqueSpecialties, doctorHasSpecialty, parseDoctorSpecialties } from "@/utils/specialtyUtils";
+
 
 export default function DoctorManagementPage() {
 
@@ -128,11 +130,12 @@ export default function DoctorManagementPage() {
 
   const filteredDoctors = doctors.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(search.toLowerCase()) || 
-                          doc.specialty.toLowerCase().includes(search.toLowerCase());
-    const matchesSpecialty = filterSpecialty === "" || doc.specialty === filterSpecialty;
+                          (doc.specialty && doc.specialty.toLowerCase().includes(search.toLowerCase()));
+    const matchesSpecialty = doctorHasSpecialty(doc, filterSpecialty);
     const matchesStatus = filterStatus === "" || doc.status === filterStatus;
     return matchesSearch && matchesSpecialty && matchesStatus;
   });
+
 
   return (
     <div className="space-y-6 text-left animate-fade-in">
@@ -200,7 +203,7 @@ export default function DoctorManagementPage() {
             className="px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-primary text-gray-700 cursor-pointer"
           >
             <option value="">All Specialties</option>
-            {Array.from(new Set(doctors.map(d => d.specialty))).filter(Boolean).map(spec => (
+            {getAllUniqueSpecialties(doctors).map(spec => (
               <option key={spec} value={spec}>{spec}</option>
             ))}
           </select>

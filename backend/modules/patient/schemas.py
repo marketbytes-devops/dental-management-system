@@ -63,22 +63,45 @@ class PatientResponse(PatientBase):
 
 
 class ConsentRequest(BaseModel):
-    patient_id: int
+    patient_id: Optional[int] = None
+    patient_token: Optional[str] = None
     doctor_id: Optional[int] = None
+    doctor_name: Optional[str] = None
+    procedure_name: Optional[str] = None
     treatment_plan_id: Optional[int] = None
+    step_id: Optional[int] = None
     title: str
     content: str
+    custom_details: Optional[str] = None
+
+
+class ConsentCustomCreate(BaseModel):
+    patient_token: Optional[str] = None
+    patient_id: Optional[int] = None
+    patient_name: Optional[str] = None
+    doctor_id: Optional[int] = None
+    doctor_name: Optional[str] = None
+    procedure_name: str
+    title: Optional[str] = None
+    custom_details: Optional[str] = None
+    treatment_plan_id: Optional[int] = None
+    step_id: Optional[int] = None
 
 
 class ConsentSignRequest(BaseModel):
     signature_data: str
-    signing_method: str  # 'PORTAL' or 'IN_PERSON'
+    signing_method: str  # 'PORTAL', 'IN_PERSON', or 'RECEPTION_UPLOAD'
 
 
 class ConsentResponse(BaseModel):
     id: int
     patient_id: Optional[int] = None
+    patient_token: Optional[str] = None
     doctor_id: Optional[int] = None
+    doctor_name: Optional[str] = None
+    procedure_name: Optional[str] = None
+    custom_details: Optional[str] = None
+    uploaded_document_path: Optional[str] = None
     treatment_plan_id: Optional[int] = None
     step_id: Optional[int] = None
     title: str

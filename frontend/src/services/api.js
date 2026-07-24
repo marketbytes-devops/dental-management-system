@@ -177,6 +177,33 @@ export const getSignedConsents = async () => {
   return response.data;
 };
 
+export const createCustomConsent = async (consentData) => {
+  const response = await client.post("/patient/consents/custom-request", consentData);
+  return response.data;
+};
+
+export const getAllConsentsForStaff = async (params = {}) => {
+  const query = new URLSearchParams();
+  if (params.search) query.append("search", params.search);
+  if (params.status_filter) query.append("status_filter", params.status_filter);
+  if (params.doctor_name) query.append("doctor_name", params.doctor_name);
+  if (params.patient_token) query.append("patient_token", params.patient_token);
+  
+  const queryString = query.toString();
+  const url = queryString ? `/patient/consents/all-staff?${queryString}` : "/patient/consents/all-staff";
+  const response = await client.get(url);
+  return response.data;
+};
+
+export const uploadSignedConsentFile = async (consentId, formData) => {
+  const response = await client.post(`/patient/consents/${consentId}/upload-signed`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
 export const signConsentDocument = async (id, signatureData) => {
   const response = await client.post(`/patient/consents/${id}/sign`, signatureData);
   return response.data;
@@ -651,10 +678,10 @@ export const getDailyTransactions = async () => {
  * @param {number} appointmentId - The newly-created appointment ID
  * @returns {{ razorpay_order_id, amount, currency, key_id, appointment_id }}
  */
-export const createPaymentOrder = async (appointmentId) => {
+export const createPaymentOrder = async (appointmentId, amount = 100.0) => {
   const response = await client.post("/payment/create-order", {
     appointment_id: appointmentId,
-    amount: 100.0,
+    amount: amount,
   });
   return response.data;
 };
@@ -746,5 +773,15 @@ export const getComplaintLogs = async (id) => {
   } catch (err) {
     return [];
   }
+};
+
+export const getConsultationFees = async () => {
+  const response = await client.get("/payment/consultation-fees");
+  return response.data;
+};
+
+export const updateConsultationFees = async (tariffData) => {
+  const response = await client.put("/payment/consultation-fees", tariffData);
+  return response.data;
 };
 

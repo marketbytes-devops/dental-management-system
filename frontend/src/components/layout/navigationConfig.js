@@ -43,7 +43,8 @@ import {
   Package,
   MessageSquare,
   LifeBuoy,
-  FlaskConical
+  FlaskConical,
+  FileSignature
 } from "lucide-react";
 
 import ToothIcon from "@/components/ui/shared/ToothIcon";
@@ -90,12 +91,13 @@ export const ROLE_NAV_ITEMS = {
     { name: "Registrations", href: "/frontdesk/receptionist/patients", icon: UserPlus },
     { name: "Medicines to Dispense", href: "/frontdesk/receptionist/dispensing", icon: Pill },
     { name: "Lab Order Pickups", href: "/frontdesk/receptionist/lab-orders", icon: FlaskConical },
+    { name: "Consent Forms", href: "/frontdesk/receptionist/consents", icon: FileSignature },
     { name: "Daily Transactions", href: "/frontdesk/receptionist/transactions", icon: Receipt },
     { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: Stethoscope },
     { name: "Reminders", href: "/frontdesk/receptionist/reminders", icon: Bell },
     { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },
     { name: "Leave Management", href: "/frontdesk/receptionist/leave", icon: Calendar },
-    { name: "Support Requests", href: "/frontdesk/receptionist/support", icon: Headphones },
+    { name: "Support Portal", href: "/frontdesk/receptionist/support", icon: LifeBuoy },
     { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings },
     { name: "My Profile", href: "/frontdesk/receptionist/profile", icon: User }
   ],
@@ -105,6 +107,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Insurance Claims", href: "/frontdesk/accountant/claims", icon: Shield },
     { name: "Expenses & Payroll", href: "/frontdesk/accountant/expenses", icon: TrendingDown },
     { name: "Financial Reports", href: "/frontdesk/accountant/reports", icon: FileText },
+    { name: "Leave Management", href: "/frontdesk/accountant/leave", icon: Calendar },
     { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings },
     { name: "My Profile", href: "/frontdesk/accountant/profile", icon: User },
     { name: "Support Portal", href: "/frontdesk/accountant/support", icon: LifeBuoy }

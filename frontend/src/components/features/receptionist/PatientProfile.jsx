@@ -5,10 +5,19 @@ import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, User, Phone, Mail, MapPin, Calendar, 
   Droplet, AlertTriangle, FileText, FileImage, 
-  CheckCircle, Clock, Stethoscope, Download, Edit, X, Save
+  CheckCircle, Clock, Stethoscope, Download, Edit, X, Save,
+  FileSignature, Printer, Upload, PenTool, Loader2
 } from "lucide-react";
-import { getAllPatients, getPatientAppointments, adminUpdateUser } from "@/services/api";
+import { 
+  getAllPatients, 
+  getPatientAppointments, 
+  adminUpdateUser,
+  getAllConsentsForStaff,
+  downloadConsentPdf,
+  uploadSignedConsentFile
+} from "@/services/api";
 import BookAppointmentModal from "@/components/features/patients/appointments/bookAppointmentModal";
+import ConsentFormViewer from "@/components/features/patients/documents/consentFormViewer";
 
 export default function PatientProfile({ patientId }) {
   const router = useRouter();
@@ -22,6 +31,22 @@ export default function PatientProfile({ patientId }) {
   const [editFormData, setEditFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
+
+  // Consent actions modal states
+  const [signingConsent, setSigningConsent] = useState(null);
+  const [uploadingConsent, setUploadingConsent] = useState(null);
+  const [printingConsent, setPrintingConsent] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const fetchPatientConsents = async (token) => {
+    try {
+      const data = await getAllConsentsForStaff({ patient_token: token });
+      setConsentForms(data || []);
+    } catch (err) {
+      console.error("Failed to fetch consents for patient:", err);
+    }
+  };
 
   useEffect(() => {
     const fetchPatientData = async () => {
@@ -38,6 +63,11 @@ export default function PatientProfile({ patientId }) {
             setAppointments(apts || []);
           } catch (aptErr) {
             console.error("Failed to fetch appointments:", aptErr);
+          }
+
+          // Fetch real live consent forms for this patient
+          if (foundPatient.token) {
+            await fetchPatientConsents(foundPatient.token);
           }
         } else {
           console.error("Patient not found");
@@ -229,42 +259,122 @@ export default function PatientProfile({ patientId }) {
     </div>
   );
 
+  const handleUploadSubmit = async (e) => {
+    e.preventDefault();
+    if (!uploadingConsent || !selectedFile) {
+      alert("Please select a scanned paper consent file.");
+      return;
+    }
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    try {
+      await uploadSignedConsentFile(uploadingConsent.id, formData);
+      alert("Signed paper consent copy uploaded successfully.");
+      setUploadingConsent(null);
+      setSelectedFile(null);
+      if (patient?.token) fetchPatientConsents(patient.token);
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert(err.message || "Failed to upload file.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownloadPdf = async (consentId, title) => {
+    try {
+      const blobData = await downloadConsentPdf(consentId);
+      const blob = new Blob([blobData], { type: "application/pdf" });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${(title || "Consent_Form").replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert("Failed to download consent PDF file.");
+    }
+  };
+
   const renderConsents = () => (
     <div className="space-y-4 animate-fade-in">
       <div className="bg-white border border-gray-150 rounded-2xl overflow-hidden shadow-sm">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-              <th className="py-4 px-5">Document Name</th>
-              <th className="py-4 px-5">Date Signed</th>
+            <tr className="bg-gray-50 border-b border-gray-100 font-bold text-gray-500 uppercase tracking-wider">
+              <th className="py-4 px-5">Document Title</th>
+              <th className="py-4 px-5">Doctor</th>
+              <th className="py-4 px-5">Date</th>
               <th className="py-4 px-5">Status</th>
               <th className="py-4 px-5 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-gray-50 text-gray-700">
             {consentForms.length === 0 ? (
               <tr>
-                <td colSpan="4" className="py-8 text-center text-sm text-gray-400 font-medium">
-                  No consent forms found.
+                <td colSpan="5" className="py-8 text-center text-sm text-gray-400 font-medium">
+                  No consent forms found for this patient.
                 </td>
               </tr>
             ) : (
               consentForms.map(form => (
-                <tr key={form.id} className="text-sm hover:bg-gray-50/50 transition-colors">
-                  <td className="py-4 px-5 font-medium text-gray-900">{form.name}</td>
-                  <td className="py-4 px-5 text-gray-500">{form.date}</td>
+                <tr key={form.id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="py-4 px-5 font-bold text-gray-900">
+                    <div>{form.procedure_name || form.title}</div>
+                    {form.custom_details && (
+                      <div className="text-[10px] text-gray-400 font-normal line-clamp-1 mt-0.5">{form.custom_details}</div>
+                    )}
+                  </td>
+                  <td className="py-4 px-5 text-gray-600 font-medium">{form.doctor_name || "Doctor"}</td>
+                  <td className="py-4 px-5 text-gray-500 whitespace-nowrap">
+                    {new Date(form.signed_at || form.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  </td>
                   <td className="py-4 px-5">
                     <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 w-max ${
-                      form.status === "Signed" ? "bg-success/10 text-success" : "bg-warning/10 text-warning-700"
+                      form.status === "SIGNED" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100"
                     }`}>
-                      {form.status === "Signed" ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                      {form.status === "SIGNED" ? <CheckCircle className="w-3 h-3 text-emerald-600" /> : <Clock className="w-3 h-3 text-amber-600" />}
                       {form.status}
                     </span>
                   </td>
                   <td className="py-4 px-5 text-right">
-                    <button className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer">
-                      {form.status === "Signed" ? "View PDF" : "Request Sign"}
-                    </button>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => setPrintingConsent(form)}
+                        title="Print Unsigned Form"
+                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer border border-gray-200"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
+
+                      {form.status === "SIGNED" ? (
+                        <button
+                          onClick={() => handleDownloadPdf(form.id, form.procedure_name || form.title)}
+                          className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Download PDF
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setSigningConsent(form)}
+                            className="px-2.5 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                          >
+                            <PenTool className="w-3.5 h-3.5" /> In-Person Sign
+                          </button>
+                          <button
+                            onClick={() => setUploadingConsent(form)}
+                            className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                          >
+                            <Upload className="w-3.5 h-3.5" /> Upload Signed
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -486,6 +596,100 @@ export default function PatientProfile({ patientId }) {
           onClose={() => setIsBookModalOpen(false)} 
           onBook={handleBookAppointment} 
         />
+      )}
+
+      {/* In-Person Digital Signing Overlay */}
+      {signingConsent && (
+        <ConsentFormViewer
+          doc={signingConsent}
+          onClose={() => setSigningConsent(null)}
+          onSignComplete={() => {
+            alert("Consent form signed digitally in person!");
+            setSigningConsent(null);
+            if (patient?.token) fetchPatientConsents(patient.token);
+          }}
+        />
+      )}
+
+      {/* Receptionist Paper Upload Modal */}
+      {uploadingConsent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 text-left">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4 border border-gray-150 animate-fadeIn">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+              <h3 className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
+                <Upload className="w-4 h-4 text-primary" /> Upload Scanned Consent Form
+              </h3>
+              <button onClick={() => setUploadingConsent(null)} className="text-gray-400 hover:text-gray-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-600">
+              Upload a scanned PDF or image copy of the paper consent form signed physically by the patient.
+            </p>
+
+            <form onSubmit={handleUploadSubmit} className="space-y-4 pt-1">
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">Select File (PDF, PNG, JPG)</label>
+                <input
+                  type="file"
+                  required
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setUploadingConsent(null)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploading || !selectedFile}
+                  className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                  {isUploading ? "Uploading..." : "Save Signed Copy"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Print Preview Modal */}
+      {printingConsent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4 overflow-y-auto text-left">
+          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl space-y-4 border border-gray-150 animate-fadeIn my-8">
+            <div className="flex justify-between items-center pb-3 border-b border-gray-100 print:hidden">
+              <h3 className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
+                <Printer className="w-4 h-4 text-primary" /> Print Consent Form Preview
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 flex items-center gap-1 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print Now
+                </button>
+                <button onClick={() => setPrintingConsent(null)} className="p-1 text-gray-400 hover:text-gray-700">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 rounded-2xl border border-gray-200 font-mono text-xs text-gray-800 whitespace-pre-wrap leading-relaxed">
+              {printingConsent.content || printingConsent.custom_details || `Procedure Consent Form: ${printingConsent.procedure_name}`}
+
+              {`\n\n----------------------------------------------------\nPATIENT PHYSICAL SIGNATURE:\n\n\n___________________________             _____________\nSignature                               Date\n`}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -322,3 +322,35 @@ class RestockRequestResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class LabItemPriceBase(BaseModel):
+    item_name: str
+    category: Optional[str] = "Prosthetic"
+    material_tier: Optional[str] = "Standard"
+    vendor_cost: Optional[float] = 0.0
+    clinic_markup_pct: Optional[float] = 50.0
+    patient_price: Optional[float] = 0.0
+    warranty_months: Optional[int] = 12
+    is_active: Optional[bool] = True
+
+class LabItemPriceCreate(LabItemPriceBase):
+    pass
+
+class LabItemPriceUpdate(BaseModel):
+    item_name: Optional[str] = None
+    category: Optional[str] = None
+    material_tier: Optional[str] = None
+    vendor_cost: Optional[float] = None
+    clinic_markup_pct: Optional[float] = None
+    patient_price: Optional[float] = None
+    warranty_months: Optional[int] = None
+    is_active: Optional[bool] = None
+
+class LabItemPriceResponse(LabItemPriceBase):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+

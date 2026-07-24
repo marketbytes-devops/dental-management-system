@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getAvailableDoctors, getDoctorAvailableSlots } from "@/services/api";
 import { Calendar, User, X, ArrowLeft } from "lucide-react";
+import { getAllUniqueSpecialties, doctorHasSpecialty, parseDoctorSpecialties } from "@/utils/specialtyUtils";
+
 
 export default function DoctorGrid() {
   const [doctors, setDoctors] = useState([]);
@@ -88,23 +90,19 @@ export default function DoctorGrid() {
     );
   }
 
-  // Derive unique specialties from the fetched doctors
-  const specialties = [...new Set(doctors.map(d => d.specialty || "General Dentistry"))];
+  // Derive unique atomic specialties from fetched doctors
+  const specialties = getAllUniqueSpecialties(doctors);
 
   // Derive doctor options based on the selected specialty
-  const doctorOptions = doctors.filter(doc => {
-    const docSpecialty = doc.specialty || "General Dentistry";
-    if (selectedSpecialty && docSpecialty !== selectedSpecialty) return false;
-    return true;
-  });
+  const doctorOptions = doctors.filter(doc => doctorHasSpecialty(doc, selectedSpecialty));
 
   // Filter the grid display based on both filters
   const filteredDoctors = doctors.filter(doc => {
-    const docSpecialty = doc.specialty || "General Dentistry";
-    if (selectedSpecialty && docSpecialty !== selectedSpecialty) return false;
+    if (!doctorHasSpecialty(doc, selectedSpecialty)) return false;
     if (selectedDoctorId && doc.id.toString() !== selectedDoctorId) return false;
     return true;
   });
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -183,7 +181,7 @@ export default function DoctorGrid() {
               {doctor.name}
             </h3>
             <p className="text-primary font-semibold text-sm mb-3">
-              {doctor.specialty || "BDS, MDS"}
+              {parseDoctorSpecialties(doctor).join(" · ")}
             </p>
             <p className="text-slate-500 text-sm mb-6 flex-grow">
               Department: {doctor.dept || doctor.operatory || "General Dentistry"}

@@ -139,6 +139,23 @@ function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmerg
 
 function PaymentModal({ isOpen, onClose, onConfirm, patientName }) {
   const [method, setMethod] = useState("Cash");
+  const [amount, setAmount] = useState(500);
+  const [fetchingTariff, setFetchingTariff] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFetchingTariff(true);
+      client.get("/payment/consultation-fees")
+        .then(res => {
+          if (res.data?.general_consultation_fee) {
+            setAmount(res.data.general_consultation_fee);
+          }
+        })
+        .catch(err => console.error("Failed to fetch active consultation tariff:", err))
+        .finally(() => setFetchingTariff(false));
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -157,7 +174,7 @@ function PaymentModal({ isOpen, onClose, onConfirm, patientName }) {
         </div>
 
         {/* Body */}
-        <div className="p-6">
+        <div className="p-6 text-left">
           
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6 flex justify-between items-center">
             <div>
@@ -165,18 +182,31 @@ function PaymentModal({ isOpen, onClose, onConfirm, patientName }) {
               <p className="font-bold text-gray-900 mt-0.5">{patientName}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount Due</p>
-              <p className="text-xl font-extrabold text-gray-900 mt-0.5">?100.00</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Active Consultation Fee</p>
+              <p className="text-xl font-extrabold text-emerald-600 mt-0.5">₹{parseFloat(amount || 0).toFixed(2)}</p>
             </div>
           </div>
 
           <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Collection Amount (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+              />
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Select Payment Method</label>
               <div className="grid grid-cols-3 gap-3">
                 {["Cash", "Card", "Online"].map(m => (
                   <button
                     key={m}
+                    type="button"
                     onClick={() => setMethod(m)}
                     className={"py-2.5 px-3 rounded-xl border text-sm font-semibold transition-all " + (
                       method === m 
@@ -198,7 +228,7 @@ function PaymentModal({ isOpen, onClose, onConfirm, patientName }) {
           <button onClick={onClose} className="flex-1 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition shadow-sm">
             Cancel
           </button>
-          <button onClick={() => onConfirm(method)} className="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+          <button onClick={() => onConfirm(method, parseFloat(amount) || 0)} className="flex-1 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-sm flex items-center justify-center gap-2">
             Confirm Payment
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
           </button>
@@ -378,10 +408,10 @@ export default function ReceptionistAppointments() {
     setPaymentModal({ isOpen: true, id, name });
   };
 
-  const handlePayConsultationConfirm = async (method) => {
+  const handlePayConsultationConfirm = async (method, amount) => {
     try {
-      await payConsultation(paymentModal.id, { amount: 100.0, payment_method: method });
-      alert(`Payment collected via ${method}! ${paymentModal.name} has been added to the queue.`);
+      await payConsultation(paymentModal.id, { amount: amount || 500.0, payment_method: method });
+      alert(`Payment of ₹${amount} collected via ${method}! ${paymentModal.name} has been added to the queue.`);
       setPaymentModal({ isOpen: false, id: null, name: "" });
       fetchData();
     } catch (err) {

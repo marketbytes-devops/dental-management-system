@@ -228,23 +228,18 @@ export default function LabDashboard() {
   // Filters for lists
   const pendingOrders = orders.filter(o => o.status === "Pending");
   
-  const dueTodayOrders = orders.filter(
-    o => o.due_date === "2026-06-10" && o.status !== "Completed" && o.status !== "Rejected"
+  const recentOrders = [...orders].sort((a, b) => {
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  }).slice(0, 5);
+
+  const urgentCases = orders.filter(
+    o => (o.priority === "Urgent" || o.priority === "High") && o.status !== "Completed" && o.status !== "Rejected"
   );
 
-  const overdueOrders = orders.filter(
-    o => o.due_date && o.due_date < "2026-06-10" && o.status !== "Completed" && o.status !== "Rejected"
-  ).map(o => {
-    let daysLate = 0;
-    try {
-      const timeDiff = new Date("2026-06-10") - new Date(o.due_date);
-      daysLate = Math.ceil(timeDiff / (1000 * 3600 * 24));
-      if (isNaN(daysLate)) daysLate = 0;
-    } catch (e) {
-      daysLate = 0;
-    }
-    return { ...o, daysLate };
-  }).filter(o => o.daysLate > 0);
+  const getOrderDate = (order) => {
+    if (!order.created_at) return "2026-06-10";
+    return order.created_at.split("T")[0];
+  };
 
   const activityLogs = generateActivityLogs(orders);
 
@@ -456,30 +451,30 @@ export default function LabDashboard() {
       {/* Deadlines & Escalations Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* Left Column: Due Today Widget (6 Cols) */}
+        {/* Left Column: Recent Orders Widget (6 Cols) */}
         <div className="bg-white border border-gray-150 rounded-2xl shadow-sm overflow-hidden flex flex-col">
           <div className="px-5 py-4 border-b border-gray-100 bg-white flex items-center justify-between">
             <div>
               <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-                📅 Due Today
+                📅 Recent Orders
                 <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs font-bold rounded-full">
-                  {dueTodayOrders.length}
+                  {recentOrders.length}
                 </span>
               </h3>
-              <p className="text-xs text-gray-400 mt-0.5">Lab cases scheduled for completion today</p>
+              <p className="text-xs text-gray-400 mt-0.5">Latest clinical cases received for processing</p>
             </div>
           </div>
 
           <div className="divide-y divide-gray-100 overflow-y-auto max-h-[300px]">
-            {dueTodayOrders.length === 0 ? (
+            {recentOrders.length === 0 ? (
               <div className="p-8 text-center flex flex-col items-center justify-center text-gray-400 space-y-2">
                 <span className="text-3xl">☕</span>
-                <p className="text-sm font-semibold">No cases due today!</p>
-                <p className="text-xs text-gray-400">All set for today's deadlines.</p>
+                <p className="text-sm font-semibold">No recent orders found!</p>
+                <p className="text-xs text-gray-400">All set for now.</p>
               </div>
             ) : (
-              dueTodayOrders.map((order) => (
-                <div key={order.id} className="p-4 hover:bg-gray-50 transition-colors flex justify-between items-center">
+              recentOrders.map((order) => (
+                <div key={order.id} className="p-4 hover:bg-gray-50 transition-colors flex justify-between items-center text-left">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black text-gray-900">{order.id}</span>
@@ -507,43 +502,43 @@ export default function LabDashboard() {
           </div>
         </div>
 
-        {/* Right Column: Overdue Cases Widget (6 Cols) */}
+        {/* Right Column: Urgent Cases Widget (6 Cols) */}
         <div className="bg-white border border-danger/20 rounded-2xl shadow-sm overflow-hidden flex flex-col bg-danger/[0.01]">
           <div className="px-5 py-4 border-b border-danger/10 bg-danger/[0.02] flex items-center justify-between">
             <div>
               <h3 className="text-base font-extrabold text-danger flex items-center gap-2">
-                ⚠ Overdue Cases
+                ⚠ Urgent Cases
                 <span className="px-2 py-0.5 bg-danger/10 text-danger text-xs font-bold rounded-full animate-pulse">
-                  {overdueOrders.length}
+                  {urgentCases.length}
                 </span>
               </h3>
-              <p className="text-xs text-red-500/80 mt-0.5">Active cases that missed their delivery dates</p>
+              <p className="text-xs text-red-500/80 mt-0.5">Active cases that require immediate fabrication attention</p>
             </div>
           </div>
 
           <div className="divide-y divide-red-100/50 overflow-y-auto max-h-[300px]">
-            {overdueOrders.length === 0 ? (
+            {urgentCases.length === 0 ? (
               <div className="p-8 text-center flex flex-col items-center justify-center text-gray-400 space-y-2">
                 <span className="text-3xl">🎉</span>
-                <p className="text-sm font-semibold text-gray-500">No overdue cases!</p>
-                <p className="text-xs text-gray-400">Excellent pace! Everything is on schedule.</p>
+                <p className="text-sm font-semibold text-gray-500">No urgent cases!</p>
+                <p className="text-xs text-gray-400">Excellent pace! Everything is stable.</p>
               </div>
             ) : (
-              overdueOrders.map((order) => (
-                <div key={order.id} className="p-4 hover:bg-danger/[0.02] transition-colors flex justify-between items-center">
+              urgentCases.map((order) => (
+                <div key={order.id} className="p-4 hover:bg-danger/[0.02] transition-colors flex justify-between items-center text-left">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black text-gray-900">{order.id}</span>
                       {getPriorityBadge(order.priority)}
                       <span className="bg-danger/10 text-danger border border-danger/20 text-[9px] px-1.5 py-0.5 rounded font-bold">
-                        {order.daysLate} day{order.daysLate !== 1 ? "s" : ""} late
+                        {order.priority}
                       </span>
                     </div>
                     <div className="text-xs text-gray-650 font-medium">
                       Patient: {order.patient_name || "Walk-in Patient"}
                     </div>
                     <div className="text-[10px] text-gray-400">
-                      Due Date: <span className="font-semibold text-danger">{order.due_date}</span>
+                      Ordered: <span className="font-semibold text-gray-500">{getOrderDate(order)}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

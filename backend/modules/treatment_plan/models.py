@@ -13,8 +13,6 @@ class TreatmentPlanModel(Base):
     treatment_objectives = Column(JSON, nullable=True)  # List of strings e.g. ["Align upper teeth", ...]
     estimated_duration = Column(String, nullable=True)  # e.g. "18 months"
     expected_completion = Column(String, nullable=True)  # e.g. "March 2028"
-    next_visit_date = Column(String, nullable=True)
-    next_visit_procedure = Column(String, nullable=True)
     attachments = Column(JSON, nullable=True)  # List of objects e.g. [{"name": "OPG", "url": "/static/..."}]
     status = Column(String, default="Draft")  # Draft, Active, Archived
     created_at = Column(DateTime(timezone=True), server_default=func.now())

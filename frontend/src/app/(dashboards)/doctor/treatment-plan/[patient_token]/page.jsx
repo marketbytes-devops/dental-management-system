@@ -247,8 +247,6 @@ export default function DoctorTreatmentPlanPage() {
   const [goals, setGoals] = useState([]);
   const [duration, setDuration] = useState("12 months");
   const [completion, setCompletion] = useState("");
-  const [nextVisitDate, setNextVisitDate] = useState("");
-  const [nextVisitProc, setNextVisitProc] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [steps, setSteps] = useState([]);
   const [sittings, setSittings] = useState(["Sitting 1"]);
@@ -574,8 +572,6 @@ export default function DoctorTreatmentPlanPage() {
         setGoals(draftOrActive.treatment_objectives || []);
         setDuration(draftOrActive.estimated_duration || "12 months");
         setCompletion(draftOrActive.expected_completion || "");
-        setNextVisitDate(draftOrActive.next_visit_date || "");
-        setNextVisitProc(draftOrActive.next_visit_procedure || "");
         setAttachments(draftOrActive.attachments || []);
         
         const dbSteps = draftOrActive.steps || [];
@@ -608,8 +604,6 @@ export default function DoctorTreatmentPlanPage() {
         setGoals([]);
         setDuration("12 months");
         setCompletion("");
-        setNextVisitDate("");
-        setNextVisitProc("");
         setAttachments([]);
         setSteps([]);
         setSittings(["Sitting 1"]);
@@ -635,8 +629,6 @@ export default function DoctorTreatmentPlanPage() {
       treatment_objectives: goals,
       estimated_duration: duration,
       expected_completion: completion,
-      next_visit_date: nextVisitDate,
-      next_visit_procedure: nextVisitProc,
       attachments,
       status: statusType
     };
@@ -938,8 +930,35 @@ export default function DoctorTreatmentPlanPage() {
         </div>
       </div>
 
-      
-          
+      {/* Plan Timeline Row */}
+      <div className="flex flex-wrap items-center justify-between bg-white border border-gray-150 rounded-2xl p-4 shadow-sm text-xs gap-4">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-primary" />
+          <span className="font-extrabold text-gray-800 uppercase tracking-wider text-[11px]">Plan Timeline:</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-gray-600">Estimated Duration:</span>
+            <input
+              type="text"
+              placeholder="e.g. 12 months"
+              value={duration}
+              onChange={(e) => handleDurationChange(e.target.value)}
+              className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 w-36"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-gray-600">Expected Completion:</span>
+            <input
+              type="text"
+              placeholder="e.g. March 2028"
+              value={completion}
+              onChange={(e) => setCompletion(e.target.value)}
+              className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 w-36"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* 3D Dental Chart Toggle and Panel */}
       <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
@@ -1771,57 +1790,6 @@ export default function DoctorTreatmentPlanPage() {
 
         {/* RIGHT COLUMN/MAIN CONTENT: DURATION, EXPECTED COMPLETION, VISITS, ATTACHMENTS, PHASES TABLE */}
         <div className="lg:col-span-2 space-y-6">
-          
-          {/* Plan Meta / Scheduling Details */}
-          <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-xs font-black text-gray-850 uppercase tracking-wider flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-primary" /> Plan Timeline & Scheduling Linkage
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="font-bold text-gray-600 block mb-1">Estimated Duration</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 18 months"
-                  value={duration}
-                  onChange={(e) => handleDurationChange(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div>
-                <label className="font-bold text-gray-600 block mb-1">Expected Completion</label>
-                <input
-                  type="text"
-                  placeholder="e.g. March 2028"
-                  value={completion}
-                  onChange={(e) => setCompletion(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div>
-                <label className="font-bold text-gray-600 block mb-1">Next Visit Date</label>
-                <input
-                  type="date"
-                  value={nextVisitDate}
-                  onChange={(e) => setNextVisitDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div>
-                <label className="font-bold text-gray-600 block mb-1">Next Visit Planned Procedure</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Archwire Replacement"
-                  value={nextVisitProc}
-                  onChange={(e) => setNextVisitProc(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-            </div>
-          </div>
-
-
 
           {/* Procedures and Sittings Table */}
           <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">

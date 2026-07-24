@@ -41,6 +41,58 @@ import random
 import os
 import shutil
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+
+def send_smtp_email(to_email: str, subject: str, body_text: str, attachment_files: list = None) -> bool:
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = os.getenv("SMTP_PORT")
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    smtp_from = os.getenv("SMTP_FROM", smtp_user)
+    
+    if not all([smtp_host, smtp_port, smtp_user, smtp_password]):
+        print(f"[SMTP WARNING] SMTP configuration variables are missing in .env. Real email skipped. To: {to_email}", flush=True)
+        return False
+        
+    try:
+        msg = MIMEMultipart('mixed')
+        msg['From'] = smtp_from
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        
+        msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
+        
+        if attachment_files:
+            for file_path in attachment_files:
+                if os.path.exists(file_path):
+                    filename = os.path.basename(file_path)
+                    try:
+                        with open(file_path, "rb") as attachment:
+                            part = MIMEBase("application", "octet-stream")
+                            part.set_payload(attachment.read())
+                            encoders.encode_base64(part)
+                            part.add_header("Content-Disposition", "attachment", filename=filename)
+                            msg.attach(part)
+                            print(f"[SMTP ATTACHMENT] Attached file: {file_path}", flush=True)
+                    except Exception as att_err:
+                        print(f"[SMTP ATTACHMENT ERROR] Failed to attach {file_path}: {att_err}", flush=True)
+                else:
+                    print(f"[SMTP ATTACHMENT WARNING] File not found at path: {file_path}", flush=True)
+
+        server = smtplib.SMTP(smtp_host, int(smtp_port))
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.sendmail(smtp_from, to_email, msg.as_string())
+        server.quit()
+        print(f"[SMTP SUCCESS] Real email dispatched successfully to {to_email}", flush=True)
+        return True
+    except Exception as e:
+        print(f"[SMTP ERROR] Failed to dispatch real email to {to_email}: {e}", flush=True)
+        return False
 
 def serialize_order(order: LabOrderModel):
     if not order:
@@ -162,7 +214,6 @@ def create_lab_order(
         priority=order_data.priority,
         status=initial_status,
         notes=order_data.notes,
-        due_date=order_data.due_date or "2026-06-15",
         rejection_reason=None,
         
         # Extended fields
@@ -293,34 +344,99 @@ def update_lab_order_status(
     if status_data.tech_notes is not None:
         order.tech_notes = status_data.tech_notes
 
-    if new_status in ["Rejected", "returned_for_rework", "Flagged", "Revision Requested"]:
+    if new_status in ["Rejected", "returned_for_rework", "Returned for Rework", "Flagged", "Revision Requested"]:
         order.rejection_reason = status_data.rejection_reason or status_data.tech_notes
     else:
         order.rejection_reason = None  # type: ignore
         
     if status_data.rejection_category:
         order.rejection_category = status_data.rejection_category  # type: ignore
+    if status_data.attachments is not None:
+        order.attachments = status_data.attachments  # type: ignore
 
-    if new_status == "returned_for_rework":
-        order.is_rework = True
-        if not order.original_case_id:
-            order.original_case_id = order_id
-
-    # Handle workflow step 5: "On doctor approval (Sent to Lab), send email to the external lab"
-    if new_status == "Sent to Lab":
-        vendor_email = "labs@smilecare.com"
-        
-        # 1. Lookup vendor email
+    # Extract vendor email
+    vendor_email = "labs@smilecare.com"
+    if order.order_details and isinstance(order.order_details, dict):
+        email = order.order_details.get("lab_email")
+        if email:
+            vendor_email = email
+    
+    if vendor_email == "labs@smilecare.com":
         if order.vendor_id:
             vendor = db.query(LabVendorModel).filter(LabVendorModel.id == order.vendor_id).first()
             if vendor and vendor.email:
                 vendor_email = vendor.email
         elif order.lab_name:
-            # Fallback if selected lab partner has a name match
             vendor = db.query(LabVendorModel).filter(LabVendorModel.name.ilike(f"%{order.lab_name}%")).first()
             if vendor and vendor.email:
                 vendor_email = vendor.email
 
+    # Gather attachment URLs
+    attachment_urls = []
+    if order.prosthetic_detail:
+        if order.prosthetic_detail.scan_file:
+            attachment_urls.append(order.prosthetic_detail.scan_file)
+        if order.prosthetic_detail.opposing_bite_scan:
+            attachment_urls.append(order.prosthetic_detail.opposing_bite_scan)
+
+    if order.attachments:
+        if isinstance(order.attachments, list):
+            for att in order.attachments:
+                if isinstance(att, dict) and att.get("url"):
+                    attachment_urls.append(att.get("url"))
+                elif isinstance(att, str):
+                    attachment_urls.append(att)
+
+    if new_status in ["returned_for_rework", "Returned for Rework"]:
+        order.is_rework = True
+        if not order.original_case_id:
+            order.original_case_id = order_id
+        
+        # Simulate rework email sending
+        from datetime import datetime
+        order.email_sent_at = datetime.utcnow().isoformat()
+        
+        email_body = f"""
+========================================================================
+[SIMULATED EMAIL DISPATCH]
+To: {vendor_email}
+Subject: REWORK REQUEST: Case {order.id}
+Timestamp: {order.email_sent_at}
+------------------------------------------------------------------------
+Dear Lab Partner,
+
+Please perform correction/rework on Case {order.id} as per the specifications below.
+
+Patient Name: {order.patient_name}
+Ordering Dentist: {order.dentist_name}
+Dentist Contact: {order.dentist_contact}
+
+Rework Reason / Category: {order.rejection_category}
+Correction details: {order.rejection_reason or 'No details provided'}
+
+Attachments / Reference Files:
+{chr(10).join('- ' + a for a in attachment_urls) if attachment_urls else 'No reference attachments uploaded.'}
+
+Please process this correction as soon as possible.
+
+Regards,
+SmileCare Lab Management System
+========================================================================
+"""
+        print(email_body, flush=True)
+        # Collect physical attachment files
+        attachment_files = []
+        for url_or_name in attachment_urls:
+            fname = os.path.basename(url_or_name)
+            if fname:
+                path = os.path.join("static", "uploads", fname)
+                if os.path.exists(path):
+                    attachment_files.append(path)
+
+        send_smtp_email(vendor_email, f"REWORK REQUEST: Case {order.id}", email_body, attachment_files)
+
+    # Handle workflow step 5: "On doctor approval (Sent to Lab), send email to the external lab"
+    if new_status == "Sent to Lab":
         # 2. Gather measurements, doctor notes, attachments
         measurements = []
         if order.order_category == "Prosthetic":
@@ -333,15 +449,6 @@ def update_lab_order_status(
             measurements.append(f"Test Type: {order.test_type or 'N/A'}")
             measurements.append(f"Sample Type: {order.sample_type or 'N/A'}")
             measurements.append(f"Reason: {order.reason_for_test or 'N/A'}")
-
-        attachment_urls = []
-        if order.attachments:
-            if isinstance(order.attachments, list):
-                for att in order.attachments:
-                    if isinstance(att, dict) and att.get("url"):
-                        attachment_urls.append(att.get("url"))
-                    elif isinstance(att, str):
-                        attachment_urls.append(att)
 
         # 3. Simulate email sending
         from datetime import datetime
@@ -381,7 +488,16 @@ Regards,
 SmileCare Lab Management System
 ========================================================================
 """
-        print(email_body, flush=True)
+        # Collect physical attachment files
+        attachment_files = []
+        for url_or_name in attachment_urls:
+            fname = os.path.basename(url_or_name)
+            if fname:
+                path = os.path.join("static", "uploads", fname)
+                if os.path.exists(path):
+                    attachment_files.append(path)
+
+        send_smtp_email(vendor_email, f"New Lab Order Request: Case {order.id}", email_body, attachment_files)
 
     db.commit()
     db.refresh(order)
@@ -471,7 +587,7 @@ def edit_lab_order(
         raise HTTPException(status_code=404, detail="Lab order not found")
 
     # Lock direct edits once Sent to Lab or later
-    if order.status not in ["Draft", "draft", "Revision Requested", "revision_requested", "Submitted", "submitted", "Confirmed", "confirmed", "Doctor Accepted", "doctor_accepted", "Ordered", "ordered", "Flagged", "flagged", "Pending", "Pending Review", "Pending Doctor Review", "Pending Doctor Confirmation"]:
+    if order.status not in ["Draft", "draft", "Revision Requested", "revision_requested", "Submitted", "submitted", "Confirmed", "confirmed", "Doctor Accepted", "doctor_accepted", "Ordered", "ordered", "Flagged", "flagged", "Pending", "Pending Review", "Pending Doctor Review", "Pending Doctor Confirmation", "Confirmed by Tech", "Returned for Rework", "returned_for_rework"]:
         raise HTTPException(
             status_code=403,
             detail="Direct edits are locked once order is Sent to Lab or later. Please use Return for Correction."
@@ -497,9 +613,6 @@ def edit_lab_order(
     if edit_data.priority is not None:
         order.priority = edit_data.priority  # type: ignore
         changes.append("priority")
-    if edit_data.due_date is not None:
-        order.due_date = edit_data.due_date  # type: ignore
-        changes.append("due_date")
     if edit_data.notes is not None:
         order.notes = edit_data.notes  # type: ignore
         changes.append("notes")
@@ -632,6 +745,109 @@ def edit_lab_order(
             type="Orders",
             title="Lab Order Submitted for Review",
             desc=f"Case {order_id} has been submitted for review by Dr. {user_name}.",
+            read=False
+        ))
+        db.commit()
+
+    if "status" in changes and order.status == "Sent to Lab":
+        # Extract vendor email
+        vendor_email = "labs@smilecare.com"
+        if order.order_details and isinstance(order.order_details, dict):
+            email = order.order_details.get("lab_email")
+            if email:
+                vendor_email = email
+        
+        if vendor_email == "labs@smilecare.com":
+            if order.vendor_id:
+                vendor = db.query(LabVendorModel).filter(LabVendorModel.id == order.vendor_id).first()
+                if vendor and vendor.email:
+                    vendor_email = vendor.email
+            elif order.lab_name:
+                vendor = db.query(LabVendorModel).filter(LabVendorModel.name.ilike(f"%{order.lab_name}%")).first()
+                if vendor and vendor.email:
+                    vendor_email = vendor.email
+
+        # Gather measurements
+        measurements = []
+        if order.order_category == "Prosthetic":
+            measurements.append(f"Quadrant/Tooth: {order.tooth_quadrant or order.prosthetic_type or 'N/A'}")
+            measurements.append(f"Margin Design: {order.margin_design or 'N/A'}")
+            measurements.append(f"Impression Type: {order.impression_type or 'N/A'}")
+            measurements.append(f"Material: {order.material or 'N/A'}")
+            measurements.append(f"Shade: {order.shade or 'N/A'}")
+        else:
+            measurements.append(f"Test Type: {order.test_type or 'N/A'}")
+            measurements.append(f"Sample Type: {order.sample_type or 'N/A'}")
+            measurements.append(f"Reason: {order.reason_for_test or 'N/A'}")
+
+        attachment_urls = []
+        if order.prosthetic_detail:
+            if order.prosthetic_detail.scan_file:
+                attachment_urls.append(order.prosthetic_detail.scan_file)
+            if order.prosthetic_detail.opposing_bite_scan:
+                attachment_urls.append(order.prosthetic_detail.opposing_bite_scan)
+
+        if order.attachments:
+            if isinstance(order.attachments, list):
+                for att in order.attachments:
+                    if isinstance(att, dict) and att.get("url"):
+                        attachment_urls.append(att.get("url"))
+                    elif isinstance(att, str):
+                        attachment_urls.append(att)
+
+        from datetime import datetime
+        order.email_sent_at = datetime.utcnow().isoformat()
+        
+        email_body = f"""
+========================================================================
+[SIMULATED EMAIL DISPATCH]
+To: {vendor_email}
+Subject: New Lab Order Request: Case {order.id}
+Timestamp: {order.email_sent_at}
+------------------------------------------------------------------------
+Dear Lab Partner,
+
+Please fabricate the following dental case request.
+
+Patient Name: {order.patient_name}
+Ordering Dentist: {order.dentist_name}
+Dentist Contact: {order.dentist_contact}
+
+Case Details / Measurements:
+- Category: {order.order_category}
+{chr(10).join('- ' + m for m in measurements)}
+
+Doctor's Notes:
+"{order.notes or 'None'}"
+
+Technician's Notes:
+"{order.tech_notes or 'None'}"
+
+Attachments:
+{chr(10).join('- ' + a for a in attachment_urls) if attachment_urls else 'No attachments uploaded.'}
+
+Please confirm receipt and expected completion date.
+
+Regards,
+SmileCare Lab Management System
+========================================================================
+"""
+        # Collect physical attachment files
+        attachment_files = []
+        for url_or_name in attachment_urls:
+            fname = os.path.basename(url_or_name)
+            if fname:
+                path = os.path.join("static", "uploads", fname)
+                if os.path.exists(path):
+                    attachment_files.append(path)
+
+        send_smtp_email(vendor_email, f"New Lab Order Request: Case {order.id}", email_body, attachment_files)
+        
+        db.add(LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title="Lab Order Sent to External Lab",
+            desc=f"Case {order_id} approved. Pre-filled dispatch email successfully sent to the external lab.",
             read=False
         ))
         db.commit()

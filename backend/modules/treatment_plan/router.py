@@ -125,8 +125,6 @@ def create_treatment_plan(
         treatment_objectives=plan_in.treatment_objectives,
         estimated_duration=plan_in.estimated_duration,
         expected_completion=plan_in.expected_completion,
-        next_visit_date=plan_in.next_visit_date,
-        next_visit_procedure=plan_in.next_visit_procedure,
         attachments=plan_in.attachments,
         status="Draft"
     )

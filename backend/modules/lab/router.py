@@ -1204,3 +1204,90 @@ def update_restock_request_status(
     db.commit()
 
     return req
+
+# -------------------------------------------------------------
+# Admin Lab Module Pricing Catalog Endpoints
+# -------------------------------------------------------------
+
+from modules.lab.models import LabItemPriceModel
+from modules.lab.schemas import LabItemPriceCreate, LabItemPriceUpdate, LabItemPriceResponse
+
+@router.get("/pricing-catalog", response_model=List[LabItemPriceResponse])
+def get_lab_pricing_catalog(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    prices = db.query(LabItemPriceModel).order_by(LabItemPriceModel.category.asc(), LabItemPriceModel.item_name.asc()).all()
+    return prices
+
+@router.post("/pricing-catalog", response_model=LabItemPriceResponse)
+def create_lab_pricing_item(
+    item_data: LabItemPriceCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    # Calculate patient price if not provided or 0
+    patient_price = item_data.patient_price
+    if not patient_price or patient_price == 0:
+        vendor_cost = item_data.vendor_cost or 0.0
+        markup = item_data.clinic_markup_pct or 0.0
+        patient_price = round(vendor_cost * (1 + markup / 100.0), 2)
+
+    new_item = LabItemPriceModel(
+        item_name=item_data.item_name,
+        category=item_data.category,
+        material_tier=item_data.material_tier,
+        vendor_cost=item_data.vendor_cost,
+        clinic_markup_pct=item_data.clinic_markup_pct,
+        patient_price=patient_price,
+        warranty_months=item_data.warranty_months,
+        is_active=item_data.is_active
+    )
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
+    return new_item
+
+@router.put("/pricing-catalog/{item_id}", response_model=LabItemPriceResponse)
+def update_lab_pricing_item(
+    item_id: int,
+    item_data: LabItemPriceUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    item = db.query(LabItemPriceModel).filter(LabItemPriceModel.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Pricing catalog item not found")
+
+    if item_data.item_name is not None: item.item_name = item_data.item_name  # type: ignore
+    if item_data.category is not None: item.category = item_data.category  # type: ignore
+    if item_data.material_tier is not None: item.material_tier = item_data.material_tier  # type: ignore
+    if item_data.vendor_cost is not None: item.vendor_cost = item_data.vendor_cost  # type: ignore
+    if item_data.clinic_markup_pct is not None: item.clinic_markup_pct = item_data.clinic_markup_pct  # type: ignore
+    if item_data.warranty_months is not None: item.warranty_months = item_data.warranty_months  # type: ignore
+    if item_data.is_active is not None: item.is_active = item_data.is_active  # type: ignore
+
+    if item_data.patient_price is not None:
+        item.patient_price = item_data.patient_price  # type: ignore
+    elif item_data.vendor_cost is not None or item_data.clinic_markup_pct is not None:
+        v_cost = item.vendor_cost or 0.0
+        markup = item.clinic_markup_pct or 0.0
+        item.patient_price = round(v_cost * (1 + markup / 100.0), 2)  # type: ignore
+
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.delete("/pricing-catalog/{item_id}")
+def delete_lab_pricing_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    item = db.query(LabItemPriceModel).filter(LabItemPriceModel.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Pricing catalog item not found")
+    db.delete(item)
+    db.commit()
+    return {"detail": "Pricing catalog item deleted successfully"}
+

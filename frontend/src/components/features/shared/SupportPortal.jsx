@@ -203,12 +203,12 @@ export default function SupportPortal() {
         return reports.filter(r => {
             const parsed = parseSubject(r.subject);
             const cat = getCategoryByLabel(parsed.categoryLabel);
-            
-            const matchesSearch = 
-                parsed.subject.toLowerCase().includes(searchQuery.toLowerCase()) || 
+
+            const matchesSearch =
+                parsed.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 r.body.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 `#${r.id}`.includes(searchQuery);
-            
+
             const matchesStatus = statusFilter === "all" || r.status?.toLowerCase() === statusFilter.toLowerCase();
             const matchesCategory = categoryFilter === "all" || cat.id === categoryFilter;
 
@@ -336,7 +336,7 @@ export default function SupportPortal() {
             {/* ── Custom Glassmorphism Navigation Bar ── */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl bg-white border border-slate-100 shadow-sm relative overflow-hidden backdrop-blur-md">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50/50 rounded-full blur-3xl -z-10 pointer-events-none" />
-                
+
                 <div className="flex items-center gap-4 text-left">
                     <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200 shrink-0">
                         <ShieldCheck className="w-6 h-6 animate-pulse" />
@@ -407,7 +407,7 @@ export default function SupportPortal() {
             {/* ── Tab Layout Workspace ── */}
             {activeTab === "desk" ? (
                 <div className="flex flex-col lg:flex-row border border-slate-200/60 rounded-3xl bg-white shadow-sm overflow-hidden h-[700px]">
-                    
+
                     {/* Left Pane: Ticket Sidebar list */}
                     <div className="w-full lg:w-[360px] xl:w-[400px] border-b lg:border-b-0 lg:border-r border-slate-150 flex flex-col h-full bg-slate-50/50 shrink-0">
                         {/* Search & Header */}
@@ -423,7 +423,7 @@ export default function SupportPortal() {
                                     <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-indigo-600" : ""}`} />
                                 </button>
                             </div>
-                            
+
                             {/* Search bar */}
                             <div className="relative flex items-center">
                                 <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
@@ -438,7 +438,7 @@ export default function SupportPortal() {
 
                             {/* Category Filter dropdown */}
                             <div className="flex gap-2 text-[11px] font-bold text-slate-500">
-                                <select 
+                                <select
                                     value={categoryFilter}
                                     onChange={(e) => setCategoryFilter(e.target.value)}
                                     className="flex-1 bg-slate-100 hover:bg-slate-200/70 border-0 rounded-lg px-2.5 py-1.5 outline-none font-semibold cursor-pointer"
@@ -446,7 +446,7 @@ export default function SupportPortal() {
                                     <option value="all">All Categories</option>
                                     {BUG_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                                 </select>
-                                <select 
+                                <select
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
                                     className="flex-1 bg-slate-100 hover:bg-slate-200/70 border-0 rounded-lg px-2.5 py-1.5 outline-none font-semibold cursor-pointer"
@@ -481,7 +481,7 @@ export default function SupportPortal() {
                                     const parsed = parseSubject(r.subject);
                                     const categoryInfo = getCategoryByLabel(parsed.categoryLabel);
                                     const CategoryIcon = categoryInfo.icon;
-                                    
+
                                     const timeStr = new Date(r.created_at).toLocaleDateString([], {
                                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                                     });
@@ -512,8 +512,8 @@ export default function SupportPortal() {
                                                 <span className="text-[9px] text-slate-400 font-bold">{timeStr}</span>
                                                 <span className={`w-2.5 h-2.5 rounded-full ring-2 ring-white ${r.status?.toLowerCase() === "resolved" ? "bg-emerald-500" :
                                                     r.status?.toLowerCase() === "under review" ? "bg-amber-500 animate-pulse" :
-                                                    r.status?.toLowerCase() === "closed" ? "bg-slate-400" : "bg-indigo-500"
-                                                }`} />
+                                                        r.status?.toLowerCase() === "closed" ? "bg-slate-400" : "bg-indigo-500"
+                                                    }`} />
                                             </div>
                                         </div>
                                     );
@@ -526,7 +526,7 @@ export default function SupportPortal() {
                     <div className="flex-1 flex flex-col h-full bg-slate-50/20 overflow-y-auto">
                         {activeReport ? (
                             <div className="flex-1 flex flex-col divide-y divide-slate-150">
-                                
+
                                 {/* Detail Header */}
                                 <div className="p-6 bg-white space-y-4 text-left">
                                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -599,7 +599,7 @@ export default function SupportPortal() {
                                             <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Status logs &amp; Dev History</h4>
                                             <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{selectedReportLogs.length} updates</span>
                                         </div>
-                                        
+
                                         {loadingLogs ? (
                                             <div className="flex items-center justify-center gap-2 py-6 text-slate-450 text-xs font-semibold">
                                                 <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
@@ -620,7 +620,7 @@ export default function SupportPortal() {
                                                                 </>
                                                             ) : null}
                                                             <span className="text-indigo-700 uppercase tracking-wide text-[10px] bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded font-black">{log.to_status}</span>
-                                                            
+
                                                             <span className="text-[10px] font-semibold text-slate-400 ml-auto">
                                                                 {new Date(log.created_at).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                                                             </span>

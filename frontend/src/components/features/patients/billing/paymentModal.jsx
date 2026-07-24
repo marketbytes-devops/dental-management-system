@@ -1,206 +1,194 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPaymentOrder, verifyPayment } from "@/services/api";
 
 export default function PaymentModal({ invoice, onClose, onPaymentSuccess }) {
-  const [paymentMethod, setPaymentMethod] = useState("upi"); // upi | card | emi | netbank
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [upiId, setUpiId] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
+  const [paymentState, setPaymentState] = useState("loading"); // loading | verifying | success | error | idle
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const loadAndOpenRazorpay = async () => {
+    setPaymentState("loading");
+    setErrorMessage("");
+
+    try {
+      // Step 1: Create order on backend → get Razorpay order details
+      // Note: We use invoice.id (which maps to appointment ID) and the patientDue amount
+      const order = await createPaymentOrder(invoice.id, invoice.patientDue);
+
+      // Step 2: Dynamically load the Razorpay checkout script
+      await new Promise((resolve, reject) => {
+        if (window.Razorpay) return resolve();
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = resolve;
+        script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
+        document.body.appendChild(script);
+      });
+
+      // Step 3: Open the Razorpay payment popup
+      const patientName =
+        typeof window !== "undefined"
+          ? localStorage.getItem("patient_name") || "Patient"
+          : "Patient";
+
+      const options = {
+        key: order.key_id,
+        amount: order.amount, // already in paise
+        currency: order.currency,
+        name: "SmileCare Dental Clinic",
+        description: `Invoice Payment for ${invoice.invoiceNo || `INV-${invoice.id}`}`,
+        order_id: order.razorpay_order_id,
+        prefill: {
+          name: patientName,
+        },
+        theme: { color: "#4f46e5" },
+        modal: {
+          ondismiss: () => {
+            setPaymentState("idle");
+          },
+        },
+        handler: async (response) => {
+          try {
+            setPaymentState("verifying");
+            // Step 4: Verify payment signature on the backend
+            await verifyPayment({
+              appointment_id: invoice.id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            setPaymentState("success");
+            setTimeout(() => {
+              onPaymentSuccess(invoice.id);
+            }, 1000);
+          } catch (err) {
+            setPaymentState("error");
+            setErrorMessage(err.message || "Payment verification failed.");
+          }
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on("payment.failed", (response) => {
+        setPaymentState("error");
+        setErrorMessage(response.error?.description || "Payment failed");
+      });
+      rzp.open();
+    } catch (err) {
+      setPaymentState("error");
+      setErrorMessage(err.message || "Could not initialize payment. Please try again.");
+    }
+  };
+
+  useEffect(() => {
+    if (invoice) {
+      loadAndOpenRazorpay();
+    }
+  }, [invoice]);
 
   if (!invoice) return null;
 
-  const handlePay = (e) => {
-    e.preventDefault();
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      onPaymentSuccess(invoice.id);
-    }, 1500); // simulate 1.5s gateway latency
-  };
-
-  const getTaxedTotal = () => {
-    return Math.round(invoice.patientDue * 1.18);
-  };
-
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-md shadow-xl border border-gray-150 p-6 space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center pb-4 border-b border-gray-100">
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">Make a Payment</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Pay online securely for invoice {invoice.id}</p>
-          </div>
-          <button
-            onClick={onClose}
-            disabled={isProcessing}
-            className="text-gray-400 hover:text-gray-600 transition-colors text-xl font-bold disabled:opacity-30"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Tab Links */}
-        <div className="flex bg-gray-50 p-1.5 rounded-xl border border-gray-100 gap-1">
-          {[
-            { id: "upi", label: "UPI" },
-            { id: "card", label: "Card" },
-            { id: "emi", label: "EMI" },
-            { id: "netbank", label: "NetBanking" },
-          ].map((tab) => (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-gray-100 p-8 space-y-6 text-center animate-fade-in">
+        {/* Close Button (only show if not actively loading or verifying) */}
+        {paymentState !== "loading" && paymentState !== "verifying" && (
+          <div className="flex justify-end -mr-4 -mt-4">
             <button
-              key={tab.id}
-              onClick={() => !isProcessing && setPaymentMethod(tab.id)}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg text-center transition-all ${
-                paymentMethod === tab.id
-                  ? "bg-white text-primary shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Amount Box */}
-        <div className="bg-primary/5 border border-primary/10 p-4 rounded-2xl flex justify-between items-center">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount Due (incl. GST)</span>
-          <span className="text-2xl font-extrabold text-primary">₹{getTaxedTotal().toLocaleString("en-IN")}</span>
-        </div>
-
-        {/* Form area based on Tab selection */}
-        <form onSubmit={handlePay} className="space-y-4 text-xs sm:text-sm text-gray-600">
-          {paymentMethod === "upi" && (
-            <div className="space-y-4">
-              <div className="flex flex-col items-center justify-center p-4 border border-dashed border-gray-200 rounded-2xl bg-gray-50">
-                <span className="text-5xl mb-2">📱</span>
-                <span className="font-bold text-gray-800 text-xs uppercase tracking-wider">Scan QR Code</span>
-                <div className="w-32 h-32 bg-white border border-gray-200 rounded-lg mt-3 flex items-center justify-center font-bold text-gray-300">
-                  [ MOCK QR ]
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-700 block">Or enter UPI ID</label>
-                <input
-                  type="text"
-                  required
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="rahul@okhdfcbank"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all font-medium text-gray-800"
-                />
-              </div>
-            </div>
-          )}
-
-          {paymentMethod === "card" && (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-700 block">Card Number</label>
-                <input
-                  type="text"
-                  required
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value)}
-                  placeholder="4321 8765 9012 3456"
-                  className="w-full p-3 border border-gray-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all font-medium text-gray-850"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-700 block">Expiry Date</label>
-                  <input
-                    type="text"
-                    required
-                    value={cardExpiry}
-                    onChange={(e) => setCardExpiry(e.target.value)}
-                    placeholder="MM/YY"
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all font-medium text-gray-850"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-700 block">CVV</label>
-                  <input
-                    type="password"
-                    required
-                    maxLength="3"
-                    value={cardCvv}
-                    onChange={(e) => setCardCvv(e.target.value)}
-                    placeholder="***"
-                    className="w-full p-3 border border-gray-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all font-medium text-gray-850"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {paymentMethod === "emi" && (
-            <div className="space-y-3">
-              <span className="text-xs font-semibold text-gray-700 block">Choose your EMI Plan</span>
-              <div className="space-y-2">
-                {[
-                  { months: 3, amount: Math.round(getTaxedTotal() / 3), rate: "0% Interest" },
-                  { months: 6, amount: Math.round(getTaxedTotal() / 6), rate: "0% Interest" },
-                  { months: 12, amount: Math.round(getTaxedTotal() / 12 * 1.05), rate: "5% Interest" },
-                ].map((plan) => (
-                  <label
-                    key={plan.months}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer font-medium"
-                  >
-                    <div className="flex items-center gap-3">
-                      <input type="radio" name="emi_plan" required className="accent-primary" />
-                      <span className="font-bold text-gray-800 text-xs sm:text-sm">{plan.months} Months EMI</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-extrabold text-gray-900 block text-xs sm:text-sm">₹{plan.amount}/mo</span>
-                      <span className="text-[10px] text-gray-400 font-semibold">{plan.rate}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {paymentMethod === "netbank" && (
-            <div className="space-y-3">
-              <label className="text-xs font-semibold text-gray-700 block">Select your Bank</label>
-              <select className="w-full p-3 border border-gray-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all font-semibold text-gray-700 bg-white">
-                <option>HDFC Bank</option>
-                <option>ICICI Bank</option>
-                <option>State Bank of India</option>
-                <option>Axis Bank</option>
-                <option>Kotak Mahindra Bank</option>
-              </select>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex justify-between gap-3 pt-4 border-t border-gray-100">
-            <button
-              type="button"
               onClick={onClose}
-              disabled={isProcessing}
-              className="flex-1 px-5 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="text-gray-400 hover:text-gray-600 transition-colors text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isProcessing}
-              className="flex-1 px-5 py-2.5 bg-primary text-white text-xs font-semibold rounded-xl hover:bg-primary/90 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isProcessing ? (
-                <>
-                  <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-3 h-3" />
-                  Processing...
-                </>
-              ) : (
-                "Confirm Payment"
-              )}
+              ✕
             </button>
           </div>
-        </form>
+        )}
+
+        {paymentState === "loading" && (
+          <div className="py-8 flex flex-col items-center space-y-4">
+            <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Opening payment method....</h3>
+              <p className="text-xs text-gray-500 mt-1">Please wait while we initialize your secure transaction.</p>
+            </div>
+            <div className="bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-100 mt-2">
+              <span className="text-xs font-semibold text-gray-500">Amount Due: </span>
+              <span className="text-sm font-bold text-gray-900">₹{invoice.patientDue.toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+        )}
+
+        {paymentState === "verifying" && (
+          <div className="py-8 flex flex-col items-center space-y-4">
+            <div className="w-12 h-12 border-4 border-success/20 border-t-success rounded-full animate-spin"></div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Verifying Payment...</h3>
+              <p className="text-xs text-gray-500 mt-1">Securing your payment confirmation. Do not close this page.</p>
+            </div>
+          </div>
+        )}
+
+        {paymentState === "success" && (
+          <div className="py-8 flex flex-col items-center space-y-4">
+            <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center text-3xl animate-bounce">
+              ✓
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-success-800">Payment Successful!</h3>
+              <p className="text-xs text-gray-500 mt-1">Thank you. Your invoice status is being updated...</p>
+            </div>
+          </div>
+        )}
+
+        {paymentState === "idle" && (
+          <div className="py-6 flex flex-col items-center space-y-4">
+            <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl">
+              ℹ
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Payment Cancelled</h3>
+              <p className="text-xs text-gray-500 mt-1">You closed the secure payment popup before completion.</p>
+            </div>
+            <div className="flex gap-3 w-full mt-4">
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2.5 border border-gray-250 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={loadAndOpenRazorpay}
+                className="flex-1 px-4 py-2.5 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 transition-colors shadow-sm"
+              >
+                Retry Payment
+              </button>
+            </div>
+          </div>
+        )}
+
+        {paymentState === "error" && (
+          <div className="py-6 flex flex-col items-center space-y-4">
+            <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center text-3xl">
+              ⚠
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Payment Failed</h3>
+              <p className="text-xs text-red-500 font-semibold mt-1">{errorMessage}</p>
+            </div>
+            <div className="flex gap-3 w-full mt-4">
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2.5 border border-gray-250 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={loadAndOpenRazorpay}
+                className="flex-1 px-4 py-2.5 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary/95 transition-colors shadow-sm"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

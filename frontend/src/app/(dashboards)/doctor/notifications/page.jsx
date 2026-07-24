@@ -13,6 +13,8 @@ import {
   Inbox
 } from "lucide-react";
 
+import React, { useEffect } from "react";
+
 export default function DoctorNotificationsPage() {
   const router = useRouter();
   const {
@@ -22,6 +24,12 @@ export default function DoctorNotificationsPage() {
     markAllAsRead,
     setViewingPatientToken
   } = useDoctor();
+
+  useEffect(() => {
+    if (markAllAsRead) {
+      markAllAsRead();
+    }
+  }, []);
 
   // Format Date & Time for display: DD-MM-YYYY hh:mm AM/PM
   const formatDateTime = (dateStr) => {
@@ -47,7 +55,6 @@ export default function DoctorNotificationsPage() {
   const totalCount = notifications.length;
   const unreadCount = notifications.filter((n) => n.status === "unread").length;
   const referralCount = notifications.filter((n) => n.type === "referral").length;
-  const labCount = notifications.filter((n) => n.type === "labs").length;
 
   const handlePatientFocus = (patientId) => {
     if (!patientId) return;
@@ -64,18 +71,8 @@ export default function DoctorNotificationsPage() {
             <Bell className="w-6 h-6 text-primary" /> Notifications Hub
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Track and review patient referrals, lab order updates, and safety alerts.
+            Track and review patient referrals, leave status updates, and clinic alerts.
           </p>
-        </div>
-        <div className="flex gap-2">
-          {unreadCount > 0 && (
-            <button
-              onClick={markAllAsRead}
-              className="px-4 py-2 bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer outline-none border-none"
-            >
-              <CheckCircle className="w-4 h-4" /> Mark All as Read
-            </button>
-          )}
         </div>
       </div>
 
@@ -112,12 +109,12 @@ export default function DoctorNotificationsPage() {
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
-            <Microscope className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <CheckCircle className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Lab Cases</p>
-            <p className="text-2xl font-black text-gray-900 mt-1">{labCount}</p>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Leave Updates</p>
+            <p className="text-2xl font-black text-gray-900 mt-1">{notifications.filter(n => n.type === "leave").length}</p>
           </div>
         </div>
       </div>

@@ -5,10 +5,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users, Calculator, Briefcase } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
+import { useReceptionist } from "@/app/(dashboards)/frontdesk/receptionist/layout";
 
 export default function FrontdeskWorkspaceSidebar() {
   const pathname = usePathname();
   const [roles, setRoles] = useState([]);
+
+  let receptionistContext = null;
+  try {
+    receptionistContext = useReceptionist();
+  } catch (e) {
+    // not in receptionist context
+  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -87,7 +95,7 @@ export default function FrontdeskWorkspaceSidebar() {
               key={ws.id}
               href={ws.href}
               title={ws.name}
-              className={`flex flex-col items-center justify-center w-full aspect-square rounded-2xl transition-all duration-300 group cursor-pointer outline-none
+              className={`flex flex-col items-center justify-center w-full aspect-square rounded-2xl transition-all duration-300 group cursor-pointer outline-none relative
                 ${isActive 
                   ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
                   : "text-slate-400 hover:bg-white/10 hover:text-white"
@@ -98,6 +106,9 @@ export default function FrontdeskWorkspaceSidebar() {
               <span className={`text-[9px] font-bold ${isActive ? "text-white" : ""}`}>
                 {ws.id === "receptionist" ? "Front Desk" : "Finance"}
               </span>
+              {ws.id === "receptionist" && (receptionistContext?.unreadCount || 0) > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-900 shadow-sm animate-pulse" />
+              )}
             </Link>
           );
         })}

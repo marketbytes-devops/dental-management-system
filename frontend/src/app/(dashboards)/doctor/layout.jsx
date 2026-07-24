@@ -27,7 +27,8 @@ import {
   getAllReferrals,
   updateReferral,
   saveClinicalNote,
-  getPatientClinicalNotes
+  getPatientClinicalNotes,
+  getMyLeaveRequests
 } from "@/services/api";
 
 // Create context
@@ -156,21 +157,127 @@ export default function DoctorLayout({ children }) {
     }
   };
 
+  const [readNotifIds, setReadNotifIds] = useState({});
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("doctor_read_notif_ids");
+        if (saved) setReadNotifIds(JSON.parse(saved));
+      } catch (e) {
+        console.warn("Failed to parse doctor read notification cache:", e);
+      }
+    }
+  }, []);
+
+  const markAsRead = (id) => {
+    setReadNotifIds((prev) => {
+      const updated = { ...prev, [id]: true };
+      try {
+        localStorage.setItem("doctor_read_notif_ids", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    setDbNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, status: "read" } : n)));
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, status: "read" } : n)));
+  };
+
+  const markAsUnread = (idOrItemId) => {
+    setReadNotifIds((prev) => {
+      const updated = { ...prev };
+      delete updated[idOrItemId];
+      try {
+        localStorage.setItem("doctor_read_notif_ids", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    setDbNotifications((prev) => prev.map((n) => (n.id === idOrItemId ? { ...n, status: "unread" } : n)));
+  };
+
+  const markAllAsRead = () => {
+    setReadNotifIds((prev) => {
+      const updated = { ...prev };
+      allNotifications.forEach((n) => {
+        updated[n.id] = true;
+      });
+      try {
+        localStorage.setItem("doctor_read_notif_ids", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+    setDbNotifications((prev) => prev.map((n) => ({ ...n, status: "read" })));
+    setNotifications((prev) => prev.map((n) => ({ ...n, status: "read" })));
+  };
+
   const fetchDbNotifications = async () => {
     try {
-      const data = await getLabNotifications('doctor');
-      const mapped = data.map(n => ({
-        id: n.id,
-        message: n.desc,
-        type: "labs",
-        link: "/doctor/labs",
-        status: n.read ? "read" : "unread",
-        dotColor: n.title.toLowerCase().includes("rejected") ? "red" : "green",
-        timestamp: new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        receivedAt: n.created_at,
-        itemId: n.title.split(" ").pop()
-      }));
-      setDbNotifications(mapped);
+      // Fetch leave requests for current doctor and all referrals
+      const [leaves, allRefs] = await Promise.all([
+        getMyLeaveRequests().catch(() => []),
+        getAllReferrals().catch(() => []),
+      ]);
+
+      const notifs = [];
+      const currentLower = currentDoctorName ? currentDoctorName.toLowerCase().replace("dr.", "").trim() : "";
+
+      // 1. Targeted Referrals Only (Incoming to me OR Replies to my referrals)
+      (allRefs || []).forEach((ref) => {
+        const targetLower = ref.target_doctor ? ref.target_doctor.toLowerCase().replace("dr.", "").trim() : "";
+        const referredByLower = ref.referred_by ? ref.referred_by.toLowerCase().replace("dr.", "").trim() : "";
+
+        // A. Incoming Referral: ONLY notify target doctor when status is Pending
+        if (targetLower && currentLower && targetLower.includes(currentLower) && ref.status === "Pending") {
+          const notifId = `ref-in-${ref.id}`;
+          notifs.push({
+            id: notifId,
+            message: `${ref.referred_by || "Doctor"} referred patient token ${ref.patient_token} to you for ${ref.reason || "consultation"}.`,
+            type: "referral",
+            link: "/doctor/referrals",
+            dotColor: "blue",
+            timestamp: ref.date || "Today",
+            receivedAt: ref.date || new Date().toISOString(),
+            patientId: ref.patient_token,
+            status: readNotifIds[notifId] ? "read" : "unread",
+          });
+        }
+
+        // B. Completed Referral Reply: ONLY notify referring doctor when status is Completed
+        if (referredByLower && currentLower && referredByLower.includes(currentLower) && ref.status === "Completed") {
+          const notifId = `ref-reply-${ref.id}`;
+          notifs.push({
+            id: notifId,
+            message: `${ref.target_doctor || "Specialist"} completed & replied to your referral for patient token ${ref.patient_token}.`,
+            type: "referral",
+            link: "/doctor/referrals",
+            dotColor: "green",
+            timestamp: ref.date || "Today",
+            receivedAt: ref.date || new Date().toISOString(),
+            patientId: ref.patient_token,
+            status: readNotifIds[notifId] ? "read" : "unread",
+          });
+        }
+      });
+
+      // 2. Doctor's own Leave Status Updates
+      (leaves || []).forEach((l) => {
+        if (l.status === "Approved" || l.status === "Rejected") {
+          const notifId = `leave-${l.id}-${l.status}`;
+          notifs.push({
+            id: notifId,
+            message: `Your ${l.type} request (${l.start_date} to ${l.end_date}) was ${l.status.toLowerCase()} by Admin.`,
+            type: "leave",
+            link: "/doctor/leave",
+            dotColor: l.status === "Approved" ? "green" : "red",
+            timestamp: l.start_date,
+            receivedAt: l.submitted_at || new Date().toISOString(),
+            status: readNotifIds[notifId] ? "read" : "unread",
+          });
+        }
+      });
+
+      notifs.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+
+      setDbNotifications(notifs);
     } catch (err) {
       console.warn("Failed to fetch doctor notifications from backend:", err);
     }
@@ -192,39 +299,41 @@ export default function DoctorLayout({ children }) {
   const [toastAnimation, setToastAnimation] = useState("");
   const [bellAnimating, setBellAnimating] = useState(false);
 
-  const prevUnreadCountRef = useRef(0);
+  const shownToastIdsRef = useRef(new Set());
+
   useEffect(() => {
-    const unreadDbNotifs = dbNotifications.filter(n => n.status === "unread");
-    if (unreadDbNotifs.length > prevUnreadCountRef.current) {
-      const latest = unreadDbNotifs[0];
-      if (latest) {
-        setActiveToast({
-          id: latest.id,
-          message: latest.message,
-          type: latest.type,
-          link: latest.link,
-          dotColor: latest.dotColor,
-          timestamp: "Just now"
-        });
-        setToastAnimation("slide-in");
+    const unreadDbNotifs = dbNotifications.filter((n) => n.status === "unread");
+    const unreadUnshown = unreadDbNotifs.filter((n) => !shownToastIdsRef.current.has(n.id));
 
-        if (window.toastTimeout) clearTimeout(window.toastTimeout);
-        if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+    if (unreadUnshown.length > 0) {
+      const latest = unreadUnshown[0];
+      shownToastIdsRef.current.add(latest.id);
 
-        window.toastTimeout = setTimeout(() => {
-          setToastAnimation("slide-out");
-          window.toastExitTimeout = setTimeout(() => {
-            setActiveToast(null);
-            setToastAnimation("");
-            setBellAnimating(true);
-            setTimeout(() => {
-              setBellAnimating(false);
-            }, 2400);
-          }, 400);
-        }, 4500);
-      }
+      setActiveToast({
+        id: latest.id,
+        message: latest.message,
+        type: latest.type,
+        link: latest.link || "/doctor/notifications",
+        dotColor: latest.dotColor,
+        timestamp: "Just now"
+      });
+      setToastAnimation("slide-in");
+
+      if (window.toastTimeout) clearTimeout(window.toastTimeout);
+      if (window.toastExitTimeout) clearTimeout(window.toastExitTimeout);
+
+      window.toastTimeout = setTimeout(() => {
+        setToastAnimation("slide-out");
+        window.toastExitTimeout = setTimeout(() => {
+          setActiveToast(null);
+          setToastAnimation("");
+          setBellAnimating(true);
+          setTimeout(() => {
+            setBellAnimating(false);
+          }, 2400);
+        }, 400);
+      }, 4500);
     }
-    prevUnreadCountRef.current = unreadDbNotifs.length;
   }, [dbNotifications]);
 
   const triggerNotification = (newNotif) => {
@@ -254,34 +363,6 @@ export default function DoctorLayout({ children }) {
       }, 400);
     }, 4500);
   };
-
-  const markAsRead = async (id) => {
-    if (typeof id === "number" || !isNaN(id)) {
-      try {
-        await markNotificationAsRead(id);
-        fetchDbNotifications();
-      } catch (err) {
-        console.error("Failed to mark notification read in backend:", err);
-      }
-    } else {
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: "read" } : n));
-    }
-  };
-
-  const markAsUnread = (idOrItemId) => {
-    setNotifications(prev => prev.map(n => (n.id === idOrItemId || n.itemId === idOrItemId) ? { ...n, status: "unread" } : n));
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      await markAllNotificationsAsRead();
-      fetchDbNotifications();
-    } catch (err) {
-      console.error("Failed to mark all notifications as read in backend:", err);
-    }
-    setNotifications(prev => prev.map(n => ({ ...n, status: "read" })));
-  };
-
   // Referrals database
   const [referrals, setReferrals] = useState([]);
 

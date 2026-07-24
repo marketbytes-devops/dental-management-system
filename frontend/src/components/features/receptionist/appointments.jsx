@@ -112,7 +112,7 @@ function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmerg
                   <div className="flex gap-2 justify-end">
                     {app.status === "Confirmed" && app.payment_status !== "Paid" && (
                       <button
-                        onClick={() => onPayConsultation(app.id, app.patient?.name)}
+                        onClick={() => onPayConsultation(app.id, app.patient?.name, app.doctor?.name || app.doctor_name)}
                         className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg border border-green-600 transition cursor-pointer shadow-sm shadow-green-600/20"
                       >
                         Payment
@@ -137,7 +137,7 @@ function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmerg
 
 // ── main ──────────────────────────────────────────────────────────────────────
 
-function PaymentModal({ isOpen, onClose, onConfirm, patientName }) {
+function PaymentModal({ isOpen, onClose, onConfirm, patientName, doctorName, doctors = [] }) {
   const [method, setMethod] = useState("Cash");
   const [amount, setAmount] = useState(500);
   const [fetchingTariff, setFetchingTariff] = useState(true);
@@ -147,14 +147,17 @@ function PaymentModal({ isOpen, onClose, onConfirm, patientName }) {
       setFetchingTariff(true);
       client.get("/payment/consultation-fees")
         .then(res => {
-          if (res.data?.general_consultation_fee) {
-            setAmount(res.data.general_consultation_fee);
+          if (res.data) {
+            const selectedDocObj = doctors.find(d => d.name === doctorName);
+            const isSpecialist = selectedDocObj?.specialty && selectedDocObj.specialty.toLowerCase() !== "general dentistry";
+            const fee = isSpecialist ? (res.data.specialist_consultation_fee || res.data.general_consultation_fee) : res.data.general_consultation_fee;
+            if (fee) setAmount(fee);
           }
         })
         .catch(err => console.error("Failed to fetch active consultation tariff:", err))
         .finally(() => setFetchingTariff(false));
     }
-  }, [isOpen]);
+  }, [isOpen, doctorName, doctors]);
 
   if (!isOpen) return null;
 
@@ -404,15 +407,15 @@ export default function ReceptionistAppointments() {
     }
   };
 
-  const handlePayConsultationClick = (id, name) => {
-    setPaymentModal({ isOpen: true, id, name });
+  const handlePayConsultationClick = (id, name, doctor_name) => {
+    setPaymentModal({ isOpen: true, id, name, doctor_name });
   };
 
   const handlePayConsultationConfirm = async (method, amount) => {
     try {
       await payConsultation(paymentModal.id, { amount: amount || 500.0, payment_method: method });
       alert(`Payment of ₹${amount} collected via ${method}! ${paymentModal.name} has been added to the queue.`);
-      setPaymentModal({ isOpen: false, id: null, name: "" });
+      setPaymentModal({ isOpen: false, id: null, name: "", doctor_name: "" });
       fetchData();
     } catch (err) {
       alert(err.message || "Payment failed.");
@@ -452,9 +455,11 @@ export default function ReceptionistAppointments() {
     <div className="min-h-screen bg-gray-50 p-6 space-y-6">
       <PaymentModal
         isOpen={paymentModal.isOpen}
-        onClose={() => setPaymentModal({ isOpen: false, id: null, name: "" })}
+        onClose={() => setPaymentModal({ isOpen: false, id: null, name: "", doctor_name: "" })}
         onConfirm={handlePayConsultationConfirm}
         patientName={paymentModal.name}
+        doctorName={paymentModal.doctor_name}
+        doctors={doctors}
       />
 
       {/* header */}

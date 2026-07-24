@@ -366,7 +366,23 @@ def get_receipt(billing_request_id: int, db: Session = Depends(get_db)):
             "found_in_inventory": inventory_entry is not None
         })
 
-    consultation_fee = float(br.total_amount or 500.0)
+    # Fetch dynamic active consultation tariff from admin clinic settings
+    from modules.payment.models import ClinicSettingModel
+    if br.total_amount and float(br.total_amount) > 0:
+        consultation_fee = float(br.total_amount)
+    else:
+        tariff_key = "general_consultation_fee"
+        if doctor_model and doctor_model.specialty and doctor_model.specialty.lower() != "general dentistry":
+            tariff_key = "specialist_consultation_fee"
+        setting = db.query(ClinicSettingModel).filter(ClinicSettingModel.setting_key == tariff_key).first()
+        if setting and setting.setting_value:
+            try:
+                consultation_fee = float(setting.setting_value)
+            except ValueError:
+                consultation_fee = 500.0
+        else:
+            consultation_fee = 500.0
+
     grand_total = consultation_fee + medication_total
 
     # Clinic info (static - can be made dynamic via admin settings later)

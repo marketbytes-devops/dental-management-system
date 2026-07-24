@@ -14,6 +14,7 @@ import {
 
 export default function useLeaveData(userId, role, staffName) {
   const [requests, setRequests] = useState([]);
+  const [allRequests, setAllRequests] = useState([]);
   const [balances, setBalances] = useState({});
   const [allBalances, setAllBalances] = useState({});
   const [isLoaded, setIsLoaded] = useState(false);
@@ -24,7 +25,7 @@ export default function useLeaveData(userId, role, staffName) {
       const myReqsData = await getMyLeaveRequests();
       
       // Map backend fields to frontend expected format
-      const mappedMyRequests = myReqsData.map(r => ({
+      const mappedMyRequests = (myReqsData || []).map(r => ({
         id: `LV-${r.id}`,
         dbId: r.id,
         userId: `USER-${r.user_id}`,
@@ -42,32 +43,45 @@ export default function useLeaveData(userId, role, staffName) {
 
       // 2. Fetch my balances
       const balData = await getMyLeaveBalances();
-
-      setRequests(mappedMyRequests);
       setBalances(balData);
 
-      // 3. If admin / manager, fetch all requests and all balances
-      if (role === "admin" || role === "manager") {
+      // 3. Fetch all leave requests for the Month Schedule Calendar across all modules
+      let mappedAllRequests = mappedMyRequests;
+      try {
         const allReqsData = await getAllLeaveRequests();
-        const mappedAllRequests = allReqsData.map(r => ({
-          id: `LV-${r.id}`,
-          dbId: r.id,
-          userId: `USER-${r.user_id}`,
-          staffName: r.staff_name,
-          role: r.role,
-          type: r.type,
-          startDate: r.start_date,
-          endDate: r.end_date,
-          days: r.days,
-          reason: r.reason,
-          status: r.status,
-          submittedAt: new Date(r.submitted_at).toLocaleString(),
-          onCallDoctor: r.on_call_doctor || ""
-        }));
-        setRequests(mappedAllRequests);
+        if (Array.isArray(allReqsData)) {
+          mappedAllRequests = allReqsData.map(r => ({
+            id: `LV-${r.id}`,
+            dbId: r.id,
+            userId: `USER-${r.user_id}`,
+            staffName: r.staff_name,
+            role: r.role,
+            type: r.type,
+            startDate: r.start_date,
+            endDate: r.end_date,
+            days: r.days,
+            reason: r.reason,
+            status: r.status,
+            submittedAt: new Date(r.submitted_at).toLocaleString(),
+            onCallDoctor: r.on_call_doctor || ""
+          }));
+        }
+      } catch (e) {
+        console.warn("Could not fetch all leave requests:", e);
+      }
+      setAllRequests(mappedAllRequests);
 
-        const allBalData = await getAllLeaveBalances();
-        setAllBalances(allBalData);
+      // If admin or manager, use all requests as default requests list
+      if (role === "admin" || role === "manager") {
+        setRequests(mappedAllRequests);
+        try {
+          const allBalData = await getAllLeaveBalances();
+          setAllBalances(allBalData);
+        } catch (e) {
+          // ignore
+        }
+      } else {
+        setRequests(mappedMyRequests);
       }
       
       setIsLoaded(true);
@@ -141,6 +155,7 @@ export default function useLeaveData(userId, role, staffName) {
 
   return {
     requests,
+    allRequests,
     balances: myBalances,
     allBalances,
     isLoaded,

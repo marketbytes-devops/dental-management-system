@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Bell, HelpCircle, Sparkles, Share2, Microscope, AlertTriangle, Calendar, CreditCard, ClipboardList, Info } from "lucide-react";
+import { Bell, Sparkles, Share2, Microscope, AlertTriangle, Calendar, CreditCard, ClipboardList, Info, Pill } from "lucide-react";
 import { useDoctor } from "@/app/(dashboards)/doctor/layout";
-import { updateAuthStatus, getPatientNotifications, markPatientNotificationAsRead } from "@/services/api";
+import { useReceptionist } from "@/app/(dashboards)/frontdesk/receptionist/layout";
+import { useAdmin } from "@/app/(dashboards)/admin/layout";
+import { updateAuthStatus, getPatientNotifications, markPatientNotificationAsRead, getMyLeaveRequests } from "@/services/api";
 
 export default function Navbar() {
   const [role, setRole] = useState("");
@@ -13,6 +15,9 @@ export default function Navbar() {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [patientNotifications, setPatientNotifications] = useState([]);
+
+  const [staffLeaveNotifs, setStaffLeaveNotifs] = useState([]);
+  const [readStaffLeaveIds, setReadStaffLeaveIds] = useState({});
 
   const fetchPatientNotifs = async () => {
     try {
@@ -27,6 +32,36 @@ export default function Navbar() {
     if (role === "patient") {
       fetchPatientNotifs();
       const interval = setInterval(fetchPatientNotifs, 5000);
+      return () => clearInterval(interval);
+    } else if (role && role !== "admin" && role !== "doctor" && role !== "receptionist") {
+      const fetchLeaves = async () => {
+        try {
+          const leaves = await getMyLeaveRequests();
+          const roleLeaveHref =
+            role === "accountant" ? "/frontdesk/accountant/leave" :
+            role === "lab tech" ? "/labtechnicians/leave" : "/leave";
+
+          const notifs = [];
+          (leaves || []).forEach(l => {
+            if (l.status === "Approved" || l.status === "Rejected") {
+              notifs.push({
+                id: `leave-${l.id}-${l.status}`,
+                type: "leave",
+                title: `Leave Application ${l.status}`,
+                message: `Your ${l.type} request (${l.start_date} to ${l.end_date}) was ${l.status.toLowerCase()} by Admin.`,
+                link: roleLeaveHref,
+                timestamp: l.start_date
+              });
+            }
+          });
+          setStaffLeaveNotifs(notifs);
+        } catch (e) {
+          console.warn("Failed to fetch staff leave notifications:", e);
+        }
+      };
+
+      fetchLeaves();
+      const interval = setInterval(fetchLeaves, 5000);
       return () => clearInterval(interval);
     }
   }, [role]);
@@ -75,7 +110,23 @@ export default function Navbar() {
     // not in doctor context
   }
 
-  const { notifications = [], bellAnimating, markAsRead } = doctorContext || {};
+  const { notifications = [], bellAnimating, markAsRead, markAllAsRead } = doctorContext || {};
+
+  // Safely try-catch calling useReceptionist so it doesn't crash when rendered outside ReceptionistProvider
+  let receptionistContext = null;
+  try {
+    receptionistContext = useReceptionist();
+  } catch (e) {
+    // not in receptionist context
+  }
+
+  // Safely try-catch calling useAdmin so it doesn't crash when rendered outside AdminProvider
+  let adminContext = null;
+  try {
+    adminContext = useAdmin();
+  } catch (e) {
+    // not in admin context
+  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -199,15 +250,6 @@ export default function Navbar() {
           </p>
           <p className="text-xs text-gray-500">{userSubtitle}</p>
         </div>
-
-        <div className="hidden md:flex items-center bg-gray-50 rounded-lg px-3 py-1.5 border border-gray-200 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary w-80 transition-all">
-          <Search className="text-gray-400 mr-2 w-4 h-4 shrink-0" />
-          <input
-            type="text"
-            placeholder="Search patients, doctors, appointments..."
-            className="bg-transparent border-none outline-none text-sm w-full placeholder:text-gray-400"
-          />
-        </div>
       </div>
 
       <div className="flex items-center gap-4 relative">
@@ -215,8 +257,16 @@ export default function Navbar() {
         {role === "doctor" ? (
           <>
             <button
-              onClick={() => setShowNotifications(!showNotifications)}
+              onClick={() => {
+                const nextState = !showNotifications;
+                setShowNotifications(nextState);
+                if (nextState) {
+                  if (markAllAsRead) markAllAsRead();
+                  if (doctorContext?.markAllAsRead) doctorContext.markAllAsRead();
+                }
+              }}
               className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center cursor-pointer outline-none"
+              title="Doctor Notifications"
             >
               <Bell className={`w-5 h-5 transition-transform ${bellAnimating ? "animate-bell-ring text-primary" : ""}`} />
               {unreadCount > 0 && (
@@ -229,8 +279,8 @@ export default function Navbar() {
               <div className="absolute right-0 top-12 w-80 bg-white border border-gray-150 rounded-2xl shadow-xl z-50 p-4 space-y-3 animate-fade-in text-left">
                 <div className="flex justify-between items-center pb-2 border-b border-gray-100">
                   <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Clinical Notifications</span>
-                  <span className="text-[9px] font-bold bg-danger/10 text-danger px-2 py-0.5 rounded">
-                    {unreadCount} New
+                  <span className="text-[9px] font-bold text-gray-400">
+                    {notifications.length} Alerts
                   </span>
                 </div>
 
@@ -306,10 +356,220 @@ export default function Navbar() {
               <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-danger rounded-full border border-white animate-pulse" />
             )}
           </Link>
+        ) : role === "receptionist" ? (
+          <>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center cursor-pointer outline-none"
+              title="Front Desk Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {(receptionistContext?.unreadCount || 0) > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full border border-white bg-danger animate-pulse" />
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 top-12 w-80 bg-white border border-gray-150 rounded-2xl shadow-xl z-50 p-4 space-y-3 animate-fade-in text-left">
+                <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Front Desk Notifications</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold bg-danger/10 text-danger px-2 py-0.5 rounded">
+                      {receptionistContext?.unreadCount || 0} New
+                    </span>
+                    {(receptionistContext?.unreadCount || 0) > 0 && (
+                      <button
+                        onClick={() => receptionistContext?.markAllNotifsAsRead()}
+                        className="text-[9px] font-semibold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-[260px] overflow-y-auto">
+                  {(receptionistContext?.notifications || []).map((notif) => (
+                    <Link
+                      key={notif.id}
+                      href={notif.link}
+                      onClick={() => {
+                        if (receptionistContext?.markNotifAsRead) {
+                          receptionistContext.markNotifAsRead(notif.id);
+                        }
+                        setShowNotifications(false);
+                      }}
+                      className={`block p-2.5 rounded-xl border transition-all text-xs relative ${
+                        !notif.read
+                          ? "bg-blue-50/60 hover:bg-blue-50 border-blue-100 font-semibold"
+                          : "bg-white hover:bg-gray-50 border-gray-100"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <p className="font-bold text-gray-900 flex items-center gap-1.5 capitalize">
+                          {notif.type === "dispensing" ? (
+                            <Pill className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          ) : (
+                            <Microscope className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                          )}
+                          <span>{notif.title}</span>
+                        </p>
+                        {!notif.read && (
+                          <span className="w-2 h-2 rounded-full bg-danger animate-pulse shrink-0 ml-1" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-600 mt-1 leading-normal font-normal">
+                        {notif.message}
+                      </p>
+                      <span className="text-[9px] text-gray-400 font-semibold block mt-1">
+                        {notif.timestamp}
+                      </span>
+                    </Link>
+                  ))}
+
+                  {(!receptionistContext?.notifications || receptionistContext.notifications.length === 0) && (
+                    <p className="text-xs text-gray-400 text-center py-6 font-medium">No new notifications.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : role === "admin" ? (
+          <>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center cursor-pointer outline-none"
+              title="Admin Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {(adminContext?.unreadCount || 0) > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full border border-white bg-danger animate-pulse" />
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 top-12 w-84 bg-white border border-gray-150 rounded-2xl shadow-xl z-50 p-4 space-y-3 animate-fade-in text-left">
+                <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Admin System Notifications</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold bg-danger/10 text-danger px-2 py-0.5 rounded">
+                      {adminContext?.unreadCount || 0} New
+                    </span>
+                    {(adminContext?.unreadCount || 0) > 0 && (
+                      <button
+                        onClick={() => adminContext?.markAllNotifsAsRead()}
+                        className="text-[9px] font-semibold text-blue-600 hover:underline cursor-pointer border-none bg-transparent"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-[260px] overflow-y-auto">
+                  {(adminContext?.notifications || []).map((notif) => (
+                    <Link
+                      key={notif.id}
+                      href={notif.link}
+                      onClick={() => {
+                        if (adminContext?.markNotifAsRead) {
+                          adminContext.markNotifAsRead(notif.id);
+                        }
+                        setShowNotifications(false);
+                      }}
+                      className={`block p-2.5 rounded-xl border transition-all text-xs relative ${
+                        !notif.read
+                          ? "bg-amber-50/60 hover:bg-amber-50 border-amber-200 font-semibold"
+                          : "bg-white hover:bg-gray-50 border-gray-100"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <p className="font-bold text-gray-900 flex items-center gap-1.5 capitalize">
+                          <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>{notif.title}</span>
+                        </p>
+                        {!notif.read && (
+                          <span className="w-2 h-2 rounded-full bg-danger animate-pulse shrink-0 ml-1" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-600 mt-1 leading-normal font-normal">
+                        {notif.message}
+                      </p>
+                      <span className="text-[9px] text-gray-400 font-semibold block mt-1">
+                        {notif.timestamp}
+                      </span>
+                    </Link>
+                  ))}
+
+                  {(!adminContext?.notifications || adminContext.notifications.length === 0) && (
+                    <p className="text-xs text-gray-400 text-center py-6 font-medium">No new notifications.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         ) : (
-          <button className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center">
-            <Bell className="w-5 h-5" />
-          </button>
+          <>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center cursor-pointer outline-none"
+              title="Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {staffLeaveNotifs.filter(n => !readStaffLeaveIds[n.id]).length > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full border border-white bg-danger animate-pulse" />
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute right-0 top-12 w-80 bg-white border border-gray-150 rounded-2xl shadow-xl z-50 p-4 space-y-3 animate-fade-in text-left">
+                <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Leave Status Notifications</span>
+                  <span className="text-[9px] font-bold bg-danger/10 text-danger px-2 py-0.5 rounded">
+                    {staffLeaveNotifs.filter(n => !readStaffLeaveIds[n.id]).length} New
+                  </span>
+                </div>
+
+                <div className="space-y-2 max-h-[260px] overflow-y-auto">
+                  {staffLeaveNotifs.map((notif) => (
+                    <Link
+                      key={notif.id}
+                      href={notif.link}
+                      onClick={() => {
+                        setReadStaffLeaveIds(prev => ({ ...prev, [notif.id]: true }));
+                        setShowNotifications(false);
+                      }}
+                      className={`block p-2.5 rounded-xl border transition-all text-xs relative ${
+                        !readStaffLeaveIds[notif.id]
+                          ? "bg-blue-50/60 hover:bg-blue-50 border-blue-100 font-semibold"
+                          : "bg-white hover:bg-gray-50 border-gray-100"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <p className="font-bold text-gray-900 flex items-center gap-1.5 capitalize">
+                          <Calendar className="w-3.5 h-3.5 text-primary shrink-0" />
+                          <span>{notif.title}</span>
+                        </p>
+                        {!readStaffLeaveIds[notif.id] && (
+                          <span className="w-2 h-2 rounded-full bg-danger animate-pulse shrink-0 ml-1" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-600 mt-1 leading-normal font-normal">
+                        {notif.message}
+                      </p>
+                      <span className="text-[9px] text-gray-400 font-semibold block mt-1">
+                        {notif.timestamp}
+                      </span>
+                    </Link>
+                  ))}
+
+                  {staffLeaveNotifs.length === 0 && (
+                    <p className="text-xs text-gray-400 text-center py-6 font-medium">No new notifications.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Doctor-specific availability status dropdown */}
@@ -355,9 +615,6 @@ export default function Navbar() {
           </div>
         )}
 
-        <button className="p-2 text-gray-400 hover:text-primary transition-colors flex items-center justify-center">
-          <HelpCircle className="w-5 h-5" />
-        </button>
         <div className="h-6 w-px bg-gray-200 mx-1"></div>
         <button
           onClick={handleLogout}

@@ -195,7 +195,7 @@ export default function LabOrderPickupsPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-gray-150 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-5 rounded-2xl border border-teal-200 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Total Patients</p>
             <h3 className="text-2xl font-black text-gray-900 mt-1">{totalPatients}</h3>
@@ -231,7 +231,7 @@ export default function LabOrderPickupsPage() {
 
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="bg-white p-3.5 rounded-2xl border border-gray-150 shadow-xs flex items-center gap-3 flex-1">
+        <div className="bg-white p-3.5 rounded-2xl border border-teal-200 shadow-xs flex items-center gap-3 flex-1">
           <Search className="w-4 h-4 text-gray-400 shrink-0" />
           <input
             type="text"
@@ -241,7 +241,7 @@ export default function LabOrderPickupsPage() {
             className="w-full text-xs font-semibold text-gray-800 placeholder-gray-400 bg-transparent border-none focus:outline-none"
           />
         </div>
-        <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-gray-150 shadow-xs">
+        <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-teal-200 shadow-xs">
           <Filter className="w-3.5 h-3.5 text-gray-400 ml-1" />
           {["All", "Ready", "InProgress"].map((f) => (
             <button
@@ -271,11 +271,11 @@ export default function LabOrderPickupsPage() {
       {/* Grouped Patient Cards */}
       <div className="space-y-4">
         {loading ? (
-          <div className="p-12 text-center text-xs font-semibold text-gray-400 bg-white rounded-2xl border border-gray-150">
+          <div className="p-12 text-center text-xs font-semibold text-gray-400 bg-white rounded-2xl border border-teal-200">
             Loading lab orders...
           </div>
         ) : filteredPatients.length === 0 ? (
-          <div className="p-12 text-center bg-white rounded-2xl border border-gray-150 space-y-2">
+          <div className="p-12 text-center bg-white rounded-2xl border border-teal-200 space-y-2">
             <FlaskConical className="w-8 h-8 text-gray-300 mx-auto" />
             <p className="text-xs font-bold text-gray-600">No matching patients or lab orders found</p>
           </div>
@@ -288,9 +288,7 @@ export default function LabOrderPickupsPage() {
             return (
               <div
                 key={group.patient_token}
-                className={`bg-white rounded-2xl border shadow-xs overflow-hidden transition-all ${
-                  hasReady ? "border-teal-200" : "border-gray-150"
-                }`}
+                className="bg-white rounded-2xl border border-teal-200 shadow-xs overflow-hidden transition-all"
               >
                 {/* Patient Summary Header Row */}
                 <div
@@ -304,6 +302,9 @@ export default function LabOrderPickupsPage() {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-sm font-black text-gray-900">{group.patient_name}</h3>
+                        {hasReady && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 border border-white shadow-sm animate-pulse shrink-0" title="Needs Attention: Ready for Pickup" />
+                        )}
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600">
                           {group.patient_token}
                         </span>
@@ -332,6 +333,7 @@ export default function LabOrderPickupsPage() {
                         onClick={() => handleOpenNotifyForPatient(group, readyOrders)}
                         className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-black rounded-xl shadow-xs transition-all border-none cursor-pointer"
                       >
+                        <span className="w-2 h-2 rounded-full bg-red-400 border border-white animate-pulse shrink-0" />
                         <Bell className="w-3.5 h-3.5" /> Inform Patient ({readyOrders.length})
                       </button>
                     ) : (

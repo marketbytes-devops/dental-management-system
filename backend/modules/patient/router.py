@@ -66,10 +66,17 @@ def get_available_doctors(db: Session = Depends(get_db)):
         user = db.query(UserModel).filter(UserModel.id == doc.user_id).first()
         profile_picture = user.profile_picture if user else None
         
+        user_specs = user.specialties if (user and user.specialties) else []
+        if not user_specs and doc.specialty:
+            user_specs = [s.strip() for s in doc.specialty.split(",") if s.strip()]
+        if not user_specs:
+            user_specs = ["General Dentistry"]
+
         result.append({
             "id": doc.id,
             "name": doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}",
             "specialty": doc.specialty or "General Dentistry",
+            "specialties": user_specs,
             "status": "On Duty" if doc.status == "Active" else doc.status,
             "profile_picture": profile_picture
         })
@@ -1527,23 +1534,101 @@ def get_patient_clinical_notes_route(
 # Medicine Dispensing Queue Endpoints (For Receptionist)
 # ---------------------------------------------------------------------------
 
+def parse_pills_per_day(schedule: str) -> int:
+    import re
+    if not schedule:
+        return 1
+    s = str(schedule).strip().lower()
+    if re.match(r"^\d+(?:-\d+)+$", s):
+        parts = [int(p) for p in s.split("-") if p.isdigit()]
+        return sum(parts) if parts else 1
+    if "qid" in s or "4 times" in s or "4x" in s:
+        return 4
+    if "tds" in s or "tid" in s or "thrice" in s or "3 times" in s or "3x" in s:
+        return 3
+    if "bd" in s or "bid" in s or "twice" in s or "2 times" in s or "2x" in s:
+        return 2
+    if "od" in s or "once" in s or "1 time" in s or "1x" in s:
+        return 1
+    match = re.search(r"(\d+)\s*(?:pills?|tablets?|times?)", s)
+    if match:
+        return int(match.group(1))
+    return 1
+
+def parse_duration_days(duration: str) -> int:
+    import re
+    if not duration:
+        return 1
+    d = str(duration).strip().lower()
+    num_match = re.search(r"\d+", d)
+    val = int(num_match.group(0)) if num_match else 1
+    if "week" in d:
+        return max(1, val * 7)
+    if "month" in d:
+        return max(1, val * 30)
+    return max(1, val)
+
 @router.get("/dispensing")
 def get_dispensing_queue(db: Session = Depends(get_db)):
     from .models import MedicineDispenseModel
+    from modules.lab.models import InventoryItemModel
+
     dispenses = db.query(MedicineDispenseModel).order_by(MedicineDispenseModel.created_at.desc()).all()
-    return [
-        {
+    inventory_items = db.query(InventoryItemModel).all()
+    inv_map = {}
+    for item in inventory_items:
+        if item.name:
+            inv_map[item.name.strip().lower()] = float(item.unit_price) if item.unit_price is not None else 10.0
+
+    result = []
+    for d in dispenses:
+        raw_meds = d.medications or []
+        enriched_meds = []
+        total_amount = 0.0
+
+        for med in raw_meds:
+            med_name = (med.get("medicine") or med.get("name") or "").strip()
+            schedule = med.get("schedule", "")
+            timing = med.get("timing", "")
+            duration = med.get("duration", "")
+
+            pills_per_day = parse_pills_per_day(schedule)
+            duration_days = parse_duration_days(duration)
+            total_pills = pills_per_day * duration_days
+
+            # Unit price lookup from inventory or med object
+            unit_price = inv_map.get(med_name.lower())
+            if unit_price is None:
+                unit_price = float(med.get("unit_price", 10.0))
+            
+            line_total = round(total_pills * unit_price, 2)
+            total_amount += line_total
+
+            enriched_meds.append({
+                "medicine": med_name,
+                "schedule": schedule,
+                "timing": timing,
+                "duration": duration,
+                "pills_per_day": pills_per_day,
+                "duration_days": duration_days,
+                "total_pills": total_pills,
+                "unit_price": unit_price,
+                "line_total": line_total
+            })
+
+        result.append({
             "id": d.id,
             "patient_token": d.patient_token,
             "patient_name": d.patient_name,
             "doctor_name": d.doctor_name,
-            "medications": d.medications or [],
+            "medications": enriched_meds,
+            "total_amount": round(total_amount, 2),
             "status": d.status,
             "created_at": d.created_at.isoformat() if d.created_at else None,
             "dispensed_at": d.dispensed_at.isoformat() if d.dispensed_at else None
-        }
-        for d in dispenses
-    ]
+        })
+
+    return result
 
 
 @router.put("/dispensing/{dispense_id}/status")

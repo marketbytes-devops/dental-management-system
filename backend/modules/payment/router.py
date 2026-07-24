@@ -82,10 +82,12 @@ def create_payment_order(
 
     key_id, _ = _get_razorpay_credentials()
 
+    order_amount = body.amount if (body.amount and body.amount > 0) else get_active_consultation_fee(db, "online_booking_fee", 100.0)
+
     # If a Razorpay order already exists for this appointment with same amount, return it
     existing = db.query(ConsultationPaymentModel).filter(
         ConsultationPaymentModel.appointment_id == body.appointment_id,
-        ConsultationPaymentModel.amount == body.amount,
+        ConsultationPaymentModel.amount == order_amount,
         ConsultationPaymentModel.status == "Created",
     ).first()
     if existing:
@@ -99,7 +101,7 @@ def create_payment_order(
 
     rz_client = _get_razorpay_client()
 
-    amount_paise = int(body.amount * 100)
+    amount_paise = int(order_amount * 100)
     order_data = {
         "amount": amount_paise,
         "currency": "INR",
@@ -122,7 +124,7 @@ def create_payment_order(
     payment_record = ConsultationPaymentModel(
         appointment_id=body.appointment_id,
         razorpay_order_id=rz_order["id"],
-        amount=body.amount,
+        amount=order_amount,
         currency="INR",
         status="Created",
     )

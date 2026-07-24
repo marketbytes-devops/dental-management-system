@@ -59,7 +59,6 @@ export const ROLE_NAV_ITEMS = {
     { name: "Lab Module", href: "/admin/lab-module", icon: Microscope },
     { name: "Procedures Catalog", href: "/admin/procedures", icon: ClipboardList },
     { name: "Leave Management", href: "/admin/leave", icon: Calendar },
-    { name: "Complaints", href: "/admin/complaints", icon: MessageSquare },
     { name: "Support Portal", href: "/admin/support", icon: LifeBuoy }
   ],
   doctor: [

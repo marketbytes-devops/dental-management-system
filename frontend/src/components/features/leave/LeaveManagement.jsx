@@ -60,6 +60,7 @@ export default function LeaveManagement({ role = "doctor" }) {
   // Load centralized leave request and balance hook
   const {
     requests,
+    allRequests,
     balances,
     allBalances,
     isLoaded,
@@ -229,7 +230,7 @@ export default function LeaveManagement({ role = "doctor" }) {
         )}
 
         {activeTab === "calendar" && (
-          <LeaveCalendar requests={requests} />
+          <LeaveCalendar requests={allRequests && allRequests.length > 0 ? allRequests : requests} />
         )}
 
         {activeTab === "manager" && isManagerMode && (

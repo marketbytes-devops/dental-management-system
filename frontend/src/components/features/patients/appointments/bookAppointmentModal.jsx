@@ -37,11 +37,11 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  
+
   const [doctors, setDoctors] = useState([]);
   const [doctorLeaves, setDoctorLeaves] = useState([]);
   const [doctorsLoaded, setDoctorsLoaded] = useState(false);
-  
+
   // Track if we are auto-submitting from a redirect
   const [autoSubmitting, setAutoSubmitting] = useState(!!initialData?.autoSubmit);
   const [createdApptId, setCreatedApptId] = useState(null);
@@ -125,7 +125,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
       setAutoSubmitting(false);
       return;
     }
-    
+
     setStep(3); // Go to confirm step implicitly
     setSubmitting(true);
     try {
@@ -165,9 +165,39 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
 
   const today = new Date().toISOString().split("T")[0];
 
+  const isPastTime = (time, selectedDate) => {
+    // If no date is selected, don't disable the slot
+    if (!selectedDate) return false;
+
+    // Only check past time if selected date is today
+    if (selectedDate !== today) return false;
+
+    const now = new Date();
+
+    // Example: "10:30 AM"
+    const [timePart, modifier] = time.split(" ");
+    let [hours, minutes] = timePart.split(":").map(Number);
+
+    // Convert 12-hour format to 24-hour format
+    if (modifier === "PM" && hours !== 12) {
+      hours += 12;
+    }
+
+    if (modifier === "AM" && hours === 12) {
+      hours = 0;
+    }
+
+    // Create today's slot time
+    const slotDate = new Date();
+    slotDate.setHours(hours, minutes, 0, 0);
+
+    // Return true if slot time has already passed
+    return slotDate <= now;
+  };
+
   const selectedDoctorObj = doctors.find((d) => d.name === form.doctor);
   const [timeSlots, setTimeSlots] = useState([]);
-  
+
   useEffect(() => {
     const fetchSlots = async () => {
       if (selectedDoctorObj && form.date) {
@@ -345,7 +375,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
       onClick={(e) => { if (e.target === e.currentTarget && step !== 4) onClose(); }}
     >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-        
+
         {/* Header */}
         {step !== 4 && (
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
@@ -367,8 +397,8 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
         {/* Progress Bar */}
         {step !== 4 && (
           <div className="h-1 w-full bg-gray-100 shrink-0">
-            <div 
-              className="h-full bg-primary transition-all duration-300 ease-out" 
+            <div
+              className="h-full bg-primary transition-all duration-300 ease-out"
               style={{ width: `${(step / 3) * 100}%` }}
             />
           </div>
@@ -384,25 +414,24 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                 {doctors.map((d) => {
                   const isAvailable = d.status === "Available" || d.status === "On Duty";
                   return (
-                  <button
-                    key={d.id || d.name}
-                    onClick={() => {
-                      handleChange("doctor", d.name);
-                      setErrors({});
-                    }}
-                    disabled={!isAvailable}
-                    className={`text-left p-4 rounded-xl border transition-all ${
-                      form.doctor === d.name
+                    <button
+                      key={d.id || d.name}
+                      onClick={() => {
+                        handleChange("doctor", d.name);
+                        setErrors({});
+                      }}
+                      disabled={!isAvailable}
+                      className={`text-left p-4 rounded-xl border transition-all ${form.doctor === d.name
                         ? "border-primary bg-primary/5 ring-1 ring-primary"
                         : "border-gray-200 bg-white hover:border-primary/50 hover:shadow-md"
-                    } ${!isAvailable ? "opacity-50 cursor-not-allowed" : ""}`}
-                  >
-                    <div className="font-bold text-gray-900">{d.name}</div>
-                    <div className="text-sm text-gray-600 mt-1">{d.specialty}</div>
-                    <div className="text-xs text-primary mt-2">
-                      {SPECIALTY_DESCRIPTIONS[d.specialty] || "Specialized dental care."}
-                    </div>
-                  </button>
+                        } ${!isAvailable ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      <div className="font-bold text-gray-900">{d.name}</div>
+                      <div className="text-sm text-gray-600 mt-1">{d.specialty}</div>
+                      <div className="text-xs text-primary mt-2">
+                        {SPECIALTY_DESCRIPTIONS[d.specialty] || "Specialized dental care."}
+                      </div>
+                    </button>
                   );
                 })}
               </div>
@@ -438,26 +467,28 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Select Time</label>
                   <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                    {timeSlots.length > 0 ? (
-                      timeSlots.map((slot) => (
+                    {timeSlots.map((slot) => {
+                      const pastTime = isPastTime(slot.time, form.date);
+
+                      // Disable if slot is full OR time has already passed
+                      const isDisabled = slot.is_full || pastTime;
+
+                      return (
                         <button
                           key={slot.time}
-                          disabled={slot.is_full}
+                          disabled={isDisabled}
                           onClick={() => handleChange("time", slot.time)}
-                          className={`py-2 text-sm font-semibold rounded-lg border transition-all ${
-                            slot.is_full
-                              ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                              : form.time === slot.time
-                                ? "bg-primary text-white border-primary"
-                                : "bg-white text-gray-700 border-gray-200 hover:border-primary"
-                          }`}
+                          className={`py-2 text-sm font-semibold rounded-lg border transition-all ${isDisabled
+                            ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                            : form.time === slot.time
+                              ? "bg-primary text-white border-primary"
+                              : "bg-white text-gray-700 border-gray-200 hover:border-primary"
+                            }`}
                         >
                           {slot.time}
                         </button>
-                      ))
-                    ) : (
-                      <p className="text-sm text-gray-500 col-span-2 py-2">No slots available.</p>
-                    )}
+                      );
+                    })}
                   </div>
                   {errors.time && <p className="mt-1 text-xs text-danger">{errors.time}</p>}
                 </div>

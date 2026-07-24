@@ -651,10 +651,10 @@ export const getDailyTransactions = async () => {
  * @param {number} appointmentId - The newly-created appointment ID
  * @returns {{ razorpay_order_id, amount, currency, key_id, appointment_id }}
  */
-export const createPaymentOrder = async (appointmentId) => {
+export const createPaymentOrder = async (appointmentId, amount = 100.0) => {
   const response = await client.post("/payment/create-order", {
     appointment_id: appointmentId,
-    amount: 100.0,
+    amount: amount,
   });
   return response.data;
 };

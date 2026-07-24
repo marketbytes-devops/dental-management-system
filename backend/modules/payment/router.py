@@ -2,6 +2,7 @@ import os
 import hmac
 import hashlib
 import razorpay
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -10,7 +11,8 @@ from dotenv import load_dotenv
 
 from database import get_db
 from dependencies import get_current_user
-from modules.frontdesk.models import AppointmentModel
+from modules.frontdesk.models import AppointmentModel, TransactionModel
+from modules.patient.models import PatientModel
 
 from .models import ConsultationPaymentModel, ClinicSettingModel
 from .schemas import (
@@ -256,31 +258,165 @@ def create_counter_consultation_payment(
 
 @router.get("/daily-summary")
 def get_daily_collection_summary(
+    filter_type: str = "today",
+    target_date: str = None,
+    month_str: str = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    now_utc = datetime.utcnow()
+    today_str = now_utc.strftime("%Y-%m-%d")
+    yesterday_str = (now_utc - timedelta(days=1)).strftime("%Y-%m-%d")
+    this_month_str = now_utc.strftime("%Y-%m")
+
+    # Query all DB transactions from the `transactions` table
+    db_transactions = db.query(TransactionModel).all()
     
-    # Query today's consultation payments
-    payments = db.query(ConsultationPaymentModel).all()
-    today_payments = [p for p in payments if p.created_at and p.created_at.strftime("%Y-%m-%d") == today_str and p.status == "Paid"]
-    
-    cash_total = sum(p.amount for p in today_payments if (p.payment_method or "").lower() == "cash")
-    upi_total = sum(p.amount for p in today_payments if (p.payment_method or "").lower() == "upi")
-    card_total = sum(p.amount for p in today_payments if (p.payment_method or "").lower() in ["card", "razorpay"])
+    # Query consultation payments from `consultation_payments` table
+    consultation_payments = db.query(ConsultationPaymentModel).filter(ConsultationPaymentModel.status == "Paid").all()
+
+    # Filter helper
+    def matches_filter(dt_val):
+        if not dt_val:
+            return False
+        date_fmt = dt_val.strftime("%Y-%m-%d")
+        month_fmt = dt_val.strftime("%Y-%m")
+
+        if filter_type == "yesterday":
+            return date_fmt == yesterday_str
+        elif filter_type == "this_month":
+            return month_fmt == this_month_str
+        elif filter_type == "month" and month_str:
+            return month_fmt == month_str
+        elif filter_type == "date" and target_date:
+            return date_fmt == target_date
+        elif filter_type == "all":
+            return True
+        else: # "today" default
+            return date_fmt == today_str
+
+    filtered_txns = [t for t in db_transactions if t.transaction_date and matches_filter(t.transaction_date)]
+    filtered_consultations = [c for c in consultation_payments if c.created_at and matches_filter(c.created_at)]
+
+    # Combine both sources avoiding duplicate entries by appointment_id if present in both
+    seen_appt_ids = set()
+    enriched_line_items = []
+
+    for t in filtered_txns:
+        if not t.appointment_id:
+            continue  # Only consultation charges tied to appointments
+        seen_appt_ids.add(t.appointment_id)
+        appt = db.query(AppointmentModel).filter(AppointmentModel.id == t.appointment_id).first()
+        pid = t.patient_id or (appt.patient_id if appt else None)
+        patient = db.query(PatientModel).filter(PatientModel.id == pid).first() if pid else None
+        
+        patient_name = patient.name if patient else "Patient"
+        patient_token = patient.token if patient else f"PT-{pid or t.appointment_id or 100}"
+        patient_phone = patient.phone if patient else "N/A"
+        doctor_name = appt.doctor_name if appt else "General Doctor"
+        treatment_type = appt.treatment_type if appt else "Consultation"
+
+        t_lower = (treatment_type or "").lower()
+        d_lower = (doctor_name or "").lower()
+        if t.amount == 300 or "follow" in t_lower:
+            tariff_cat = "Follow-up Checkup"
+        elif t.amount == 800 or any(kw in t_lower or kw in d_lower for kw in ["specialist", "ortho", "surgeon", "endodontist", "periodontist", "root canal", "implant"]):
+            tariff_cat = "Specialist Consultation"
+        else:
+            tariff_cat = "General Consultation"
+
+        enriched_line_items.append({
+            "id": t.id,
+            "appointment_id": t.appointment_id,
+            "patient_name": patient_name,
+            "patient_token": patient_token,
+            "patient_phone": patient_phone,
+            "doctor_name": doctor_name,
+            "treatment_type": treatment_type,
+            "tariff_category": tariff_cat,
+            "payment_method": t.payment_method or "Cash",
+            "razorpay_order_id": None,
+            "razorpay_payment_id": f"TXN-{t.id}",
+            "amount": t.amount,
+            "created_at": t.transaction_date.isoformat() if t.transaction_date else None
+        })
+
+    for c in filtered_consultations:
+        if c.appointment_id and c.appointment_id in seen_appt_ids:
+            continue  # Already captured via TransactionModel
+        
+        appt = db.query(AppointmentModel).filter(AppointmentModel.id == c.appointment_id).first() if c.appointment_id else None
+        pid = appt.patient_id if appt else None
+        patient = db.query(PatientModel).filter(PatientModel.id == pid).first() if pid else None
+
+        doctor_name = c.doctor_name or (appt.doctor_name if appt else "General Doctor")
+        treatment_type = appt.treatment_type if appt else "Consultation"
+        
+        t_lower = (treatment_type or "").lower()
+        d_lower = (doctor_name or "").lower()
+        if c.amount == 300 or "follow" in t_lower:
+            tariff_cat = "Follow-up Checkup"
+        elif c.amount == 800 or any(kw in t_lower or kw in d_lower for kw in ["specialist", "ortho", "surgeon", "endodontist", "periodontist", "root canal", "implant"]):
+            tariff_cat = "Specialist Consultation"
+        else:
+            tariff_cat = "General Consultation"
+
+        enriched_line_items.append({
+            "id": f"cp-{c.id}",
+            "appointment_id": c.appointment_id,
+            "patient_name": c.patient_name or (patient.name if patient else "Patient"),
+            "patient_token": c.patient_token or (patient.token if patient else f"PT-{c.appointment_id or 100}"),
+            "patient_phone": patient.phone if patient else "N/A",
+            "doctor_name": doctor_name,
+            "treatment_type": treatment_type,
+            "tariff_category": tariff_cat,
+            "payment_method": c.payment_method or "Online",
+            "razorpay_order_id": c.razorpay_order_id,
+            "razorpay_payment_id": c.razorpay_payment_id,
+            "amount": c.amount,
+            "created_at": c.created_at.isoformat() if c.created_at else None
+        })
+
+    cash_total = 0.0
+    upi_total = 0.0
+    card_total = 0.0
+
+    for item in enriched_line_items:
+        pm = (item["payment_method"] or "").lower()
+        amt = float(item["amount"] or 0.0)
+        
+        if any(kw in pm for kw in ["upi", "online", "razorpay", "gpay", "phonepe", "paytm"]):
+            upi_total += amt
+        elif any(kw in pm for kw in ["card", "pos", "debit", "credit"]):
+            card_total += amt
+        else:
+            # Default cash/counter classification
+            cash_total += amt
+
     grand_total = cash_total + upi_total + card_total
 
+    general_items = [item for item in enriched_line_items if item["tariff_category"] == "General Consultation"]
+    specialist_items = [item for item in enriched_line_items if item["tariff_category"] == "Specialist Consultation"]
+    followup_items = [item for item in enriched_line_items if item["tariff_category"] == "Follow-up Checkup"]
+
     return {
-        "shift_date": today_str,
-        "total_transactions": len(today_payments),
+        "filter_type": filter_type,
+        "shift_date": target_date or (yesterday_str if filter_type == "yesterday" else today_str),
+        "total_transactions": len(enriched_line_items),
         "system_cash_total": cash_total,
         "system_upi_total": upi_total,
         "system_card_total": card_total,
         "system_grand_total": grand_total,
-        "payments": today_payments
+        "general_consultation_total": sum(item["amount"] for item in general_items),
+        "specialist_consultation_total": sum(item["amount"] for item in specialist_items),
+        "followup_consultation_total": sum(item["amount"] for item in followup_items),
+        "general_count": len(general_items),
+        "specialist_count": len(specialist_items),
+        "followup_count": len(followup_items),
+        "payments": enriched_line_items
     }
 
-@router.post("/shift-handover", response_model=ShiftReconciliationResponse)
+@router.post("/shift-handover")
 def submit_shift_handover(
     body: ShiftReconciliationCreate,
     db: Session = Depends(get_db),
@@ -288,16 +424,20 @@ def submit_shift_handover(
 ):
     receptionist_name = current_user.get("name") or "Receptionist"
     user_id = current_user.get("user_id")
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    target_shift_date = body.shift_date or datetime.utcnow().strftime("%Y-%m-%d")
     
-    # Calculate totals
-    payments = db.query(ConsultationPaymentModel).all()
-    today_payments = [p for p in payments if p.created_at and p.created_at.strftime("%Y-%m-%d") == today_str and p.status == "Paid"]
-    
-    cash_total = sum(p.amount for p in today_payments if (p.payment_method or "").lower() == "cash")
-    upi_total = sum(p.amount for p in today_payments if (p.payment_method or "").lower() == "upi")
-    card_total = sum(p.amount for p in today_payments if (p.payment_method or "").lower() in ["card", "razorpay"])
-    grand_total = cash_total + upi_total + card_total
+    # Calculate exact totals for target_shift_date
+    summary = get_daily_collection_summary(
+        filter_type="date",
+        target_date=target_shift_date,
+        db=db,
+        current_user=current_user
+    )
+
+    cash_total = summary.get("system_cash_total", 0.0)
+    upi_total = summary.get("system_upi_total", 0.0)
+    card_total = summary.get("system_card_total", 0.0)
+    grand_total = summary.get("system_grand_total", 0.0)
 
     discrepancy = body.physical_cash_submitted - cash_total
     initial_status = "Reconciled" if discrepancy == 0 else "Discrepancy Flagged"
@@ -305,7 +445,7 @@ def submit_shift_handover(
     shift_record = ShiftReconciliationModel(
         receptionist_id=user_id,
         receptionist_name=receptionist_name,
-        shift_date=today_str,
+        shift_date=target_shift_date,
         system_cash_total=cash_total,
         system_upi_total=upi_total,
         system_card_total=card_total,
@@ -320,13 +460,45 @@ def submit_shift_handover(
     db.refresh(shift_record)
     return shift_record
 
-@router.get("/shift-handovers", response_model=List[ShiftReconciliationResponse])
+@router.get("/shift-handovers")
 def get_shift_handovers(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     shifts = db.query(ShiftReconciliationModel).order_by(ShiftReconciliationModel.created_at.desc()).all()
-    return shifts
+    result = []
+    all_payments = db.query(ConsultationPaymentModel).all()
+    
+    for s in shifts:
+        summary = get_daily_collection_summary(
+            filter_type="date", 
+            target_date=s.shift_date, 
+            db=db, 
+            current_user=current_user
+        )
+        enriched_p = summary.get("payments", [])
+        
+        s_dict = {
+            "id": s.id,
+            "receptionist_id": s.receptionist_id,
+            "receptionist_name": s.receptionist_name,
+            "shift_date": s.shift_date,
+            "system_cash_total": s.system_cash_total,
+            "system_upi_total": s.system_upi_total,
+            "system_card_total": s.system_card_total,
+            "system_grand_total": s.system_grand_total,
+            "physical_cash_submitted": s.physical_cash_submitted,
+            "discrepancy_amount": s.discrepancy_amount,
+            "status": s.status,
+            "accountant_notes": s.accountant_notes,
+            "accountant_name": s.accountant_name,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "reconciled_at": s.reconciled_at.isoformat() if s.reconciled_at else None,
+            "payments": enriched_p
+        }
+        result.append(s_dict)
+        
+    return result
 
 @router.put("/shift-handover/{shift_id}/reconcile", response_model=ShiftReconciliationResponse)
 def reconcile_shift_handover(

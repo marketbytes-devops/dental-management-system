@@ -219,15 +219,15 @@ export default function ProceduresPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
         <div>
-          <h1 className="text-2xl font-black text-gray-900">Procedures & Rates Catalog</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage standard procedures and base billing rates.</p>
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Procedures & Rates Catalog</h1>
+          <p className="text-sm text-gray-500 mt-1 font-medium">Manage standard procedures and base billing rates.</p>
         </div>
         <button
           onClick={() => openModal()}
-          className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all"
+          className="bg-primary text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-md shadow-primary/20 cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add Procedure
         </button>

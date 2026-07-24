@@ -51,7 +51,7 @@ export default function PrintableTokenSheet({ appointment, paymentDetails, queue
               <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900">SMILECARE DENTAL CLINIC</h1>
             </div>
             <p className="text-xs font-bold text-slate-500 mt-0.5">
-              Advanced Oral Health & Dental Surgery Centre • ISO 9001:2015 Certified
+              Advanced Oral Health & Dental Surgery Centre
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
               Ph: +91 40 2345 6789 | Email: care@smilecare.com | Web: www.smilecare.com

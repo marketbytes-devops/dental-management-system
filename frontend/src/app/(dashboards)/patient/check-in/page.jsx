@@ -225,20 +225,24 @@ export default function CheckInPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto pb-10">
-      <div className="no-print">
-        <h1 className="text-2xl font-bold text-gray-900">Clinic Self Check-In & Triage Pass</h1>
-        <p className="text-xs text-gray-500 mt-1">
-          Complete your dental screening questionnaire and consultation charge payment to receive your live doctor queue token pass.
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6 pb-10">
+        <div className="no-print flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Clinic Self Check-In & Triage Pass</h1>
+            <p className="text-sm text-gray-500 mt-1 font-medium">
+              Complete your dental screening questionnaire and consultation charge payment to receive your live doctor queue token pass.
+            </p>
+          </div>
+        </div>
 
-      <div className="no-print">
-        <CheckInStepper step={step} steps={stepsMeta} />
-      </div>
+        <div className="no-print">
+          <CheckInStepper step={step} steps={stepsMeta} />
+        </div>
 
-      <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
-        {renderStep()}
+        <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
+          {renderStep()}
+        </div>
       </div>
     </div>
   );

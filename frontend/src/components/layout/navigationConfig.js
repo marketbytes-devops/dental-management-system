@@ -100,6 +100,7 @@ export const ROLE_NAV_ITEMS = {
   ],
   accountant: [
     { name: "Dashboard", href: "/frontdesk/accountant/dashboard", icon: BarChart3 },
+    { name: "Receptionist Ledger", href: "/frontdesk/accountant/receptionist-ledger", icon: ShieldCheck },
     { name: "Billing & Payments", href: "/frontdesk/accountant/billing", icon: Receipt },
     { name: "Insurance Claims", href: "/frontdesk/accountant/claims", icon: Shield },
     { name: "Expenses & Payroll", href: "/frontdesk/accountant/expenses", icon: TrendingDown },

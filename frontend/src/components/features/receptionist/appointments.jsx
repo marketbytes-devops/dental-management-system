@@ -520,9 +520,18 @@ export default function ReceptionistAppointments() {
       )}
 
       {/* header */}
-      <div>
-        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Appointment Booking</h1>
-        <p className="text-sm text-gray-500 mt-1">Schedule visits for registered patients and review the daily schedule.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Appointment Booking</h1>
+          <p className="text-sm text-gray-500 mt-1">Schedule visits for registered patients and review the daily schedule.</p>
+        </div>
+        <a
+          href="/frontdesk/receptionist/transactions"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-sm transition"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Daily Ledger & Shift Handover
+        </a>
       </div>
 
       {/* ── booking form ── */}

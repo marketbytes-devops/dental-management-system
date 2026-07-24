@@ -58,6 +58,7 @@ class CounterConsultationPaymentCreate(BaseModel):
 class ShiftReconciliationCreate(BaseModel):
     physical_cash_submitted: float
     accountant_notes: Optional[str] = None
+    shift_date: Optional[str] = None
 
 class ShiftReconciliationReconcileRequest(BaseModel):
     status: str # Reconciled, Discrepancy Flagged

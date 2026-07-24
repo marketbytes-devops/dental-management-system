@@ -153,6 +153,18 @@ try:
             add_tp_col_if_missing("next_visit_date", "VARCHAR")
             add_tp_col_if_missing("next_visit_procedure", "VARCHAR")
 
+            # Also check billing_requests table
+            if engine.dialect.name == "sqlite":
+                br_col_query = conn.execute(text("PRAGMA table_info(billing_requests);")).fetchall()
+                existing_br_cols = [row[1] for row in br_col_query]
+            else:
+                br_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='billing_requests';")).fetchall()
+                existing_br_cols = [row[0] for row in br_col_query]
+
+            if "source_type" not in existing_br_cols:
+                conn.execute(text("ALTER TABLE billing_requests ADD COLUMN source_type VARCHAR DEFAULT 'consultation';"))
+                print("Added column source_type to billing_requests table.")
+
             print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")

@@ -114,3 +114,17 @@ class ClinicalNoteModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class MedicineDispenseModel(Base):
+    __tablename__ = "medicine_dispenses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_token = Column(String, index=True, nullable=False)
+    patient_name = Column(String, nullable=False)
+    doctor_name = Column(String, nullable=False)
+    medications = Column(JSON, nullable=False)  # list of medication objects
+    status = Column(String, default="Pending")   # Pending, Dispensed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    dispensed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+

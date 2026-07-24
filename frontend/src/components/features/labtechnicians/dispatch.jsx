@@ -55,7 +55,7 @@ export default function LabDispatch() {
 
   useEffect(() => {
     fetchShipments();
-    const interval = setInterval(fetchShipments, 5000);
+    const interval = setInterval(fetchShipments, 30000);
     return () => clearInterval(interval);
   }, []);
 

@@ -1,6 +1,6 @@
 # router.py - lab technician and doctor lab endpoints
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from database import get_db
 from dependencies import get_current_user
@@ -305,8 +305,110 @@ def get_lab_orders(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    orders = db.query(LabOrderModel).order_by(LabOrderModel.created_at.desc()).all()
+    orders = (
+        db.query(LabOrderModel)
+        .options(
+            joinedload(LabOrderModel.prosthetic_detail),
+            joinedload(LabOrderModel.pathology_detail)
+        )
+        .order_by(LabOrderModel.created_at.desc())
+        .all()
+    )
     return [serialize_order(o) for o in orders]
+
+# -------------------------------------------------------------
+# Receptionist: Lab Orders Ready for Pickup / Patient Notification
+# -------------------------------------------------------------
+@router.get("/orders/receptionist")
+def get_receptionist_lab_orders(db: Session = Depends(get_db)):
+    """
+    Returns all lab orders enriched with patient phone numbers,
+    so the receptionist can contact patients when their orders arrive.
+    Includes all statuses so receptionist can track the full pipeline.
+    """
+    orders = (
+        db.query(LabOrderModel)
+        .options(
+            joinedload(LabOrderModel.prosthetic_detail),
+            joinedload(LabOrderModel.pathology_detail)
+        )
+        .order_by(LabOrderModel.created_at.desc())
+        .all()
+    )
+    result = []
+    for order in orders:
+        # Fetch patient details to get phone number
+        patient = db.query(PatientModel).filter(PatientModel.token == order.patient_token).first()
+        patient_phone = patient.phone if patient else None
+        patient_email = patient.email if patient else None
+
+        # Determine order type description
+        order_type = order.prosthetic_type or order.order_category or "Lab Order"
+        if order.prosthetic_detail and order.prosthetic_detail.fabrication_type:
+            order_type = order.prosthetic_detail.fabrication_type
+        elif order.pathology_detail and order.pathology_detail.test_type:
+            order_type = order.pathology_detail.test_type
+
+        result.append({
+            "id": order.id,
+            "patient_token": order.patient_token,
+            "patient_name": order.patient_name or "Unknown Patient",
+            "patient_phone": patient_phone or "",
+            "patient_email": patient_email or "",
+            "order_category": order.order_category or "Lab Order",
+            "order_type": order_type,
+            "dentist_name": order.dentist_name or "",
+            "status": order.status,
+            "priority": order.priority or "Medium",
+            "notes": order.notes or "",
+            "tech_notes": order.tech_notes or "",
+            "created_at": order.created_at.isoformat() if order.created_at else None,
+            "expected_return_date": order.expected_return_date or "",
+            # Patient notification tracking
+            "patient_notified_at": getattr(order, "patient_notified_at", None),
+            "patient_notified_note": getattr(order, "patient_notified_note", None),
+        })
+    return result
+
+@router.put("/orders/{order_id}/notify")
+def notify_patient_for_lab_order(
+    order_id: str,
+    payload: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Logs that the receptionist has contacted the patient about their lab order.
+    Stores timestamp and a brief note about the contact.
+    """
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Lab order not found")
+
+    contact_note = payload.get("note", "Patient contacted by receptionist.")
+    contacted_at = datetime.utcnow().isoformat()
+
+    # Store notification info in tech_notes (reusing existing field)
+    existing_tech_notes = order.tech_notes or ""
+    notification_entry = f"\n[PATIENT NOTIFIED {contacted_at[:10]}]: {contact_note}"
+    order.tech_notes = existing_tech_notes + notification_entry
+
+    # Add audit trail
+    audit = LabAuditTrailModel(
+        order_id=order_id,
+        user_name="Receptionist",
+        action="Patient Notified",
+        note=contact_note
+    )
+    db.add(audit)
+    db.commit()
+
+    return {
+        "success": True,
+        "order_id": order_id,
+        "notified_at": contacted_at,
+        "note": contact_note
+    }
+
 
 @router.get("/orders/{order_id}", response_model=LabOrderResponse)
 def get_lab_order(

@@ -1419,7 +1419,7 @@ def save_clinical_note_route(
     )
     db.add(new_note)
 
-    # Automatically create a matching PatientPrescription record if medications list is present
+    # 1. Automatically create a matching PatientPrescription record if medications list is present
     if req.medications and len(req.medications) > 0:
         from .models import PatientPrescription
         new_rx = PatientPrescription(
@@ -1428,6 +1428,38 @@ def save_clinical_note_route(
             medications=req.medications
         )
         db.add(new_rx)
+
+    # Fetch patient name for dispensing & billing records
+    patient_obj = db.query(PatientModel).filter(PatientModel.token == req.patient_token).first()
+    patient_name = patient_obj.name if patient_obj else "Unknown Patient"
+
+    # 2. Automatically create Dispensing entry for Receptionist
+    from .models import MedicineDispenseModel
+    new_dispense = MedicineDispenseModel(
+        patient_token=req.patient_token,
+        patient_name=patient_name,
+        doctor_name=req.doctor_name,
+        medications=req.medications or [],
+        status="Pending"
+    )
+    db.add(new_dispense)
+
+    # 3. Automatically create Consultation Charge for Accountant (Always, every visit)
+    from modules.billing.models import BillingRequestModel
+    consultation_charge = BillingRequestModel(
+        patient_token=req.patient_token,
+        doctor_name=req.doctor_name,
+        total_amount=500.0,
+        status="Pending",
+        source_type="consultation",
+        procedures=[{
+            "name": "Clinical Consultation Charge",
+            "rate": 500.0,
+            "source": "consultation"
+        }],
+        notes=f"Automated consultation charge for diagnosis visit ({note_date[:10] if note_date else 'Today'})"
+    )
+    db.add(consultation_charge)
 
     db.commit()
     db.refresh(new_note)
@@ -1463,5 +1495,50 @@ def get_patient_clinical_notes_route(
         ClinicalNoteModel.patient_token == patient_token
     ).order_by(ClinicalNoteModel.created_at.desc()).all()
     return notes
+
+
+# ---------------------------------------------------------------------------
+# Medicine Dispensing Queue Endpoints (For Receptionist)
+# ---------------------------------------------------------------------------
+
+@router.get("/dispensing")
+def get_dispensing_queue(db: Session = Depends(get_db)):
+    from .models import MedicineDispenseModel
+    dispenses = db.query(MedicineDispenseModel).order_by(MedicineDispenseModel.created_at.desc()).all()
+    return [
+        {
+            "id": d.id,
+            "patient_token": d.patient_token,
+            "patient_name": d.patient_name,
+            "doctor_name": d.doctor_name,
+            "medications": d.medications or [],
+            "status": d.status,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "dispensed_at": d.dispensed_at.isoformat() if d.dispensed_at else None
+        }
+        for d in dispenses
+    ]
+
+
+@router.put("/dispensing/{dispense_id}/status")
+def update_dispense_status(dispense_id: int, payload: dict, db: Session = Depends(get_db)):
+    from .models import MedicineDispenseModel
+    dispense = db.query(MedicineDispenseModel).filter(MedicineDispenseModel.id == dispense_id).first()
+    if not dispense:
+        raise HTTPException(status_code=404, detail="Dispensing record not found")
+
+    new_status = payload.get("status", "Dispensed")
+    dispense.status = new_status
+    if new_status.lower() == "dispensed":
+        dispense.dispensed_at = datetime.datetime.now()
+
+    db.commit()
+    db.refresh(dispense)
+    return {
+        "id": dispense.id,
+        "status": dispense.status,
+        "dispensed_at": dispense.dispensed_at.isoformat() if dispense.dispensed_at else None
+    }
+
 
 

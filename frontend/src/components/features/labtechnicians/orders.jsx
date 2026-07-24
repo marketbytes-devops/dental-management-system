@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   ClipboardList, 
   Hourglass, 
@@ -98,7 +98,7 @@ export default function LabOrders() {
   useEffect(() => {
     fetchOrders();
     fetchVendors();
-    const interval = setInterval(fetchOrders, 5000);
+    const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
   }, []);
   
@@ -414,7 +414,7 @@ export default function LabOrders() {
     setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
   };
 
-  const dentists = Array.from(new Set(orders.map((o) => o.dentistName)));
+  const dentists = useMemo(() => Array.from(new Set(orders.map((o) => o.dentistName))), [orders]);
 
   useEffect(() => {
     let result = [...orders];
@@ -469,26 +469,28 @@ export default function LabOrders() {
     setFilteredOrders(result);
   }, [orders, searchQuery, statusFilter, priorityFilter, dentistFilter, dateFilter, activeCategory]);
 
-  const categoryFiltered = orders.filter((o) =>
-    activeCategory === "Dental Prosthetics"
-      ? o.orderCategory === "Prosthetic"
-      : o.orderCategory !== "Prosthetic"
-  );
+  const categoryFiltered = useMemo(() => {
+    return orders.filter((o) =>
+      activeCategory === "Dental Prosthetics"
+        ? o.orderCategory === "Prosthetic"
+        : o.orderCategory !== "Prosthetic"
+    );
+  }, [orders, activeCategory]);
 
-  const totalCases = categoryFiltered.filter((o) => o.status !== "completed" && o.status !== "Completed").length;
-  const pendingCases = categoryFiltered.filter((o) => 
+  const totalCases = useMemo(() => categoryFiltered.filter((o) => o.status !== "completed" && o.status !== "Completed").length, [categoryFiltered]);
+  const pendingCases = useMemo(() => categoryFiltered.filter((o) => 
     ["submitted", "Submitted", "Pending", "Flagged", "flagged", "ordered", "Ordered"].includes(o.status)
-  ).length;
-  const inProductionCases = categoryFiltered.filter((o) => {
+  ).length, [categoryFiltered]);
+  const inProductionCases = useMemo(() => categoryFiltered.filter((o) => {
     if (activeCategory === "Dental Prosthetics") {
       return ["received_by_lab", "in_design", "in_fabrication", "quality_check", "Accepted", "In Progress", "Confirmed", "Sent to Lab", "Received from Lab", "Fitted"].includes(o.status);
     } else {
       return ["Sample Collected", "Sent to Lab", "Report Received", "Reviewed by Doctor"].includes(o.status);
     }
-  }).length;
-  const urgentHighCases = categoryFiltered.filter((o) => 
+  }).length, [categoryFiltered, activeCategory]);
+  const urgentHighCases = useMemo(() => categoryFiltered.filter((o) => 
     ["Urgent", "High"].includes(o.priority) && o.status !== "completed" && o.status !== "Completed"
-  ).length;
+  ).length, [categoryFiltered]);
 
   const getPriorityStyle = (priority) => {
     switch (priority) {
@@ -1949,24 +1951,42 @@ export default function LabOrders() {
                   </div>
 
                   {/* Close and Return for Correction buttons */}
-                  <div className="flex gap-3 pt-2">
+                  <div className="flex flex-col gap-2 pt-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsDispatchModalOpen(false);
-                        handleOpenReworkModal(dispatchOrder);
+                      onClick={async () => {
+                        const ok = await updateDbStatus(dispatchOrder.id, "Ready for Pickup");
+                        if (ok) {
+                          triggerToast(`Order #${dispatchOrder.id} marked Ready for Pickup! Receptionist informed.`);
+                          setIsDispatchModalOpen(false);
+                          fetchOrders();
+                        } else {
+                          triggerToast("Failed to update order status.", "error");
+                        }
                       }}
-                      className="flex-1 py-2.5 text-sm font-semibold text-danger bg-danger/10 hover:bg-danger hover:text-white border border-danger/20 rounded-xl transition-colors cursor-pointer text-center"
+                      className="w-full py-2.5 text-xs font-black text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-all shadow-sm cursor-pointer text-center flex items-center justify-center gap-1.5"
                     >
-                      Return for Correction
+                      <CheckCircle className="w-4 h-4" /> Inform Receptionist (Order Ready for Patient Pickup)
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsDispatchModalOpen(false)}
-                      className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-center"
-                    >
-                      Close
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDispatchModalOpen(false);
+                          handleOpenReworkModal(dispatchOrder);
+                        }}
+                        className="flex-1 py-2 text-xs font-semibold text-danger bg-danger/10 hover:bg-danger hover:text-white border border-danger/20 rounded-xl transition-colors cursor-pointer text-center"
+                      >
+                        Return for Correction
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsDispatchModalOpen(false)}
+                        className="flex-1 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-center"
+                      >
+                        Close
+                      </button>
+                    </div>
                   </div>
                 </>
               )}

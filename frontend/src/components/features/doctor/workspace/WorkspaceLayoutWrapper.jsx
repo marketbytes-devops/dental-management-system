@@ -895,8 +895,24 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
         )}
 
         {activeKpiSection === "plan" && (
-          <div className="space-y-6 animate-scale-up">
-            {/* Treatment Plan steps manager */}
+          <div className="space-y-4 animate-scale-up">
+            {/* Treatment Plan Header with Add Button */}
+            <div className="flex justify-between items-center bg-white p-4 border border-gray-150 rounded-2xl shadow-xs">
+              <div>
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4 text-primary shrink-0" /> Treatment Plan
+                </h3>
+                <p className="text-[10px] text-gray-400 font-medium mt-0.5">Manage and track multi-step treatment plans for this patient.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push(`/doctor/treatment-plan/${encodeURIComponent(viewingPatient.token)}`)}
+                className="px-4 py-2 bg-primary hover:bg-primary/95 text-white text-xs font-extrabold rounded-xl transition-all shadow-sm cursor-pointer outline-none border-none"
+              >
+                + New Treatment Plan
+              </button>
+            </div>
+            {/* Treatment Plan steps manager summary */}
             <TreatmentPlanManager patientToken={viewingPatient.token} />
           </div>
         )}

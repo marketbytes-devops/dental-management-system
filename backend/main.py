@@ -16,6 +16,7 @@ from modules.doctor.router import router as doctor_router
 from modules.procedures.router import router as procedures_router
 from modules.billing.router import router as billing_router
 from modules.payment.router import router as payment_router
+from modules.complaint.router import router as complaint_router
 
 
 
@@ -34,9 +35,19 @@ from modules.treatment_plan.models import TreatmentPlanModel, TreatmentPlanStepM
 from modules.procedures.models import ProcedureModel
 from modules.billing.models import BillingRequestModel
 from modules.payment.models import ConsultationPaymentModel, ClinicSettingModel
+from modules.complaint.models import ComplaintModel, ComplaintLogModel
 from modules.auth.service import hash_password
 
 
+
+# Drop and recreate complaint tables to fix column type issues (safe — new tables, no data)
+try:
+    from sqlalchemy import text as _text
+    with engine.begin() as _conn:
+        _conn.execute(_text("DROP TABLE IF EXISTS complaint_logs CASCADE;"))
+        _conn.execute(_text("DROP TABLE IF EXISTS complaints CASCADE;"))
+except Exception as _e:
+    print(f"Warning: Could not drop complaint tables: {_e}")
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -298,6 +309,7 @@ app.include_router(doctor_router)
 app.include_router(procedures_router)
 app.include_router(billing_router)
 app.include_router(payment_router)
+app.include_router(complaint_router)
 
 
 

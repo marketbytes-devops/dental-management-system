@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
+    getMyComplaints,
+    getComplaintLogs,
+    submitComplaint,
+    reopenComplaint,
+} from "@/services/api";
+
+import {
     Bug,
     Zap,
     LayoutGrid,
@@ -29,12 +36,6 @@ import {
     CornerDownRight,
     ArrowUpRight
 } from "lucide-react";
-import {
-    getMyComplaints,
-    submitComplaint,
-    reopenComplaint,
-    getComplaintLogs,
-} from "@/services/api";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

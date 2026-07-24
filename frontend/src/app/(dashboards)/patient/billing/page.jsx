@@ -47,7 +47,7 @@ export default function PatientBillingPage() {
         }
         const insurancePaid = Math.round(gross * 0.7); // 70% insurance coverage
         const patientDue = gross - insurancePaid;
-        const status = appt.status === "Completed" ? "Paid" : "Pending";
+        const status = appt.payment_status === "Paid" ? "Paid" : "Pending";
         
         return {
           id: appt.id,

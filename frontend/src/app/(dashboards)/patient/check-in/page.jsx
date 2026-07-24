@@ -4,16 +4,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import TodaysAppointmentBanner from "@/components/features/patients/check-in/todaysAppointmentBanner";
 import CheckInSymptomForm from "@/components/features/patients/check-in/checkInSymptomForm";
-import FrontDeskVerification from "@/components/features/patients/check-in/frontDeskVerification";
-import PatientOtpEntry from "@/components/features/patients/check-in/patientOtpEntry";
+import ConsultationPaymentStep from "@/components/features/patients/check-in/consultationPaymentStep";
+import PrintableTokenSheet from "@/components/features/patients/check-in/printableTokenSheet";
 import CheckInStepper from "@/components/features/patients/check-in/checkInStepper";
-import CheckInConfirmation from "@/components/features/patients/check-in/checkInConfirmation";
 import client from "@/services/api";
 
 export default function CheckInPage() {
-  const [step, setStep] = useState(1); // Steps: 1=Select, 2=Symptoms, 3=Wait for OTP, 4=Enter OTP, 5=Confirmation
+  const [step, setStep] = useState(1); // 1=Select, 2=Screening Questionnaire, 3=Consultation Payment, 4=Printable Medical Pass
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [symptomData, setSymptomData] = useState(null);
+  const [paymentDetails, setPaymentDetails] = useState(null);
+  const [patientProfile, setPatientProfile] = useState(null);
   const [patientId, setPatientId] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +35,7 @@ export default function CheckInPage() {
       try {
         const profileRes = await client.get("/patient/profile");
         const profileData = profileRes.data;
+        setPatientProfile(profileData);
         const pId = profileData.id;
         setPatientId(pId);
         
@@ -47,39 +49,6 @@ export default function CheckInPage() {
     }
     initCheckIn();
   }, []);
-
-  // Poll for status updates when in Step 3 (Waiting for OTP send or bypass)
-  useEffect(() => {
-    let intervalId;
-    if (step === 3 && selectedAppt && patientId) {
-      const pollStatus = async () => {
-        try {
-          const appts = await fetchAppointments(patientId);
-          const updated = appts.find(a => a.id === selectedAppt.id);
-          if (updated) {
-            setSelectedAppt(updated);
-            if (updated.status === "Waiting") {
-              // Receptionist bypassed OTP check, go straight to confirmation
-              await fetchQueueDetails(updated.id);
-              setStep(5);
-            } else if (updated.otp_status === "Sent") {
-              // Receptionist sent OTP code, advance to entering screen
-              setStep(4);
-            }
-          }
-        } catch (err) {
-          console.error("Polling status error:", err);
-        }
-      };
-      
-      // Poll every 3 seconds
-      intervalId = setInterval(pollStatus, 3000);
-    }
-    
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [step, selectedAppt?.id, patientId]);
 
   const fetchAppointments = async (pId) => {
     try {
@@ -98,8 +67,8 @@ export default function CheckInPage() {
           doctor: appt.doctor_name,
           treatment: appt.treatment_type,
           status: appt.status,
+          payment_status: appt.payment_status,
           otp_status: appt.otp_status,
-          otp: appt.otp,
           wait_time_estimate: appt.wait_time_estimate,
           symptoms: appt.symptoms,
           priority: appt.priority
@@ -108,21 +77,12 @@ export default function CheckInPage() {
       setAppointments(formatted);
 
       // Check if there is an active check-in flow already in progress
-      const activeAppt = formatted.find(appt => ["Pending OTP", "Waiting"].includes(appt.status));
+      const activeAppt = formatted.find(appt => ["Waiting"].includes(appt.status));
       if (activeAppt && !selectedAppt) {
         setSelectedAppt(activeAppt);
         setSymptomData({ isEmergency: activeAppt.priority === "Emergency" });
-        
-        if (activeAppt.status === "Pending OTP") {
-          if (activeAppt.otp_status === "Sent") {
-            setStep(4);
-          } else {
-            setStep(3);
-          }
-        } else if (activeAppt.status === "Waiting") {
-          await fetchQueueDetails(activeAppt.id);
-          setStep(5);
-        }
+        await fetchQueueDetails(activeAppt.id);
+        setStep(4);
       }
       return formatted;
     } catch (err) {
@@ -138,18 +98,19 @@ export default function CheckInPage() {
       
       const currentAppt = queueData.find(q => q.id === apptId);
       if (currentAppt) {
-        // Only count position against patients waiting for the same doctor
         const doctorQueue = queueData.filter(q => q.doctor_name === currentAppt.doctor_name);
         const index = doctorQueue.findIndex(q => q.id === apptId);
         
-        setQueueNo(index + 1);
+        setQueueNo(index >= 0 ? index + 1 : 1);
         setWaitTime(currentAppt.wait_time_estimate);
       } else {
-        setQueueNo(null);
-        setWaitTime(null);
+        setQueueNo(1);
+        setWaitTime(0);
       }
     } catch (err) {
       console.error("Error fetching queue details:", err);
+      setQueueNo(1);
+      setWaitTime(0);
     }
   };
 
@@ -158,100 +119,16 @@ export default function CheckInPage() {
     setStep(2);
   };
 
-  const handleSymptomSubmit = async (data) => {
+  const handleSymptomSubmit = (data) => {
     setSymptomData(data);
-    
-    // Package symptom details for the backend
-    const symptomString = [
-      `Reason: ${data.primaryReason}`,
-      `Pain: ${data.painLevel}/10`,
-      data.symptoms.length > 0 ? `Symptoms: ${data.symptoms.join(", ")}` : "",
-      data.additionalNotes ? `Notes: ${data.additionalNotes}` : ""
-    ].filter(Boolean).join(" | ");
-
-    try {
-      const res = await client.post(`/frontdesk/appointments/${selectedAppt.id}/checkin`, {
-        symptoms: symptomString,
-        is_emergency: data.isEmergency
-      });
-      
-      const updatedAppt = res.data;
-      setSelectedAppt({
-        id: updatedAppt.id,
-        date: updatedAppt.appointment_date,
-        time: updatedAppt.appointment_time,
-        doctor: updatedAppt.doctor_name,
-        treatment: updatedAppt.treatment_type,
-        status: updatedAppt.status,
-        otp_status: updatedAppt.otp_status,
-        otp: updatedAppt.otp,
-        wait_time_estimate: updatedAppt.wait_time_estimate,
-        symptoms: updatedAppt.symptoms,
-        priority: updatedAppt.priority
-      });
-      
-      if (updatedAppt.status === "Waiting") {
-        await fetchQueueDetails(updatedAppt.id);
-        setStep(5);
-      } else {
-        setStep(3);
-      }
-    } catch (err) {
-      alert(err.message || "Failed to submit check-in request. Please try again.");
-    }
+    setStep(3);
   };
 
-  const handleOtpSentSimulated = async () => {
-    try {
-      // Simulate receptionist clicking 'Send OTP' from patient's side
-      const res = await client.post(`/frontdesk/appointments/${selectedAppt.id}/send-otp`);
-      const updatedAppt = res.data;
-      setSelectedAppt({
-        id: updatedAppt.id,
-        date: updatedAppt.appointment_date,
-        time: updatedAppt.appointment_time,
-        doctor: updatedAppt.doctor_name,
-        treatment: updatedAppt.treatment_type,
-        status: updatedAppt.status,
-        otp_status: updatedAppt.otp_status,
-        otp: updatedAppt.otp,
-        wait_time_estimate: updatedAppt.wait_time_estimate,
-        symptoms: updatedAppt.symptoms,
-        priority: updatedAppt.priority
-      });
-      setStep(4);
-    } catch (err) {
-      console.error("Failed to simulate OTP send:", err);
-      setStep(4);
-    }
-  };
-
-  const handleOtpVerify = async (enteredOtp) => {
-    try {
-      const res = await client.post(`/frontdesk/appointments/${selectedAppt.id}/verify-otp`, {
-        otp: enteredOtp
-      });
-      
-      const updatedAppt = res.data;
-      setSelectedAppt({
-        id: updatedAppt.id,
-        date: updatedAppt.appointment_date,
-        time: updatedAppt.appointment_time,
-        doctor: updatedAppt.doctor_name,
-        treatment: updatedAppt.treatment_type,
-        status: updatedAppt.status,
-        otp_status: updatedAppt.otp_status,
-        otp: updatedAppt.otp,
-        wait_time_estimate: updatedAppt.wait_time_estimate,
-        symptoms: updatedAppt.symptoms,
-        priority: updatedAppt.priority
-      });
-      
-      await fetchQueueDetails(updatedAppt.id);
-      setStep(5);
-    } catch (err) {
-      throw new Error(err.message || "Failed to verify OTP.");
-    }
+  const handlePaymentSuccess = async ({ appointment: updatedAppt, paymentDetails: payData }) => {
+    setSelectedAppt(updatedAppt);
+    setPaymentDetails(payData);
+    await fetchQueueDetails(updatedAppt.id);
+    setStep(4);
   };
 
   const handleBack = () => {
@@ -264,7 +141,8 @@ export default function CheckInPage() {
         return (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Select an Appointment</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Select Today's Appointment</h3>
+              <p className="text-xs text-gray-500">Choose your scheduled visit to begin online screening and check-in.</p>
             </div>
             {appointments.length > 0 ? (
               appointments.map((appt) => (
@@ -275,8 +153,11 @@ export default function CheckInPage() {
                 />
               ))
             ) : (
-              <div className="text-center py-8 text-gray-400 font-bold">
-                No eligible appointments scheduled for today.
+              <div className="text-center py-10 bg-gray-50 rounded-2xl border border-gray-150">
+                <p className="text-sm font-bold text-gray-700">No eligible appointments scheduled for today.</p>
+                <Link href="/patient/appointments" className="mt-2 inline-block text-xs font-bold text-primary hover:underline">
+                  Book an appointment now →
+                </Link>
               </div>
             )}
           </div>
@@ -290,26 +171,22 @@ export default function CheckInPage() {
         );
       case 3:
         return (
-          <FrontDeskVerification
-            isEmergency={symptomData?.isEmergency}
-            onOtpSent={handleOtpSentSimulated}
+          <ConsultationPaymentStep
+            appointment={selectedAppt}
+            symptomData={symptomData}
+            onPaymentSuccess={handlePaymentSuccess}
             onBack={handleBack}
           />
         );
       case 4:
         return (
-          <PatientOtpEntry
-            onVerify={handleOtpVerify}
-            onBack={handleBack}
-          />
-        );
-      case 5:
-        return (
-          <CheckInConfirmation 
-            appointment={selectedAppt} 
-            isEmergency={symptomData?.isEmergency} 
+          <PrintableTokenSheet
+            appointment={selectedAppt}
+            paymentDetails={paymentDetails}
             queueNo={queueNo}
             waitTime={waitTime}
+            isEmergency={symptomData?.isEmergency}
+            patientProfile={patientProfile}
           />
         );
       default:
@@ -318,11 +195,10 @@ export default function CheckInPage() {
   };
 
   const stepsMeta = [
-    { number: 1, label: "Select" },
-    { number: 2, label: "Symptoms" },
-    { number: 3, label: "Wait" },
-    { number: 4, label: "Verify OTP" },
-    { number: 5, label: "Confirmed" },
+    { number: 1, label: "Select Appt" },
+    { number: 2, label: "Screening" },
+    { number: 3, label: "Consultation Payment" },
+    { number: 4, label: "Medical Pass" },
   ];
 
   if (loading) {
@@ -350,14 +226,16 @@ export default function CheckInPage() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-10">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Clinic Self Check-In</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Check in on your phone when arriving at the clinic to notify staff.
+      <div className="no-print">
+        <h1 className="text-2xl font-bold text-gray-900">Clinic Self Check-In & Triage Pass</h1>
+        <p className="text-xs text-gray-500 mt-1">
+          Complete your dental screening questionnaire and consultation charge payment to receive your live doctor queue token pass.
         </p>
       </div>
 
-      <CheckInStepper step={step} steps={stepsMeta} />
+      <div className="no-print">
+        <CheckInStepper step={step} steps={stepsMeta} />
+      </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 p-8 shadow-sm">
         {renderStep()}
@@ -365,3 +243,4 @@ export default function CheckInPage() {
     </div>
   );
 }
+

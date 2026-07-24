@@ -10,8 +10,10 @@ import {
   getFrontdeskDoctors, 
   updateAppointmentStatus, 
   createAppointment, 
-  payConsultation 
+  payConsultation,
+  getQueue
 } from "@/services/api";
+import PrintableTokenSheet from "@/components/features/patients/check-in/printableTokenSheet";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const STATUS_STYLES = {
@@ -404,15 +406,47 @@ export default function ReceptionistAppointments() {
     }
   };
 
+  const [counterPrintModal, setCounterPrintModal] = useState({ isOpen: false, appointment: null, paymentDetails: null, queueNo: 1, waitTime: 0 });
+
   const handlePayConsultationClick = (id, name) => {
     setPaymentModal({ isOpen: true, id, name });
   };
 
   const handlePayConsultationConfirm = async (method, amount) => {
     try {
-      await payConsultation(paymentModal.id, { amount: amount || 500.0, payment_method: method });
-      alert(`Payment of ₹${amount} collected via ${method}! ${paymentModal.name} has been added to the queue.`);
+      const updatedAppt = await payConsultation(paymentModal.id, { amount: amount || 500.0, payment_method: method });
+      
+      let qNo = 1;
+      let wTime = 0;
+      try {
+        const queueData = await getQueue();
+        const cur = queueData.find(q => q.id === paymentModal.id);
+        if (cur) {
+          const docQueue = queueData.filter(q => q.doctor_name === cur.doctor_name);
+          const idx = docQueue.findIndex(q => q.id === paymentModal.id);
+          qNo = idx >= 0 ? idx + 1 : 1;
+          wTime = cur.wait_time_estimate || 0;
+        }
+      } catch (qErr) {
+        console.warn("Queue notice:", qErr);
+      }
+
       setPaymentModal({ isOpen: false, id: null, name: "" });
+
+      // Open Medical Pass print modal for receptionist
+      setCounterPrintModal({
+        isOpen: true,
+        appointment: updatedAppt,
+        paymentDetails: {
+          amount: amount || 500.0,
+          category: "Consultation Fee",
+          method: method,
+          transactionId: `TXN-${Date.now().toString().slice(-6)}`
+        },
+        queueNo: qNo,
+        waitTime: wTime
+      });
+
       fetchData();
     } catch (err) {
       alert(err.message || "Payment failed.");
@@ -456,6 +490,34 @@ export default function ReceptionistAppointments() {
         onConfirm={handlePayConsultationConfirm}
         patientName={paymentModal.name}
       />
+
+      {/* Counter Medical Pass Print Modal */}
+      {counterPrintModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center no-print border-b pb-3">
+              <h3 className="text-lg font-extrabold text-gray-900">Counter Medical Case Pass Issued</h3>
+              <button
+                onClick={() => setCounterPrintModal({ isOpen: false, appointment: null, paymentDetails: null, queueNo: 1, waitTime: 0 })}
+                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition"
+              >
+                Close
+              </button>
+            </div>
+            <PrintableTokenSheet
+              appointment={counterPrintModal.appointment}
+              paymentDetails={counterPrintModal.paymentDetails}
+              queueNo={counterPrintModal.queueNo}
+              waitTime={counterPrintModal.waitTime}
+              isEmergency={counterPrintModal.appointment?.priority === "Emergency"}
+              patientProfile={{
+                name: counterPrintModal.appointment?.patient?.name || counterPrintModal.appointment?.patient_name || "Patient",
+                phone: counterPrintModal.appointment?.patient?.phone
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* header */}
       <div>

@@ -31,7 +31,8 @@ from .service import (
     direct_checkin_bypass,
     update_appointment_status,
     process_consultation_payment,
-    get_daily_transactions
+    get_daily_transactions,
+    auto_mark_missed_appointments
 )
 from dependencies import get_current_user
 
@@ -59,6 +60,7 @@ def schedule_appointment(appt_in: AppointmentCreate, db: Session = Depends(get_d
 
 @router.get("/appointments/today", response_model=List[AppointmentResponse])
 def get_todays_appointments(db: Session = Depends(get_db)):
+    auto_mark_missed_appointments(db)
     appointments = get_today_appointments(db)
     for appt in appointments:
         appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
@@ -66,6 +68,7 @@ def get_todays_appointments(db: Session = Depends(get_db)):
 
 @router.get("/appointments/tomorrow", response_model=List[AppointmentResponse])
 def get_tomorrows_appointments(db: Session = Depends(get_db)):
+    auto_mark_missed_appointments(db)
     appointments = get_tomorrow_appointments(db)
     
     for appt in appointments:
@@ -77,6 +80,7 @@ def get_tomorrows_appointments(db: Session = Depends(get_db)):
 
 @router.get("/appointments/patient/{patient_id}", response_model=List[AppointmentResponse])
 def get_patient_appointments_route(patient_id: int, db: Session = Depends(get_db)):
+    auto_mark_missed_appointments(db)
     appointments = get_patient_appointments(db, patient_id)
     for appt in appointments:
         appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
@@ -85,10 +89,17 @@ def get_patient_appointments_route(patient_id: int, db: Session = Depends(get_db
 
 @router.get("/appointments", response_model=List[AppointmentResponse])
 def get_all_appointments(db: Session = Depends(get_db)):
+    auto_mark_missed_appointments(db)
     appointments = db.query(AppointmentModel).order_by(AppointmentModel.appointment_date.desc()).all()
     for appt in appointments:
         appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
     return appointments
+
+@router.post("/appointments/{id}/mark-missed", response_model=AppointmentResponse)
+def mark_appointment_missed_route(id: int, db: Session = Depends(get_db)):
+    appt = update_appointment_status(db, appt_id=id, status_str="Missed")
+    appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    return appt
 
 
 @router.get("/records")

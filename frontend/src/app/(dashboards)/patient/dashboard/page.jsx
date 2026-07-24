@@ -6,13 +6,14 @@ import LastVisitSummaryCard from "@/components/features/patients/dashboard/lastV
 import HealthScoreCard from "@/components/features/patients/dashboard/HealthScoreCard";
 import { Calendar, CreditCard, CheckSquare, Clock, Pill, X, AlertCircle, Award, CheckCircle } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
-import { getPatientProfile, getPatientAppointments, getOralHealthDetails, getPatientPrescriptions } from "@/services/api";
+import { getPatientProfile, getPatientAppointments, getOralHealthDetails, getPatientPrescriptions, getSignedConsents } from "@/services/api";
 
 export default function PatientDashboardPage() {
   const [profile, setProfile] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [oralHealthDetails, setOralHealthDetails] = useState(null);
   const [prescriptions, setPrescriptions] = useState([]);
+  const [signedConsents, setSignedConsents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -53,6 +54,14 @@ export default function PatientDashboardPage() {
           setPrescriptions(rxData);
         } catch (rxErr) {
           console.error("Failed to load prescriptions:", rxErr);
+        }
+
+        // Fetch signed consents
+        try {
+          const consentData = await getSignedConsents();
+          setSignedConsents(consentData);
+        } catch (consentErr) {
+          console.error("Failed to load consents:", consentErr);
         }
 
       } catch (err) {
@@ -108,6 +117,7 @@ export default function PatientDashboardPage() {
   const confirmedAppointments = appointments.filter(a => a.status === "Confirmed" || a.status === "Pending" || a.status === "Pending OTP" || a.status === "Waiting");
   const nextAppointment = confirmedAppointments[0];
   const completedAppointments = appointments.filter(a => a.status === "Completed");
+  const missedAppointments = appointments.filter(a => a.status === "Missed");
   const lastVisit = completedAppointments[0];
 
   // Match medications for last visit
@@ -125,6 +135,29 @@ export default function PatientDashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">My Dashboard</h1>
       </div>
+
+      {/* Missed Appointment Alert Banner */}
+      {missedAppointments.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-sm">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-amber-950">You have {missedAppointments.length} Missed Appointment(s)</h4>
+              <p className="text-xs text-amber-800 mt-0.5">
+                {missedAppointments[0].treatment} with {missedAppointments[0].doctor} on {missedAppointments[0].date} was missed.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/patient/appointments"
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all shrink-0"
+          >
+            Reschedule Visit →
+          </Link>
+        </div>
+      )}
 
       {/* Row 1 — KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -220,27 +253,93 @@ export default function PatientDashboardPage() {
         {/* Recent Activity */}
         <div className="xl:col-span-2 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
-            <Link href="/patient/records" className="text-sm text-primary font-medium hover:underline">View All</Link>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Recent Activity & Timeline</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Comprehensive audit trail of your visits, prescriptions, consents & bookings</p>
+            </div>
+            <Link href="/patient/records" className="text-xs font-bold text-primary hover:underline bg-primary/5 px-3 py-1.5 rounded-xl border border-primary/10 transition-all">
+              View Records →
+            </Link>
           </div>
-          <div className="space-y-4">
-            {completedAppointments.slice(0, 3).map(appt => (
-              <div key={appt.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-lg">
-                  <ToothIcon className="w-5 h-5 text-primary" strokeWidth={2} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">Visit Completed</p>
-                  <p className="text-xs text-gray-500">{appt.treatment} by {appt.doctor}</p>
-                </div>
-                <span className="text-xs text-gray-400">{appt.date}</span>
-              </div>
-            ))}
 
-            {completedAppointments.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-6">No recent completed visits.</p>
-            )}
-          </div>
+          {(() => {
+            const recentActivities = [
+              ...appointments.map(a => ({
+                id: `appt-${a.id}`,
+                type: a.status === "Completed" ? "Completed Visit" : a.status === "Missed" ? "Missed Visit" : "Appointment Scheduled",
+                title: a.status === "Completed" ? "Visit Completed" : a.status === "Missed" ? "Missed Appointment" : `Appointment (${a.status})`,
+                detail: `${a.treatment || "Consultation"} with ${a.doctor}`,
+                date: a.date,
+                time: a.time,
+                category: "appointment",
+                status: a.status,
+                rawDate: new Date(`${a.date}T${a.time ? a.time.replace(/[^0-9:]/g, '') : "00:00"}`).getTime() || 0
+              })),
+              ...prescriptions.map(rx => ({
+                id: `rx-${rx.id}`,
+                type: "Prescription Issued",
+                title: "Prescription Issued",
+                detail: `Prescribed ${rx.medications ? rx.medications.length : 0} medication(s) by ${rx.doctor_name || "Doctor"}`,
+                date: rx.created_at ? new Date(rx.created_at).toISOString().split("T")[0] : "N/A",
+                time: rx.created_at ? new Date(rx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
+                category: "prescription",
+                status: "Active",
+                rawDate: rx.created_at ? new Date(rx.created_at).getTime() : 0
+              })),
+              ...signedConsents.map(c => ({
+                id: `consent-${c.id}`,
+                type: "Consent Form Signed",
+                title: "Consent Form Signed",
+                detail: `${c.procedure_name || c.title || "Procedure Consent"} — Approved for ${c.doctor_name || "Doctor"}`,
+                date: c.signed_at ? new Date(c.signed_at).toISOString().split("T")[0] : (c.created_at ? new Date(c.created_at).toISOString().split("T")[0] : "N/A"),
+                time: c.signed_at ? new Date(c.signed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
+                category: "consent",
+                status: "SIGNED",
+                rawDate: c.signed_at ? new Date(c.signed_at).getTime() : (c.created_at ? new Date(c.created_at).getTime() : 0)
+              }))
+            ].sort((a, b) => b.rawDate - a.rawDate);
+
+            if (recentActivities.length === 0) {
+              return <p className="text-sm text-gray-400 text-center py-8">No recent patient activity recorded.</p>;
+            }
+
+            return (
+              <div className="space-y-3">
+                {recentActivities.slice(0, 5).map(act => {
+                  const isCompleted = act.status === "Completed";
+                  const isMissed = act.status === "Missed";
+                  const isPrescription = act.category === "prescription";
+                  const isConsent = act.category === "consent";
+
+                  return (
+                    <div key={act.id} className="flex items-start gap-4 p-3.5 hover:bg-slate-50/80 rounded-2xl border border-gray-100 transition-all">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base shrink-0 ${
+                        isCompleted ? "bg-emerald-50 text-emerald-600 border border-emerald-150" :
+                        isMissed ? "bg-amber-50 text-amber-600 border border-amber-150" :
+                        isPrescription ? "bg-purple-50 text-purple-600 border border-purple-150" :
+                        isConsent ? "bg-indigo-50 text-indigo-600 border border-indigo-150" :
+                        "bg-blue-50 text-blue-600 border border-blue-150"
+                      }`}>
+                        {isCompleted && <ToothIcon className="w-5 h-5 text-emerald-600" />}
+                        {isMissed && <AlertCircle className="w-5 h-5 text-amber-600" />}
+                        {isPrescription && <Pill className="w-5 h-5 text-purple-600" />}
+                        {isConsent && <CheckCircle className="w-5 h-5 text-indigo-600" />}
+                        {!isCompleted && !isMissed && !isPrescription && !isConsent && <Calendar className="w-5 h-5 text-blue-600" />}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-sm font-bold text-gray-900 truncate">{act.title}</h4>
+                          <span className="text-[11px] font-semibold text-gray-400 shrink-0">{act.date} {act.time ? `• ${act.time}` : ""}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 font-medium mt-0.5 truncate">{act.detail}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
       </div>

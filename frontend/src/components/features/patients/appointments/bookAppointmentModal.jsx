@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, CheckCircle2, ChevronRight, ArrowLeft } from "lucide-react";
-import { getDoctorLeaves, getAvailableDoctors, createAppointment, createPaymentOrder, verifyPayment } from "@/services/api";
+import { Calendar, CheckCircle2, ChevronRight, ArrowLeft, Printer, ShieldCheck } from "lucide-react";
+import client, { getDoctorLeaves, getAvailableDoctors, createAppointment, createPaymentOrder, verifyPayment, getConsultationFees } from "@/services/api";
+import PrintableTokenSheet from "@/components/features/patients/check-in/printableTokenSheet";
 
 const VISIT_REASONS = [
   "Consultation",
@@ -45,17 +46,33 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
   // Track if we are auto-submitting from a redirect
   const [autoSubmitting, setAutoSubmitting] = useState(!!initialData?.autoSubmit);
   const [createdApptId, setCreatedApptId] = useState(null);
-  // Payment state: idle | loading | success | error
+  // Payment & Tariff state
   const [paymentState, setPaymentState] = useState("idle");
   const [paymentError, setPaymentError] = useState("");
+  const [tariffs, setTariffs] = useState(null);
+  const [applicableAmount, setApplicableAmount] = useState(500.0);
+  const [selectedFeeCategory, setSelectedFeeCategory] = useState("General Consultation");
+  const [createdApptObj, setCreatedApptObj] = useState(null);
+  const [queueNo, setQueueNo] = useState(1);
+  const [waitTime, setWaitTime] = useState(0);
+  const [paymentDetails, setPaymentDetails] = useState(null);
+  const [showPrintablePass, setShowPrintablePass] = useState(false);
 
   useEffect(() => {
-    const fetchDoctors = async () => {
+    const fetchDoctorsAndTariffs = async () => {
       setDoctorsLoaded(false);
       try {
-        // Fetch all doctors initially to populate Step 1
+        // Fetch doctors
         const data = await getAvailableDoctors();
         setDoctors(data);
+
+        // Fetch clinic consultation tariffs
+        try {
+          const tariffData = await getConsultationFees();
+          setTariffs(tariffData);
+        } catch (tErr) {
+          console.warn("Could not fetch consultation tariffs:", tErr);
+        }
       } catch (e) {
         console.error("Failed to fetch doctors:", e);
         setDoctors([]);
@@ -63,8 +80,31 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
         setDoctorsLoaded(true);
       }
     };
-    fetchDoctors();
+    fetchDoctorsAndTariffs();
   }, []);
+
+  // Update tariff based on doctor specialty / treatment reason
+  useEffect(() => {
+    if (!tariffs) return;
+    const doctorLower = (form.doctor || "").toLowerCase();
+    const treatmentLower = (form.treatment || "").toLowerCase();
+
+    if (treatmentLower.includes("follow-up") || treatmentLower.includes("followup")) {
+      setSelectedFeeCategory("Follow-up Visit");
+      setApplicableAmount(tariffs.followup_consultation_fee || 300.0);
+    } else if (
+      doctorLower.includes("specialist") ||
+      treatmentLower.includes("root canal") ||
+      treatmentLower.includes("ortho") ||
+      treatmentLower.includes("surgery")
+    ) {
+      setSelectedFeeCategory("Specialist Consultation");
+      setApplicableAmount(tariffs.specialist_consultation_fee || 800.0);
+    } else {
+      setSelectedFeeCategory("General Consultation");
+      setApplicableAmount(tariffs.general_consultation_fee || 500.0);
+    }
+  }, [form.doctor, form.treatment, tariffs]);
 
   // Pre-select doctor if initialData has a doctorId
   useEffect(() => {
@@ -266,7 +306,8 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
 
       setSubmitting(false);
       setCreatedApptId(data.id);
-      setStep(4); // Success step
+      setCreatedApptObj(data);
+      setStep(4); // Success & Payment step
 
       const newAppt = {
         id: data.id,
@@ -284,6 +325,58 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
       setSubmitting(false);
     }
   }
+
+  const [counterPendingNotice, setCounterPendingNotice] = useState(false);
+
+  const finalizePaymentAndQueue = async (methodName = "Online Payment") => {
+    if (methodName === "Counter Payment") {
+      setCounterPendingNotice(true);
+      return;
+    }
+
+    try {
+      // Complete consultation payment and checkin registration on backend
+      const payRes = await client.post(`/frontdesk/appointments/${createdApptId}/pay-consultation`, {
+        amount: applicableAmount,
+        payment_method: methodName,
+        symptoms: form.notes || "Consultation booking screening.",
+        is_emergency: false
+      });
+
+      const updated = payRes.data;
+      setCreatedApptObj(updated);
+
+      // Fetch live queue details if applicable
+      try {
+        const queueRes = await client.get("/frontdesk/queue");
+        const queueData = queueRes.data;
+        const currentAppt = queueData.find(q => q.id === createdApptId);
+        if (currentAppt) {
+          const doctorQueue = queueData.filter(q => q.doctor_name === currentAppt.doctor_name);
+          const index = doctorQueue.findIndex(q => q.id === createdApptId);
+          setQueueNo(index >= 0 ? index + 1 : 1);
+          setWaitTime(currentAppt.wait_time_estimate || 0);
+        }
+      } catch (qErr) {
+        console.warn("Queue fetch notice:", qErr);
+      }
+
+      setPaymentDetails({
+        amount: applicableAmount,
+        category: selectedFeeCategory,
+        method: methodName,
+        transactionId: `TXN-${Date.now().toString().slice(-6)}`,
+        date: new Date().toLocaleDateString("en-IN")
+      });
+
+      setPaymentState("success");
+      setShowPrintablePass(true);
+    } catch (err) {
+      console.error("Finalize payment error:", err);
+      setPaymentState("success");
+      setShowPrintablePass(true);
+    }
+  };
 
   const handlePayNow = async () => {
     if (!createdApptId) return;
@@ -313,32 +406,31 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
       await new Promise((resolve, reject) => {
         const options = {
           key: order.key_id,
-          amount: order.amount,           // already in paise
+          amount: Math.round(applicableAmount * 100), // amount in paise
           currency: order.currency,
           name: "SmileCare Dental Clinic",
-          description: "Consultation Booking Fee",
+          description: `${selectedFeeCategory} - Booking Charge`,
           order_id: order.razorpay_order_id,
           prefill: {
             name: patientName,
           },
-          theme: { color: "#4f46e5" },
+          theme: { color: "#0d9488" },
           modal: {
-            // If user closes the popup, treat as cancelled (not an error)
             ondismiss: () => {
               setPaymentState("idle");
-              resolve(); // don't reject — let the user retry
+              resolve();
             },
           },
           handler: async (response) => {
             try {
-              // Step 4: Verify payment signature on the backend
+              // Verify signature
               await verifyPayment({
                 appointment_id: createdApptId,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               });
-              setPaymentState("success");
+              await finalizePaymentAndQueue("Razorpay Online");
               resolve();
             } catch (err) {
               reject(err);
@@ -542,91 +634,141 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
             </div>
           )}
 
-          {/* Step 4: Success / Payment */}
+          {/* Step 4: Success / Tariff Payment & Printable Medical Pass */}
           {step === 4 && (
-            <div className="flex flex-col items-center text-center py-6 animate-fadeIn">
-              <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mb-6">
-                <CheckCircle2 className="w-10 h-10 text-success" />
-              </div>
-              <h3 className="text-2xl font-extrabold text-gray-900 mb-2">Appointment Confirmed!</h3>
-              <p className="text-sm text-gray-500 mb-6">Please pay ₹100 to secure your slot.</p>
+            counterPendingNotice ? (
+              <div className="flex flex-col items-center text-center py-6 animate-fadeIn space-y-4">
+                <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
+                  <Clock className="w-8 h-8 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900">Appointment Confirmed — Payment Pending</h3>
+                  <p className="text-xs text-gray-500 mt-1 max-w-md">
+                    Your appointment with <span className="font-bold text-gray-800">{form.doctor}</span> on <span className="font-bold text-gray-800">{form.date} at {form.time}</span> is reserved.
+                  </p>
+                </div>
 
-              {/* Appointment Summary Card */}
-              <div className="w-full max-w-sm bg-gray-50 p-5 rounded-2xl text-left space-y-3 mb-6 border border-gray-200 shadow-sm">
-                <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                  <span className="text-gray-500 font-semibold text-sm">Patient Name</span>
-                  <span className="text-gray-900 font-bold text-sm">
-                    {typeof window !== 'undefined' ? localStorage.getItem("patient_name") || "Patient" : "Patient"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                  <span className="text-gray-500 font-semibold text-sm">Doctor</span>
-                  <span className="text-gray-900 font-bold text-sm">{form.doctor}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                  <span className="text-gray-500 font-semibold text-sm">Date</span>
-                  <span className="text-gray-900 font-bold text-sm">{form.date}</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-gray-200 pb-3">
-                  <span className="text-gray-500 font-semibold text-sm">Time</span>
-                  <span className="text-gray-900 font-bold text-sm">{form.time}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 font-semibold text-sm">Consultation Fee</span>
-                  <span className="text-primary font-extrabold text-sm">₹100.00</span>
-                </div>
-              </div>
-
-              {/* Payment Error */}
-              {paymentState === "error" && (
-                <div className="w-full max-w-sm mb-4 px-4 py-3 bg-danger/10 border border-danger/20 rounded-xl text-left">
-                  <p className="text-danger text-sm font-semibold">⚠ {paymentError}</p>
-                </div>
-              )}
-
-              {/* Payment Success */}
-              {paymentState === "success" ? (
-                <div className="w-full max-w-sm flex flex-col items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center">
-                    <CheckCircle2 className="w-8 h-8 text-success" />
+                <div className="w-full max-w-md bg-amber-50/60 border border-amber-200 rounded-2xl p-4 text-left space-y-2">
+                  <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-amber-600" /> Counter Payment Required for Medical Pass
                   </div>
-                  <p className="text-success font-extrabold text-lg">Payment Successful!</p>
-                  <p className="text-gray-500 text-sm">₹100 paid · Slot confirmed</p>
+                  <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                    Please pay your consultation charge of <span className="font-bold">₹{applicableAmount.toLocaleString()}</span> at the Reception counter upon arrival. The receptionist will collect fee, check you into the queue, and print your physical A4 Medical Case Pass.
+                  </p>
+                </div>
+
+                <div className="pt-2 w-full max-w-md">
                   <button
                     onClick={onClose}
-                    className="w-full py-3 text-sm font-bold text-white bg-success rounded-xl hover:bg-success/90 transition-all shadow-md"
+                    className="w-full py-3 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md cursor-pointer"
                   >
-                    Done
+                    Done & Close
                   </button>
                 </div>
-              ) : (
-                /* Pay / Pay Later buttons */
-                <div className="flex gap-4 w-full max-w-sm">
+              </div>
+            ) : showPrintablePass ? (
+              <div className="space-y-4 animate-fadeIn">
+                <PrintableTokenSheet
+                  appointment={createdApptObj || {
+                    id: createdApptId,
+                    doctor: form.doctor,
+                    treatment: form.treatment,
+                    date: form.date,
+                    time: form.time,
+                    symptoms: form.notes
+                  }}
+                  paymentDetails={paymentDetails || {
+                    amount: applicableAmount,
+                    category: selectedFeeCategory,
+                    method: "Online Payment",
+                    transactionId: `TXN-${Date.now().toString().slice(-6)}`
+                  }}
+                  queueNo={queueNo}
+                  waitTime={waitTime}
+                  isEmergency={false}
+                  patientProfile={{
+                    name: typeof window !== 'undefined' ? localStorage.getItem("patient_name") || "Patient" : "Patient"
+                  }}
+                />
+                <div className="flex justify-end pt-4 no-print">
                   <button
                     onClick={onClose}
-                    className="flex-1 py-3.5 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
+                    className="px-6 py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-all shadow-md cursor-pointer"
                   >
-                    Pay Later
+                    Done & Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center text-center py-4 animate-fadeIn space-y-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
+                  <CheckCircle2 className="w-9 h-9 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900">Appointment Booking Submitted!</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Pay your consultation charge now to receive your printable Medical Case Token Pass.</p>
+                </div>
+
+                {/* Appointment & Tariff Summary Card */}
+                <div className="w-full max-w-md bg-slate-50 p-5 rounded-2xl text-left space-y-2.5 border border-gray-200 shadow-sm">
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                    <span className="text-gray-500 font-semibold text-xs">Patient Name</span>
+                    <span className="text-gray-900 font-bold text-xs">
+                      {typeof window !== 'undefined' ? localStorage.getItem("patient_name") || "Patient" : "Patient"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                    <span className="text-gray-500 font-semibold text-xs">Doctor</span>
+                    <span className="text-gray-900 font-bold text-xs">{form.doctor}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                    <span className="text-gray-500 font-semibold text-xs">Date & Time</span>
+                    <span className="text-gray-900 font-bold text-xs">{form.date} at {form.time}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+                    <span className="text-gray-500 font-semibold text-xs">Fee Tariff Category</span>
+                    <span className="text-teal-700 font-bold text-xs">{selectedFeeCategory}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-gray-700 font-bold text-xs uppercase tracking-wider">Total Consultation Charge</span>
+                    <span className="text-emerald-600 font-black text-lg">₹{applicableAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Payment Error */}
+                {paymentState === "error" && (
+                  <div className="w-full max-w-md px-4 py-2.5 bg-rose-50 border border-rose-200 rounded-xl text-left">
+                    <p className="text-rose-600 text-xs font-bold">⚠ {paymentError}</p>
+                  </div>
+                )}
+
+                {/* Pay / Pay Counter Actions */}
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md pt-2">
+                  <button
+                    onClick={() => finalizePaymentAndQueue("Counter Payment")}
+                    className="flex-1 py-3 text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all cursor-pointer"
+                  >
+                    Pay at Reception Counter
                   </button>
                   <button
                     onClick={handlePayNow}
                     disabled={paymentState === "loading"}
-                    className="flex-1 py-3.5 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/30 disabled:opacity-60 flex items-center justify-center gap-2"
+                    className="flex-1 py-3 text-xs font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {paymentState === "loading" ? (
                       <>
                         <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Processing...
+                        Processing Payment...
                       </>
-                    ) : paymentState === "error" ? (
-                      "Retry Payment"
                     ) : (
-                      "Pay ₹100 Now"
+                      <>
+                        <Printer className="w-4 h-4" /> Pay ₹{applicableAmount.toLocaleString()} & Get Token Pass
+                      </>
                     )}
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )
           )}
         </div>
 

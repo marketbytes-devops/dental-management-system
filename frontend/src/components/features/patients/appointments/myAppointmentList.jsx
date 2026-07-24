@@ -4,7 +4,7 @@ import { useState } from "react";
 import AppointmentCard from "./appointmentCard";
 import { Calendar } from "lucide-react";
 
-const TABS = ["All", "Upcoming", "Completed", "Cancelled"];
+const TABS = ["All", "Upcoming", "Completed", "Missed", "Cancelled"];
 
 export default function MyAppointmentList({ appointments, onReschedule, onCancel }) {
   const [activeTab, setActiveTab] = useState("All");

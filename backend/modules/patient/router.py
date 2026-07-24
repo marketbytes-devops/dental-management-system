@@ -1491,3 +1491,48 @@ def get_patient_clinical_notes_route(
     return notes
 
 
+# ---------------------------------------------------------------------------
+# Patient Settings Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/settings")
+def get_patient_settings(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    return {
+        "theme": "system",
+        "timezone": "Asia/Kolkata",
+        "language": "en",
+        "twoFAEnabled": False,
+        "activeSessions": [
+            {"device": "Chrome on Windows", "lastActive": "Just now"}
+        ],
+        "linkedAccounts": [
+            {"provider": "Google", "connected": True}
+        ]
+    }
+
+
+@router.patch("/settings")
+@router.put("/settings")
+def update_patient_settings(
+    updates: dict,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    
+    return {"message": "Settings updated successfully", "updates": updates}
+
+
+

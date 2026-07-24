@@ -26,7 +26,6 @@ class LabOrderModel(Base):
     priority = Column(String, default="Medium")
     status = Column(String, default="submitted")
     notes = Column(String, nullable=True)
-    due_date = Column(String, nullable=True)
     lab_name = Column(String, nullable=True)
     rejection_reason = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -165,3 +164,19 @@ class ClinicalEncounterModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     lab_case = relationship("LabOrderModel", back_populates="encounter")
+
+class LabItemPriceModel(Base):
+    __tablename__ = "lab_pricing_catalog"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    item_name = Column(String, nullable=False, index=True) # e.g. Zirconia Crown, E-max Veneer
+    category = Column(String, default="Prosthetic") # Prosthetic, Orthodontic, Surgical, Pathology
+    material_tier = Column(String, default="Standard") # Standard, Premium, Elite
+    vendor_cost = Column(Float, default=0.0) # Base cost paid to vendor/lab
+    clinic_markup_pct = Column(Float, default=50.0) # Clinic markup percentage e.g. 50%
+    patient_price = Column(Float, default=0.0) # Final calculated or preset price to patient
+    warranty_months = Column(Integer, default=12) # Warranty duration in months
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+

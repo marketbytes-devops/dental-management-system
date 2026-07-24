@@ -25,6 +25,7 @@ import {
 import { useDoctor } from "@/app/(dashboards)/doctor/layout";
 import ToothChart from "@/components/features/doctor/workspace/ToothChart";
 import SmileCareChart from "@/components/features/doctor/workspace/smilecare/SmileCareChart";
+import CustomConsentModal from "@/components/features/doctor/workspace/CustomConsentModal";
 import { 
   getPatientByToken,
   getPatientTreatmentPlan, 
@@ -34,7 +35,8 @@ import {
   updateTreatmentPlanStep,
   downloadConsentPdf,
   getProcedures,
-  createBillingRequest
+  createBillingRequest,
+  createCustomConsent
 } from "@/services/api";
 
 const SPECIALTY_CONFIGS = {
@@ -213,7 +215,7 @@ export default function DoctorTreatmentPlanPage() {
   const params = useParams();
   const router = useRouter();
   const patientToken = params.patient_token;
-  const { enrichPatientTimeline, viewingPatient, handleToggleToothState } = useDoctor() || {};
+  const { enrichPatientTimeline, viewingPatient, handleToggleToothState, currentDoctorName } = useDoctor() || {};
 
   const [doctorSpecialty, setDoctorSpecialty] = useState("General Dentistry");
 
@@ -245,12 +247,12 @@ export default function DoctorTreatmentPlanPage() {
   const [goals, setGoals] = useState([]);
   const [duration, setDuration] = useState("12 months");
   const [completion, setCompletion] = useState("");
-  const [nextVisitDate, setNextVisitDate] = useState("");
-  const [nextVisitProc, setNextVisitProc] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [steps, setSteps] = useState([]);
   const [sittings, setSittings] = useState(["Sitting 1"]);
   const [showTeethChart, setShowTeethChart] = useState(false);
+  const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
+  const [customConsentPayload, setCustomConsentPayload] = useState(null);
 
   // Orthodontic Consultation Sheet Fields
   const [orthoActiveTab, setOrthoActiveTab] = useState("history");
@@ -570,8 +572,6 @@ export default function DoctorTreatmentPlanPage() {
         setGoals(draftOrActive.treatment_objectives || []);
         setDuration(draftOrActive.estimated_duration || "12 months");
         setCompletion(draftOrActive.expected_completion || "");
-        setNextVisitDate(draftOrActive.next_visit_date || "");
-        setNextVisitProc(draftOrActive.next_visit_procedure || "");
         setAttachments(draftOrActive.attachments || []);
         
         const dbSteps = draftOrActive.steps || [];
@@ -604,8 +604,6 @@ export default function DoctorTreatmentPlanPage() {
         setGoals([]);
         setDuration("12 months");
         setCompletion("");
-        setNextVisitDate("");
-        setNextVisitProc("");
         setAttachments([]);
         setSteps([]);
         setSittings(["Sitting 1"]);
@@ -631,8 +629,6 @@ export default function DoctorTreatmentPlanPage() {
       treatment_objectives: goals,
       estimated_duration: duration,
       expected_completion: completion,
-      next_visit_date: nextVisitDate,
-      next_visit_procedure: nextVisitProc,
       attachments,
       status: statusType
     };
@@ -643,10 +639,34 @@ export default function DoctorTreatmentPlanPage() {
         await updateTreatmentPlan(activePlan.id, payload);
       } else {
         // Create new plan
-        await createTreatmentPlan({
+        const createdPlan = await createTreatmentPlan({
           ...payload,
           steps: steps.map((s, idx) => ({ ...s, sequence: idx + 1 }))
         });
+
+        // Dispatch custom consents configured for steps
+        if (createdPlan && createdPlan.steps) {
+          for (let i = 0; i < steps.length; i++) {
+            const s = steps[i];
+            if (s.requires_consent && s.custom_consent) {
+              const createdStep = createdPlan.steps[i] || createdPlan.steps.find(cs => cs.title === s.title);
+              try {
+                await createCustomConsent({
+                  patient_token: patientToken,
+                  patient_name: patient?.name,
+                  doctor_name: currentDoctorName || createdPlan.doctor_name || "Doctor",
+                  procedure_name: s.custom_consent.procedure_name || s.title,
+                  title: s.custom_consent.title,
+                  custom_details: s.custom_consent.custom_details,
+                  treatment_plan_id: createdPlan.id,
+                  step_id: createdStep ? createdStep.id : 0
+                });
+              } catch (err) {
+                console.error("Failed to create custom consent for step:", err);
+              }
+            }
+          }
+        }
       }
 
       alert(`Plan successfully saved as ${statusType}!`);
@@ -668,7 +688,26 @@ export default function DoctorTreatmentPlanPage() {
     if (activePlan) {
       // Append step to active plan in DB
       try {
-        await createTreatmentPlanStep(activePlan.id, newStep);
+        const createdStep = await createTreatmentPlanStep(activePlan.id, newStep);
+
+        // If step requires consent and has custom consent payload
+        if (newStep.requires_consent && customConsentPayload) {
+          try {
+            await createCustomConsent({
+              patient_token: patientToken,
+              patient_name: patient?.name,
+              doctor_name: currentDoctorName || activePlan?.doctor_name || "Doctor",
+              procedure_name: customConsentPayload.procedure_name || newStep.title,
+              title: customConsentPayload.title,
+              custom_details: customConsentPayload.custom_details,
+              treatment_plan_id: activePlan.id,
+              step_id: createdStep.id
+            });
+          } catch (consentErr) {
+            console.error("Error creating custom consent record:", consentErr);
+          }
+        }
+
         setNewStep({
           title: "",
           details: "",
@@ -678,6 +717,7 @@ export default function DoctorTreatmentPlanPage() {
           phase: sittings[0] || "Sitting 1",
           sequence: steps.length + 1
         });
+        setCustomConsentPayload(null);
         setSelectedParentProcName("");
         setSelectedSubProcId("");
         loadData();
@@ -693,6 +733,7 @@ export default function DoctorTreatmentPlanPage() {
       // Local addition for a new draft plan
       setSteps([...steps, {
         ...newStep,
+        custom_consent: customConsentPayload,
         id: Date.now(), // temporary local ID
         consent_status: newStep.requires_consent ? "Pending" : "Not Required",
         status: "Planned"
@@ -706,6 +747,7 @@ export default function DoctorTreatmentPlanPage() {
         phase: sittings[0] || "Sitting 1",
         sequence: steps.length + 2
       });
+      setCustomConsentPayload(null);
       setSelectedParentProcName("");
       setSelectedSubProcId("");
     }
@@ -888,8 +930,35 @@ export default function DoctorTreatmentPlanPage() {
         </div>
       </div>
 
-      
-          
+      {/* Plan Timeline Row */}
+      <div className="flex flex-wrap items-center justify-between bg-white border border-gray-150 rounded-2xl p-4 shadow-sm text-xs gap-4">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-primary" />
+          <span className="font-extrabold text-gray-800 uppercase tracking-wider text-[11px]">Plan Timeline:</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-gray-600">Estimated Duration:</span>
+            <input
+              type="text"
+              placeholder="e.g. 12 months"
+              value={duration}
+              onChange={(e) => handleDurationChange(e.target.value)}
+              className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 w-36"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-gray-600">Expected Completion:</span>
+            <input
+              type="text"
+              placeholder="e.g. March 2028"
+              value={completion}
+              onChange={(e) => setCompletion(e.target.value)}
+              className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 w-36"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* 3D Dental Chart Toggle and Panel */}
       <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
@@ -1721,57 +1790,6 @@ export default function DoctorTreatmentPlanPage() {
 
         {/* RIGHT COLUMN/MAIN CONTENT: DURATION, EXPECTED COMPLETION, VISITS, ATTACHMENTS, PHASES TABLE */}
         <div className="lg:col-span-2 space-y-6">
-          
-          {/* Plan Meta / Scheduling Details */}
-          <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-xs font-black text-gray-850 uppercase tracking-wider flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-primary" /> Plan Timeline & Scheduling Linkage
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="font-bold text-gray-600 block mb-1">Estimated Duration</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 18 months"
-                  value={duration}
-                  onChange={(e) => handleDurationChange(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div>
-                <label className="font-bold text-gray-600 block mb-1">Expected Completion</label>
-                <input
-                  type="text"
-                  placeholder="e.g. March 2028"
-                  value={completion}
-                  onChange={(e) => setCompletion(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div>
-                <label className="font-bold text-gray-600 block mb-1">Next Visit Date</label>
-                <input
-                  type="date"
-                  value={nextVisitDate}
-                  onChange={(e) => setNextVisitDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-              <div>
-                <label className="font-bold text-gray-600 block mb-1">Next Visit Planned Procedure</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Archwire Replacement"
-                  value={nextVisitProc}
-                  onChange={(e) => setNextVisitProc(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-            </div>
-          </div>
-
-
 
           {/* Procedures and Sittings Table */}
           <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
@@ -1991,9 +2009,26 @@ export default function DoctorTreatmentPlanPage() {
                   <input
                     type="checkbox"
                     checked={newStep.requires_consent}
-                    onChange={(e) => setNewStep({ ...newStep, requires_consent: e.target.checked })}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (checked) {
+                        if (!newStep.title.trim()) {
+                          alert("Please select or enter a Procedure Title before configuring consent details.");
+                          return;
+                        }
+                        setIsConsentModalOpen(true);
+                      } else {
+                        setNewStep({ ...newStep, requires_consent: false });
+                        setCustomConsentPayload(null);
+                      }
+                    }}
                   />
                   Requires Patient Consent
+                  {newStep.requires_consent && customConsentPayload && (
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 ml-1">
+                      ✓ Custom Form Configured
+                    </span>
+                  )}
                 </label>
                 <button
                   type="button"
@@ -2012,6 +2047,20 @@ export default function DoctorTreatmentPlanPage() {
 
       </div>
 
+      {/* Custom Consent Modal */}
+      <CustomConsentModal
+        isOpen={isConsentModalOpen}
+        onClose={() => setIsConsentModalOpen(false)}
+        onConfirm={(payload) => {
+          setCustomConsentPayload(payload);
+          setNewStep(prev => ({ ...prev, requires_consent: true }));
+          setIsConsentModalOpen(false);
+        }}
+        patientName={patient?.name || ""}
+        patientToken={patientToken}
+        doctorName={currentDoctorName || activePlan?.doctor_name || "Doctor"}
+        procedureName={newStep.title}
+      />
     </div>
   );
 }

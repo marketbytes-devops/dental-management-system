@@ -67,7 +67,7 @@ function mapOrderToInvoice(o) {
     amount,
     status: invStatus,
     orderStatus: o.status,
-    date: o.due_date || "2026-06-15",
+    date: o.created_at ? o.created_at.split("T")[0] : "2026-06-10",
     items,
     dispatched: DISPATCHED_STATUSES.includes(o.status),
   };

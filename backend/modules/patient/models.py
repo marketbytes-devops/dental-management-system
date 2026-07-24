@@ -49,12 +49,16 @@ class PatientConsent(Base):
     patient_id = Column(Integer, index=True, nullable=True)
     patient_token = Column(String, index=True, nullable=True)
     doctor_id = Column(Integer, nullable=True)
+    doctor_name = Column(String, nullable=True)
+    procedure_name = Column(String, nullable=True)
+    custom_details = Column(Text, nullable=True)
+    uploaded_document_path = Column(String, nullable=True)
     treatment_plan_id = Column(Integer, nullable=True)
     step_id = Column(Integer, nullable=True)
     title = Column(String, nullable=False)
     content = Column(String, nullable=True)
     status = Column(String, default="PENDING")       # PENDING, SIGNED, REJECTED
-    signing_method = Column(String, nullable=True)   # PORTAL, IN_PERSON
+    signing_method = Column(String, nullable=True)   # PORTAL, IN_PERSON, RECEPTION_UPLOAD
     signature_data = Column(String, nullable=True)   # Base64 signature image or typed name
     pdf_file_path = Column(String, nullable=True)    # PDF path
     signed_at = Column(DateTime(timezone=True), nullable=True)

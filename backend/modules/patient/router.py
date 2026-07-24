@@ -2,7 +2,7 @@
 import os
 import datetime
 import shutil
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
@@ -22,6 +22,7 @@ from .models import (
 )
 from .schemas import (
     ConsentRequest,
+    ConsentCustomCreate,
     ConsentResponse,
     ConsentSignRequest,
     PasswordChangeRequest,
@@ -323,183 +324,7 @@ def get_patient_by_token_endpoint(token: str, db: Session = Depends(get_db)):
     return patient
 
 
-# ---------------------------------------------------------------------------
-# Consents
-# ---------------------------------------------------------------------------
-
-@router.post("/consents/request", response_model=ConsentResponse)
-def request_consent(req: ConsentRequest, db: Session = Depends(get_db)):
-    """Staff/doctor creates a consent request for a patient."""
-    patient = db.query(PatientModel).filter(PatientModel.id == req.patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-
-    new_consent = PatientConsent(
-        patient_id=req.patient_id,
-        doctor_id=req.doctor_id,
-        treatment_plan_id=req.treatment_plan_id,
-        title=req.title,
-        content=req.content,
-        status="PENDING",
-    )
-    db.add(new_consent)
-    db.commit()
-    db.refresh(new_consent)
-    return new_consent
-
-
-@router.get("/consents/pending", response_model=List[ConsentResponse])
-def get_pending_consents(
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Returns all PENDING consents for the logged-in patient."""
-    patient_id = current_user.get("patient_id")
-    if not patient_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-
-    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
-    patient_token = patient.token if patient else None
-
-    return (
-        db.query(PatientConsent)
-        .filter(
-            (PatientConsent.patient_id == patient_id) | (PatientConsent.patient_token == patient_token),
-            PatientConsent.status == "PENDING"
-        )
-        .order_by(PatientConsent.created_at.desc())
-        .all()
-    )
-
-
-@router.get("/consents/documents", response_model=List[ConsentResponse])
-def get_signed_consents(
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Returns all SIGNED consent documents for the logged-in patient."""
-    patient_id = current_user.get("patient_id")
-    if not patient_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-
-    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
-    patient_token = patient.token if patient else None
-
-    return (
-        db.query(PatientConsent)
-        .filter(
-            (PatientConsent.patient_id == patient_id) | (PatientConsent.patient_token == patient_token),
-            PatientConsent.status == "SIGNED"
-        )
-        .order_by(PatientConsent.signed_at.desc())
-        .all()
-    )
-
-
-@router.post("/consents/{consent_id}/sign", response_model=ConsentResponse)
-def sign_consent(
-    consent_id: int,
-    req: ConsentSignRequest,
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Patient signs a consent form, or a Doctor/Admin signs on behalf of a patient (IN_PERSON).
-    """
-    patient_id = current_user.get("patient_id")
-    roles = current_user.get("roles", [])
-
-    consent = db.query(PatientConsent).filter(PatientConsent.id == consent_id).first()
-    if not consent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
-
-    if not patient_id:
-        # Must be a staff member acting on behalf of the patient
-        if "Admin" not in roles and "Doctor" not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
-        
-        # Determine patient_id
-        if consent.patient_id:
-            patient_id = consent.patient_id
-        else:
-            patient = db.query(PatientModel).filter(PatientModel.token == consent.patient_token).first()
-            if patient:
-                patient_id = patient.id
-
-    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-
-    # Authorisation check: ensure consent belongs to this patient
-    if consent.patient_id and consent.patient_id != patient.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
-    if consent.patient_token and consent.patient_token != patient.token:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
-
-    if consent.status == "SIGNED":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Consent already signed")
-
-    # Generate PDF
-    pdf_path = generate_consent_pdf(
-        title=consent.title,     #type:ignore
-        body_text=consent.content or "",      
-        signature_data=req.signature_data,
-        patient_name=patient.name,
-    )
-
-    consent.status = "SIGNED"
-    consent.patient_id = patient.id
-    consent.signature_data = req.signature_data
-    consent.signing_method = req.signing_method
-    consent.signed_at = datetime.datetime.now(datetime.timezone.utc)
-    consent.pdf_file_path = pdf_path
-
-    # Update associated treatment plan step if it exists
-    if consent.step_id:
-        from modules.treatment_plan.models import TreatmentPlanStepModel
-        step = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.id == consent.step_id).first()
-        if step:
-            step.consent_status = "Given"
-            step.consent_given_at = consent.signed_at
-
-    db.commit()
-    db.refresh(consent)
-    return consent
-
-
-@router.get("/consents/{consent_id}/pdf")
-def get_consent_pdf(
-    consent_id: int,
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Serve the signed PDF. Accessible by the owning patient or by Admin/Doctor."""
-    patient_id = current_user.get("patient_id")
-    roles = current_user.get("roles", [])
-
-    consent = db.query(PatientConsent).filter(PatientConsent.id == consent_id).first()
-    if not consent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent not found")
-
-    # Authorisation check
-    if patient_id:
-        patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
-        is_owner = (consent.patient_id == patient_id) or (patient and consent.patient_token == patient.token)
-        if not is_owner:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-    else:
-        if "Admin" not in roles and "Doctor" not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-
-    pdf_file = consent.pdf_file_path
-    if not pdf_file or not os.path.exists(pdf_file):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDF file not found")
-
-    return FileResponse(
-        path=pdf_file,
-        filename=os.path.basename(pdf_file),
-        media_type="application/pdf",
-    )
+# (Consents section relocated to dedicated endpoints block below)
 
 
 # ---------------------------------------------------------------------------
@@ -744,14 +569,24 @@ def get_patient_by_token_endpoint(token: str, db: Session = Depends(get_db)):
 @router.post("/consents/request", response_model=ConsentResponse)
 def request_consent(req: ConsentRequest, db: Session = Depends(get_db)):
     """Staff/doctor creates a consent request for a patient."""
-    patient = db.query(PatientModel).filter(PatientModel.id == req.patient_id).first()
+    patient = None
+    if req.patient_id:
+        patient = db.query(PatientModel).filter(PatientModel.id == req.patient_id).first()
+    elif req.patient_token:
+        patient = db.query(PatientModel).filter(PatientModel.token == req.patient_token).first()
+        
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
 
     new_consent = PatientConsent(
-        patient_id=req.patient_id,
-        doctor_id=req.doctor_id,
-        treatment_plan_id=req.treatment_plan_id,
+        patient_id=patient.id,
+        patient_token=patient.token,
+        doctor_id=req.doctor_id or 0,
+        doctor_name=req.doctor_name,
+        procedure_name=req.procedure_name,
+        custom_details=req.custom_details,
+        treatment_plan_id=req.treatment_plan_id or 0,
+        step_id=req.step_id or 0,
         title=req.title,
         content=req.content,
         status="PENDING",
@@ -768,6 +603,97 @@ def request_consent(req: ConsentRequest, db: Session = Depends(get_db)):
         type="consent",
         title="Pending Dental Consent Form",
         message=f"You have a new consent form '{req.title}' to sign."
+    )
+
+    return new_consent
+
+
+@router.post("/consents/custom-request", response_model=ConsentResponse)
+def create_custom_consent(req: ConsentCustomCreate, db: Session = Depends(get_db)):
+    """Doctor creates a custom consent form for a procedure in a treatment sitting."""
+    patient = db.query(PatientModel).filter(PatientModel.token == req.patient_token).first()
+    if not patient:
+        # Fallback search by ID if token is numeric ID
+        if req.patient_token.isdigit():
+            patient = db.query(PatientModel).filter(PatientModel.id == int(req.patient_token)).first()
+            
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    title = req.title or f"Consent Form: {req.procedure_name}"
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    patient_display_name = getattr(req, "patient_name", None) or patient.name
+
+    formatted_content = (
+        f"PROCEDURE INFORMED CONSENT FORM\n"
+        f"====================================\n"
+        f"Procedure Name: {req.procedure_name}\n"
+        f"Doctor Name: {req.doctor_name}\n"
+        f"Patient Name: {patient_display_name} (Token: {patient.token})\n"
+        f"Date & Time: {now_str}\n\n"
+        f"CLINICAL & PROCEDURE DETAILS:\n"
+        f"{req.custom_details or 'No additional details specified.'}\n\n"
+        f"ACKNOWLEDGMENT & AGREEMENT:\n"
+        f"I have read and fully understand the procedure details described above. The doctor has explained the risks, benefits, and alternative treatment options. I hereby give my consent for this procedure."
+    )
+
+    # Check if a consent form already exists for this step to avoid duplicates
+    existing_consent = None
+    if req.step_id and req.step_id > 0:
+        existing_consent = db.query(PatientConsent).filter(PatientConsent.step_id == req.step_id).first()
+    elif req.treatment_plan_id and req.treatment_plan_id > 0:
+        existing_consent = db.query(PatientConsent).filter(
+            PatientConsent.patient_token == patient.token,
+            PatientConsent.treatment_plan_id == req.treatment_plan_id,
+            PatientConsent.procedure_name == req.procedure_name,
+            PatientConsent.status == "PENDING"
+        ).first()
+
+    if existing_consent:
+        existing_consent.doctor_name = req.doctor_name
+        existing_consent.procedure_name = req.procedure_name
+        existing_consent.custom_details = req.custom_details
+        existing_consent.title = title
+        existing_consent.content = formatted_content
+        if req.step_id and req.step_id > 0:
+            existing_consent.step_id = req.step_id
+        db.commit()
+        db.refresh(existing_consent)
+        new_consent = existing_consent
+    else:
+        new_consent = PatientConsent(
+            patient_id=patient.id,
+            patient_token=patient.token,
+            doctor_id=req.doctor_id or 0,
+            doctor_name=req.doctor_name,
+            procedure_name=req.procedure_name,
+            custom_details=req.custom_details,
+            treatment_plan_id=req.treatment_plan_id or 0,
+            step_id=req.step_id or 0,
+            title=title,
+            content=formatted_content,
+            status="PENDING",
+        )
+        db.add(new_consent)
+        db.commit()
+        db.refresh(new_consent)
+
+    # Link to treatment step model if step_id provided
+    if req.step_id and req.step_id > 0:
+        step = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.id == req.step_id).first()
+        if step:
+            step.consent_id = new_consent.id
+            step.consent_status = "Pending"
+            db.commit()
+
+    # Trigger patient notification
+    create_patient_notification(
+        db=db,
+        patient_token=patient.token,
+        sender_role="doctor",
+        type="consent",
+        title=f"New Consent Request: {req.procedure_name}",
+        message=f"Dr. {req.doctor_name} has requested your consent for procedure '{req.procedure_name}'."
     )
 
     return new_consent
@@ -821,6 +747,56 @@ def get_signed_consents(
     )
 
 
+@router.get("/consents/all-staff", response_model=List[ConsentResponse])
+def get_all_consents_for_staff(
+    search: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    doctor_name: Optional[str] = None,
+    patient_token: Optional[str] = None,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Staff (Receptionist, Doctor, Admin) endpoint to list and filter all consent forms."""
+    roles = current_user.get("roles", [])
+    patient_id = current_user.get("patient_id")
+
+    if patient_id and not roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff access required")
+
+    query = db.query(PatientConsent)
+
+    if patient_token:
+        patient = db.query(PatientModel).filter(PatientModel.token == patient_token).first()
+        p_id = patient.id if patient else None
+        query = query.filter((PatientConsent.patient_token == patient_token) | (PatientConsent.patient_id == p_id))
+
+    if status_filter and status_filter.upper() != "ALL":
+        query = query.filter(PatientConsent.status == status_filter.upper())
+
+    if doctor_name and doctor_name.strip():
+        query = query.filter(PatientConsent.doctor_name.ilike(f"%{doctor_name.strip()}%"))
+
+    consents = query.order_by(PatientConsent.created_at.desc()).all()
+
+    if search and search.strip():
+        search_term = search.strip().lower()
+        patients_matched = db.query(PatientModel).filter(
+            (PatientModel.name.ilike(f"%{search_term}%")) |
+            (PatientModel.token.ilike(f"%{search_term}%")) |
+            (PatientModel.phone.ilike(f"%{search_term}%"))
+        ).all()
+        matched_tokens = {p.token for p in patients_matched}
+        matched_ids = {p.id for p in patients_matched}
+
+        filtered = []
+        for c in consents:
+            if (c.patient_token in matched_tokens) or (c.patient_id in matched_ids) or (c.title and search_term in c.title.lower()) or (c.procedure_name and search_term in c.procedure_name.lower()):
+                filtered.append(c)
+        return filtered
+
+    return consents
+
+
 @router.post("/consents/{consent_id}/sign", response_model=ConsentResponse)
 def sign_consent(
     consent_id: int,
@@ -829,10 +805,11 @@ def sign_consent(
     db: Session = Depends(get_db),
 ):
     """
-    Patient signs a consent form, or a Doctor/Admin signs on behalf of a patient (IN_PERSON).
+    Patient signs a consent form online, or Staff (Receptionist/Doctor/Admin) signs in-person with patient.
     """
     patient_id = current_user.get("patient_id")
     roles = current_user.get("roles", [])
+    normalized_roles = [r.lower() for r in roles]
 
     consent = db.query(PatientConsent).filter(PatientConsent.id == consent_id).first()
     if not consent:
@@ -840,7 +817,7 @@ def sign_consent(
 
     if not patient_id:
         # Must be a staff member acting on behalf of the patient
-        if "Admin" not in roles and "Doctor" not in roles:
+        if not any(r in normalized_roles for r in ["admin", "doctor", "receptionist", "reception"]):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
         
         # Determine patient_id
@@ -855,10 +832,8 @@ def sign_consent(
     if not patient:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
 
-    # Authorisation check: ensure consent belongs to this patient
-    if consent.patient_id and consent.patient_id != patient.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
-    if consent.patient_token and consent.patient_token != patient.token:
+    # Authorisation check: ensure consent belongs to this patient if patient token
+    if not roles and consent.patient_id and consent.patient_id != patient.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorised")
 
     if consent.status == "SIGNED":
@@ -874,6 +849,7 @@ def sign_consent(
 
     consent.status = "SIGNED"
     consent.patient_id = patient.id
+    consent.patient_token = patient.token
     consent.signature_data = req.signature_data
     consent.signing_method = req.signing_method
     consent.signed_at = datetime.datetime.now(datetime.timezone.utc)
@@ -892,15 +868,62 @@ def sign_consent(
     return consent
 
 
+@router.post("/consents/{consent_id}/upload-signed", response_model=ConsentResponse)
+def upload_signed_consent_file(
+    consent_id: int,
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Receptionist/Staff uploads scanned physical paper consent form."""
+    roles = current_user.get("roles", [])
+    normalized_roles = [r.lower() for r in roles]
+    if not any(r in normalized_roles for r in ["admin", "doctor", "receptionist", "reception"]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff authorization required")
+
+    consent = db.query(PatientConsent).filter(PatientConsent.id == consent_id).first()
+    if not consent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Consent form not found")
+
+    os.makedirs("static/uploads/consents", exist_ok=True)
+    ext = os.path.splitext(file.filename)[1] or ".pdf"
+    filename = f"signed_consent_{consent_id}_{int(datetime.datetime.now().timestamp())}{ext}"
+    file_path = os.path.join("static/uploads/consents", filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    saved_url = f"/static/uploads/consents/{filename}"
+
+    consent.status = "SIGNED"
+    consent.signing_method = "RECEPTION_UPLOAD"
+    consent.uploaded_document_path = saved_url
+    consent.pdf_file_path = file_path
+    consent.signed_at = datetime.datetime.now(datetime.timezone.utc)
+
+    # Sync treatment plan step if linked
+    if consent.step_id:
+        from modules.treatment_plan.models import TreatmentPlanStepModel
+        step = db.query(TreatmentPlanStepModel).filter(TreatmentPlanStepModel.id == consent.step_id).first()
+        if step:
+            step.consent_status = "Given"
+            step.consent_given_at = consent.signed_at
+
+    db.commit()
+    db.refresh(consent)
+    return consent
+
+
 @router.get("/consents/{consent_id}/pdf")
 def get_consent_pdf(
     consent_id: int,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Serve the signed PDF. Accessible by the owning patient or by Admin/Doctor."""
+    """Serve the signed PDF or uploaded document file."""
     patient_id = current_user.get("patient_id")
     roles = current_user.get("roles", [])
+    normalized_roles = [r.lower() for r in roles]
 
     consent = db.query(PatientConsent).filter(PatientConsent.id == consent_id).first()
     if not consent:
@@ -913,17 +936,20 @@ def get_consent_pdf(
         if not is_owner:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     else:
-        if "Admin" not in roles and "Doctor" not in roles:
+        if not any(r in normalized_roles for r in ["admin", "doctor", "receptionist", "reception"]):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    pdf_file = consent.pdf_file_path
+    pdf_file = consent.pdf_file_path or consent.uploaded_document_path
+    if pdf_file and pdf_file.startswith("/"):
+        pdf_file = pdf_file.lstrip("/")
+
     if not pdf_file or not os.path.exists(pdf_file):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDF file not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDF or uploaded document file not found")
 
     return FileResponse(
         path=pdf_file,
         filename=os.path.basename(pdf_file),
-        media_type="application/pdf",
+        media_type="application/pdf" if pdf_file.endswith(".pdf") else None,
     )
 
 

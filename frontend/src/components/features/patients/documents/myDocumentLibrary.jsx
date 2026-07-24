@@ -78,9 +78,7 @@ export default function MyDocumentLibrary({ documents = [], onSignDocument, onDo
                       ) : (
                         <button
                           onClick={() => {
-                            if (doc.url === "#") {
-                              alert(`Downloading "${doc.name}" is not supported in the mock version.`);
-                            } else if (onDownloadDocument) {
+                            if (onDownloadDocument) {
                               onDownloadDocument(doc);
                             }
                           }}

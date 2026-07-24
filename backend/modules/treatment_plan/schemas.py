@@ -46,8 +46,6 @@ class TreatmentPlanBase(BaseModel):
     treatment_objectives: Optional[List[str]] = []
     estimated_duration: Optional[str] = None
     expected_completion: Optional[str] = None
-    next_visit_date: Optional[str] = None
-    next_visit_procedure: Optional[str] = None
     attachments: Optional[List[Dict[str, str]]] = []  # e.g. [{"name": "OPG", "type": "OPG", "url": "/..."}]
 
 
@@ -61,8 +59,6 @@ class TreatmentPlanUpdate(BaseModel):
     treatment_objectives: Optional[List[str]] = None
     estimated_duration: Optional[str] = None
     expected_completion: Optional[str] = None
-    next_visit_date: Optional[str] = None
-    next_visit_procedure: Optional[str] = None
     attachments: Optional[List[Dict[str, str]]] = None
     status: Optional[str] = None
 

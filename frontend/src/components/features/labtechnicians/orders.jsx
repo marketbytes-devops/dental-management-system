@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   ClipboardList, 
   Hourglass, 
@@ -22,9 +22,13 @@ import {
   ShieldCheck,
   RefreshCw,
   Plus,
-  Microscope
+  Microscope,
+  FileText,
+  Paperclip,
+  Flag,
+  Mail
 } from "lucide-react";
-import { getLabOrders, updateLabOrderStatus, updateLabOrder } from "@/services/api";
+import { getLabOrders, updateLabOrderStatus, updateLabOrder, getLabVendors, uploadLabFile } from "@/services/api";
 import { validateLabOrderFields } from "@/services/labValidation";
 
 
@@ -32,6 +36,7 @@ import { validateLabOrderFields } from "@/services/labValidation";
 export default function LabOrders() {
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
+  const [labVendors, setLabVendors] = useState([]);
 
   const fetchOrders = async () => {
     try {
@@ -47,7 +52,7 @@ export default function LabOrders() {
         material: o.material || "Zirconia",
         shade: o.shade || "A2",
         priority: o.priority || "Medium",
-        dueDate: o.due_date || "2026-06-15",
+        orderDate: o.created_at ? o.created_at.split("T")[0] : "2026-06-10",
         status: o.status,
         notes: o.notes || "",
         rejectionReason: o.rejection_reason || "",
@@ -81,8 +86,18 @@ export default function LabOrders() {
     }
   };
 
+  const fetchVendors = async () => {
+    try {
+      const data = await getLabVendors();
+      setLabVendors(data);
+    } catch (err) {
+      console.error("Failed to fetch lab vendors:", err);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
+    fetchVendors();
     const interval = setInterval(fetchOrders, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -107,9 +122,6 @@ export default function LabOrders() {
     // Add lab-tech specific universal routing requirements
     if (!order.labName && !order.lab_name && !order.external_lab_name) {
       missing.push("Lab partner selection");
-    }
-    if (!order.dueDate && !order.due_date) {
-      missing.push("Due date");
     }
     return missing;
   };
@@ -143,24 +155,23 @@ export default function LabOrders() {
   const [reworkOrder, setReworkOrder] = useState(null);
   const [reworkReason, setReworkReason] = useState("shade mismatch");
   const [reworkNote, setReworkNote] = useState("");
+  const [reworkFiles, setReworkFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [expandedPatients, setExpandedPatients] = useState({});
+
+  const togglePatientExpand = (patientName) => {
+    setExpandedPatients((prev) => ({
+      ...prev,
+      [patientName]: !prev[patientName],
+    }));
+  };
 
   // Dispatch Modal States
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
   const [dispatchOrder, setDispatchOrder] = useState(null);
   const [dispatchFormData, setDispatchFormData] = useState({
-    labName: "Apex Dental Laboratories",
-    address: "SmileCare Dental Practice, 4th Floor, Suite 402, Jubilee Hills, Hyderabad, Telangana - 500033",
-    expectedReturnDate: "",
-    courierPartner: "SmileCare Express",
-    marginClearance: "Verified (Correct)",
-    prepHeight: "Verified (Correct)",
-    occlusalFit: "Verified (Correct)",
-    externalCost: 3500,
-    notes: "",
-    prostheticType: "",
-    material: "",
-    shade: "",
-    toothQuadrant: ""
+    selectedPartnerKey: "apex",
+    email: "apex.dental@labmail.com"
   });
 
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -176,25 +187,76 @@ export default function LabOrders() {
   const [reworkReason2, setReworkReason2] = useState("");
   const [reworkCategory2, setReworkCategory2] = useState("shade mismatch");
 
-  const LAB_PARTNERS = {
-    apex: {
+  const LAB_PARTNERS = {};
+  if (labVendors && labVendors.length > 0) {
+    labVendors.forEach((vendor) => {
+      const key = vendor.name.toLowerCase().replace(/[^a-z0-9]/g, "_");
+      LAB_PARTNERS[key] = {
+        id: vendor.id,
+        name: vendor.name,
+        email: vendor.email || "labs@smilecare.com",
+        phone: vendor.phone || "",
+        contact_person: vendor.contact_person || "",
+        average_tat_days: vendor.average_tat_days || 5,
+        address: vendor.pricing_list?.address || "Address not provided"
+      };
+    });
+  } else {
+    LAB_PARTNERS.apex = {
+      id: 1,
       name: "Apex Dental Laboratories",
       address: "Apex Dental Lab, 2nd Floor, Plot 14, Road 12, Banjara Hills, Hyderabad — 500034",
       contact: "+91 40 2345 6789",
+      email: "apex.dental@labmail.com",
       specialty: "Zirconia Crowns, E-max Veneers, Full-Arch Bridges"
-    },
-    precision: {
+    };
+    LAB_PARTNERS.precision = {
+      id: 2,
       name: "Precision Milling Centre",
       address: "Precision Milling Centre, Unit 3, HITEC City, Madhapur, Hyderabad — 500081",
       contact: "+91 40 6678 9012",
+      email: "precision.dental@labmail.com",
       specialty: "CAD-CAM Milling, PMMA Temporaries, Implant Crowns"
-    },
-    citypath: {
+    };
+    LAB_PARTNERS.citypath = {
+      id: 3,
       name: "City Path Labs",
       address: "City Path Diagnostics, Lane 4, Punjagutta, Hyderabad — 500082",
       contact: "+91 40 4456 7890",
+      email: "citypath.diagnostics@labmail.com",
       specialty: "Biopsy Analysis, Blood Tests, Microbiology Panels"
+    };
+  }
+
+  const getMeasurementsList = (order) => {
+    if (!order) return [];
+    const list = [];
+    if (order.orderCategory === "Prosthetic") {
+      if (order.prostheticType) list.push({ label: "Prosthetic type", value: order.prostheticType });
+      if (order.toothQuadrant) list.push({ label: "Tooth number", value: order.toothQuadrant });
+      if (order.shade) list.push({ label: "Shade", value: order.shade });
+      if (order.material) list.push({ label: "Material", value: order.material });
+      if (order.impressionType) list.push({ label: "Impression type", value: order.impressionType });
+      if (order.marginDesign) list.push({ label: "Margin design", value: order.marginDesign });
+      if (order.implantSystem) list.push({ label: "Implant system", value: order.implantSystem });
+    } else {
+      if (order.testType) list.push({ label: "Test Type", value: order.testType });
+      if (order.sampleType) list.push({ label: "Sample Type", value: order.sampleType });
+      if (order.reasonForTest) list.push({ label: "Reason for test", value: order.reasonForTest });
     }
+    // Any other extra fields inside orderDetails can also be added dynamically if not already listed
+    if (order.orderDetails && typeof order.orderDetails === "object") {
+      Object.entries(order.orderDetails).forEach(([key, val]) => {
+        if (typeof val === "string" && val.trim() && !["address", "notes", "lab_name", "lab_email"].includes(key)) {
+          const cleanKey = key.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+          // check if already added
+          if (!list.some(item => item.label.toLowerCase() === cleanKey.toLowerCase())) {
+            list.push({ label: cleanKey, value: val });
+          }
+        }
+      });
+    }
+    return list;
   };
 
   const currentCase = selectedOrder ? {
@@ -207,7 +269,7 @@ export default function LabOrders() {
     type: selectedOrder.prostheticType,
     material: selectedOrder.material,
     priority: selectedOrder.priority,
-    dueDate: selectedOrder.dueDate,
+    orderDate: selectedOrder.orderDate,
     shade: selectedOrder.shade,
     status: selectedOrder.status,
     notes: selectedOrder.notes,
@@ -336,8 +398,8 @@ export default function LabOrders() {
     prostheticType: "",
     material: "",
     shade: "",
-    priority: "",
-    dueDate: "",
+    priority: "Medium",
+    orderDate: "",
     notes: ""
   });
 
@@ -389,15 +451,15 @@ export default function LabOrders() {
     if (dateFilter !== "") {
       const today = new Date("2026-06-10");
       result = result.filter((o) => {
-        const orderDate = new Date(o.dueDate);
-        const timeDiff = orderDate.getTime() - today.getTime();
+        const orderDate = new Date(o.orderDate);
+        const timeDiff = today.getTime() - orderDate.getTime();
         const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
 
         if (dateFilter === "Today") {
-          return o.dueDate === "2026-06-10";
-        } else if (dateFilter === "Next 7 Days") {
+          return o.orderDate === "2026-06-10";
+        } else if (dateFilter === "Last 7 Days") {
           return daysDiff >= 0 && daysDiff <= 7;
-        } else if (dateFilter === "Next 30 Days") {
+        } else if (dateFilter === "Last 30 Days") {
           return daysDiff >= 0 && daysDiff <= 30;
         }
         return true;
@@ -598,7 +660,26 @@ export default function LabOrders() {
     setReworkOrder(order);
     setReworkReason("shade mismatch");
     setReworkNote("");
+    setReworkFiles([]);
     setIsReworkModalOpen(true);
+  };
+
+  const handleReworkFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await uploadLabFile(formData);
+      setReworkFiles((prev) => [...prev, res]);
+      triggerToast(`File "${file.name}" uploaded successfully.`);
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to upload file.", "error");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleReworkSubmit = async (e) => {
@@ -608,10 +689,12 @@ export default function LabOrders() {
       await updateLabOrderStatus(reworkOrder.id, {
         status: "Returned for Rework",
         rejection_category: reworkReason,
-        rejection_reason: reworkNote
+        rejection_reason: reworkNote,
+        attachments: reworkFiles
       });
       triggerToast(`Case ${reworkOrder.id} returned for rework.`);
       setIsReworkModalOpen(false);
+      setReworkFiles([]);
       fetchOrders();
     } catch (err) {
       console.error(err);
@@ -667,19 +750,6 @@ export default function LabOrders() {
     const hasMissing = missing.length > 0;
     
     if (isProsthetic) {
-      if (order.status === "Pending Review") {
-        return (
-          <button
-            onClick={() => {
-              setSelectedOrder(order);
-              setIsDrawerOpen(true);
-            }}
-            className="px-2.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-lg text-xs font-bold transition-all cursor-pointer"
-          >
-            Review &amp; Route
-          </button>
-        );
-      }
       if (order.status === "Revision Requested") {
         return (
           <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded border border-rose-100">
@@ -687,27 +757,14 @@ export default function LabOrders() {
           </span>
         );
       }
-      if (order.status === "Confirmed by Tech") {
-        return (
-          <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded border border-blue-100">
-            Awaiting Doctor Approval
-          </span>
-        );
-      }
-      if (order.status === "submitted" || order.status === "Submitted" || order.status === "Pending" || order.status === "Flagged" || order.status === "flagged") {
+      if (["submitted", "Submitted", "Pending", "Pending Review", "Confirmed by Tech", "Flagged", "flagged"].includes(order.status)) {
         return (
           <div className="flex gap-2 items-center flex-wrap">
             <button
-              onClick={() => updateDbStatus(order.id, "Doctor Accepted")}
-              disabled={hasMissing}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                hasMissing 
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200" 
-                  : "bg-primary text-white hover:bg-primary/95"
-              }`}
-              title={hasMissing ? `Missing fields: ${missing.join(", ")}` : "Confirm Order"}
+              onClick={() => handleOpenDispatchModal(order)}
+              className="px-2.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-lg text-xs font-bold transition-all cursor-pointer"
             >
-              Confirm Order
+              Send to Lab
             </button>
             {order.status !== "Flagged" && order.status !== "flagged" && (
               <button
@@ -719,7 +776,7 @@ export default function LabOrders() {
             )}
             {hasMissing && (
               <span className="text-[10px] text-warning font-semibold block w-full mt-1">
-                ⚠️ Missing: {missing.join(", ")}
+                Missing: {missing.join(", ")}
               </span>
             )}
           </div>
@@ -728,31 +785,47 @@ export default function LabOrders() {
       if (["Confirmed", "confirmed", "Doctor Accepted"].includes(order.status)) {
         return (
           <button
-            onClick={() => updateDbStatus(order.id, "Order Sent to Lab")}
+            onClick={() => handleOpenDispatchModal(order)}
             className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-650 hover:text-white border border-indigo-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
           >
-            Mark as Sent to Lab
+            Send to Lab
           </button>
         );
       }
       if (["Sent to Lab", "sent_to_lab", "Order Sent to Lab", "in_design", "in_fabrication", "quality_check"].includes(order.status)) {
         return (
-          <button
-            onClick={() => updateDbStatus(order.id, "Order Received")}
-            className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-600 text-purple-650 hover:text-white border border-purple-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
-          >
-            Mark as Received from Lab
-          </button>
+          <div className="flex gap-2 items-center flex-wrap">
+            <button
+              onClick={() => updateDbStatus(order.id, "Order Received")}
+              className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-600 text-purple-650 hover:text-white border border-purple-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Mark as Received from Lab
+            </button>
+            <button
+              onClick={() => handleOpenReworkModal(order)}
+              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Return for Correction
+            </button>
+          </div>
         );
       }
       if (["Received from Lab", "received_from_lab", "Order Received"].includes(order.status)) {
         return (
-          <button
-            onClick={() => updateDbStatus(order.id, "Fitted")}
-            className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-500 text-teal-500 hover:text-white border border-teal-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
-          >
-            Mark as Delivered to Clinic
-          </button>
+          <div className="flex gap-2 items-center flex-wrap">
+            <button
+              onClick={() => updateDbStatus(order.id, "Fitted")}
+              className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-500 text-teal-500 hover:text-white border border-teal-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Mark as Delivered to Clinic
+            </button>
+            <button
+              onClick={() => handleOpenReworkModal(order)}
+              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Return for Correction
+            </button>
+          </div>
         );
       }
       if (order.status === "Fitted" || order.status === "fitted") {
@@ -798,10 +871,10 @@ export default function LabOrders() {
       if (order.status === "Sample Collected" || order.status === "sample_collected") {
         return (
           <button
-            onClick={() => updateDbStatus(order.id, "Order Sent to Lab")}
+            onClick={() => handleOpenDispatchModal(order)}
             className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-650 hover:text-white border border-indigo-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
           >
-            Mark as Sent to Lab
+            Send to Lab
           </button>
         );
       }
@@ -887,7 +960,6 @@ export default function LabOrders() {
       material: order.material,
       shade: order.shade,
       priority: order.priority,
-      dueDate: order.dueDate,
       notes: order.notes
     });
     setIsEditModalOpen(true);
@@ -901,7 +973,6 @@ export default function LabOrders() {
         material: editFormData.material,
         shade: editFormData.shade,
         priority: editFormData.priority,
-        due_date: editFormData.dueDate,
         notes: editFormData.notes
       });
       if (selectedOrder && selectedOrder.id === editFormData.id) {
@@ -911,7 +982,6 @@ export default function LabOrders() {
           material: editFormData.material,
           shade: editFormData.shade,
           priority: editFormData.priority,
-          dueDate: editFormData.dueDate,
           notes: editFormData.notes
         }));
       }
@@ -937,11 +1007,10 @@ export default function LabOrders() {
 
   const handleOpenDispatchModal = (order) => {
     setDispatchOrder(order);
-    const details = order.orderDetails || {};
+    const initialKey = Object.keys(LAB_PARTNERS).find(key => LAB_PARTNERS[key].name === order.labName) || Object.keys(LAB_PARTNERS)[0] || "apex";
     setDispatchFormData({
-      address: details.address || "",
-      expectedReturnDate: order.expectedReturnDate || order.dueDate || "",
-      notes: details.notes || order.notes || "",
+      selectedPartnerKey: initialKey,
+      email: LAB_PARTNERS[initialKey]?.email || "apex.dental@labmail.com",
     });
     setIsDispatchModalOpen(true);
   };
@@ -950,15 +1019,17 @@ export default function LabOrders() {
     e.preventDefault();
     if (!dispatchOrder) return;
     try {
+      const selectedPartner = LAB_PARTNERS[dispatchFormData.selectedPartnerKey];
       const orderDetailsPayload = {
         ...dispatchOrder.orderDetails,
-        address: dispatchFormData.address,
-        notes: dispatchFormData.notes
+        lab_name: selectedPartner.name,
+        lab_email: selectedPartner.email,
       };
 
       await updateLabOrder(dispatchOrder.id, {
         status: "Sent to Lab",
-        expected_return_date: dispatchFormData.expectedReturnDate,
+        lab_name: selectedPartner.name,
+        vendor_id: selectedPartner.id,
         order_details: orderDetailsPayload,
       });
 
@@ -972,15 +1043,7 @@ export default function LabOrders() {
   };
 
   const openDetailsDrawer = (order) => {
-    setSelectedOrder(order);
-    setIsDrawerOpen(true);
-
-    const partnerKey = Object.keys(LAB_PARTNERS).find(key => LAB_PARTNERS[key].name === order.labName) || "apex";
-    setSelectedLabPartner(partnerKey);
-    setDeliveryAddress(order.orderDetails?.address || LAB_PARTNERS[partnerKey].address);
-    setLabNotes(order.orderDetails?.notes || order.notes || "");
-    setIsReceived(["Order Received", "Completed"].includes(order.status));
-    setReceivedDate(order.receivedDate || "");
+    handleOpenDispatchModal(order);
   };
 
   return (
@@ -1052,25 +1115,13 @@ export default function LabOrders() {
           </span>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between relative overflow-hidden group hover:border-purple-55/35 transition-all duration-300">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">In Production</p>
-            <h3 className="text-3xl font-extrabold text-gray-900">{inProductionCases}</h3>
-            <p className="text-xs text-purple-650 font-semibold mt-2">Accepted & active</p>
-          </div>
-          <span className="bg-purple-50 p-3 rounded-xl text-purple-600 flex items-center justify-center shrink-0 z-10">
-            <Microscope className="w-6 h-6" />
-          </span>
-        </div>
-
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between relative overflow-hidden group hover:border-danger/45 transition-all duration-300">
           <div className="absolute top-0 right-0 w-24 h-24 bg-danger/5 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Urgent & High</p>
             <h3 className="text-3xl font-extrabold text-gray-900">{urgentHighCases}</h3>
             <p className="text-xs text-danger font-semibold mt-2 flex items-center gap-1">
-              <span>⚠️</span> Priority handling
+              Priority handling
             </p>
           </div>
           <span className="bg-danger/10 p-3 rounded-xl text-danger flex items-center justify-center shrink-0 z-10">
@@ -1188,112 +1239,197 @@ export default function LabOrders() {
               onChange={(e) => setDateFilter(e.target.value)}
               className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-700 min-w-[130px]"
             >
-              <option value="">All Due Dates</option>
+              <option value="">All Order Dates</option>
               <option value="Today">Today (June 10)</option>
-              <option value="Next 7 Days">Next 7 Days</option>
-              <option value="Next 30 Days">Next 30 Days</option>
+              <option value="Last 7 Days">Last 7 Days</option>
+              <option value="Last 30 Days">Last 30 Days</option>
             </select>
           </div>
         </div>
 
-        {viewMode === "table" ? (
-          <div className="overflow-x-auto border border-gray-100 rounded-xl">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50/70 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  <th className="px-6 py-4">Case ID</th>
-                  <th className="px-6 py-4">Patient Name</th>
-                  <th className="px-6 py-4">Dentist</th>
-                  <th className="px-6 py-4">Prosthetic Specs</th>
-                  <th className="px-6 py-4">Priority</th>
-                  <th className="px-6 py-4">Due Date</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
-                {filteredOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" className="px-6 py-10 text-center text-gray-450">
-                      <div className="flex flex-col items-center justify-center space-y-2">
-                        <Search className="w-8 h-8 text-gray-300" />
-                        <p className="font-semibold text-base text-gray-750">No lab orders found</p>
-                        <p className="text-xs text-gray-400">Try adjusting your filters or search term.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredOrders.map((order) => (
-                    <tr 
-                      key={order.id} 
-                      className="hover:bg-gray-50/50 transition-colors group cursor-pointer"
-                      onClick={() => openDetailsDrawer(order)}
+        {viewMode === "table" ? (() => {
+          // Group orders by patient
+          const groupedPatients = filteredOrders.reduce((acc, order) => {
+            const pName = order.patientName || "Unknown Patient";
+            if (!acc[pName]) {
+              acc[pName] = {
+                name: pName,
+                dentists: new Set(),
+                orders: [],
+                newOrdersCount: 0
+              };
+            }
+            acc[pName].orders.push(order);
+            if (order.dentistName) {
+              acc[pName].dentists.add(order.dentistName);
+            }
+            if (["Pending Review", "pending_review", "Returned for Rework", "returned_for_rework"].includes(order.status)) {
+              acc[pName].newOrdersCount += 1;
+            }
+            return acc;
+          }, {});
+
+          const patientRows = Object.values(groupedPatients);
+
+          return (
+            <div className="space-y-4">
+              {patientRows.length === 0 ? (
+                <div className="bg-white border border-gray-150 rounded-2xl p-10 text-center text-gray-450">
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <Search className="w-8 h-8 text-gray-300" />
+                    <p className="font-semibold text-base text-gray-750">No lab orders found</p>
+                    <p className="text-xs text-gray-400">Try adjusting your filters or search term.</p>
+                  </div>
+                </div>
+              ) : (
+                patientRows.map((patient) => {
+                  const isExpanded = !!expandedPatients[patient.name];
+                  const firstLetter = patient.name.charAt(0).toUpperCase();
+                  return (
+                    <div 
+                      key={patient.name}
+                      className={`bg-white border rounded-2xl shadow-sm transition-all duration-300 overflow-hidden ${
+                        isExpanded ? "border-indigo-200 ring-2 ring-indigo-50" : "border-gray-150 hover:border-indigo-150 hover:shadow-md"
+                      }`}
                     >
-                      <td className="px-6 py-4 font-bold text-gray-900 text-xs group-hover:text-primary transition-colors">
-                        {order.id}
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-800">
-                        {order.patientName}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        <div>
-                          <p className="font-medium text-gray-800">{order.dentistName}</p>
-                          <p className="text-xs text-gray-400">{order.dentistContact}</p>
+                      {/* Header row */}
+                      <div 
+                        onClick={() => togglePatientExpand(patient.name)}
+                        className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none text-left"
+                      >
+                        {/* Left: Avatar & Patient Name */}
+                        <div className="flex items-center gap-3.5 flex-1 min-w-[200px]">
+                          <div className="relative w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-black text-indigo-750 text-sm shrink-0">
+                            {firstLetter}
+                            {patient.newOrdersCount > 0 && (
+                              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-extrabold text-gray-900 text-sm leading-tight">{patient.name}</h3>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Patient Profile</p>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">
-                        <div>
-                          {order.orderCategory === "Prosthetic" ? (
-                            <>
-                              <p className="font-semibold text-gray-750 text-xs">{order.prostheticType}</p>
-                              <p className="text-[11px] text-gray-400">{order.material} (Shade: {order.shade})</p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="font-semibold text-gray-750 text-xs">{order.orderCategory}</p>
-                              <p className="text-[11px] text-gray-400 truncate max-w-[150px]">{JSON.stringify(order.orderDetails)}</p>
-                            </>
-                          )}
+
+                        {/* Middle Left: Dentist info */}
+                        <div className="flex-1 min-w-[150px]">
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ordering Dentist(s)</p>
+                          <p className="text-xs text-gray-700 font-extrabold mt-0.5">
+                            {Array.from(patient.dentists).join(", ") || "N/A"}
+                          </p>
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${getPriorityStyle(order.priority)}`}>
-                          {order.priority}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-600 font-medium">
-                        {order.dueDate === "2026-06-10" ? (
-                          <span className="text-danger font-semibold flex items-center gap-1">
-                            Today ⚠️
-                          </span>
-                        ) : (
-                          order.dueDate
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full ${getStatusDotColor(order.status)}`}></span>
-                          <span className="text-sm font-semibold text-gray-700">{getStatusLabel(order.status)}</span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end items-center gap-1.5 flex-wrap">
-                          {renderOrderActions(order)}
-                          <button 
-                            onClick={() => openDetailsDrawer(order)}
-                            className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-100 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                          >
-                            View Details
-                          </button>
+
+                        {/* Middle Right: Total Orders badge */}
+                        <div className="w-20">
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Cases</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-700 text-xs font-black rounded-md">
+                              {patient.orders.length}
+                            </span>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        ) : (
+
+                        {/* Right: Status callout & Chevron */}
+                        <div className="flex items-center justify-between md:justify-end gap-6 md:w-60">
+                          <div className="text-left md:text-right">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Recent Activity</p>
+                            {patient.newOrdersCount > 0 ? (
+                              <span className="text-red-500 font-extrabold text-xs flex items-center md:justify-end gap-1.5 mt-0.5">
+                                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
+                                {patient.newOrdersCount} new order{patient.newOrdersCount > 1 ? "s" : ""}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 font-bold text-xs block mt-0.5">
+                                No new activity
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="text-gray-400 hover:text-indigo-650 transition-colors p-1.5 bg-gray-50 rounded-xl shrink-0">
+                            <ChevronRight className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? "rotate-90 text-indigo-650" : ""}`} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded section: nested details table */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-100 bg-gray-50/30 p-5 text-left">
+                          <div className="bg-white border border-gray-150 rounded-xl overflow-hidden shadow-inner">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                  <tr className="bg-gray-50/70 border-b border-gray-150 font-black text-gray-500 uppercase tracking-wider text-[10px]">
+                                    <th className="px-4 py-3">Case ID</th>
+                                    <th className="px-4 py-3">Prosthetic Specs</th>
+                                    <th className="px-4 py-3">Priority</th>
+                                    <th className="px-4 py-3">Order Date</th>
+                                    <th className="px-4 py-3">Status</th>
+                                    <th className="px-4 py-3 text-right">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {patient.orders.map((order) => (
+                                    <tr 
+                                      key={order.id} 
+                                      onClick={() => openDetailsDrawer(order)}
+                                      className="hover:bg-gray-50/70 transition-colors cursor-pointer group"
+                                    >
+                                      <td className="px-4 py-3.5 font-bold text-gray-900 group-hover:text-primary transition-colors">
+                                        {order.id}
+                                      </td>
+                                      <td className="px-4 py-3.5">
+                                        {order.orderCategory === "Prosthetic" ? (
+                                          <div>
+                                            <p className="font-semibold text-gray-750">{order.prostheticType}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5">{order.material} (Shade: {order.shade})</p>
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <p className="font-semibold text-gray-750">{order.orderCategory}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[200px]">{JSON.stringify(order.orderDetails)}</p>
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td className="px-4 py-3.5">
+                                        <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide ${getPriorityStyle(order.priority)}`}>
+                                          {order.priority}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3.5 text-gray-650 font-medium">
+                                        {order.orderDate}
+                                      </td>
+                                      <td className="px-4 py-3.5">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className={`w-2 h-2 rounded-full ${getStatusDotColor(order.status)}`}></span>
+                                          <span className="font-semibold text-gray-750">{getStatusLabel(order.status)}</span>
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex justify-end items-center gap-1.5 flex-wrap">
+                                          {renderOrderActions(order)}
+                                          <button 
+                                            onClick={() => openDetailsDrawer(order)}
+                                            className="px-2.5 py-1.5 text-gray-500 hover:bg-gray-150 hover:text-gray-750 rounded-lg text-[10px] font-bold transition-all cursor-pointer border border-gray-100"
+                                          >
+                                            View Details
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          );
+        })() : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
             {BOARD_COLUMNS.map((column) => {
               const columnOrders = filteredOrders.filter((o) =>
@@ -1344,9 +1480,9 @@ export default function LabOrders() {
                           
                           <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2.5">
                             <div className="flex flex-col">
-                              <span className="text-[9px] text-gray-400 uppercase tracking-wider">Due Date</span>
-                              <span className={`text-[11px] font-bold ${order.dueDate === "2026-06-10" ? "text-danger" : "text-gray-600"}`}>
-                                {order.dueDate}
+                              <span className="text-[9px] text-gray-400 uppercase tracking-wider">Order Date</span>
+                              <span className="text-[11px] font-bold text-gray-650">
+                                {order.orderDate}
                               </span>
                             </div>
                             
@@ -1370,386 +1506,6 @@ export default function LabOrders() {
           </div>
         )}
       </div>
-      {isDrawerOpen && currentCase && (
-        <>
-          {/* Backdrop overlay */}
-          <div 
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 transition-opacity animate-in fade-in duration-200"
-            onClick={() => setIsDrawerOpen(false)}
-          />
-          
-          {/* Drawer Wrapper */}
-          <div className="fixed inset-y-0 right-0 w-full md:w-[600px] bg-white border-l border-gray-200 shadow-2xl z-50 flex flex-col h-full animate-in slide-in-from-right duration-300 pointer-events-auto">
-            
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/60 shrink-0">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black text-gray-900">{currentCase.id}</span>
-                  <span className={`inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${getPriorityStyle(currentCase.priority)}`}>
-                    {currentCase.priority}
-                  </span>
-                </div>
-                <h3 className="text-base font-extrabold text-gray-900 mt-1">{currentCase.patient}</h3>
-              </div>
-              <button 
-                onClick={() => setIsDrawerOpen(false)}
-                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-650 cursor-pointer transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Single scrollable content — no tabs */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-6 space-y-6">
-
-                {/* ── SECTION 1: Doctor's Specifications (read-only) ── */}
-                <div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Order Specifications</p>
-                  <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-4">
-
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-                      {currentCase.orderCategory === "Prosthetic" ? (
-                        <>
-                          <div>
-                            <p className="text-gray-400 font-medium">Prosthetic Type</p>
-                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.type || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400 font-medium">Material</p>
-                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.material || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400 font-medium">Tooth / Quadrant</p>
-                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.toothQuadrant ? `#${currentCase.toothQuadrant}` : "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400 font-medium">Shade</p>
-                            <p className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/30 inline-block mt-0.5">{currentCase.shade || "—"}</p>
-                          </div>
-                          {currentCase.implantSystem && (
-                            <div className="col-span-2">
-                              <p className="text-gray-400 font-medium">Implant System</p>
-                              <p className="font-bold text-gray-800 mt-0.5">{currentCase.implantSystem}</p>
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-gray-400 font-medium">Due Date</p>
-                            <p className="font-bold text-danger mt-0.5 flex items-center gap-1"><Calendar className="w-3 h-3" />{currentCase.dueDate || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400 font-medium">Priority</p>
-                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.priority || "—"}</p>
-                          </div>
-                          {currentCase.scanFile && (
-                            <div className="col-span-2">
-                              <p className="text-gray-400 font-medium mb-1">Scan File</p>
-                              <a href={`/api/lab/files/${currentCase.scanFile}`} download
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 border border-primary/20 rounded-lg text-primary hover:bg-primary/10 font-bold text-[11px] transition-colors">
-                                📂 {currentCase.scanFile}
-                              </a>
-                            </div>
-                          )}
-                          {currentCase.opposingBiteScan && (
-                            <div className="col-span-2">
-                              <p className="text-gray-400 font-medium mb-1">Opposing Bite Scan</p>
-                              <a href={`/api/lab/files/${currentCase.opposingBiteScan}`} download
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/5 border border-primary/20 rounded-lg text-primary hover:bg-primary/10 font-bold text-[11px] transition-colors">
-                                📂 {currentCase.opposingBiteScan}
-                              </a>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <div>
-                            <p className="text-gray-400 font-medium">Test Type</p>
-                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.testType || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400 font-medium">Sample Type</p>
-                            <p className="font-bold text-gray-800 mt-0.5">{currentCase.sampleType || "—"}</p>
-                          </div>
-                          <div className="col-span-2">
-                            <p className="text-gray-400 font-medium">Reason for Test</p>
-                            <p className="font-bold text-gray-700 mt-0.5">{currentCase.reasonForTest || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400 font-medium">Due Date</p>
-                            <p className="font-bold text-danger mt-0.5 flex items-center gap-1"><Calendar className="w-3 h-3" />{currentCase.dueDate || "—"}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-400 font-medium">Sample Collected</p>
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider mt-0.5 ${
-                              currentCase.sampleCollectedConfirm
-                                ? "bg-success/10 text-success border-success/20"
-                                : "bg-danger/10 text-danger border-danger/20"
-                            }`}>
-                              {currentCase.sampleCollectedConfirm ? "Confirmed" : "Pending"}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {currentCase.notes && (
-                      <div className="pt-3 border-t border-gray-200">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Doctor&apos;s Notes</p>
-                        <p className="text-xs text-gray-600 italic leading-relaxed">&ldquo;{currentCase.notes}&rdquo;</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ordering Dentist strip */}
-                  <div className="mt-3 border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-between bg-white">
-                    <div>
-                      <p className="text-[9px] font-black text-primary uppercase tracking-widest">Ordering Dentist</p>
-                      <p className="text-xs font-bold text-gray-900 mt-0.5">{currentCase.dentist}</p>
-                      <p className="text-[10px] text-gray-400">{currentCase.dentistContact}</p>
-                    </div>
-                    <span className="text-lg bg-gray-50 p-2 rounded-xl border border-gray-100">👤</span>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="border-t border-dashed border-gray-200" />
-
-                {/* ── SECTION 2: Service Provider ── */}
-                <div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Select Service Provider</p>
-                  <div className="space-y-2">
-                    {Object.entries(LAB_PARTNERS).map(([key, lab]) => (
-                      <label
-                        key={key}
-                        className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
-                          selectedLabPartner === key
-                            ? "border-primary bg-primary/5"
-                            : "border-gray-100 hover:border-gray-200 bg-white"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="labPartner"
-                          value={key}
-                          checked={selectedLabPartner === key}
-                          onChange={() => {
-                            setSelectedLabPartner(key);
-                            setDeliveryAddress(LAB_PARTNERS[key].address);
-                          }}
-                          className="mt-0.5 accent-primary shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-900">{lab.name}</p>
-                          <p className="text-[10px] text-gray-500 mt-0.5">{lab.specialty}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{lab.contact}</p>
-                        </div>
-                        {selectedLabPartner === key && (
-                          <span className="w-4 h-4 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
-                            <span className="text-white text-[8px] font-black">✓</span>
-                          </span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* ── SECTION 3: Delivery Address ── */}
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                    Delivery Address <span className="text-red-400 normal-case tracking-normal font-bold">*</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Enter the address where the item should be delivered"
-                    value={deliveryAddress || (selectedLabPartner ? LAB_PARTNERS[selectedLabPartner].address : "")}
-                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 resize-none placeholder-gray-400 leading-relaxed"
-                  />
-                </div>
-
-                {/* ── SECTION 4: Additional Notes ── */}
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                    Additional Notes
-                    <span className="ml-1.5 normal-case tracking-normal font-normal text-gray-400">(optional — sent to doctor)</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="e.g. Please use A1 shade guide. Urgent — patient appointment on Friday."
-                    value={labNotes}
-                    onChange={(e) => setLabNotes(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 resize-none placeholder-gray-400 leading-relaxed"
-                  />
-                </div>
-
-                {/* ── SECTION 5: Workflow Action Buttons ── */}
-                {currentCase.status === "Revision Requested" ? (
-                  <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl flex items-start gap-2.5">
-                    <span className="text-base shrink-0">📝</span>
-                    <div>
-                      <p className="text-xs font-bold">Revision Requested</p>
-                      <p className="text-[10px] text-rose-600/80 mt-0.5 leading-relaxed">
-                        Waiting for Dr. {currentCase.dentist || "the doctor"} to review notes and resubmit case.
-                      </p>
-                    </div>
-                  </div>
-                ) : currentCase.status === "Pending Review" ? (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={async () => {
-                        if (!labNotes) {
-                          triggerToast("Please add comments explaining the revision request.", "error");
-                          return;
-                        }
-                        const body = {
-                          status: "Revision Requested",
-                          tech_notes: labNotes
-                        };
-                        try {
-                          await updateLabOrderStatus(currentCase.id, body);
-                          triggerToast(`Revision requested on Case ${currentCase.id}.`);
-                          setIsDrawerOpen(false);
-                          fetchOrders();
-                        } catch (err) {
-                          console.error(err);
-                          triggerToast("Failed to request revision.", "error");
-                        }
-                      }}
-                      className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-xl text-xs transition-all cursor-pointer text-center"
-                    >
-                      Request Revision
-                    </button>
-                    <button
-                      onClick={async () => {
-                        const vendorIdMap = {
-                          apex: 1,
-                          precision: 2,
-                          citypath: 3
-                        };
-                        const body = {
-                          status: "Confirmed by Tech",
-                          vendor_id: vendorIdMap[selectedLabPartner] || 1,
-                          lab_name: LAB_PARTNERS[selectedLabPartner]?.name || "Apex Dental Laboratories",
-                          tech_notes: labNotes
-                        };
-                        try {
-                          await updateLabOrderStatus(currentCase.id, body);
-                          triggerToast(`Case ${currentCase.id} confirmed and routed to Doctor.`);
-                          setIsDrawerOpen(false);
-                          fetchOrders();
-                        } catch (err) {
-                          console.error(err);
-                          triggerToast("Failed to confirm case.", "error");
-                        }
-                      }}
-                      className="flex-1 py-3 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-xs transition-all shadow-md cursor-pointer text-center flex items-center justify-center gap-1.5"
-                    >
-                      <Check className="w-3.5 h-3.5" /> Confirm &amp; Route
-                    </button>
-                  </div>
-                ) : currentCase.status === "Confirmed by Tech" ? (
-                  <div className="p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-2xl flex items-start gap-2.5">
-                    <span className="text-base shrink-0">⏳</span>
-                    <div>
-                      <p className="text-xs font-bold">Confirmed by Lab Technician</p>
-                      <p className="text-[10px] text-blue-600/80 mt-0.5 leading-relaxed">
-                        Awaiting doctor review &amp; confirmation to send pre-filled email to {LAB_PARTNERS[selectedLabPartner]?.name || "the lab"}.
-                      </p>
-                    </div>
-                  </div>
-                ) : ["Sent to Lab", "Order Sent to Lab", "Order Received", "Completed", "Returned for Rework"].includes(currentCase.status) ? (
-                  <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
-                    <span className="text-lg shrink-0">📦</span>
-                    <div>
-                      <p className="text-xs font-bold text-primary">Dispatched &amp; Sent to External Lab</p>
-                      <p className="text-[10px] text-gray-555 mt-0.5 leading-relaxed">
-                        This order has been physically sent to {selectedLabPartner ? LAB_PARTNERS[selectedLabPartner]?.name : "the lab"}.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      if (!deliveryAddress && !LAB_PARTNERS[selectedLabPartner]?.address) {
-                        triggerToast("Please enter a delivery address.", "error");
-                        return;
-                      }
-                      const ok = await updateDbStatus(currentCase.id, "Order Sent to Lab");
-                      if (ok) {
-                        triggerToast(`Case ${currentCase.id} marked as Order Sent to Lab.`);
-                      } else {
-                        triggerToast("Failed to update status.", "error");
-                      }
-                    }}
-                    className="w-full py-3.5 bg-primary hover:bg-primary/95 text-white font-extrabold rounded-xl text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Truck className="w-4 h-4" /> Mark as Sent to Lab
-                  </button>
-                )}
-
-                {/* ── SECTION 6: Receipt tracking (only after order is sent to lab) ── */}
-                {["Sent to Lab", "Order Sent to Lab", "Order Received", "Completed", "Returned for Rework"].includes(currentCase.status) && (
-                  <>
-                    <div className="border-t border-dashed border-gray-200" />
-
-                    <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Item Receipt</p>
-
-                      <div className="flex items-start gap-3 p-4 bg-gray-50 border border-gray-150 rounded-xl">
-                        <input
-                          type="checkbox"
-                          id="received-check"
-                          checked={isReceived || ["Order Received", "Completed"].includes(currentCase.status)}
-                          onChange={async (e) => {
-                            const checked = e.target.checked;
-                            setIsReceived(checked);
-                            if (checked) {
-                              await updateDbStatus(currentCase.id, "Order Received");
-                            } else {
-                              await updateDbStatus(currentCase.id, "Order Sent to Lab");
-                            }
-                          }}
-                          className="mt-0.5 w-4 h-4 accent-primary shrink-0 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <label htmlFor="received-check" className="text-xs font-bold text-gray-800 cursor-pointer">
-                            Item Received at Clinic
-                          </label>
-                          <p className="text-[10px] text-gray-400 mt-0.5">Tick this once the package arrives from the lab.</p>
-                          {(isReceived || ["Order Received", "Completed"].includes(currentCase.status)) && (
-                            <div className="mt-3">
-                              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Date & Time Received</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. 10 July 2026, 11:30 AM"
-                                value={receivedDate}
-                                onChange={(e) => setReceivedDate(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 placeholder-gray-400"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {isReceived && (
-                        <button
-                          onClick={() => setIsReworkModalOpen2(true)}
-                          className="mt-3 w-full py-2.5 bg-warning/10 hover:bg-warning/20 border border-warning/30 text-warning font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          🔄 Return / Request Rework
-                        </button>
-                      )}
-                    </div>
-                  </>
-                )}
-
-              </div>
-            </div>
-
-          </div>
-        </>
-      )}
 
       {/* Return / Rework Reason Modal */}
       {isReworkModalOpen2 && (
@@ -1757,7 +1513,7 @@ export default function LabOrders() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <span className="text-warning">🔄</span> Return / Request Rework
+                <RefreshCw className="w-4 h-4 text-warning" /> Return / Request Rework
               </h2>
               <button
                 onClick={() => setIsReworkModalOpen2(false)}
@@ -1894,30 +1650,18 @@ export default function LabOrders() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Priority</label>
-                    <select 
-                      value={editFormData.priority}
-                      onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 bg-white"
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Urgent">Urgent</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Due Date</label>
-                    <input 
-                      type="date" 
-                      required
-                      value={editFormData.dueDate}
-                      onChange={(e) => setEditFormData({ ...editFormData, dueDate: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Priority</label>
+                  <select 
+                    value={editFormData.priority}
+                    onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 bg-white"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
                 </div>
 
                 <div>
@@ -1957,7 +1701,7 @@ export default function LabOrders() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
             <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <span className="text-danger">⚠️</span> Reject Lab Case {rejectTargetId}
+                <AlertTriangle className="w-4.5 h-4.5 text-danger" /> Reject Lab Case {rejectTargetId}
               </h2>
               <button 
                 onClick={() => setIsRejectModalOpen(false)}
@@ -2008,115 +1752,225 @@ export default function LabOrders() {
       {/* Send to External Lab Modal */}
       {isDispatchModalOpen && dispatchOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 my-8">
+          <div className="bg-white text-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 my-8 font-sans text-left">
             {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+            <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-start">
               <div>
-                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <span className="text-lg">📦</span> Send to External Lab
-                </h2>
-                <p className="text-xs text-gray-400 mt-0.5">Review the doctor&apos;s order, enter the delivery address, and send.</p>
+                <p className="text-xs font-bold text-gray-400">Order #{dispatchOrder.id}</p>
+                <h2 className="text-lg font-bold text-gray-900 mt-1">Patient: {dispatchOrder.patientName}</h2>
               </div>
               <button 
                 onClick={() => setIsDispatchModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                className="text-gray-400 hover:text-gray-650 transition-colors p-2 hover:bg-gray-100 rounded-full"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleDispatchSubmit}>
-              <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
+            <form onSubmit={handleDispatchSubmit} className="p-6 space-y-5">
+              
+              {/* Measurements from doctor */}
+              <div className="bg-gray-50 border border-gray-150 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-1">
+                  <FileText className="w-4 h-4 text-gray-550" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Measurements from doctor</span>
+                </div>
 
-                {/* Doctor Specs — read-only */}
-                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Doctor&apos;s Specifications</p>
+                <div className="space-y-2 text-xs font-medium text-gray-800">
+                  {getMeasurementsList(dispatchOrder).map(({ label, value }) => (
+                    <div key={label} className="flex justify-between border-b border-gray-200/50 pb-1.5">
+                      <span className="text-gray-500">{label}</span>
+                      <span className="text-gray-900 font-bold">{value}</span>
+                    </div>
+                  ))}
 
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
-                    {[
-                      { label: "Patient", value: dispatchOrder.patientName },
-                      { label: "Dentist", value: dispatchOrder.dentistName },
-                      { label: "Case ID", value: dispatchOrder.id },
-                      { label: "Priority", value: dispatchOrder.priority },
-                      { label: "Category", value: dispatchOrder.category || dispatchOrder.prostheticType || "—" },
-                      { label: "Tooth / Quadrant", value: dispatchOrder.toothQuadrant || "—" },
-                      { label: "Material", value: dispatchOrder.material || "—" },
-                      { label: "Shade", value: dispatchOrder.shade || "—" },
-                      { label: "Due Date", value: dispatchOrder.dueDate || "—" },
-                    ].map(({ label, value }) => (
-                      <div key={label}>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</p>
-                        <p className="text-sm font-medium text-gray-800 mt-0.5">{value || "—"}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {(dispatchOrder.notes || (dispatchOrder.orderDetails || {}).notes) && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Doctor&apos;s Notes</p>
-                      <p className="text-sm text-gray-700 leading-relaxed">{dispatchOrder.notes || (dispatchOrder.orderDetails || {}).notes}</p>
+                  {dispatchOrder.notes && (
+                    <div className="pt-2 border-t border-gray-200 mt-2">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Doctor&apos;s notes</p>
+                      <p className="text-gray-800 text-xs font-semibold leading-relaxed bg-white p-2.5 rounded-lg border border-gray-150">{dispatchOrder.notes}</p>
                     </div>
                   )}
                 </div>
-
-                {/* Delivery Address */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                    Lab Delivery Address <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    rows="3"
-                    required
-                    placeholder="e.g. Apex Dental Lab, 2nd Floor, Banjara Hills, Hyderabad — 500034"
-                    value={dispatchFormData.address}
-                    onChange={(e) => setDispatchFormData({ ...dispatchFormData, address: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 resize-none placeholder:text-gray-400"
-                  ></textarea>
-                </div>
-
-                {/* Expected Return Date */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                    Expected Return Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={dispatchFormData.expectedReturnDate}
-                    onChange={(e) => setDispatchFormData({ ...dispatchFormData, expectedReturnDate: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800"
-                  />
-                </div>
-
-                {/* Optional notes */}
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Additional Instructions <span className="text-gray-400 font-normal">(optional)</span></label>
-                  <textarea
-                    rows="2"
-                    value={dispatchFormData.notes}
-                    onChange={(e) => setDispatchFormData({ ...dispatchFormData, notes: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-sm text-gray-800 resize-none placeholder:text-gray-400"
-                    placeholder="Any special handling notes for the lab..."
-                  ></textarea>
-                </div>
-
               </div>
 
-              <div className="p-5 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsDispatchModalOpen(false)}
-                  className="px-5 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 text-sm font-semibold text-white bg-primary rounded-xl hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30 cursor-pointer flex items-center gap-2"
-                >
-                  <Truck className="w-4 h-4" /> Send to Lab
-                </button>
-              </div>
+              {/* Attachments */}
+              {(dispatchOrder.scanFile || dispatchOrder.opposingBiteScan) && (
+                <div className="bg-gray-50 border border-gray-155 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-1">
+                    <Paperclip className="w-4 h-4 text-gray-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Attachments</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {dispatchOrder.scanFile && (
+                      <a 
+                        href={`/api/lab/files/${dispatchOrder.scanFile}`} 
+                        download
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
+                      >
+                        <Paperclip className="w-3.5 h-3.5" /> {dispatchOrder.scanFile}
+                      </a>
+                    )}
+                    {dispatchOrder.opposingBiteScan && (
+                      <a 
+                        href={`/api/lab/files/${dispatchOrder.opposingBiteScan}`} 
+                        download
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
+                      >
+                        <Paperclip className="w-3.5 h-3.5" /> {dispatchOrder.opposingBiteScan}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Choose external lab or display selected lab */}
+              {!["Sent to Lab", "sent_to_lab", "Order Sent to Lab", "In Progress", "in_progress", "in_design", "in_fabrication", "quality_check", "Order Received", "Received from Lab", "received_from_lab", "Completed", "completed", "Fitted", "fitted"].includes(dispatchOrder.status) ? (
+                <>
+                  <div className="bg-gray-50 border border-gray-155 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-1">
+                      <Truck className="w-4 h-4 text-indigo-600" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Choose external lab</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <select
+                        value={dispatchFormData.selectedPartnerKey}
+                        onChange={(e) => {
+                          const key = e.target.value;
+                          setDispatchFormData({
+                            selectedPartnerKey: key,
+                            email: LAB_PARTNERS[key]?.email || "",
+                          });
+                        }}
+                        className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 cursor-pointer"
+                      >
+                        {Object.entries(LAB_PARTNERS).map(([key, partner]) => (
+                          <option key={key} value={key} className="bg-white text-gray-800">
+                            {partner.name} — {partner.email}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-xs">
+                          <Mail className="w-4 h-4" />
+                        </span>
+                        <input
+                          type="text"
+                          readOnly
+                          value={dispatchFormData.email}
+                          className="w-full pl-8 pr-4 py-2.5 bg-gray-100/50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Info banner */}
+                  <div className="bg-primary/5 border border-primary/20 rounded-xl p-3.5 text-xs text-primary flex items-start gap-2.5">
+                    <Mail className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                    <p className="font-semibold leading-relaxed">
+                      An email with the measurements, notes, and attachment links will be sent directly to this lab.
+                    </p>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsDispatchModalOpen(false)}
+                      className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-center"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 text-sm font-semibold text-white bg-primary rounded-xl hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30 cursor-pointer text-center flex items-center justify-center gap-1.5"
+                    >
+                      Send to lab ↗
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Read-only Lab details & Receipt tracking */}
+                  <div className="bg-gray-50 border border-gray-155 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-1">
+                      <Truck className="w-4 h-4 text-indigo-600" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">External lab partner</span>
+                    </div>
+                    <div className="text-xs font-semibold text-gray-800">
+                      <p>{dispatchOrder.labName || LAB_PARTNERS[dispatchFormData.selectedPartnerKey]?.name || "Apex Dental Laboratories"}</p>
+                      <p className="text-gray-500 mt-1 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" /> {dispatchFormData.email}</p>
+                    </div>
+                  </div>
+
+                  {/* Item receipt checkbox */}
+                  <div className="bg-gray-50 border border-gray-155 rounded-xl p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id="modal-received-check"
+                        checked={isReceived || ["Order Received", "Completed", "Fitted", "fitted"].includes(dispatchOrder.status)}
+                        onChange={async (e) => {
+                          const checked = e.target.checked;
+                          setIsReceived(checked);
+                          const newStatus = checked ? "Order Received" : "Sent to Lab";
+                          const ok = await updateDbStatus(dispatchOrder.id, newStatus);
+                          if (ok) {
+                            setDispatchOrder({ ...dispatchOrder, status: newStatus });
+                          }
+                        }}
+                        className="mt-0.5 w-4 h-4 accent-primary shrink-0 cursor-pointer rounded"
+                      />
+                      <div className="flex-1">
+                        <label htmlFor="modal-received-check" className="text-xs font-bold text-gray-800 cursor-pointer">
+                          Item Received at Clinic
+                        </label>
+                        <p className="text-[10px] text-gray-555 mt-0.5">Tick this once the package arrives from the lab.</p>
+                        {(isReceived || ["Order Received", "Completed", "Fitted", "fitted"].includes(dispatchOrder.status)) && (
+                          <div className="mt-3">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Date & Time Received</label>
+                            <input
+                              type="datetime-local"
+                              value={receivedDate}
+                              onChange={async (e) => {
+                                setReceivedDate(e.target.value);
+                                await updateLabOrder(dispatchOrder.id, {
+                                  received_date: e.target.value
+                                });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-250 rounded-lg text-xs outline-none bg-white text-gray-800"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Close and Return for Correction buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDispatchModalOpen(false);
+                        handleOpenReworkModal(dispatchOrder);
+                      }}
+                      className="flex-1 py-2.5 text-sm font-semibold text-danger bg-danger/10 hover:bg-danger hover:text-white border border-danger/20 rounded-xl transition-colors cursor-pointer text-center"
+                    >
+                      Return for Correction
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsDispatchModalOpen(false)}
+                      className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-center"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </>
+              )}
+
             </form>
           </div>
         </div>
@@ -2128,7 +1982,7 @@ export default function LabOrders() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
             <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <span className="text-danger">🔄</span> Return Case {reworkOrder.id} for Correction
+                <RefreshCw className="w-4 h-4 text-danger animate-spin" /> Return Case {reworkOrder.id} for Correction
               </h2>
               <button 
                 onClick={() => setIsReworkModalOpen(false)}
@@ -2166,8 +2020,40 @@ export default function LabOrders() {
                     placeholder="Enter detailed correction request notes..."
                     value={reworkNote}
                     onChange={(e) => setReworkNote(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-danger/20 focus:border-danger outline-none transition-all text-sm text-gray-805 resize-none placeholder:text-gray-400"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-danger/20 focus:border-danger outline-none transition-all text-sm text-gray-850 resize-none placeholder:text-gray-400"
                   ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Attach Reference File / Photo (Optional)</label>
+                  <div className="flex flex-col gap-2">
+                    <input 
+                      type="file" 
+                      id="rework-file-input"
+                      onChange={handleReworkFileChange}
+                      disabled={isUploading}
+                      className="text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer"
+                    />
+                    {isUploading && (
+                      <span className="text-[10px] text-gray-400 animate-pulse font-medium">Uploading reference file...</span>
+                    )}
+                    {reworkFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {reworkFiles.map((file, idx) => (
+                          <div key={idx} className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 text-[10px] font-bold text-gray-700">
+                            <span className="flex items-center gap-1"><Paperclip className="w-3 h-3 text-gray-400 shrink-0" /> {file.name}</span>
+                            <button 
+                              type="button" 
+                              onClick={() => setReworkFiles(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-gray-400 hover:text-red-500 font-extrabold cursor-pointer ml-1 text-[11px]"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2197,7 +2083,7 @@ export default function LabOrders() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100">
             <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <span className="text-warning">🚩</span> Flag Case {flagOrder.id} for Doctor
+                <Flag className="w-4 h-4 text-warning" /> Flag Case {flagOrder.id} for Doctor
               </h2>
               <button 
                 onClick={() => setIsFlagModalOpen(false)}

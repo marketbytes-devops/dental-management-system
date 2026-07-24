@@ -12,7 +12,6 @@ export default function LabOrderForm({ onSubmitLabOrder, initialOrder, onCancel 
   // Universal fields
   const [orderCategory, setOrderCategory] = useState("Prosthetic");
   const [priority, setPriority] = useState("Medium");
-  const [dueDate, setDueDate] = useState(new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]); // Default to today + 5 days
   const [specialNotes, setSpecialNotes] = useState("");
 
   // Dental Prosthetics fields
@@ -47,7 +46,6 @@ export default function LabOrderForm({ onSubmitLabOrder, initialOrder, onCancel 
     if (initialOrder) {
       setOrderCategory(initialOrder.order_category || initialOrder.orderCategory || "Prosthetic");
       setPriority(initialOrder.priority || "Medium");
-      setDueDate(initialOrder.due_date || initialOrder.dueDate || "");
       setSpecialNotes(initialOrder.notes || "");
 
       const isDiag = (initialOrder.order_category || initialOrder.orderCategory) === "Diagnostic";
@@ -117,7 +115,6 @@ export default function LabOrderForm({ onSubmitLabOrder, initialOrder, onCancel 
     const payload = {
       order_category: orderCategory,
       priority,
-      due_date: dueDate,
       notes: specialNotes,
       status: statusValue,
       patient_token: initialOrder?.patientToken || initialOrder?.patient_token || doctorCtx?.viewingPatient?.token || ""

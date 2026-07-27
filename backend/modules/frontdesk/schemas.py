@@ -62,6 +62,7 @@ class PaymentRequest(BaseModel):
 
 class QueueItemResponse(BaseModel):
     id: int
+    patient_id: int
     patient_name: str
     patient_phone: str
     token: str

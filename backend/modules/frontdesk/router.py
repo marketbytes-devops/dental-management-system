@@ -84,11 +84,29 @@ def get_patient_appointments_route(patient_id: int, db: Session = Depends(get_db
 
 
 @router.get("/appointments", response_model=List[AppointmentResponse])
-def get_all_appointments(db: Session = Depends(get_db)):
-    appointments = db.query(AppointmentModel).order_by(AppointmentModel.appointment_date.desc()).all()
+def get_all_appointments(
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(AppointmentModel)
+    if month is not None and year is not None:
+        query = query.filter(
+            AppointmentModel.appointment_date >= date(year, month, 1),
+            AppointmentModel.appointment_date < (
+                date(year, month + 1, 1) if month < 12 else date(year + 1, 1, 1)
+            )
+        )
+    elif year is not None:
+        query = query.filter(
+            AppointmentModel.appointment_date >= date(year, 1, 1),
+            AppointmentModel.appointment_date < date(year + 1, 1, 1)
+        )
+    appointments = query.order_by(AppointmentModel.appointment_date.desc()).all()
     for appt in appointments:
         appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
     return appointments
+
 
 
 @router.get("/records")
@@ -339,7 +357,8 @@ def get_live_queue(db: Session = Depends(get_db)):
                 alerts.append(patient.known_allergies)
                 
             queue_items.append({
-                "id": appt.id,
+                "id": appt.id,                    # Appointment / Queue ID
+                "patient_id": patient.id,        # Actual Patient ID
                 "patient_name": patient.name,
                 "patient_phone": patient.phone,
                 "token": patient.token or f"PT-{patient.id}",

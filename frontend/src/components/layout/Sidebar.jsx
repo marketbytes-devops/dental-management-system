@@ -142,12 +142,17 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
   const roleLabel =
     role === "admin" ? "Admin" :
       role === "doctor" ? "Doctor" :
-        role === "receptionist" ? "Reception" :
-          role === "accountant" ? "Finance" :
+        role === "receptionist" ? "Receptionist" :
+          role === "accountant" ? "Accountant" :
             role === "lab tech" ? "Lab Tech" :
               role === "patient" ? "Patient" : "";
 
   const avatarChar = currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "U";
+
+  const userRoles = currentUser?.roles?.map(r => r.toLowerCase()) || [];
+  const hasReceptionist = userRoles.includes("receptionist") || userRoles.includes("admin");
+  const hasAccountant = userRoles.includes("accountant") || userRoles.includes("admin");
+  const showWorkspaceSidebar = pathname?.startsWith("/frontdesk") && hasReceptionist && hasAccountant;
 
   return (
     <div className={`bg-white border-r border-gray-200 flex flex-col h-full shadow-sm transition-all duration-300 relative ${isMinimized ? "w-16" : "w-64"}`}>
@@ -155,17 +160,17 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
       {/* Floating Toggle Button */}
       <div className="h-16 border-b border-gray-100 flex items-center justify-between px-4">
 
-        <div className="flex items-center gap-2 overflow-hidden">
-          {!pathname?.startsWith("/frontdesk") && (
+        <div className="flex items-center gap-1.5 overflow-hidden shrink-0">
+          {!showWorkspaceSidebar && (
             <>
               <ToothIcon className="w-6 h-6 text-primary shrink-0" />
               {!isMinimized && (
                 <>
-                  <span className="font-bold text-lg text-primary">
+                  <span className="font-bold text-lg text-primary tracking-tight shrink-0">
                     SmileCare
                   </span>
                   {roleLabel && (
-                    <span className="text-[10px] font-bold px-2 py-1 rounded bg-primary/10 text-primary uppercase">
+                    <span className="text-[10px] font-bold px-1.5 py-1 rounded bg-primary/10 text-primary uppercase shrink-0">
                       {roleLabel}
                     </span>
                   )}

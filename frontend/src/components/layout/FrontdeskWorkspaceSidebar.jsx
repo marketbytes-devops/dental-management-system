@@ -96,7 +96,7 @@ export default function FrontdeskWorkspaceSidebar() {
             >
               <ws.icon className={`w-6 h-6 mb-1 ${isActive ? "text-white" : ""}`} />
               <span className={`text-[9px] font-bold ${isActive ? "text-white" : ""}`}>
-                {ws.id === "receptionist" ? "Front Desk" : "Finance"}
+                {ws.id === "receptionist" ? "Front Desk" : "Accountant"}
               </span>
             </Link>
           );

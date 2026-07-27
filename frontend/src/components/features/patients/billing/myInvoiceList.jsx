@@ -31,11 +31,10 @@ export default function MyInvoiceList({ invoices = [], onSelectInvoice, onPayInv
                   <td className="p-4 text-right font-extrabold text-gray-900">₹{inv.patientDue.toLocaleString("en-IN")}</td>
                   <td className="p-4 text-center">
                     <span
-                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        inv.status === "Paid"
+                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${inv.status === "Paid"
                           ? "bg-success/10 text-success"
                           : "bg-danger/10 text-danger"
-                      }`}
+                        }`}
                     >
                       {inv.status}
                     </span>

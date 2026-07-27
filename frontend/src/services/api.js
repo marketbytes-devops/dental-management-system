@@ -440,10 +440,7 @@ export const simulateVendorInboundEmail = async (payload) => {
   return response.data;
 };
 
-export const sendLabBillingRequest = async (payload) => {
-  const response = await client.post("/billing/lab-request", payload);
-  return response.data;
-};
+
 
 export const acceptEmailUpdate = async (id) => {
   const response = await client.post(`/lab/orders/${id}/accept-email-update`);

@@ -45,14 +45,6 @@ export default function PatientSummaryBanner({
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          {completedPatientHistory && completedPatientHistory.length > 0 && isHistorical && (
-            <button
-              onClick={onViewPreviousPatient}
-              className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
-            >
-              <span>📂</span> Previous Patient
-            </button>
-          )}
           {!isHistorical && (
             <>
               <button

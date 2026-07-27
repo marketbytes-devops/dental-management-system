@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from database import get_db
-from dependencies import get_current_user
+from dependencies import get_current_user, get_optional_current_user
 from modules.lab.models import (
     LabOrderModel, 
     LabNotificationModel, 
@@ -340,7 +340,7 @@ def create_lab_order(
 @router.get("/orders", response_model=List[LabOrderResponse])
 def get_lab_orders(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_optional_current_user)
 ):
     orders = (
         db.query(LabOrderModel)

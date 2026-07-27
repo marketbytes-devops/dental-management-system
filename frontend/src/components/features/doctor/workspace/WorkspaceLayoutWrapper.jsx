@@ -968,6 +968,25 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
                       </div>
                     )}
 
+                    {order.rework_history && order.rework_history.length > 0 && (
+                      <div className="mt-3 p-3 bg-rose-50/70 border border-rose-200 rounded-xl space-y-2 text-left">
+                        <span className="text-[10px] font-black text-rose-800 uppercase tracking-wider block">
+                          Correction / Rework History ({order.rework_history.length} Attempts)
+                        </span>
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                          {order.rework_history.map((rw, rIdx) => (
+                            <div key={rIdx} className="p-2 bg-white rounded-lg border border-rose-150 text-[11px]">
+                              <div className="flex justify-between items-center text-[10px] text-gray-500 font-bold mb-0.5">
+                                <span>Attempt #{rw.rework_count || rIdx + 1} • {rw.category || "Correction"}</span>
+                                <span>{rw.date}</span>
+                              </div>
+                              <p className="text-gray-800 font-medium">Reason: {rw.reason || rw.notes}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {order.notes && (
                       <p className="text-[10px] text-gray-500 italic bg-gray-50 p-2.5 rounded-lg border border-gray-100 mt-2">
                         <span className="font-bold text-gray-400 uppercase tracking-wider block mb-0.5 text-[8px] not-italic">Doctor's Notes:</span>

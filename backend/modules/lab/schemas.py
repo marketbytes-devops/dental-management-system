@@ -201,6 +201,11 @@ class LabOrderResponse(BaseModel):
     stage: Optional[str] = "New Cases"
     tech_notes: Optional[str] = None
     email_sent_at: Optional[str] = None
+    rework_history: Optional[List[Any]] = []
+    claimed_by: Optional[str] = None
+    claimed_at: Optional[datetime] = None
+    physical_mold_sent: Optional[bool] = False
+    physical_opposing_mold_sent: Optional[bool] = False
 
     class Config:
         from_attributes = True

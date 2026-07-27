@@ -50,6 +50,13 @@ class LabOrderModel(Base):
     stage = Column(String, default="New Cases")
     tech_notes = Column(String, nullable=True)
     email_sent_at = Column(String, nullable=True)
+    
+    # Extended Rework History, Soft Lock & Physical Molds
+    rework_history = Column(JSON, default=list)  # List of objects: [{"date": "", "category": "", "reason": "", "notes": "", "files": []}]
+    claimed_by = Column(String, nullable=True)   # Tech user who claimed review
+    claimed_at = Column(DateTime(timezone=True), nullable=True)
+    physical_mold_sent = Column(Boolean, default=False)
+    physical_opposing_mold_sent = Column(Boolean, default=False)
 
     prosthetic_detail = relationship("ProstheticCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")
     pathology_detail = relationship("PathologyCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")

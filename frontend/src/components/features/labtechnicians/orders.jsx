@@ -78,7 +78,12 @@ export default function LabOrders() {
         testType: o.test_type || "",
         sampleType: o.sample_type || "",
         reasonForTest: o.reason_for_test || "",
-        sampleCollectedConfirm: o.sample_collected_confirm || false
+        sampleCollectedConfirm: o.sample_collected_confirm || false,
+        reworkHistory: o.rework_history || [],
+        claimedBy: o.claimed_by || null,
+        physicalMoldSent: o.physical_mold_sent || false,
+        physicalOpposingMoldSent: o.physical_opposing_mold_sent || false,
+        trackingNumber: o.tracking_number || ""
       }));
       setOrders(mapped);
     } catch (err) {
@@ -784,64 +789,59 @@ export default function LabOrders() {
           </div>
         );
       }
-      if (["Confirmed", "confirmed", "Doctor Accepted"].includes(order.status)) {
-        return (
-          <button
-            onClick={() => handleOpenDispatchModal(order)}
-            className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-650 hover:text-white border border-indigo-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
-          >
-            Send to Lab
-          </button>
-        );
-      }
-      if (["Sent to Lab", "sent_to_lab", "Order Sent to Lab", "in_design", "in_fabrication", "quality_check"].includes(order.status)) {
+      if (["Confirmed", "confirmed", "Doctor Accepted", "Pending Review", "Submitted"].includes(order.status)) {
         return (
           <div className="flex gap-2 items-center flex-wrap">
             <button
-              onClick={() => updateDbStatus(order.id, "Order Received")}
-              className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-600 text-purple-650 hover:text-white border border-purple-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              onClick={() => handleOpenDispatchModal(order)}
+              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
-              Mark as Received from Lab
+              Send to Lab
             </button>
             <button
               onClick={() => handleOpenReworkModal(order)}
-              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
             >
               Return for Correction
             </button>
           </div>
         );
       }
-      if (["Received from Lab", "received_from_lab", "Order Received"].includes(order.status)) {
+      if (["Arriving", "Arriving / In Transit", "Order Sent to Lab", "Sent to Lab", "in_design", "in_fabrication", "quality_check"].includes(order.status)) {
         return (
           <div className="flex gap-2 items-center flex-wrap">
+            {order.trackingNumber && (
+              <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded font-black">
+                📦 Tracking: {order.trackingNumber}
+              </span>
+            )}
             <button
-              onClick={() => updateDbStatus(order.id, "Fitted")}
-              className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-500 text-teal-500 hover:text-white border border-teal-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              onClick={() => updateDbStatus(order.id, "Arrived")}
+              className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
-              Mark as Delivered to Clinic
+              Mark Arrived
             </button>
             <button
               onClick={() => handleOpenReworkModal(order)}
-              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
             >
               Return for Correction
             </button>
           </div>
         );
       }
-      if (order.status === "Fitted" || order.status === "fitted") {
+      if (["Arrived", "Order Received", "Received from Lab", "received_from_lab"].includes(order.status)) {
         return (
           <div className="flex gap-2 items-center flex-wrap">
             <button
               onClick={() => updateDbStatus(order.id, "Completed")}
-              className="px-2.5 py-1.5 bg-success/15 hover:bg-success text-success hover:text-white border border-success/20 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
               Complete Order
             </button>
             <button
               onClick={() => handleOpenReworkModal(order)}
-              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
             >
               Return for Correction
             </button>
@@ -850,12 +850,38 @@ export default function LabOrders() {
       }
       if (order.status === "Completed" || order.status === "completed") {
         return (
-          <button
-            onClick={() => handleOpenReworkModal(order)}
-            className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
-          >
-            Return for Correction
-          </button>
+          <div className="flex gap-2 items-center flex-wrap">
+            <button
+              onClick={async () => {
+                try {
+                  const { sendLabBillingRequest } = await import("@/services/api");
+                  await sendLabBillingRequest({
+                    patient_token: order.patientToken || "PT-WALKIN",
+                    doctor_name: order.dentistName || "Lab Technician",
+                    amount: order.externalCost || 3500.0,
+                    notes: `Vendor Invoice for Case ${order.id} (${order.prostheticType || order.orderCategory})`,
+                    procedures: [{
+                      name: `Vendor Invoice (${order.prostheticType || order.orderCategory})`,
+                      cost: order.externalCost || 3500.0,
+                      tooth: order.toothQuadrant || "Full Arch"
+                    }]
+                  });
+                  triggerToast(`Case ${order.id} vendor invoice sent to Accountant.`);
+                } catch (err) {
+                  triggerToast("Failed to send invoice to Accountant.", "error");
+                }
+              }}
+              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
+            >
+              <span>💳</span> Send to Accountant
+            </button>
+            <button
+              onClick={() => handleOpenReworkModal(order)}
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Return for Correction
+            </button>
+          </div>
         );
       }
     } else {

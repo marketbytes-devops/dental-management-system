@@ -430,6 +430,21 @@ export const createLabRework = async (id, statusData) => {
   return response.data;
 };
 
+export const claimLabOrder = async (id) => {
+  const response = await client.post(`/lab/orders/${id}/claim`);
+  return response.data;
+};
+
+export const simulateVendorInboundEmail = async (payload) => {
+  const response = await client.post("/lab/inbound-email", payload);
+  return response.data;
+};
+
+export const sendLabBillingRequest = async (payload) => {
+  const response = await client.post("/billing/lab-request", payload);
+  return response.data;
+};
+
 export const getLabComments = async (id) => {
   const response = await client.get(`/lab/orders/${id}/comments`);
   return response.data;

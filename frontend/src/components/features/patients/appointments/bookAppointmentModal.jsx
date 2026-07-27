@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Calendar, CheckCircle2, ChevronRight, ArrowLeft } from "lucide-react";
-import { getDoctorLeaves, getAvailableDoctors, createAppointment, createPaymentOrder, verifyPayment } from "@/services/api";
+import { getDoctorLeaves, getAvailableDoctors, createAppointment, createPaymentOrder, verifyPayment, getConsultationFees } from "@/services/api";
 
 const VISIT_REASONS = [
   "Consultation",
@@ -23,6 +23,7 @@ const SPECIALTY_DESCRIPTIONS = {
 const INITIAL_FORM = {
   doctor: "",
   treatment: "Consultation",
+  consultSpecialty: "",
   date: "",
   time: "",
   notes: "",
@@ -48,6 +49,17 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
   // Payment state: idle | loading | success | error
   const [paymentState, setPaymentState] = useState("idle");
   const [paymentError, setPaymentError] = useState("");
+  const [bookingFee, setBookingFee] = useState(100);
+
+  useEffect(() => {
+    getConsultationFees()
+      .then(data => {
+        if (data && data.online_booking_fee) {
+          setBookingFee(data.online_booking_fee);
+        }
+      })
+      .catch(e => console.warn("Failed to fetch active online booking fee tariff:", e));
+  }, []);
 
   useEffect(() => {
     const fetchDoctors = async () => {
@@ -196,6 +208,15 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
   };
 
   const selectedDoctorObj = doctors.find((d) => d.name === form.doctor);
+
+  const doctorSpecialties = selectedDoctorObj
+    ? (Array.isArray(selectedDoctorObj.specialties) && selectedDoctorObj.specialties.length > 0
+        ? selectedDoctorObj.specialties
+        : (selectedDoctorObj.specialty ? selectedDoctorObj.specialty.split(",").map(s => s.trim()).filter(Boolean) : []))
+    : [];
+
+  const hasMultipleSpecialties = doctorSpecialties.length >= 2;
+
   const [timeSlots, setTimeSlots] = useState([]);
 
   useEffect(() => {
@@ -228,6 +249,9 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
     }
     if (step === 2) {
       const errs = {};
+      if (hasMultipleSpecialties && !form.consultSpecialty) {
+        errs.consultSpecialty = "Please select a specialty to consult.";
+      }
       if (!form.date) errs.date = "Please pick a date.";
       if (!form.time) errs.time = "Please select a time slot.";
       if (Object.keys(errs).length) {
@@ -261,7 +285,9 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
         treatment_type: form.treatment,
         status: "Confirmed",
         priority: "Routine",
-        symptoms: form.notes || null
+        symptoms: form.consultSpecialty
+          ? (form.notes ? `[Specialty: ${form.consultSpecialty}] ${form.notes}` : `Consultation Specialty: ${form.consultSpecialty}`)
+          : (form.notes || null)
       });
 
       setSubmitting(false);
@@ -292,7 +318,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
 
     try {
       // Step 1: Create order on backend → get Razorpay order details
-      const order = await createPaymentOrder(createdApptId);
+      const order = await createPaymentOrder(createdApptId, bookingFee);
 
       // Step 2: Dynamically load the Razorpay checkout script
       await new Promise((resolve, reject) => {
@@ -452,6 +478,38 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                 </div>
               </div>
 
+              {/* Specialty Selection if Doctor has 2 Specialties */}
+              {hasMultipleSpecialties && (
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Which specialty do you need to consult? <span className="text-danger">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {doctorSpecialties.map((spec) => {
+                      const isSelected = form.consultSpecialty === spec;
+                      return (
+                        <button
+                          key={spec}
+                          type="button"
+                          onClick={() => handleChange("consultSpecialty", spec)}
+                          className={`text-left p-3.5 rounded-xl border transition-all cursor-pointer ${
+                            isSelected
+                              ? "border-primary bg-primary/5 ring-1 ring-primary font-bold text-gray-900"
+                              : "border-gray-200 bg-white text-gray-700 hover:border-primary/50"
+                          }`}
+                        >
+                          <div className="text-sm font-semibold">{spec}</div>
+                          <div className="text-xs text-gray-500 font-normal mt-0.5">
+                            {SPECIALTY_DESCRIPTIONS[spec] || "Specialized dental care."}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {errors.consultSpecialty && <p className="mt-1 text-xs text-danger">{errors.consultSpecialty}</p>}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Select Date</label>
@@ -505,6 +563,12 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                   <span className="text-gray-500">Doctor</span>
                   <span className="font-semibold text-gray-900">{form.doctor}</span>
                 </div>
+                {form.consultSpecialty && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Consultation Specialty</span>
+                    <span className="font-semibold text-gray-900">{form.consultSpecialty}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Date</span>
                   <span className="font-semibold text-gray-900">{form.date}</span>
@@ -549,7 +613,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                 <CheckCircle2 className="w-10 h-10 text-success" />
               </div>
               <h3 className="text-2xl font-extrabold text-gray-900 mb-2">Appointment Confirmed!</h3>
-              <p className="text-sm text-gray-500 mb-6">Please pay ₹100 to secure your slot.</p>
+              <p className="text-sm text-gray-500 mb-6">Please pay ₹{bookingFee} to secure your slot.</p>
 
               {/* Appointment Summary Card */}
               <div className="w-full max-w-sm bg-gray-50 p-5 rounded-2xl text-left space-y-3 mb-6 border border-gray-200 shadow-sm">
@@ -573,7 +637,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500 font-semibold text-sm">Consultation Fee</span>
-                  <span className="text-primary font-extrabold text-sm">₹100.00</span>
+                  <span className="text-primary font-extrabold text-sm">₹{Number(bookingFee).toFixed(2)}</span>
                 </div>
               </div>
 
@@ -591,7 +655,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                     <CheckCircle2 className="w-8 h-8 text-success" />
                   </div>
                   <p className="text-success font-extrabold text-lg">Payment Successful!</p>
-                  <p className="text-gray-500 text-sm">₹100 paid · Slot confirmed</p>
+                  <p className="text-gray-500 text-sm">₹{bookingFee} paid · Slot confirmed</p>
                   <button
                     onClick={onClose}
                     className="w-full py-3 text-sm font-bold text-white bg-success rounded-xl hover:bg-success/90 transition-all shadow-md"
@@ -621,7 +685,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
                     ) : paymentState === "error" ? (
                       "Retry Payment"
                     ) : (
-                      "Pay ₹100 Now"
+                      `Pay ₹${bookingFee} Now`
                     )}
                   </button>
                 </div>

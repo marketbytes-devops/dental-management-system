@@ -171,7 +171,7 @@ def get_my_balances(
 
 @router.get("/requests")
 def get_all_leave_requests(
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     requests = db.query(LeaveRequestModel).order_by(

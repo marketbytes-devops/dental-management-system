@@ -11,6 +11,7 @@ class BillingRequestModel(Base):
     doctor_name = Column(String, nullable=False)
     total_amount = Column(Float, nullable=False, default=0.0)
     status = Column(String, default="Pending") # Pending, Invoiced, Paid
+    source_type = Column(String, default="consultation") # consultation, treatment, lab
     procedures = Column(JSON) # Store list of { procedure_id, name, rate }
     notes = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

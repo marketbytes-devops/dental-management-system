@@ -7,6 +7,8 @@ import { ChevronLeft, ChevronRight, Stethoscope } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
 import { ROLE_NAV_ITEMS } from "./navigationConfig";
 import { useDoctor } from "@/app/(dashboards)/doctor/layout";
+import { useReceptionist } from "@/app/(dashboards)/frontdesk/receptionist/layout";
+import { useAdmin } from "@/app/(dashboards)/admin/layout";
 
 export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
   const pathname = usePathname();
@@ -22,6 +24,22 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
     // not in doctor layout provider context
   }
   const notifications = doctorContext?.notifications || [];
+
+  // Safely try-catch calling useReceptionist
+  let receptionistContext = null;
+  try {
+    receptionistContext = useReceptionist();
+  } catch (e) {
+    // not in receptionist context
+  }
+
+  // Safely try-catch calling useAdmin
+  let adminContext = null;
+  try {
+    adminContext = useAdmin();
+  } catch (e) {
+    // not in admin context
+  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -139,6 +157,16 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
       : 0;
   };
 
+  const checkHasRedDot = (href) => {
+    if (role === "receptionist" && receptionistContext?.hasRedDot) {
+      return receptionistContext.hasRedDot(href);
+    }
+    if (role === "admin" && adminContext?.hasRedDot) {
+      return adminContext.hasRedDot(href);
+    }
+    return false;
+  };
+
   const roleLabel =
     role === "admin" ? "Admin" :
       role === "doctor" ? "Doctor" :
@@ -204,6 +232,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
               const isOpen = !!openDropdowns[item.name];
 
               if (hasSubItems) {
+                const subHasRedDot = item.subItems.some((s) => checkHasRedDot(s.href));
                 return (
                   <li key={item.name} className="flex flex-col">
                     {isMinimized ? (
@@ -211,12 +240,15 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                         <Link
                           href={item.subItems[0].href}
                           title={item.name}
-                          className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all group cursor-pointer outline-none ${isParentActive
+                          className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all group cursor-pointer outline-none relative ${isParentActive
                             ? "bg-primary/10 text-primary"
                             : "text-gray-700 hover:bg-primary/5 hover:text-primary"
                             }`}
                         >
                           <item.icon className="w-5 h-5 shrink-0" />
+                          {subHasRedDot && (
+                            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm animate-pulse" />
+                          )}
                         </Link>
                       </div>
                     ) : (
@@ -235,16 +267,21 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                             </span>
                             {item.name}
                           </div>
-                          <svg
-                            className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""
-                              }`}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                          </svg>
+                          <div className="flex items-center gap-1.5">
+                            {subHasRedDot && (
+                              <span className="w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm animate-pulse shrink-0" />
+                            )}
+                            <svg
+                              className={`w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-transform duration-200 ${isOpen ? "transform rotate-180" : ""
+                                }`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
                         </button>
 
                         {/* Sub-menu Dropdown List */}
@@ -255,19 +292,25 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                           <ul className="pl-4 space-y-1 border-l-2 border-gray-100 ml-5">
                             {item.subItems.map((subItem) => {
                               const isSubActive = pathname === subItem.href;
+                              const isSubDot = checkHasRedDot(subItem.href);
                               return (
                                 <li key={subItem.name}>
                                   <Link
                                     href={subItem.href}
-                                    className={`flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors group cursor-pointer outline-none ${isSubActive
+                                    className={`flex items-center justify-between px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors group cursor-pointer outline-none ${isSubActive
                                       ? "bg-primary/5 text-primary"
                                       : "text-gray-600 hover:bg-primary/5 hover:text-primary"
                                       }`}
                                   >
-                                    <span className="mr-2.5 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
-                                      <subItem.icon className="w-4 h-4" />
-                                    </span>
-                                    {subItem.name}
+                                    <div className="flex items-center">
+                                      <span className="mr-2.5 opacity-70 group-hover:opacity-100 text-gray-500 group-hover:text-primary transition-colors flex items-center">
+                                        <subItem.icon className="w-4 h-4" />
+                                      </span>
+                                      {subItem.name}
+                                    </div>
+                                    {isSubDot && (
+                                      <span className="w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm animate-pulse shrink-0" />
+                                    )}
                                   </Link>
                                 </li>
                               );
@@ -282,6 +325,7 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
 
               // Leaf nav item (no sub-items)
               const unreadCount = getUnreadCount(item.href);
+              const isDotActive = checkHasRedDot(item.href);
 
               return (
                 <li key={item.name} className="flex justify-center">
@@ -295,11 +339,13 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                         }`}
                     >
                       <item.icon className="w-5 h-5 shrink-0" />
-                      {unreadCount > 0 && (
+                      {unreadCount > 0 ? (
                         <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-danger text-white text-[8px] font-black rounded-full flex items-center justify-center border border-white shadow-sm">
                           {unreadCount}
                         </span>
-                      )}
+                      ) : isDotActive ? (
+                        <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm animate-pulse" />
+                      ) : null}
                     </Link>
                   ) : (
                     <Link
@@ -315,11 +361,13 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
                         </span>
                         {item.name}
                       </div>
-                      {unreadCount > 0 && (
+                      {unreadCount > 0 ? (
                         <span className="bg-danger text-white text-[10px] font-black px-2 py-0.5 rounded-full flex items-center justify-center border border-white shadow-sm animate-pulse">
                           {unreadCount}
                         </span>
-                      )}
+                      ) : isDotActive ? (
+                        <span className="w-2.5 h-2.5 bg-red-500 rounded-full border border-white shadow-sm animate-pulse shrink-0" />
+                      ) : null}
                     </Link>
                   )}
                 </li>

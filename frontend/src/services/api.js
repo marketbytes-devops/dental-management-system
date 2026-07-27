@@ -703,6 +703,86 @@ export const verifyPayment = async (payload) => {
   return response.data;
 };
 
+// ==========================================
+// 13. Medicine Dispensing & Patient Ledger API Endpoints
+// ==========================================
+
+export const getDispensingQueue = async () => {
+  const response = await client.get("/patient/dispensing");
+  return response.data;
+};
+
+export const updateDispenseStatus = async (dispenseId, status = "Dispensed") => {
+  const response = await client.put(`/patient/dispensing/${dispenseId}/status`, { status });
+  return response.data;
+};
+
+export const getPatientLedgers = async () => {
+  const response = await client.get("/billing/patient-ledgers");
+  return response.data;
+};
+
+export const createPayment = async (paymentData) => {
+  const response = await client.post("/billing/payment", paymentData);
+  return response.data;
+};
+
+export const getReceipt = async (billingRequestId) => {
+  const response = await client.get(`/billing/receipt/${billingRequestId}`);
+  return response.data;
+};
+
+export const sendLabBillingRequest = async (payload) => {
+  const response = await client.post("/billing/lab-request", payload);
+  return response.data;
+};
+
+// ==========================================
+// 14. Receptionist Lab Order Pickups
+// ==========================================
+
+export const getLabOrdersForReceptionist = async () => {
+  const response = await client.get("/lab/orders/receptionist");
+  return response.data;
+};
+
+export const notifyPatientForLabOrder = async (orderId, note) => {
+  const response = await client.put(`/lab/orders/${orderId}/notify`, { note });
+  return response.data;
+};
+
+// ==========================================
+// 15. Support & Complaint Management
+// ==========================================
+
+export const getMyComplaints = async () => {
+  try {
+    const response = await client.get("/support/complaints");
+    return response.data;
+  } catch (err) {
+    return [];
+  }
+};
+
+export const submitComplaint = async (data) => {
+  const response = await client.post("/support/complaints", data);
+  return response.data;
+};
+
+export const reopenComplaint = async (id, note) => {
+  const response = await client.put(`/support/complaints/${id}/reopen`, { note });
+  return response.data;
+};
+
+export const getComplaintLogs = async (id) => {
+  try {
+    const response = await client.get(`/support/complaints/${id}/logs`);
+    return response.data;
+  } catch (err) {
+    return [];
+  }
+};
+
 export const getConsultationFees = async () => {
   const response = await client.get("/payment/consultation-fees");
   return response.data;
@@ -712,51 +792,4 @@ export const updateConsultationFees = async (tariffData) => {
   const response = await client.put("/payment/consultation-fees", tariffData);
   return response.data;
 };
-
-
-// ==========================================
-// 14. Support & Complaints API Endpoints
-// ==========================================
-
-/**
- * Fetch all complaints filed by the currently logged-in staff member.
- * @returns {Array} List of complaint objects
- */
-export const getMyComplaints = async () => {
-  const response = await client.get("/complaints/mine");
-  return response.data;
-};
-
-/**
- * Submit a new support/bug-report ticket.
- * @param {{ subject: string, body: string, related_complaint_id?: number }} payload
- * @returns {Object} The newly created complaint record
- */
-export const submitComplaint = async (payload) => {
-  const response = await client.post("/complaints/", payload);
-  return response.data;
-};
-
-/**
- * Fetch the full audit log (status history) for a given complaint ticket.
- * @param {number} complaintId
- * @returns {Array} List of log entries
- */
-export const getComplaintLogs = async (complaintId) => {
-  const response = await client.get(`/complaints/${complaintId}/logs`);
-  return response.data;
-};
-
-/**
- * Reopen a resolved or closed complaint with a reason.
- * @param {number} complaintId
- * @param {string} reason - Text reason for re-opening
- * @returns {Object} Updated complaint record
- */
-export const reopenComplaint = async (complaintId, reason) => {
-  const response = await client.post(`/complaints/${complaintId}/reopen`, { reason });
-  return response.data;
-};
-
-
 

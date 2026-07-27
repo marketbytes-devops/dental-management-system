@@ -615,44 +615,8 @@ SmileCare Lab Management System
     )
     db.add(audit)
 
-    # Generate notification
-    if new_status == "Pending Review":
-        notif = LabNotificationModel(
-            recipient_role="lab tech",
-            type="Orders",
-            title="Lab Order Submitted for Review",
-            desc=f"Case {order_id} has been submitted for review by Dr. {user_name}.",
-            read=False
-        )
-        db.add(notif)
-    elif new_status == "Confirmed by Tech":
-        notif = LabNotificationModel(
-            recipient_role="doctor",
-            type="labs",
-            title="Lab Order Confirmed by Tech",
-            desc=f"Case {order_id} has been confirmed by lab technician. Ready for external send approval.",
-            read=False
-        )
-        db.add(notif)
-    elif new_status == "Revision Requested":
-        notif = LabNotificationModel(
-            recipient_role="doctor",
-            type="labs",
-            title="Revision Requested for Lab Case",
-            desc=f"Tech has requested a revision on Case {order_id}. Tech Notes: {status_data.tech_notes or order.rejection_reason}",
-            read=False
-        )
-        db.add(notif)
-    elif new_status == "Sent to Lab":
-        notif = LabNotificationModel(
-            recipient_role="doctor",
-            type="labs",
-            title="Lab Order Sent to External Lab",
-            desc=f"Case {order_id} approved. Pre-filled dispatch email successfully sent to the external lab.",
-            read=False
-        )
-        db.add(notif)
-    elif new_status in ["Flagged", "flagged"]:
+    # Generate notification (Doctor receives notifications ONLY for Flagged/Revision/Sent Back/Rejected)
+    if new_status in ["Flagged", "flagged", "Sent Back"]:
         notif = LabNotificationModel(
             recipient_role="doctor",
             type="labs",
@@ -661,26 +625,41 @@ SmileCare Lab Management System
             read=False
         )
         db.add(notif)
-    else:
-        if new_status in ["Confirmed", "Doctor Accepted"]:
-            notif = LabNotificationModel(
-                recipient_role="lab tech",
-                type="Orders",
-                title="Lab Order Confirmed by Doctor",
-                desc=f"Case {order_id} has been reviewed and confirmed by {user_name}.",
-                read=False
-            )
-        else:
-            desc = f"Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} has been updated to '{new_status}' by Lab Technician."
-            if status_data.rejection_reason:
-                desc += f" Note/Reason: {status_data.rejection_reason}"
-            notif = LabNotificationModel(
-                recipient_role="doctor",
-                type="labs",
-                title=f"Lab Case {order_id} Updated",
-                desc=desc,
-                read=False
-            )
+    elif new_status in ["Revision Requested", "Revision"]:
+        notif = LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title="Revision Requested for Lab Case",
+            desc=f"Tech has requested a revision on Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} (Token: {order.patient_token}). Tech Notes: {status_data.tech_notes or order.rejection_reason or 'Revision requested.'}",
+            read=False
+        )
+        db.add(notif)
+    elif new_status in ["Rejected", "rejected"]:
+        notif = LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title=f"Lab Case {order_id} Rejected by Lab Tech",
+            desc=f"Lab Technician rejected Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} (Token: {order.patient_token}). Reason: {status_data.rejection_reason or status_data.tech_notes or 'Order rejected.'}",
+            read=False
+        )
+        db.add(notif)
+    elif new_status in ["Confirmed", "Doctor Accepted"]:
+        notif = LabNotificationModel(
+            recipient_role="lab tech",
+            type="Orders",
+            title="Lab Order Confirmed by Doctor",
+            desc=f"Case {order_id} has been reviewed and confirmed by {user_name}.",
+            read=False
+        )
+        db.add(notif)
+    elif new_status == "Pending Review":
+        notif = LabNotificationModel(
+            recipient_role="lab tech",
+            type="Orders",
+            title="Lab Order Submitted for Review",
+            desc=f"Case {order_id} has been submitted for review by Dr. {user_name}.",
+            read=False
+        )
         db.add(notif)
     db.commit()
 
@@ -954,14 +933,7 @@ SmileCare Lab Management System
 
         send_smtp_email(vendor_email, f"New Lab Order Request: Case {order.id}", email_body, attachment_files)
         
-        db.add(LabNotificationModel(
-            recipient_role="doctor",
-            type="labs",
-            title="Lab Order Sent to External Lab",
-            desc=f"Case {order_id} approved. Pre-filled dispatch email successfully sent to the external lab.",
-            read=False
-        ))
-        db.commit()
+
 
     return serialize_order(order)
 
@@ -1118,6 +1090,22 @@ def get_lab_notifications(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    # Purge any existing non-flagged/non-rejected doctor notifications from database
+    if recipient_role == "doctor":
+        all_doc_notifs = db.query(LabNotificationModel).filter(LabNotificationModel.recipient_role == "doctor").all()
+        for notif in all_doc_notifs:
+            title_lower = (notif.title or "").lower()
+            desc_lower = (notif.desc or "").lower()
+            is_allowed = (
+                "flagged" in title_lower or "flagged" in desc_lower or
+                "revision" in title_lower or "revision" in desc_lower or
+                "sent back" in title_lower or "sent back" in desc_lower or
+                "reject" in title_lower or "reject" in desc_lower
+            )
+            if not is_allowed:
+                db.delete(notif)
+        db.commit()
+
     query = db.query(LabNotificationModel)
     if recipient_role:
         query = query.filter(LabNotificationModel.recipient_role == recipient_role)

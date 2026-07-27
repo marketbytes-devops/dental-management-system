@@ -284,10 +284,22 @@ export default function DoctorLayout({ children }) {
         }
       });
 
-      // 3. Lab notifications (Flagged orders, revision requests, updates)
+      // 3. Lab notifications (ONLY Flagged orders, revision requests, sent back, or rejected orders)
       (labNotifs || []).forEach((ln) => {
+        const titleLower = (ln.title || "").toLowerCase();
+        const descLower = (ln.desc || "").toLowerCase();
+
+        const isFlaggedOrRejected = (
+          titleLower.includes("flagged") || descLower.includes("flagged") ||
+          titleLower.includes("revision") || descLower.includes("revision") ||
+          titleLower.includes("sent back") || descLower.includes("sent back") ||
+          titleLower.includes("reject") || descLower.includes("reject")
+        );
+
+        if (!isFlaggedOrRejected) return; // Skip all other lab status notifications for doctor
+
         const notifId = `lab-notif-${ln.id}`;
-        const isFlaggedOrAlert = ln.title.includes("Flagged") || ln.title.includes("Revision") || ln.desc.includes("Flagged");
+        const isFlaggedOrAlert = titleLower.includes("flagged") || titleLower.includes("revision") || descLower.includes("flagged");
         
         let targetToken = ln.patient_token || "";
 

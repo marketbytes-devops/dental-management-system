@@ -120,18 +120,40 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
   const SPECIALTY_PROCEDURES = {
     general: ["general dentistry", "consultation", "routine check-up", "follow-up check-up", "teeth cleaning", "scaling & polishing", "dental filling", "composite filling", "amalgam filling", "scaling and polishing", "teeth cleaning / polishing", "fluoride treatment", "sealants (pit and fissure)", "teeth whitening", "night guard / occlusal splint"],
     endodontics: ["endodontics", "root canal", "rct", "pulpotomy", "apicoectomy", "root canal treatment (rct)", "root canal treatment (rct) - single sitting", "root canal treatment (rct) - multiple sitting", "root canal retreatment"],
-    orthodontics: ["orthodontics", "orthodontic", "braces", "braces - metal", "braces - self-ligating", "braces - ceramic", "clear aligners", "palatal expander (rme)", "space maintainer", "habit-breaking appliance", "retainer-only treatment", "retainer fitting", "orthodontic consultation"],
+    orthodontics: ["ortho", "orthodontics", "orthodontic", "braces", "braces - metal", "braces - self-ligating", "braces - ceramic", "clear aligners", "palatal expander (rme)", "space maintainer", "habit-breaking appliance", "retainer-only treatment", "retainer fitting", "orthodontic consultation", "ortho consultation"],
     periodontics: ["periodontics", "deep cleaning", "gum surgery", "scaling and root planing", "periodontal maintenance"],
     surgery: ["oral surgery", "surgery", "simple extraction", "surgical extraction (impacted tooth, wisdom tooth)", "orthognathic surgery", "tooth extraction", "wisdom tooth removal", "dental implant surgery", "biopsy"],
     prosthodontics: ["prosthodontics", "crown – single tooth", "bridge (multi-tooth)", "complete denture (full set)", "partial denture (removable)", "implant-supported crown/bridge", "veneers", "crown fitting", "bridge installation", "denture adjustment"]
   };
 
+  const checkSpecMatch = (procStr, targetSpecId) => {
+    if (!procStr) return false;
+    const validProcs = SPECIALTY_PROCEDURES[targetSpecId] || [];
+    return validProcs.some(val => {
+      if (procStr === val) return true;
+      if (procStr.includes(val)) return true;
+      if (val.length > 4 && procStr.length > 4 && val.includes(procStr) && procStr !== "consultation") return true;
+      return false;
+    });
+  };
+
   const isPatientForSpecialty = (patient, specId) => {
     if (!patient || !specId) return false;
-    if (specId === "general") return true;
-    const proc = (patient.procedure || "").toLowerCase();
-    const validProcs = SPECIALTY_PROCEDURES[specId] || [];
-    return validProcs.some(val => proc.includes(val) || val.includes(proc));
+    const proc = (patient.procedure || patient.treatment_type || patient.chiefComplaint || "").toLowerCase().trim();
+    if (!proc) return specId === "general";
+    
+    // Check if procedure matches requested specialty
+    const matchesCurrent = checkSpecMatch(proc, specId);
+    if (matchesCurrent) return true;
+
+    // Check if procedure explicitly matches another specialty
+    const matchesOtherSpecialty = Object.keys(SPECIALTY_PROCEDURES).some(otherSpecId => {
+      if (otherSpecId === specId) return false;
+      return checkSpecMatch(proc, otherSpecId);
+    });
+
+    if (matchesOtherSpecialty) return false;
+    return specId === "general";
   };
 
   const searchParams = useSearchParams();
@@ -144,10 +166,9 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
     }
   }, [urlPatientToken, setViewingPatientToken]);
 
-  const targetToken = urlPatientToken || viewingPatientToken;
-  const effectiveViewingPatient = (targetToken && patients[targetToken] && isPatientForSpecialty(patients[targetToken], specialtyId)) 
-    ? patients[targetToken] 
-    : viewingPatient || null;
+  const effectiveViewingPatient = (urlPatientToken && patients[urlPatientToken] && isPatientForSpecialty(patients[urlPatientToken], specialtyId)) 
+    ? patients[urlPatientToken] 
+    : null;
   const effectiveActivePatientToken = isPatientForSpecialty(patients[activePatientToken], specialtyId) ? activePatientToken : "";
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -156,10 +177,10 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
   useEffect(() => {
     if (urlPatientToken && patients[urlPatientToken]) {
       const pt = patients[urlPatientToken];
-      const proc = (pt.procedure || "").toLowerCase();
+      const proc = (pt.procedure || pt.treatment_type || "").toLowerCase().trim();
       let targetSpecialty = "general";
-      for (const [specId, procs] of Object.entries(SPECIALTY_PROCEDURES)) {
-        if (procs.some(val => proc.includes(val) || val.includes(proc))) {
+      for (const [specId] of Object.entries(SPECIALTY_PROCEDURES)) {
+        if (checkSpecMatch(proc, specId)) {
           targetSpecialty = specId;
           break;
         }
@@ -364,6 +385,9 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
   };
 
   const handleGoBack = () => {
+    if (setViewingPatientToken) {
+      setViewingPatientToken("");
+    }
     router.push(`/doctor/workspace/${specialtyId}`);
   };
 

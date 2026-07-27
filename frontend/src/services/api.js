@@ -538,6 +538,11 @@ export const deleteTreatmentPlanStep = async (stepId) => {
   return response.data;
 };
 
+export const getAllPatients = async () => {
+  const response = await client.get("/patient/all");
+  return response.data;
+};
+
 // ==========================================
 // 8. Prescriptions & Referrals API Endpoints
 // ==========================================

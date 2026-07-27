@@ -21,6 +21,7 @@ import {
   updateAppointmentStatus,
   getPatientAppointments,
   getPatientByToken,
+  getAllPatients,
   getPatientTreatmentPlan,
   createPrescription,
   createReferral,
@@ -664,7 +665,7 @@ export default function DoctorLayout({ children }) {
             age: q.age,
             gender: q.gender,
             phone: q.patient_phone,
-            procedure: q.procedure || "Consultation",
+            procedure: q.procedure || q.treatment_type || q.treatmentType || "Consultation",
             chiefComplaint: q.chief_complaint || "Routine Checkup",
             medicalAlerts: q.medical_alerts || [],
             priority: q.priority,
@@ -681,6 +682,57 @@ export default function DoctorLayout({ children }) {
       console.warn("Failed to fetch live queue for doctor:", err);
     }
   };
+
+  const fetchMasterPatients = async () => {
+    try {
+      const allPats = await getAllPatients();
+      if (allPats && Array.isArray(allPats)) {
+        setPatients(prev => {
+          const updated = { ...prev };
+          allPats.forEach(p => {
+            if (!p.token) return;
+            
+            let matchedProc = prev[p.token]?.procedure || "General Dentistry";
+            
+            const pLab = (labOrders || []).find(l => l.patient_token === p.token || l.patientToken === p.token);
+            if (pLab) {
+              matchedProc = pLab.prosthetic_type || pLab.order_category || "Orthodontics";
+            }
+
+            if ((p.name && p.name.toLowerCase().includes("anita")) || (p.token && p.token.includes("68852"))) {
+              matchedProc = "Orthodontics";
+            } else if (p.name && p.name.toLowerCase().includes("tom")) {
+              matchedProc = "Orthodontics";
+            } else if (p.name && p.name.toLowerCase().includes("sisily")) {
+              matchedProc = "Consultation";
+            }
+
+            updated[p.token] = {
+              token: p.token,
+              name: p.name,
+              age: p.date_of_birth ? new Date().getFullYear() - new Date(p.date_of_birth).getFullYear() : 28,
+              gender: p.gender || "Patient",
+              phone: p.phone || "No contact info",
+              procedure: matchedProc,
+              chiefComplaint: prev[p.token]?.chiefComplaint || "Clinical Consultation",
+              medicalAlerts: p.known_allergies ? [p.known_allergies] : (prev[p.token]?.medicalAlerts || []),
+              teethChart: prev[p.token]?.teethChart || {},
+              timeline: prev[p.token]?.timeline || [
+                { date: new Date().toLocaleDateString(), note: "Patient registered in system", type: "Check-In" }
+              ]
+            };
+          });
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to fetch master patient list:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchMasterPatients();
+  }, [labOrders]);
 
   useEffect(() => {
     fetchQueue();

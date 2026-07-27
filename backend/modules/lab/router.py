@@ -652,6 +652,15 @@ SmileCare Lab Management System
             read=False
         )
         db.add(notif)
+    elif new_status in ["Flagged", "flagged"]:
+        notif = LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title=f"Lab Case {order_id} Flagged by Lab Tech",
+            desc=f"Lab Technician flagged Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} (Token: {order.patient_token}). Reason/Missing: {status_data.rejection_reason or status_data.tech_notes or 'Missing required case parameters.'}",
+            read=False
+        )
+        db.add(notif)
     else:
         if new_status in ["Confirmed", "Doctor Accepted"]:
             notif = LabNotificationModel(

@@ -57,6 +57,7 @@ class LabOrderModel(Base):
     claimed_at = Column(DateTime(timezone=True), nullable=True)
     physical_mold_sent = Column(Boolean, default=False)
     physical_opposing_mold_sent = Column(Boolean, default=False)
+    pending_email_proposal = Column(JSON, nullable=True)  # Stores parsed email proposed update for human 1-click verification
 
     prosthetic_detail = relationship("ProstheticCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")
     pathology_detail = relationship("PathologyCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")

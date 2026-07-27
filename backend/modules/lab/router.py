@@ -1067,15 +1067,19 @@ def claim_lab_order(
 # -------------------------------------------------------------
 # Vendor Inbound Email Parser / Webhook
 # -------------------------------------------------------------
+# -------------------------------------------------------------
+# Vendor Inbound Email Parser / Proposal Webhook
+# -------------------------------------------------------------
 @router.post("/inbound-email")
 def handle_inbound_vendor_email(payload: dict, db: Session = Depends(get_db)):
     """
-    Simulates / processes incoming email replies from external lab vendors.
-    Automatically parses tracking IDs, confirmation status, and delivery ETAs.
+    Parses incoming email replies from external lab vendors.
+    Instead of silently mutating status, creates a human-in-the-loop pending update proposal
+    surfaced to the lab tech for 1-click verification.
     """
     subject = payload.get("subject", "")
     body = payload.get("body", "")
-    from_email = payload.get("from_email", "")
+    from_email = payload.get("from_email", "vendor@apexdental.com")
 
     # Extract Case ID
     case_match = re.search(r"CASE-2026-\d+", f"{subject} {body}", re.IGNORECASE)
@@ -1097,35 +1101,118 @@ def handle_inbound_vendor_email(payload: dict, db: Session = Depends(get_db)):
     elif "track" in body_lower or "courier" in body_lower or "shipped" in body_lower:
         extracted_tracking = f"TRK-{random.randint(10000, 99999)}"
 
-    # Check Confirmation vs Courier Dispatch ("Arriving")
+    proposed_status = None
     if any(k in body_lower or k in subject_lower for k in ["work completed", "dispatched", "shipped", "on route", "courier", "en route", "tracking"]):
-        order.status = "Arriving"
-        order.stage = "Arriving / In Transit"
-        if extracted_tracking:
-            order.tracking_number = extracted_tracking
-        order.expected_return_date = (date.today() + timedelta(days=3)).strftime("%Y-%m-%d")
-
-        db.add(LabNotificationModel(
-            recipient_role="doctor",
-            type="labs",
-            title=f"Lab Case {case_id} En Route (Arriving)",
-            desc=f"External lab completed Case {case_id} for patient {order.patient_name or 'Walk-in'}. Courier Tracking ID: {order.tracking_number}. Estimated Delivery: {order.expected_return_date}.",
-            read=False
-        ))
+        proposed_status = "Arriving"
     elif any(k in body_lower or k in subject_lower for k in ["confirmed", "order confirmed", "accepted"]):
-        if order.status in ["Sent to Lab", "Pending Review"]:
-            order.status = "Confirmed"
-            order.stage = "Production / Confirmed"
+        proposed_status = "Confirmed"
+
+    if not proposed_status:
+        return {"success": False, "message": "No actionable status detected in email body."}
+
+    eta_date = (date.today() + timedelta(days=3)).strftime("%Y-%m-%d")
+
+    proposal = {
+        "case_id": case_id,
+        "proposed_status": proposed_status,
+        "proposed_stage": "Arriving / In Transit" if proposed_status == "Arriving" else "Production / Confirmed",
+        "tracking_number": extracted_tracking or f"TRK-{random.randint(10000, 99999)}",
+        "expected_return_date": eta_date,
+        "vendor_email": from_email,
+        "email_subject": subject,
+        "detected_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+    }
+
+    # Store proposed update on order without mutating actual order status silently!
+    order.pending_email_proposal = proposal
+
+    desc_msg = f"Detected: Apex/Vendor update for {case_id}: Proposed Status '{proposed_status}'"
+    if proposal["tracking_number"]:
+        desc_msg += f", Tracking #{proposal['tracking_number']}"
+    desc_msg += f", ETA {eta_date} — Click Accept to apply."
+
+    db.add(LabNotificationModel(
+        recipient_role="lab tech",
+        type="Orders",
+        title=f"Detected Email Update: Case {case_id}",
+        desc=desc_msg,
+        read=False
+    ))
 
     db.commit()
     db.refresh(order)
     return {
         "success": True,
+        "proposed": True,
         "case_id": case_id,
-        "status": order.status,
-        "tracking_number": order.tracking_number,
-        "expected_return_date": order.expected_return_date
+        "proposal": proposal
     }
+
+# -------------------------------------------------------------
+# Accept & Dismiss Email Proposal Endpoints
+# -------------------------------------------------------------
+@router.post("/orders/{order_id}/accept-email-update", response_model=LabOrderResponse)
+def accept_email_update(
+    order_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Lab order not found")
+
+    if not order.pending_email_proposal:
+        raise HTTPException(status_code=400, detail="No pending email proposal found for this case.")
+
+    proposal = order.pending_email_proposal
+    user_name = current_user.get("name") or current_user.get("sub") or "Lab Technician"
+
+    # Apply proposed status changes
+    order.status = proposal.get("proposed_status", "Confirmed")
+    order.stage = proposal.get("proposed_stage", "Production / Confirmed")
+    if proposal.get("tracking_number"):
+        order.tracking_number = proposal["tracking_number"]
+    if proposal.get("expected_return_date"):
+        order.expected_return_date = proposal["expected_return_date"]
+
+    # Clear pending proposal
+    order.pending_email_proposal = None
+
+    # Audit Trail
+    db.add(LabAuditTrailModel(
+        order_id=order_id,
+        user_name=user_name,
+        action="Accepted Email Proposal",
+        note=f"Applied status '{order.status}', tracking #{order.tracking_number}, ETA {order.expected_return_date}"
+    ))
+
+    # Notify doctor if arriving
+    if order.status == "Arriving":
+        db.add(LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title=f"Lab Case {order_id} En Route (Arriving)",
+            desc=f"Case {order_id} for patient {order.patient_name or 'Walk-in'} is arriving. Courier Tracking ID: {order.tracking_number}. Estimated Delivery: {order.expected_return_date}.",
+            read=False
+        ))
+
+    db.commit()
+    db.refresh(order)
+    return serialize_order(order)
+
+@router.post("/orders/{order_id}/dismiss-email-update", response_model=LabOrderResponse)
+def dismiss_email_update(
+    order_id: str,
+    db: Session = Depends(get_db)
+):
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Lab order not found")
+
+    order.pending_email_proposal = None
+    db.commit()
+    db.refresh(order)
+    return serialize_order(order)
 
 # -------------------------------------------------------------
 # Comments Endpoints

@@ -206,6 +206,7 @@ class LabOrderResponse(BaseModel):
     claimed_at: Optional[datetime] = None
     physical_mold_sent: Optional[bool] = False
     physical_opposing_mold_sent: Optional[bool] = False
+    pending_email_proposal: Optional[Any] = None
 
     class Config:
         from_attributes = True

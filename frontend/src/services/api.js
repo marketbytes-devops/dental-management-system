@@ -445,6 +445,16 @@ export const sendLabBillingRequest = async (payload) => {
   return response.data;
 };
 
+export const acceptEmailUpdate = async (id) => {
+  const response = await client.post(`/lab/orders/${id}/accept-email-update`);
+  return response.data;
+};
+
+export const dismissEmailUpdate = async (id) => {
+  const response = await client.post(`/lab/orders/${id}/dismiss-email-update`);
+  return response.data;
+};
+
 export const getLabComments = async (id) => {
   const response = await client.get(`/lab/orders/${id}/comments`);
   return response.data;

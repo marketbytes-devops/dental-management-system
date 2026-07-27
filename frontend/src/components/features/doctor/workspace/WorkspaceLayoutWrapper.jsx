@@ -91,6 +91,7 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
   const router = useRouter();
   const {
     viewingPatient,
+    viewingPatientToken,
     activePatientToken,
     completedPatientHistory,
     rxDraft,
@@ -127,6 +128,7 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
 
   const isPatientForSpecialty = (patient, specId) => {
     if (!patient || !specId) return false;
+    if (specId === "general") return true;
     const proc = (patient.procedure || "").toLowerCase();
     const validProcs = SPECIALTY_PROCEDURES[specId] || [];
     return validProcs.some(val => proc.includes(val) || val.includes(proc));
@@ -137,12 +139,15 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
 
   // Sync url patientToken with context viewing patient
   useEffect(() => {
-    setViewingPatientToken(urlPatientToken || "");
+    if (urlPatientToken && setViewingPatientToken) {
+      setViewingPatientToken(urlPatientToken);
+    }
   }, [urlPatientToken, setViewingPatientToken]);
 
-  const effectiveViewingPatient = (urlPatientToken && patients[urlPatientToken] && isPatientForSpecialty(patients[urlPatientToken], specialtyId)) 
-    ? patients[urlPatientToken] 
-    : null;
+  const targetToken = urlPatientToken || viewingPatientToken;
+  const effectiveViewingPatient = (targetToken && patients[targetToken] && isPatientForSpecialty(patients[targetToken], specialtyId)) 
+    ? patients[targetToken] 
+    : viewingPatient || null;
   const effectiveActivePatientToken = isPatientForSpecialty(patients[activePatientToken], specialtyId) ? activePatientToken : "";
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -160,13 +165,23 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
         }
       }
       if (targetSpecialty !== specialtyId) {
-        router.replace(`/doctor/workspace/${targetSpecialty}?patientToken=${urlPatientToken}`);
+        const urlSection = searchParams.get("section") || searchParams.get("tab");
+        const secQuery = urlSection ? `&section=${urlSection}` : "";
+        router.replace(`/doctor/workspace/${targetSpecialty}?patientToken=${urlPatientToken}${secQuery}`);
       }
     }
-  }, [urlPatientToken, specialtyId, router, patients]);
+  }, [urlPatientToken, specialtyId, router, patients, searchParams]);
+
+  const urlSection = searchParams.get("section") || searchParams.get("tab");
 
   // Selected active tab section
-  const [activeKpiSection, setActiveKpiSection] = useState("diagnosis");
+  const [activeKpiSection, setActiveKpiSection] = useState(urlSection || "diagnosis");
+
+  useEffect(() => {
+    if (urlSection) {
+      setActiveKpiSection(urlSection);
+    }
+  }, [urlSection]);
 
   // Toggle compose states
   const [showNewDiagForm, setShowNewDiagForm] = useState(false);
@@ -178,7 +193,7 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
   // Reset active tab and compose states when patient changes
   useEffect(() => {
     if (effectiveViewingPatient?.token) {
-      setActiveKpiSection("diagnosis");
+      setActiveKpiSection(urlSection || "diagnosis");
       setShowNewDiagForm(false);
       setShowNewRefForm(false);
       setShowNewLabForm(false);
@@ -186,7 +201,7 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
       setShowNewPrescriptionForm(false);
       setExpandedNotes({});
     }
-  }, [effectiveViewingPatient?.token]);
+  }, [effectiveViewingPatient?.token, urlSection]);
 
   // ── Reports Library state — must be declared before any early return ──
   const storageKey = effectiveViewingPatient?.token ? `patient_reports_${effectiveViewingPatient.token}` : null;
@@ -836,22 +851,41 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
               <div className="space-y-3 pt-2">
                 {patientOrders.map((order) => (
                   <div key={order.id} className="p-4 border border-gray-150 rounded-xl bg-gray-50/20 hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded font-black">{order.id}</span>
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
-                        (order.order_category || order.orderCategory) === "Diagnostic"
-                          ? "bg-secondary/10 text-secondary"
-                          : "bg-primary/10 text-primary"
-                      }`}>
-                        {order.order_category || order.orderCategory || "Restoration"}
-                      </span>
-                      {order.priority && (
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${
-                          order.priority === "Urgent" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] bg-gray-100 text-gray-500 px-2.5 py-0.5 rounded font-black">{order.id}</span>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
+                          (order.order_category || order.orderCategory) === "Diagnostic"
+                            ? "bg-secondary/10 text-secondary"
+                            : "bg-primary/10 text-primary"
                         }`}>
-                          {order.priority}
+                          {order.order_category || order.orderCategory || "Restoration"}
                         </span>
-                      )}
+                        {order.priority && (
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${
+                            order.priority === "Urgent" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"
+                          }`}>
+                            {order.priority}
+                          </span>
+                        )}
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${
+                          order.status === "Flagged" || order.status === "flagged"
+                            ? "bg-amber-100 text-amber-800 border border-amber-300 animate-pulse"
+                            : order.status === "Revision Requested"
+                            ? "bg-rose-100 text-rose-800 border border-rose-300"
+                            : "bg-blue-50 text-blue-700"
+                        }`}>
+                          {order.status || "Pending"}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditingOrder(order)}
+                        className="text-xs text-primary font-bold hover:underline cursor-pointer"
+                      >
+                        Edit Specs
+                      </button>
                     </div>
 
                     <p className="font-bold text-sm text-gray-900 mb-2">
@@ -874,6 +908,26 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
                       <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-600">
                         {order.sample_type && <div><span className="font-semibold text-gray-400">Sample:</span> {order.sample_type}</div>}
                         {order.reason_for_test && <div className="col-span-2"><span className="font-semibold text-gray-400">Reason:</span> {order.reason_for_test}</div>}
+                      </div>
+                    )}
+
+                    {(order.status === "Flagged" || order.status === "flagged" || order.rejection_reason) && (
+                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start justify-between gap-3">
+                        <div>
+                          <span className="font-extrabold flex items-center gap-1 text-amber-800">
+                            ⚠️ Flagged for Doctor Attention
+                          </span>
+                          <p className="text-[11px] mt-1 text-amber-900 font-medium">
+                            {order.rejection_reason || order.notes || "Lab Technician indicated missing or invalid specs for this case."}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingOrder(order)}
+                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-[10px] rounded-lg shrink-0 shadow-xs cursor-pointer"
+                        >
+                          Fix Specs Now
+                        </button>
                       </div>
                     )}
 

@@ -170,7 +170,7 @@ export default function DoctorLayout({ children }) {
     }
   }, []);
 
-  const markAsRead = (id) => {
+  const markAsRead = async (id) => {
     setReadNotifIds((prev) => {
       const updated = { ...prev, [id]: true };
       try {
@@ -180,6 +180,12 @@ export default function DoctorLayout({ children }) {
     });
     setDbNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, status: "read" } : n)));
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, status: "read" } : n)));
+    if (typeof id === "string" && id.startsWith("lab-notif-")) {
+      const rawId = parseInt(id.replace("lab-notif-", ""));
+      if (!isNaN(rawId)) {
+        await markNotificationAsRead(rawId).catch(() => {});
+      }
+    }
   };
 
   const markAsUnread = (idOrItemId) => {
@@ -194,7 +200,7 @@ export default function DoctorLayout({ children }) {
     setDbNotifications((prev) => prev.map((n) => (n.id === idOrItemId ? { ...n, status: "unread" } : n)));
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setReadNotifIds((prev) => {
       const updated = { ...prev };
       allNotifications.forEach((n) => {
@@ -207,14 +213,16 @@ export default function DoctorLayout({ children }) {
     });
     setDbNotifications((prev) => prev.map((n) => ({ ...n, status: "read" })));
     setNotifications((prev) => prev.map((n) => ({ ...n, status: "read" })));
+    await markAllNotificationsAsRead().catch(() => {});
   };
 
   const fetchDbNotifications = async () => {
     try {
-      // Fetch leave requests for current doctor and all referrals
-      const [leaves, allRefs] = await Promise.all([
+      // Fetch leave requests, referrals, and lab notifications for current doctor
+      const [leaves, allRefs, labNotifs] = await Promise.all([
         getMyLeaveRequests().catch(() => []),
         getAllReferrals().catch(() => []),
+        getLabNotifications("doctor").catch(() => []),
       ]);
 
       const notifs = [];
@@ -273,6 +281,51 @@ export default function DoctorLayout({ children }) {
             status: readNotifIds[notifId] ? "read" : "unread",
           });
         }
+      });
+
+      // 3. Lab notifications (Flagged orders, revision requests, updates)
+      (labNotifs || []).forEach((ln) => {
+        const notifId = `lab-notif-${ln.id}`;
+        const isFlaggedOrAlert = ln.title.includes("Flagged") || ln.title.includes("Revision") || ln.desc.includes("Flagged");
+        
+        let targetToken = ln.patient_token || "";
+
+        if (!targetToken) {
+          const matchedOrder = (labOrders || []).find(o => 
+            (o.id && (ln.title.includes(o.id) || ln.desc.includes(o.id)))
+          );
+          if (matchedOrder) {
+            targetToken = matchedOrder.patient_token || matchedOrder.patientToken || "";
+          }
+        }
+
+        if (!targetToken) {
+          const tokenMatch = ln.desc.match(/PT-[A-Za-z0-9]+/i) || ln.title.match(/PT-[A-Za-z0-9]+/i);
+          if (tokenMatch) {
+            targetToken = tokenMatch[0].toUpperCase();
+          } else {
+            const patientNameMatch = Object.values(patients || {}).find(p => p.name && (ln.desc.includes(p.name) || ln.title.includes(p.name)));
+            if (patientNameMatch) {
+              targetToken = patientNameMatch.token;
+            }
+          }
+        }
+
+        const link = targetToken 
+          ? `/doctor/workspace/general?patientToken=${encodeURIComponent(targetToken)}&section=labs` 
+          : `/doctor/workspace/general?section=labs`;
+
+        notifs.push({
+          id: notifId,
+          message: `${ln.title}: ${ln.desc}`,
+          type: "labs",
+          link,
+          patientId: targetToken,
+          dotColor: isFlaggedOrAlert ? "red" : "amber",
+          timestamp: ln.created_at ? new Date(ln.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently",
+          receivedAt: ln.created_at || new Date().toISOString(),
+          status: (readNotifIds[notifId] || ln.read) ? "read" : "unread",
+        });
       });
 
       notifs.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());

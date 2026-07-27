@@ -110,7 +110,7 @@ export default function Navbar() {
     // not in doctor context
   }
 
-  const { notifications = [], bellAnimating, markAsRead, markAllAsRead } = doctorContext || {};
+  const { notifications = [], bellAnimating, markAsRead, markAllAsRead, setViewingPatientToken } = doctorContext || {};
 
   // Safely try-catch calling useReceptionist so it doesn't crash when rendered outside ReceptionistProvider
   let receptionistContext = null;
@@ -304,6 +304,9 @@ export default function Navbar() {
                         key={notif.id}
                         href={notif.link}
                         onClick={() => {
+                          if (notif.patientId && setViewingPatientToken) {
+                            setViewingPatientToken(notif.patientId);
+                          }
                           if (markAsRead) markAsRead(notif.id);
                           setShowNotifications(false);
                         }}

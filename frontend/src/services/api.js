@@ -751,37 +751,6 @@ export const notifyPatientForLabOrder = async (orderId, note) => {
   return response.data;
 };
 
-// ==========================================
-// 15. Support & Complaint Management
-// ==========================================
-
-export const getMyComplaints = async () => {
-  try {
-    const response = await client.get("/support/complaints");
-    return response.data;
-  } catch (err) {
-    return [];
-  }
-};
-
-export const submitComplaint = async (data) => {
-  const response = await client.post("/support/complaints", data);
-  return response.data;
-};
-
-export const reopenComplaint = async (id, note) => {
-  const response = await client.put(`/support/complaints/${id}/reopen`, { note });
-  return response.data;
-};
-
-export const getComplaintLogs = async (id) => {
-  try {
-    const response = await client.get(`/support/complaints/${id}/logs`);
-    return response.data;
-  } catch (err) {
-    return [];
-  }
-};
 
 export const getConsultationFees = async () => {
   const response = await client.get("/payment/consultation-fees");

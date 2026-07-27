@@ -97,7 +97,6 @@ export const ROLE_NAV_ITEMS = {
     { name: "Patient Records", href: "/frontdesk/receptionist/records", icon: FolderOpen },
     { name: "Leave Management", href: "/frontdesk/receptionist/leave", icon: Calendar },
     { name: "Support Portal", href: "/frontdesk/receptionist/support", icon: LifeBuoy },
-    { name: "Settings", href: "/frontdesk/receptionist/settings", icon: Settings },
     { name: "My Profile", href: "/frontdesk/receptionist/profile", icon: User }
   ],
   accountant: [
@@ -107,7 +106,6 @@ export const ROLE_NAV_ITEMS = {
     { name: "Expenses & Payroll", href: "/frontdesk/accountant/expenses", icon: TrendingDown },
     { name: "Financial Reports", href: "/frontdesk/accountant/reports", icon: FileText },
     { name: "Leave Management", href: "/frontdesk/accountant/leave", icon: Calendar },
-    { name: "Settings", href: "/frontdesk/accountant/settings", icon: Settings },
     { name: "My Profile", href: "/frontdesk/accountant/profile", icon: User },
     { name: "Support Portal", href: "/frontdesk/accountant/support", icon: LifeBuoy }
   ],

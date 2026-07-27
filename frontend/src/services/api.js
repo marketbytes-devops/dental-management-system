@@ -318,6 +318,14 @@ export const getAllAppointments = async () => {
   return response.data;
 };
 
+export const getAppointmentsByMonth = async (month, year) => {
+  const response = await client.get("/frontdesk/appointments", {
+    params: { month, year },
+  });
+  return response.data;
+};
+
+
 export const callPatient = async (id, statusStr) => {
   const response = await client.post(`/frontdesk/appointments/${id}/call?status_str=${encodeURIComponent(statusStr)}`);
   return response.data;

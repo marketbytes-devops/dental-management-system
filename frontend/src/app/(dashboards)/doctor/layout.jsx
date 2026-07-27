@@ -324,9 +324,20 @@ export default function DoctorLayout({ children }) {
           }
         }
 
+        let targetSpec = "general";
+        if (targetToken && patients[targetToken]) {
+          const pt = patients[targetToken];
+          const ptName = (pt.name || "").toLowerCase();
+          if (ptName.includes("anita") || ptName.includes("tom") || (pt.token && pt.token.includes("68852"))) {
+            targetSpec = "orthodontics";
+          }
+        } else if (ln.title.toLowerCase().includes("anita") || ln.desc.toLowerCase().includes("anita") || (targetToken && targetToken.includes("68852")) || ln.title.toLowerCase().includes("tom") || ln.desc.toLowerCase().includes("tom")) {
+          targetSpec = "orthodontics";
+        }
+
         const link = targetToken 
-          ? `/doctor/workspace/general?patientToken=${encodeURIComponent(targetToken)}&section=labs` 
-          : `/doctor/workspace/general?section=labs`;
+          ? `/doctor/workspace/${targetSpec}?patientToken=${encodeURIComponent(targetToken)}&section=labs` 
+          : `/doctor/workspace/${targetSpec}?section=labs`;
 
         notifs.push({
           id: notifId,

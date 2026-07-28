@@ -48,7 +48,7 @@ export default function LabQualityControl() {
 
   useEffect(() => {
     fetchCases();
-    const interval = setInterval(fetchCases, 5000);
+    const interval = setInterval(fetchCases, 30000);
     return () => clearInterval(interval);
   }, []);
 

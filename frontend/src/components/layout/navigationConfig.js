@@ -43,6 +43,7 @@ import {
   Package,
   MessageSquare,
   LifeBuoy,
+  FlaskConical,
   FileSignature
 } from "lucide-react";
 
@@ -58,7 +59,6 @@ export const ROLE_NAV_ITEMS = {
     { name: "Lab Module", href: "/admin/lab-module", icon: Microscope },
     { name: "Procedures Catalog", href: "/admin/procedures", icon: ClipboardList },
     { name: "Leave Management", href: "/admin/leave", icon: Calendar },
-    { name: "Complaints", href: "/admin/complaints", icon: MessageSquare },
     { name: "Support Portal", href: "/admin/support", icon: LifeBuoy }
   ],
   doctor: [
@@ -88,6 +88,8 @@ export const ROLE_NAV_ITEMS = {
     { name: "Dashboard", href: "/frontdesk/receptionist/dashboard", icon: BarChart3 },
     { name: "Appointments", href: "/frontdesk/receptionist/appointments", icon: Calendar },
     { name: "Registrations", href: "/frontdesk/receptionist/patients", icon: UserPlus },
+    { name: "Medicines to Dispense", href: "/frontdesk/receptionist/dispensing", icon: Pill },
+    { name: "Lab Order Pickups", href: "/frontdesk/receptionist/lab-orders", icon: FlaskConical },
     { name: "Consent Forms", href: "/frontdesk/receptionist/consents", icon: FileSignature },
     { name: "Daily Transactions", href: "/frontdesk/receptionist/transactions", icon: Receipt },
     { name: "Doctor Schedules", href: "/frontdesk/receptionist/doctors", icon: Stethoscope },

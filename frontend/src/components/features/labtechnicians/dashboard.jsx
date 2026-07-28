@@ -44,7 +44,7 @@ export default function LabDashboard() {
   useEffect(() => {
     setAnimate(true);
     fetchOrders();
-    const interval = setInterval(fetchOrders, 5000);
+    const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -244,27 +244,21 @@ export default function LabDashboard() {
   const activityLogs = generateActivityLogs(orders);
 
   const stats = [
-    { 
-      name: "Emergency Cases", 
-      value: emergencyCases, 
-      icon: Flame, 
-      change: "Immediate action required", 
-      color: "border-danger/30 text-danger bg-danger/5" 
-    },
-    { 
-      name: "Due Today", 
-      value: dueTodayOrders.length, 
-      icon: Calendar, 
-      change: "Cases due for completion today", 
-      color: "border-primary/30 text-primary bg-primary/5" 
-    },
-    { 
-      name: "Overdue Cases", 
-      value: overdueOrders.length, 
-      icon: AlertTriangle, 
-      change: "Action required immediately", 
-      color: "border-danger/30 text-danger bg-danger/5" 
-    }
+    {
+    name: "Pending Cases",
+    value: pendingOrders.length,
+    icon: ClipboardList,
+    change: "New & unreviewed cases",
+    color: "border-primary/30 text-primary bg-primary/5"
+  },
+  {
+    name: "Emergency Cases",
+    value: emergencyCases,
+    icon: Flame,
+    change: "Immediate action required",
+    color: "border-danger/30 text-danger bg-danger/5"
+  },
+   
   ];
 
   const getPriorityBadge = (priority) => {

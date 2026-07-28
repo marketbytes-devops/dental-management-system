@@ -39,6 +39,9 @@ export default function LeaveApprovalQueue({ requests, onApprove, onReject }) {
     <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-4">
       <h3 className="text-sm font-bold text-gray-905 uppercase tracking-wider flex items-center gap-1.5 border-b border-gray-100 pb-3">
         <CheckSquare className="w-4.5 h-4.5 text-primary" /> Leave Approval Queue ({pendingRequests.length})
+        {pendingRequests.length > 0 && (
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 border border-white shadow-sm animate-pulse shrink-0 ml-1" title="Needs Attention: Pending Approvals" />
+        )}
       </h3>
 
       <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
@@ -50,6 +53,7 @@ export default function LeaveApprovalQueue({ requests, onApprove, onReject }) {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 border border-white shadow-sm animate-pulse shrink-0" title="Needs Attention: Pending Approval" />
                   <span className="text-xs font-bold text-gray-900 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-150">
                     {req.staffName} ({getRoleLabel(req.role)})
                   </span>
@@ -77,12 +81,14 @@ export default function LeaveApprovalQueue({ requests, onApprove, onReject }) {
                   onClick={() => onApprove(req.id)}
                   className="px-3.5 py-1.5 bg-success text-white font-bold rounded-lg text-xs hover:bg-success/90 transition-all flex items-center justify-center gap-1 cursor-pointer outline-none shadow-sm shadow-success/10"
                 >
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
                   <ThumbsUp className="w-3.5 h-3.5" /> Approve
                 </button>
                 <button
                   onClick={() => onReject(req.id)}
                   className="px-3.5 py-1.5 bg-danger text-white font-bold rounded-lg text-xs hover:bg-danger/90 transition-all flex items-center justify-center gap-1 cursor-pointer outline-none shadow-sm shadow-danger/10"
                 >
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
                   <ThumbsDown className="w-3.5 h-3.5" /> Reject
                 </button>
               </div>

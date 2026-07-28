@@ -249,6 +249,7 @@ export default function AdminInventory() {
         <div className="bg-white border border-warning/30 rounded-2xl shadow-sm overflow-hidden animate-fade-in">
           <div className="p-4 bg-warning/10 border-b border-warning/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse shrink-0" />
               <Bell className="w-5 h-5 text-warning" />
               <h3 className="text-sm font-bold text-gray-900">Active Restock Requests</h3>
             </div>
@@ -272,7 +273,8 @@ export default function AdminInventory() {
                 {activeRequests.map((req) => (
                   <tr key={req.id} className="hover:bg-gray-50/40">
                     <td className="px-4 py-3 font-bold">#{req.id}</td>
-                    <td className="px-4 py-3 font-semibold">
+                    <td className="px-4 py-3 font-semibold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-red-500 border border-white animate-pulse shrink-0" />
                       {req.item_id === null ? <span className="mr-1 text-[9px] bg-primary/10 text-primary px-1 py-0.5 rounded uppercase font-bold">New</span> : ""}
                       {req.item_name}
                     </td>
@@ -387,7 +389,12 @@ export default function AdminInventory() {
                   <tr key={item.code} className="hover:bg-gray-50/40 transition-colors">
                     <td className="px-4 py-3 font-bold text-gray-900">{item.code}</td>
                     <td className="px-4 py-3 font-semibold text-gray-800">
-                      {item.name}
+                      <div className="flex items-center gap-1.5">
+                        {item.quantity <= item.minLevel && (
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 border border-white animate-pulse shrink-0" title="Low Stock Warning" />
+                        )}
+                        <span>{item.name}</span>
+                      </div>
                       <span className="block text-[10px] text-gray-400 font-normal mt-0.5">{item.supplier}</span>
                     </td>
                     <td className="px-4 py-3 font-bold text-gray-900">

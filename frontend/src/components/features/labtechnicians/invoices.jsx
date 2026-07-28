@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Coins,
   CreditCard,
@@ -17,7 +17,7 @@ import {
   Printer,
   FileText
 } from "lucide-react";
-import { getLabOrders } from "@/services/api";
+import { getLabOrders, sendLabBillingRequest } from "@/services/api";
 import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
 
@@ -110,35 +110,40 @@ export default function LabInvoices() {
 
   useEffect(() => {
     fetchInvoices();
-    const interval = setInterval(fetchInvoices, 5000);
+    const interval = setInterval(fetchInvoices, 30000);
     return () => clearInterval(interval);
   }, []);
 
   // Filter logic
-  const pendingInvoices = allInvoices.filter(
-    (inv) => inv.status === "Unpaid" || inv.status === "Overdue"
-  );
+  const pendingInvoices = useMemo(() => {
+    return allInvoices.filter(
+      (inv) => inv.status === "Unpaid" || inv.status === "Overdue"
+    );
+  }, [allInvoices]);
 
-  const filteredByTab =
-    activeTab === "dispatched"
+  const filteredByTab = useMemo(() => {
+    return activeTab === "dispatched"
       ? allInvoices.filter((inv) => inv.dispatched)
       : activeTab === "pending"
         ? pendingInvoices
         : allInvoices;
+  }, [activeTab, allInvoices, pendingInvoices]);
 
-  const invoices = filteredByTab.filter((inv) => {
-    const matchesSearch =
-      inv.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.dentist.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inv.clinic.toLowerCase().includes(searchQuery.toLowerCase());
+  const invoices = useMemo(() => {
+    return filteredByTab.filter((inv) => {
+      const matchesSearch =
+        inv.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        inv.patient.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        inv.dentist.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        inv.clinic.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus =
-      statusFilter === "all" ||
-      inv.status.toLowerCase() === statusFilter.toLowerCase();
+      const matchesStatus =
+        statusFilter === "all" ||
+        inv.status.toLowerCase() === statusFilter.toLowerCase();
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    });
+  }, [filteredByTab, searchQuery, statusFilter]);
 
   // Auto-select first matching invoice when list changes
   useEffect(() => {
@@ -475,18 +480,41 @@ export default function LabInvoices() {
                           {getStatusBadge(inv.status)}
                         </td>
                         <td className="py-4 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => {
-                              setSelectedInvId(inv.id);
-                              setInvoiceModalOpen(true);
-                            }}
-                            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${selectedInvId === inv.id
-                              ? "bg-primary text-white border-primary"
-                              : "bg-white hover:bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700"
-                              }`}
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await sendLabBillingRequest({
+                                    patient_token: inv.caseId || "PT-WALKIN",
+                                    doctor_name: inv.dentist || "Lab Technician",
+                                    amount: inv.amount,
+                                    notes: `Lab Invoice ${inv.id} (${inv.items.map(i => i.name).join(', ')})`,
+                                    procedures: inv.items.map(i => ({ procedure_id: 1, name: i.name, rate: i.rate }))
+                                  });
+                                  triggerToast(`Invoice ${inv.id} sent to Accountant!`, "success");
+                                } catch (err) {
+                                  console.error(err);
+                                  triggerToast("Failed to send invoice to accountant.", "error");
+                                }
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                              title="Send charge to Accountant module"
+                            >
+                              <Send className="w-3 h-3" /> Send to Accountant
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedInvId(inv.id);
+                                setInvoiceModalOpen(true);
+                              }}
+                              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${selectedInvId === inv.id
+                                ? "bg-primary text-white border-primary"
+                                : "bg-white hover:bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700"
+                                }`}
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

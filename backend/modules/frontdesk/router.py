@@ -88,16 +88,12 @@ def get_patient_appointments_route(patient_id: int, db: Session = Depends(get_db
 
 
 @router.get("/appointments", response_model=List[AppointmentResponse])
-<<<<<<< HEAD
-def get_all_appointments(db: Session = Depends(get_db)):
-    auto_mark_missed_appointments(db)
-    appointments = db.query(AppointmentModel).order_by(AppointmentModel.appointment_date.desc()).all()
-=======
 def get_all_appointments(
     month: Optional[int] = None,
     year: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
+    auto_mark_missed_appointments(db)
     query = db.query(AppointmentModel)
     if month is not None and year is not None:
         query = query.filter(
@@ -112,7 +108,6 @@ def get_all_appointments(
             AppointmentModel.appointment_date < date(year + 1, 1, 1)
         )
     appointments = query.order_by(AppointmentModel.appointment_date.desc()).all()
->>>>>>> 165fcb811ae588439139f93c47a2db20ad94593a
     for appt in appointments:
         appt.patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
     return appointments

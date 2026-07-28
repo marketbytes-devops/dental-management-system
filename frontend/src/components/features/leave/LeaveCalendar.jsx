@@ -3,18 +3,39 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User } from "lucide-react";
 
-export default function LeaveCalendar({ requests }) {
-  // June 2026 holds the current workspace session time
-  const [currentYear] = useState(2026);
-  const [currentMonth] = useState(5); // June is index 5 in JS Date
+export default function LeaveCalendar({ requests = [] }) {
+  // Default to current date / workspace date
+  const [currentDate, setCurrentDate] = useState(() => new Date());
 
-  const daysInMonth = 30; // June has 30 days
-  const monthName = "June 2026";
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth(); // 0-indexed (0 = Jan)
+
+  // Total days in current selected month
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  // Starting day of week (0 = Sunday, 1 = Monday ...)
+  // We align grid to Mon-Sun (0=Mon ... 6=Sun)
+  const rawFirstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const startDayOffset = rawFirstDay === 0 ? 6 : rawFirstDay - 1;
+
+  const monthName = currentDate.toLocaleString("en-US", { month: "long", year: "numeric" });
 
   const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-  // Fetch approved requests
-  const approvedRequests = requests.filter((r) => r.status === "Approved");
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+  };
+
+  const handleToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  // Approved requests across all staff and modules
+  const approvedRequests = (requests || []).filter((r) => r.status === "Approved");
 
   const getLeavesForDay = (dayNum) => {
     const checkDate = new Date(currentYear, currentMonth, dayNum);
@@ -30,6 +51,7 @@ export default function LeaveCalendar({ requests }) {
   };
 
   const getShortName = (name) => {
+    if (!name) return "Staff";
     const clean = name.replace("Dr.", "").trim();
     return clean.split(" ")[0];
   };
@@ -51,15 +73,42 @@ export default function LeaveCalendar({ requests }) {
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-4">
-      {/* Calendar Header */}
-      <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-        <h3 className="text-sm font-bold text-gray-905 uppercase tracking-wider flex items-center gap-1.5">
-          <CalendarIcon className="w-4.5 h-4.5 text-primary" /> Clinic Attendance Calendar
-        </h3>
+      {/* Calendar Header with Dynamic Month Navigation Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+            <CalendarIcon className="w-4.5 h-4.5 text-primary" /> Month Schedule & Attendance Calendar
+          </h3>
+          <p className="text-[11px] text-gray-500 font-medium mt-0.5">Interactive clinic schedule. View approved staff leaves across all departments.</p>
+        </div>
+
+        {/* Month Navigation Controls */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
-            {monthName}
-          </span>
+          <button
+            onClick={handleToday}
+            className="text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-xl transition-all cursor-pointer"
+          >
+            Today
+          </button>
+          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200">
+            <button
+              onClick={handlePrevMonth}
+              className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded-lg transition cursor-pointer"
+              title="Previous Month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-extrabold text-gray-800 px-3 min-w-[110px] text-center">
+              {monthName}
+            </span>
+            <button
+              onClick={handleNextMonth}
+              className="p-1 text-gray-600 hover:text-gray-900 hover:bg-white rounded-lg transition cursor-pointer"
+              title="Next Month"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -74,19 +123,40 @@ export default function LeaveCalendar({ requests }) {
 
       {/* Calendar days grid */}
       <div className="grid grid-cols-7 gap-2 min-h-[350px]">
+        {/* Leading Empty Cells for Day Offset */}
+        {Array.from({ length: startDayOffset }).map((_, idx) => (
+          <div key={`empty-${idx}`} className="bg-gray-50/20 border border-gray-100/50 rounded-xl min-h-[85px]" />
+        ))}
+
+        {/* Dynamic Days in Selected Month */}
         {Array.from({ length: daysInMonth }).map((_, idx) => {
           const dayNum = idx + 1;
           const dayLeaves = getLeavesForDay(dayNum);
+          const isToday =
+            new Date().getDate() === dayNum &&
+            new Date().getMonth() === currentMonth &&
+            new Date().getFullYear() === currentYear;
 
           return (
             <div
               key={dayNum}
-              className="bg-white border border-gray-100 hover:border-gray-300 rounded-xl p-2.5 flex flex-col justify-between transition-all min-h-[85px] relative"
+              className={`border rounded-xl p-2.5 flex flex-col justify-between transition-all min-h-[85px] relative ${
+                isToday
+                  ? "bg-blue-50/40 border-primary/40 ring-2 ring-primary/20"
+                  : "bg-white border-gray-100 hover:border-gray-300"
+              }`}
             >
               {/* Day number */}
-              <span className="text-xs font-bold text-gray-500 self-end">
-                {dayNum}
-              </span>
+              <div className="flex justify-between items-center w-full">
+                {isToday ? (
+                  <span className="text-[9px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded uppercase">
+                    Today
+                  </span>
+                ) : <span />}
+                <span className={`text-xs font-extrabold ${isToday ? "text-primary font-black" : "text-gray-500"}`}>
+                  {dayNum}
+                </span>
+              </div>
 
               {/* Leave lists */}
               <div className="space-y-1 mt-1.5 overflow-y-auto max-h-[65px] w-full">

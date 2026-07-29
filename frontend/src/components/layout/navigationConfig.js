@@ -44,7 +44,8 @@ import {
   MessageSquare,
   LifeBuoy,
   FlaskConical,
-  FileSignature
+  FileSignature,
+  Activity
 } from "lucide-react";
 
 import ToothIcon from "@/components/ui/shared/ToothIcon";
@@ -128,6 +129,7 @@ export const ROLE_NAV_ITEMS = {
     { name: "Self Check-In", href: "/patient/check-in", icon: CheckSquare },
     { name: "My Documents", href: "/patient/documents", icon: FileText },
     { name: "My Records", href: "/patient/records", icon: Pill },
+    { name: "Activity History", href: "/patient/activity", icon: Activity },
     { name: "My Bills", href: "/patient/billing", icon: CreditCard },
     { name: "Notifications", href: "/patient/notifications", icon: Bell },
     { name: "Settings", href: "/patient/settings", icon: Settings }

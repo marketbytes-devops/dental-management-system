@@ -257,7 +257,7 @@ export default function PatientDashboardPage() {
               <h3 className="text-lg font-bold text-gray-900">Recent Activity & Timeline</h3>
               <p className="text-xs text-gray-400 mt-0.5">Comprehensive audit trail of your visits, prescriptions, consents & bookings</p>
             </div>
-            <Link href="/patient/records" className="text-xs font-bold text-primary hover:underline bg-primary/5 px-3 py-1.5 rounded-xl border border-primary/10 transition-all">
+            <Link href="/patient/activity" className="text-xs font-bold text-primary hover:underline bg-primary/5 px-3 py-1.5 rounded-xl border border-primary/10 transition-all">
               View Records →
             </Link>
           </div>

@@ -798,7 +798,6 @@ export const updateConsultationFees = async (tariffData) => {
   return response.data;
 };
 
-<<<<<<< HEAD
 // ==========================================
 // 13. Admin Lab Pricing Catalog API Endpoints
 // ==========================================
@@ -824,52 +823,3 @@ export const deleteLabPricingItem = async (id) => {
 };
 
 
-
-// ==========================================
-// 14. Support & Complaints API Endpoints
-// ==========================================
-
-/**
- * Fetch all complaints filed by the currently logged-in staff member.
- * @returns {Array} List of complaint objects
- */
-export const getMyComplaints = async () => {
-  const response = await client.get("/complaints/mine");
-  return response.data;
-};
-
-/**
- * Submit a new support/bug-report ticket.
- * @param {{ subject: string, body: string, related_complaint_id?: number }} payload
- * @returns {Object} The newly created complaint record
- */
-export const submitComplaint = async (payload) => {
-  const response = await client.post("/complaints/", payload);
-  return response.data;
-};
-
-/**
- * Fetch the full audit log (status history) for a given complaint ticket.
- * @param {number} complaintId
- * @returns {Array} List of log entries
- */
-export const getComplaintLogs = async (complaintId) => {
-  const response = await client.get(`/complaints/${complaintId}/logs`);
-  return response.data;
-};
-
-/**
- * Reopen a resolved or closed complaint with a reason.
- * @param {number} complaintId
- * @param {string} reason - Text reason for re-opening
- * @returns {Object} Updated complaint record
- */
-export const reopenComplaint = async (complaintId, reason) => {
-  const response = await client.post(`/complaints/${complaintId}/reopen`, { reason });
-  return response.data;
-};
-
-
-
-=======
->>>>>>> 8265a44ec214ea50c8e6c51ed0ff647f95e7adda

@@ -409,20 +409,14 @@ export default function ReceptionistAppointments() {
     }
   };
 
-<<<<<<< HEAD
   const [counterPrintModal, setCounterPrintModal] = useState({ isOpen: false, appointment: null, paymentDetails: null, queueNo: 1, waitTime: 0 });
 
-  const handlePayConsultationClick = (id, name) => {
-    setPaymentModal({ isOpen: true, id, name });
-=======
   const handlePayConsultationClick = (id, name, doctor_name) => {
     setPaymentModal({ isOpen: true, id, name, doctor_name });
->>>>>>> 8265a44ec214ea50c8e6c51ed0ff647f95e7adda
   };
 
   const handlePayConsultationConfirm = async (method, amount) => {
     try {
-<<<<<<< HEAD
       const updatedAppt = await payConsultation(paymentModal.id, { amount: amount || 500.0, payment_method: method });
       
       let qNo = 1;
@@ -440,7 +434,7 @@ export default function ReceptionistAppointments() {
         console.warn("Queue notice:", qErr);
       }
 
-      setPaymentModal({ isOpen: false, id: null, name: "" });
+      setPaymentModal({ isOpen: false, id: null, name: "", doctor_name: "" });
 
       // Open Medical Pass print modal for receptionist
       setCounterPrintModal({
@@ -455,12 +449,6 @@ export default function ReceptionistAppointments() {
         queueNo: qNo,
         waitTime: wTime
       });
-
-=======
-      await payConsultation(paymentModal.id, { amount: amount || 500.0, payment_method: method });
-      alert(`Payment of ₹${amount} collected via ${method}! ${paymentModal.name} has been added to the queue.`);
-      setPaymentModal({ isOpen: false, id: null, name: "", doctor_name: "" });
->>>>>>> 8265a44ec214ea50c8e6c51ed0ff647f95e7adda
       fetchData();
     } catch (err) {
       alert(err.message || "Payment failed.");

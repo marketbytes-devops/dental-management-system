@@ -34,7 +34,8 @@ export default function UnifiedProfile({ role }) {
     emergencyName: "",
     emergencyPhone: "",
     insuranceProvider: "",
-    insurancePolicyId: ""
+    insurancePolicyId: "",
+    knownAllergies: ""
   });
 
   // Password Change State
@@ -77,6 +78,7 @@ export default function UnifiedProfile({ role }) {
             provider: "Not provided",
             policyId: "N/A"
           },
+          knownAllergies: data.known_allergies || "",
           profilePicture: data.profile_picture || null
         };
         setProfile(formatted);
@@ -134,7 +136,8 @@ export default function UnifiedProfile({ role }) {
       emergencyName: profile.emergencyContact?.name || "",
       emergencyPhone: profile.emergencyContact?.phone || "",
       insuranceProvider: profile.insurance?.provider || "",
-      insurancePolicyId: profile.insurance?.policyId || ""
+      insurancePolicyId: profile.insurance?.policyId || "",
+      knownAllergies: profile.knownAllergies || ""
     });
     setIsEditing(true);
   };
@@ -154,7 +157,8 @@ export default function UnifiedProfile({ role }) {
           phone: editForm.phone,
           address_line1: editForm.address,
           emergency_contact_name: editForm.emergencyName || null,
-          emergency_contact_phone: editForm.emergencyPhone || null
+          emergency_contact_phone: editForm.emergencyPhone || null,
+          known_allergies: editForm.knownAllergies ? editForm.knownAllergies.trim() : null
         };
         const updated = await updatePatientProfile(payload);
         alert("Profile updated successfully!");
@@ -562,6 +566,30 @@ export default function UnifiedProfile({ role }) {
                   </div>
                 </div>
               </div>
+
+              {/* Medical History & Known Allergies */}
+              <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-5 h-5 text-rose-500 shrink-0" />
+                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Known Allergies</h4>
+                  </div>
+                  <span className="text-[10px] font-bold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-100">
+                    Safety Critical
+                  </span>
+                </div>
+                <div className="text-sm">
+                  {profile.knownAllergies ? (
+                    <div className="p-3 bg-rose-50/60 border border-rose-100 rounded-xl text-rose-900 font-medium">
+                      {profile.knownAllergies}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-500 text-xs italic">
+                      No known allergies recorded — click Edit Profile to add any drug or material allergies.
+                    </div>
+                  )}
+                </div>
+              </div>
             </>
           )}
 
@@ -725,6 +753,22 @@ export default function UnifiedProfile({ role }) {
                         value={editForm.emergencyPhone}
                         onChange={handleEditChange}
                         className="w-full rounded-xl border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 border-t border-gray-100 pt-4 mt-2">
+                      <h4 className="text-sm font-bold text-gray-800 mb-1">Medical History &amp; Allergies</h4>
+                      <p className="text-xs text-gray-400 mb-3">Record any drug, food, or dental material allergies (e.g. Penicillin, Latex, Aspirin)</p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Known Allergies</label>
+                      <textarea
+                        name="knownAllergies"
+                        value={editForm.knownAllergies}
+                        onChange={handleEditChange}
+                        placeholder="e.g. Penicillin, Latex — or write None"
+                        rows={3}
+                        className="w-full rounded-xl border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                       />
                     </div>
                   </>

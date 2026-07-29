@@ -1531,7 +1531,6 @@ def get_patient_clinical_notes_route(
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
 # Patient Settings Endpoints
 # ---------------------------------------------------------------------------
 
@@ -1575,7 +1574,6 @@ def update_patient_settings(
     return {"message": "Settings updated successfully", "updates": updates}
 
 
-=======
 # Medicine Dispensing Queue Endpoints (For Receptionist)
 # ---------------------------------------------------------------------------
 
@@ -1697,5 +1695,4 @@ def update_dispense_status(dispense_id: int, payload: dict, db: Session = Depend
     }
 
 
->>>>>>> 8265a44ec214ea50c8e6c51ed0ff647f95e7adda
 

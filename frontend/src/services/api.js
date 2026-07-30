@@ -737,6 +737,16 @@ export const sendLabBillingRequest = async (payload) => {
   return response.data;
 };
 
+export const getExpenses = async () => {
+  const response = await client.get("/billing/expenses");
+  return response.data;
+};
+
+export const createExpense = async (expenseData) => {
+  const response = await client.post("/billing/expense", expenseData);
+  return response.data;
+};
+
 // ==========================================
 // 14. Receptionist Lab Order Pickups
 // ==========================================
@@ -792,4 +802,15 @@ export const updateConsultationFees = async (tariffData) => {
   const response = await client.put("/payment/consultation-fees", tariffData);
   return response.data;
 };
+
+export const getAnalyticsSummary = async () => {
+  const response = await client.get("/billing/analytics/summary");
+  return response.data;
+};
+
+export const getAnalyticsReports = async () => {
+  const response = await client.get("/billing/analytics/reports");
+  return response.data;
+};
+
 

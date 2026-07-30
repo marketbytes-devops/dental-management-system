@@ -75,6 +75,135 @@ def get_analytics_summary(db: Session = Depends(get_db)):
         "chartData": chart_data
     }
 
+@router.get("/analytics/reports")
+def get_analytics_reports(db: Session = Depends(get_db)):
+    from modules.frontdesk.models import AppointmentModel
+    from modules.lab.models import LabOrderModel
+
+    # --- Appointment Summary ---
+    appt_by_status = db.query(
+        AppointmentModel.status,
+        func.count(AppointmentModel.id)
+    ).group_by(AppointmentModel.status).all()
+    appt_status_map = {row[0]: row[1] for row in appt_by_status}
+
+    total_appts = sum(appt_status_map.values())
+    completed_appts = appt_status_map.get("Completed", 0)
+    cancelled_appts = appt_status_map.get("Cancelled", 0)
+    missed_appts = appt_status_map.get("Missed", 0)
+    pending_appts = total_appts - completed_appts - cancelled_appts - missed_appts
+
+    # --- Doctor Performance ---
+    doctor_totals = db.query(
+        AppointmentModel.doctor_name,
+        func.count(AppointmentModel.id).label("total")
+    ).group_by(AppointmentModel.doctor_name).all()
+
+    doctor_completed = db.query(
+        AppointmentModel.doctor_name,
+        func.count(AppointmentModel.id).label("completed")
+    ).filter(AppointmentModel.status == "Completed").group_by(AppointmentModel.doctor_name).all()
+    completed_map = {row[0]: row[1] for row in doctor_completed}
+
+    doctor_performance = []
+    for row in sorted(doctor_totals, key=lambda x: -x[1])[:8]:
+        name = row[0]
+        total = row[1]
+        done = completed_map.get(name, 0)
+        doctor_performance.append({
+            "name": name,
+            "total": total,
+            "completed": done,
+            "completion_rate": round((done / total * 100) if total else 0, 1)
+        })
+
+    # --- Treatment Popularity ---
+    treatment_counts = db.query(
+        AppointmentModel.treatment_type,
+        func.count(AppointmentModel.id).label("count")
+    ).group_by(AppointmentModel.treatment_type).order_by(
+        func.count(AppointmentModel.id).desc()
+    ).limit(8).all()
+
+    treatment_breakdown = [
+        {"name": row[0] or "General", "count": row[1]}
+        for row in treatment_counts
+    ]
+
+    # --- Lab Order Status ---
+    lab_by_status = db.query(
+        LabOrderModel.status,
+        func.count(LabOrderModel.id).label("count")
+    ).group_by(LabOrderModel.status).all()
+
+    lab_status_breakdown = [
+        {"status": row[0], "count": row[1]}
+        for row in sorted(lab_by_status, key=lambda x: -x[1])
+    ]
+    total_lab_orders = sum(r["count"] for r in lab_status_breakdown)
+    completed_lab = sum(r["count"] for r in lab_status_breakdown if r["status"] in ["Completed", "Delivered", "Ready for Pickup"])
+
+    # --- Expense Category Breakdown ---
+    expense_by_cat = db.query(
+        ExpenseModel.category,
+        func.sum(ExpenseModel.amount).label("total")
+    ).group_by(ExpenseModel.category).all()
+
+    expense_breakdown = [
+        {"category": row[0], "amount": float(row[1] or 0)}
+        for row in sorted(expense_by_cat, key=lambda x: -(x[1] or 0))
+    ]
+    total_expenses_all = sum(r["amount"] for r in expense_breakdown)
+
+    # --- Monthly Appointment Volume (last 6 months) ---
+    today = datetime.today()
+    monthly_appts = []
+    for i in range(5, -1, -1):
+        month_date = today.replace(day=1) - timedelta(days=28 * i)
+        target_month = month_date.month
+        target_year = month_date.year
+        month_label = calendar.month_abbr[target_month]
+
+        total_m = db.query(func.count(AppointmentModel.id)).filter(
+            func.extract('month', AppointmentModel.appointment_date) == target_month,
+            func.extract('year', AppointmentModel.appointment_date) == target_year
+        ).scalar() or 0
+
+        completed_m = db.query(func.count(AppointmentModel.id)).filter(
+            AppointmentModel.status == "Completed",
+            func.extract('month', AppointmentModel.appointment_date) == target_month,
+            func.extract('year', AppointmentModel.appointment_date) == target_year
+        ).scalar() or 0
+
+        monthly_appts.append({
+            "month": month_label,
+            "total": total_m,
+            "completed": completed_m
+        })
+
+    return {
+        "appointments": {
+            "total": total_appts,
+            "completed": completed_appts,
+            "cancelled": cancelled_appts,
+            "missed": missed_appts,
+            "pending": pending_appts,
+            "completion_rate": round((completed_appts / total_appts * 100) if total_appts else 0, 1)
+        },
+        "doctorPerformance": doctor_performance,
+        "treatmentBreakdown": treatment_breakdown,
+        "labOrders": {
+            "total": total_lab_orders,
+            "completed": completed_lab,
+            "statusBreakdown": lab_status_breakdown
+        },
+        "expenseBreakdown": expense_breakdown,
+        "totalExpenses": total_expenses_all,
+        "monthlyAppointments": monthly_appts
+    }
+
+
+
 # --- Billing Requests ---
 @router.get("/requests", response_model=List[BillingRequestResponse])
 def get_billing_requests(db: Session = Depends(get_db)):

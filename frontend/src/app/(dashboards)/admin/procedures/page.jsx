@@ -45,7 +45,7 @@ export default function ProceduresPage() {
   // Tariff configuration state
   const [tariffs, setTariffs] = useState({
     general_consultation_fee: 500,
-    specialist_consultation_fee: 800,
+    routine_checkup_fee: 400,
     followup_consultation_fee: 300,
     online_booking_fee: 100
   });
@@ -84,7 +84,7 @@ export default function ProceduresPage() {
     try {
       const payload = {
         general_consultation_fee: parseFloat(tariffs.general_consultation_fee) || 500,
-        specialist_consultation_fee: parseFloat(tariffs.specialist_consultation_fee) || 800,
+        routine_checkup_fee: parseFloat(tariffs.routine_checkup_fee) || 400,
         followup_consultation_fee: parseFloat(tariffs.followup_consultation_fee) || 300,
         online_booking_fee: parseFloat(tariffs.online_booking_fee) || 100
       };
@@ -256,7 +256,7 @@ export default function ProceduresPage() {
 
         <form onSubmit={handleSaveTariffs} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">General Dentist Fee (₹)</label>
+            <label className="block text-xs font-bold text-gray-700 mb-1">General Consultation Fee (₹)</label>
             <input
               type="number"
               min="0"
@@ -268,13 +268,13 @@ export default function ProceduresPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">Specialist Doctor Fee (₹)</label>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Routine Check-up Fee (₹)</label>
             <input
               type="number"
               min="0"
               step="0.01"
-              value={tariffs.specialist_consultation_fee}
-              onChange={(e) => setTariffs(prev => ({ ...prev, specialist_consultation_fee: e.target.value }))}
+              value={tariffs.routine_checkup_fee}
+              onChange={(e) => setTariffs(prev => ({ ...prev, routine_checkup_fee: e.target.value }))}
               className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
             />
           </div>

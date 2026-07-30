@@ -22,18 +22,12 @@ export default function ConsultationPaymentStep({ appointment, symptomData, onPa
         const treatmentLower = (appointment?.treatment || "").toLowerCase();
         const doctorLower = (appointment?.doctor || "").toLowerCase();
 
-        if (treatmentLower.includes("follow-up") || treatmentLower.includes("followup") || treatmentLower.includes("review")) {
+        if (treatmentLower.includes("follow-up") || treatmentLower.includes("followup") || treatmentLower.includes("review") || treatmentLower.includes("follow")) {
           setSelectedFeeCategory("Follow-up Visit");
           setApplicableAmount(data.followup_consultation_fee || 300.0);
-        } else if (
-          doctorLower.includes("specialist") ||
-          treatmentLower.includes("root canal") ||
-          treatmentLower.includes("ortho") ||
-          treatmentLower.includes("surgery") ||
-          treatmentLower.includes("implant")
-        ) {
-          setSelectedFeeCategory("Specialist Consultation");
-          setApplicableAmount(data.specialist_consultation_fee || 800.0);
+        } else if (treatmentLower.includes("routine")) {
+          setSelectedFeeCategory("Routine Check-up");
+          setApplicableAmount(data.routine_checkup_fee || 400.0);
         } else {
           setSelectedFeeCategory("General Consultation");
           setApplicableAmount(data.general_consultation_fee || 500.0);
@@ -155,8 +149,8 @@ export default function ConsultationPaymentStep({ appointment, symptomData, onPa
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           {[
-            { key: "General Consultation", label: "General Dentist Fee", amount: tariffs?.general_consultation_fee || 500.0 },
-            { key: "Specialist Consultation", label: "Specialist Consultation", amount: tariffs?.specialist_consultation_fee || 800.0 },
+            { key: "General Consultation", label: "General Consultation Fee", amount: tariffs?.general_consultation_fee || 500.0 },
+            { key: "Routine Check-up", label: "Routine Check-up Fee", amount: tariffs?.routine_checkup_fee || 400.0 },
             { key: "Follow-up Visit", label: "Follow-up Re-evaluation", amount: tariffs?.followup_consultation_fee || 300.0 }
           ].map((t) => (
             <button

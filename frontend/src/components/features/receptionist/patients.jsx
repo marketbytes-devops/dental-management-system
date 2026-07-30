@@ -56,7 +56,7 @@ export default function ReceptionistPatients() {
   ];
   const [doctors, setDoctors] = useState([]);
   const [doctorLeaves, setDoctorLeaves] = useState([]);
-  const treatments = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
+  const treatments = ["Consultation", "Routine check-up", "Follow-up checkup", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
 
   useEffect(() => {
     const fetchDoctorLeaves = async () => {

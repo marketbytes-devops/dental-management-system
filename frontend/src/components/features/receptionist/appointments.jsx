@@ -114,7 +114,7 @@ function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmerg
                   <div className="flex gap-2 justify-end">
                     {app.status === "Confirmed" && app.payment_status !== "Paid" && (
                       <button
-                        onClick={() => onPayConsultation(app.id, app.patient?.name, app.doctor?.name || app.doctor_name)}
+                        onClick={() => onPayConsultation(app.id, app.patient?.name, app.doctor?.name || app.doctor_name, app.treatment_type || app.treatment)}
                         className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg border border-green-600 transition cursor-pointer shadow-sm shadow-green-600/20"
                       >
                         Payment
@@ -139,7 +139,7 @@ function AppointmentTable({ rows, isLoading, emptyText, onCancel, onElevateEmerg
 
 // ── main ──────────────────────────────────────────────────────────────────────
 
-function PaymentModal({ isOpen, onClose, onConfirm, patientName, doctorName, doctors = [] }) {
+function PaymentModal({ isOpen, onClose, onConfirm, patientName, doctorName, treatmentType, doctors = [] }) {
   const [method, setMethod] = useState("Cash");
   const [amount, setAmount] = useState(500);
   const [fetchingTariff, setFetchingTariff] = useState(true);
@@ -150,16 +150,20 @@ function PaymentModal({ isOpen, onClose, onConfirm, patientName, doctorName, doc
       client.get("/payment/consultation-fees")
         .then(res => {
           if (res.data) {
-            const selectedDocObj = doctors.find(d => d.name === doctorName);
-            const isSpecialist = selectedDocObj?.specialty && selectedDocObj.specialty.toLowerCase() !== "general dentistry";
-            const fee = isSpecialist ? (res.data.specialist_consultation_fee || res.data.general_consultation_fee) : res.data.general_consultation_fee;
+            const trLower = (treatmentType || "").toLowerCase();
+            let fee = res.data.general_consultation_fee || 500;
+            if (trLower.includes("follow") || trLower.includes("follow-up")) {
+              fee = res.data.followup_consultation_fee || 300;
+            } else if (trLower.includes("routine")) {
+              fee = res.data.routine_checkup_fee || 400;
+            }
             if (fee) setAmount(fee);
           }
         })
         .catch(err => console.error("Failed to fetch active consultation tariff:", err))
         .finally(() => setFetchingTariff(false));
     }
-  }, [isOpen, doctorName, doctors]);
+  }, [isOpen, treatmentType]);
 
   if (!isOpen) return null;
 
@@ -250,7 +254,7 @@ export default function ReceptionistAppointments() {
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [paymentModal, setPaymentModal] = useState({ isOpen: false, id: null, name: "" });
+  const [paymentModal, setPaymentModal] = useState({ isOpen: false, id: null, name: "", doctor_name: "", treatment_type: "" });
 
   // booking form
   const [searchPatient, setSearchPatient] = useState("");
@@ -411,8 +415,8 @@ export default function ReceptionistAppointments() {
 
   const [counterPrintModal, setCounterPrintModal] = useState({ isOpen: false, appointment: null, paymentDetails: null, queueNo: 1, waitTime: 0 });
 
-  const handlePayConsultationClick = (id, name, doctor_name) => {
-    setPaymentModal({ isOpen: true, id, name, doctor_name });
+  const handlePayConsultationClick = (id, name, doctor_name, treatment_type) => {
+    setPaymentModal({ isOpen: true, id, name, doctor_name, treatment_type });
   };
 
   const handlePayConsultationConfirm = async (method, amount) => {
@@ -488,10 +492,11 @@ export default function ReceptionistAppointments() {
     <div className="min-h-screen bg-gray-50 p-6 space-y-6">
       <PaymentModal
         isOpen={paymentModal.isOpen}
-        onClose={() => setPaymentModal({ isOpen: false, id: null, name: "", doctor_name: "" })}
+        onClose={() => setPaymentModal({ isOpen: false, id: null, name: "", doctor_name: "", treatment_type: "" })}
         onConfirm={handlePayConsultationConfirm}
         patientName={paymentModal.name}
         doctorName={paymentModal.doctor_name}
+        treatmentType={paymentModal.treatment_type}
         doctors={doctors}
       />
 

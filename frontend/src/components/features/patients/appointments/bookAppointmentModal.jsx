@@ -95,28 +95,22 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
     fetchDoctorsAndTariffs();
   }, []);
 
-  // Update tariff based on doctor specialty / treatment reason
+  // Update tariff based on treatment reason selected at booking
   useEffect(() => {
     if (!tariffs) return;
-    const doctorLower = (form.doctor || "").toLowerCase();
     const treatmentLower = (form.treatment || "").toLowerCase();
 
-    if (treatmentLower.includes("follow-up") || treatmentLower.includes("followup")) {
+    if (treatmentLower.includes("follow-up") || treatmentLower.includes("followup") || treatmentLower.includes("follow")) {
       setSelectedFeeCategory("Follow-up Visit");
       setApplicableAmount(tariffs.followup_consultation_fee || 300.0);
-    } else if (
-      doctorLower.includes("specialist") ||
-      treatmentLower.includes("root canal") ||
-      treatmentLower.includes("ortho") ||
-      treatmentLower.includes("surgery")
-    ) {
-      setSelectedFeeCategory("Specialist Consultation");
-      setApplicableAmount(tariffs.specialist_consultation_fee || 800.0);
+    } else if (treatmentLower.includes("routine")) {
+      setSelectedFeeCategory("Routine Check-up");
+      setApplicableAmount(tariffs.routine_checkup_fee || 400.0);
     } else {
       setSelectedFeeCategory("General Consultation");
       setApplicableAmount(tariffs.general_consultation_fee || 500.0);
     }
-  }, [form.doctor, form.treatment, tariffs]);
+  }, [form.treatment, tariffs]);
 
   // Pre-select doctor if initialData has a doctorId
   useEffect(() => {

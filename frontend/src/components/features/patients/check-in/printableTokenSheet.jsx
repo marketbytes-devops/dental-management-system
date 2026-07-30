@@ -75,17 +75,11 @@ export default function PrintableTokenSheet({
     // Fallback to fetched active consultation tariffs from database
     if (fetchedFee) {
       const trLower = String(treatment).toLowerCase();
-      const docLower = String(doctorName).toLowerCase();
       if (trLower.includes("follow") || trLower.includes("follow-up")) {
         return Number(fetchedFee.followup_consultation_fee || 300);
       }
-      if (
-        trLower.includes("specialist") ||
-        trLower.includes("surgery") ||
-        trLower.includes("root canal") ||
-        docLower.includes("specialist")
-      ) {
-        return Number(fetchedFee.specialist_consultation_fee || 800);
+      if (trLower.includes("routine")) {
+        return Number(fetchedFee.routine_checkup_fee || 400);
       }
       return Number(fetchedFee.general_consultation_fee || 500);
     }

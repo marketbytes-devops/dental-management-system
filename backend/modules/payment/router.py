@@ -319,11 +319,10 @@ def get_daily_collection_summary(
         treatment_type = appt.treatment_type if appt else "Consultation"
 
         t_lower = (treatment_type or "").lower()
-        d_lower = (doctor_name or "").lower()
         if t.amount == 300 or "follow" in t_lower:
             tariff_cat = "Follow-up Checkup"
-        elif t.amount == 800 or any(kw in t_lower or kw in d_lower for kw in ["specialist", "ortho", "surgeon", "endodontist", "periodontist", "root canal", "implant"]):
-            tariff_cat = "Specialist Consultation"
+        elif t.amount == 400 or "routine" in t_lower:
+            tariff_cat = "Routine Check-up"
         else:
             tariff_cat = "General Consultation"
 
@@ -355,11 +354,10 @@ def get_daily_collection_summary(
         treatment_type = appt.treatment_type if appt else "Consultation"
         
         t_lower = (treatment_type or "").lower()
-        d_lower = (doctor_name or "").lower()
         if c.amount == 300 or "follow" in t_lower:
             tariff_cat = "Follow-up Checkup"
-        elif c.amount == 800 or any(kw in t_lower or kw in d_lower for kw in ["specialist", "ortho", "surgeon", "endodontist", "periodontist", "root canal", "implant"]):
-            tariff_cat = "Specialist Consultation"
+        elif c.amount == 400 or "routine" in t_lower:
+            tariff_cat = "Routine Check-up"
         else:
             tariff_cat = "General Consultation"
 
@@ -398,7 +396,7 @@ def get_daily_collection_summary(
     grand_total = cash_total + upi_total + card_total
 
     general_items = [item for item in enriched_line_items if item["tariff_category"] == "General Consultation"]
-    specialist_items = [item for item in enriched_line_items if item["tariff_category"] == "Specialist Consultation"]
+    routine_items = [item for item in enriched_line_items if item["tariff_category"] == "Routine Check-up"]
     followup_items = [item for item in enriched_line_items if item["tariff_category"] == "Follow-up Checkup"]
 
     return {
@@ -410,10 +408,12 @@ def get_daily_collection_summary(
         "system_card_total": card_total,
         "system_grand_total": grand_total,
         "general_consultation_total": sum(item["amount"] for item in general_items),
-        "specialist_consultation_total": sum(item["amount"] for item in specialist_items),
+        "routine_checkup_total": sum(item["amount"] for item in routine_items),
+        "specialist_consultation_total": 0.0,
         "followup_consultation_total": sum(item["amount"] for item in followup_items),
         "general_count": len(general_items),
-        "specialist_count": len(specialist_items),
+        "routine_count": len(routine_items),
+        "specialist_count": 0,
         "followup_count": len(followup_items),
         "payments": enriched_line_items
     }
@@ -531,7 +531,7 @@ def get_consultation_fees(db: Session = Depends(get_db)):
     """Fetch current active consultation tariffs."""
     return ConsultationTariffResponse(
         general_consultation_fee=get_active_consultation_fee(db, "general_consultation_fee", 500.0),
-        specialist_consultation_fee=get_active_consultation_fee(db, "specialist_consultation_fee", 800.0),
+        routine_checkup_fee=get_active_consultation_fee(db, "routine_checkup_fee", 400.0),
         followup_consultation_fee=get_active_consultation_fee(db, "followup_consultation_fee", 300.0),
         online_booking_fee=get_active_consultation_fee(db, "online_booking_fee", 100.0)
     )
@@ -545,7 +545,7 @@ def update_consultation_fees(
     """Admin endpoint to update clinic consultation fee tariffs."""
     updates = {
         "general_consultation_fee": (body.general_consultation_fee, "Default General Dentist Consultation Fee (INR)"),
-        "specialist_consultation_fee": (body.specialist_consultation_fee, "Default Specialist Doctor Consultation Fee (INR)"),
+        "routine_checkup_fee": (body.routine_checkup_fee, "Routine Check-up Consultation Fee (INR)"),
         "followup_consultation_fee": (body.followup_consultation_fee, "Follow-up Re-evaluation Fee (INR)"),
         "online_booking_fee": (body.online_booking_fee, "Online Portal Booking Fee Deposit (INR)"),
     }
@@ -562,7 +562,7 @@ def update_consultation_fees(
 
     return ConsultationTariffResponse(
         general_consultation_fee=body.general_consultation_fee,
-        specialist_consultation_fee=body.specialist_consultation_fee,
+        routine_checkup_fee=body.routine_checkup_fee,
         followup_consultation_fee=body.followup_consultation_fee,
         online_booking_fee=body.online_booking_fee
     )

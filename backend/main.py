@@ -284,7 +284,7 @@ try:
     if settings_count == 0:
         default_settings = [
             ClinicSettingModel(setting_key="general_consultation_fee", setting_value="500.0", description="Default General Dentist Consultation Fee (INR)"),
-            ClinicSettingModel(setting_key="specialist_consultation_fee", setting_value="800.0", description="Default Specialist Doctor Consultation Fee (INR)"),
+            ClinicSettingModel(setting_key="routine_checkup_fee", setting_value="400.0", description="Routine Check-up Consultation Fee (INR)"),
             ClinicSettingModel(setting_key="followup_consultation_fee", setting_value="300.0", description="Follow-up Re-evaluation Fee (INR)"),
             ClinicSettingModel(setting_key="online_booking_fee", setting_value="100.0", description="Online Portal Booking Fee Deposit (INR)"),
         ]

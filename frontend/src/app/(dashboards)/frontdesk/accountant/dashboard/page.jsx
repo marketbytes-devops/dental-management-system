@@ -5,7 +5,7 @@ import {
   LineChart, Line, AreaChart, Area
 } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, AlertCircle } from 'lucide-react';
-import axios from 'axios';
+import client from '@/services/api';
 
 export default function AccountantDashboard() {
   const [data, setData] = useState({
@@ -15,10 +15,9 @@ export default function AccountantDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // In a real app, you'd use a proper configured axios instance.
     const fetchAnalytics = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/billing/analytics/summary');
+        const response = await client.get('/billing/analytics/summary');
         setData(response.data);
       } catch (error) {
         console.error("Failed to fetch analytics", error);

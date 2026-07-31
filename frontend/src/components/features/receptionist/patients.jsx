@@ -56,7 +56,7 @@ export default function ReceptionistPatients() {
   ];
   const [doctors, setDoctors] = useState([]);
   const [doctorLeaves, setDoctorLeaves] = useState([]);
-  const treatments = ["Consultation", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
+  const treatments = ["Consultation", "Routine check-up", "Follow-up checkup", "Scaling & Polishing", "Root Canal", "Extraction", "Orthodontics", "Dental Filling"];
 
   useEffect(() => {
     const fetchDoctorLeaves = async () => {
@@ -490,10 +490,10 @@ export default function ReceptionistPatients() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-550 uppercase">Known Allergies</label>
+                <label className="text-xs font-bold text-gray-550 uppercase">Known Allergies (Optional - Patient can add later)</label>
                 <textarea
                   name="known_allergies"
-                  placeholder="e.g. Penicillin, Latex, None"
+                  placeholder="e.g. Penicillin, Latex, None — Optional (patient can add via portal)"
                   value={form.known_allergies}
                   onChange={handleInputChange}
                   rows={2}

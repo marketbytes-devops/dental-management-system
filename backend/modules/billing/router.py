@@ -371,17 +371,25 @@ def get_receipt(billing_request_id: int, db: Session = Depends(get_db)):
     if br.total_amount and float(br.total_amount) > 0:
         consultation_fee = float(br.total_amount)
     else:
-        tariff_key = "general_consultation_fee"
-        if doctor_model and doctor_model.specialty and doctor_model.specialty.lower() != "general dentistry":
-            tariff_key = "specialist_consultation_fee"
+        notes_lower = (br.notes or "").lower()
+        if "follow" in notes_lower:
+            tariff_key = "followup_consultation_fee"
+            default_fee = 300.0
+        elif "routine" in notes_lower:
+            tariff_key = "routine_checkup_fee"
+            default_fee = 400.0
+        else:
+            tariff_key = "general_consultation_fee"
+            default_fee = 500.0
+
         setting = db.query(ClinicSettingModel).filter(ClinicSettingModel.setting_key == tariff_key).first()
         if setting and setting.setting_value:
             try:
                 consultation_fee = float(setting.setting_value)
             except ValueError:
-                consultation_fee = 500.0
+                consultation_fee = default_fee
         else:
-            consultation_fee = 500.0
+            consultation_fee = default_fee
 
     grand_total = consultation_fee + medication_total
 

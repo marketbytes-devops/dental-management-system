@@ -741,6 +741,16 @@ export const updateDispenseStatus = async (dispenseId, status = "Dispensed") => 
   return response.data;
 };
 
+export const collectDispensingPayment = async (dispenseId, payload) => {
+  const response = await client.post(`/patient/dispensing/${dispenseId}/collect-payment`, payload);
+  return response.data;
+};
+
+export const collectLabOrderPayment = async (orderId, payload) => {
+  const response = await client.post(`/lab/orders/${orderId}/collect-payment`, payload);
+  return response.data;
+};
+
 export const getPatientLedgers = async () => {
   const response = await client.get("/billing/patient-ledgers");
   return response.data;

@@ -207,6 +207,12 @@ class LabOrderResponse(BaseModel):
     physical_mold_sent: Optional[bool] = False
     physical_opposing_mold_sent: Optional[bool] = False
     pending_email_proposal: Optional[Any] = None
+    patient_total_amount: Optional[float] = 3500.0
+    patient_amount_paid: Optional[float] = 0.0
+    patient_balance_due: Optional[float] = 3500.0
+    payment_status: Optional[str] = "Pending Payment"
+    payment_method: Optional[str] = None
+    date_received: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -96,6 +96,12 @@ try:
             add_col_if_missing("original_case_id", "VARCHAR")
             add_col_if_missing("tech_notes", "VARCHAR")
             add_col_if_missing("email_sent_at", "VARCHAR")
+            add_col_if_missing("patient_total_amount", "FLOAT DEFAULT 3500.0")
+            add_col_if_missing("patient_amount_paid", "FLOAT DEFAULT 0.0")
+            add_col_if_missing("patient_balance_due", "FLOAT DEFAULT 3500.0")
+            add_col_if_missing("payment_status", "VARCHAR DEFAULT 'Pending Payment'")
+            add_col_if_missing("payment_method", "VARCHAR")
+            add_col_if_missing("date_received", "TIMESTAMP WITH TIME ZONE")
 
             # Also check patient_consents table
             if engine.dialect.name == "sqlite":
@@ -135,6 +141,25 @@ try:
             add_inv_col_if_missing("expiry_date", "VARCHAR")
             add_inv_col_if_missing("batch_number", "VARCHAR")
             add_inv_col_if_missing("unit_price", "FLOAT")
+
+            # Also check medicine_dispenses table
+            if engine.dialect.name == "sqlite":
+                disp_col_query = conn.execute(text("PRAGMA table_info(medicine_dispenses);")).fetchall()
+                existing_disp_cols = [row[1] for row in disp_col_query]
+            else:
+                disp_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='medicine_dispenses';")).fetchall()
+                existing_disp_cols = [row[0] for row in disp_col_query]
+
+            def add_disp_col_if_missing(col_name, col_type):
+                if col_name not in existing_disp_cols:
+                    conn.execute(text(f"ALTER TABLE medicine_dispenses ADD COLUMN {col_name} {col_type};"))
+
+            add_disp_col_if_missing("total_amount", "FLOAT DEFAULT 0.0")
+            add_disp_col_if_missing("amount_paid", "FLOAT DEFAULT 0.0")
+            add_disp_col_if_missing("balance_due", "FLOAT DEFAULT 0.0")
+            add_disp_col_if_missing("payment_status", "VARCHAR DEFAULT 'Pending Payment'")
+            add_disp_col_if_missing("payment_method", "VARCHAR")
+            add_disp_col_if_missing("date_received", "TIMESTAMP WITH TIME ZONE")
 
             # Also check procedures table
             if engine.dialect.name == "sqlite":

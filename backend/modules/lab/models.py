@@ -56,8 +56,15 @@ class LabOrderModel(Base):
     claimed_by = Column(String, nullable=True)   # Tech user who claimed review
     claimed_at = Column(DateTime(timezone=True), nullable=True)
     physical_mold_sent = Column(Boolean, default=False)
-    physical_opposing_mold_sent = Column(Boolean, default=False)
     pending_email_proposal = Column(JSON, nullable=True)  # Stores parsed email proposed update for human 1-click verification
+    
+    # Patient Payment & Receipt Fields for Receptionist Checkout
+    patient_total_amount = Column(Float, default=3500.0)
+    patient_amount_paid = Column(Float, default=0.0)
+    patient_balance_due = Column(Float, default=3500.0)
+    payment_status = Column(String, default="Pending Payment") # Pending Payment, 50% Advance Paid, Paid in Full
+    payment_method = Column(String, nullable=True) # Cash, Card, UPI
+    date_received = Column(DateTime(timezone=True), nullable=True)
 
     prosthetic_detail = relationship("ProstheticCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")
     pathology_detail = relationship("PathologyCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")

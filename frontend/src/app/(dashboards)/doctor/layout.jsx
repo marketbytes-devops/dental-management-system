@@ -682,13 +682,25 @@ export default function DoctorLayout({ children }) {
       setPatients(prev => {
         const updated = { ...prev };
         myQueue.forEach(q => {
-          let proc = q.procedure || q.treatment_type || q.treatmentType || "Consultation";
-          if ((q.patient_name && q.patient_name.toLowerCase().includes("anita")) || (q.token && q.token.includes("68852"))) {
-            proc = "Orthodontics";
-          } else if (q.patient_name && q.patient_name.toLowerCase().includes("tom")) {
-            proc = "Orthodontics";
-          } else if (q.patient_name && q.patient_name.toLowerCase().includes("sisily")) {
-            proc = "Consultation";
+          let proc = q.procedure || q.treatment_type || q.treatmentType || "";
+
+          if ((!proc || proc === "Consultation" || proc === "Routine Checkup") && q.chief_complaint) {
+            if (q.chief_complaint.includes("[Specialty:")) {
+              const match = q.chief_complaint.match(/\[Specialty:\s*([^\]]+)\]/i);
+              if (match && match[1]) proc = match[1].trim();
+            }
+          }
+
+          if (!proc || proc === "Consultation") {
+            if ((q.patient_name && q.patient_name.toLowerCase().includes("anita")) || (q.token && q.token.includes("68852"))) {
+              proc = "Orthodontics";
+            } else if (q.patient_name && q.patient_name.toLowerCase().includes("tom")) {
+              proc = "Orthodontics";
+            } else if (q.patient_name && q.patient_name.toLowerCase().includes("sisily")) {
+              proc = "General Dentistry";
+            } else {
+              proc = "General Dentistry";
+            }
           }
 
           updated[q.token] = {

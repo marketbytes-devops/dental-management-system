@@ -1214,6 +1214,35 @@ def dismiss_email_update(
     db.refresh(order)
     return serialize_order(order)
 
+@router.post("/orders/{order_id}/collect-payment", response_model=LabOrderResponse)
+def collect_lab_order_payment(
+    order_id: str,
+    payload: dict,
+    db: Session = Depends(get_db)
+):
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Lab order not found")
+
+    amount_paid = float(payload.get("amount_paid", 0.0))
+    payment_method = payload.get("payment_method", "Cash")
+    total_amount = float(payload.get("total_amount", order.patient_total_amount or 3500.0))
+
+    order.patient_total_amount = total_amount
+    order.patient_amount_paid = amount_paid
+    order.patient_balance_due = max(0.0, total_amount - amount_paid)
+    order.payment_method = payment_method
+    order.date_received = datetime.now()
+
+    if order.patient_balance_due <= 0:
+        order.payment_status = "Paid in Full"
+    else:
+        order.payment_status = "50% Advance Paid"
+
+    db.commit()
+    db.refresh(order)
+    return serialize_order(order)
+
 # -------------------------------------------------------------
 # Comments Endpoints
 # -------------------------------------------------------------

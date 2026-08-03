@@ -742,6 +742,16 @@ export const sendLabBillingRequest = async (payload) => {
   return response.data;
 };
 
+export const getExpenses = async () => {
+  const response = await client.get("/billing/expenses");
+  return response.data;
+};
+
+export const createExpense = async (expenseData) => {
+  const response = await client.post("/billing/expense", expenseData);
+  return response.data;
+};
+
 // ==========================================
 // 14. Receptionist Lab Order Pickups
 // ==========================================
@@ -798,6 +808,15 @@ export const updateConsultationFees = async (tariffData) => {
   return response.data;
 };
 
+<<<<<<< HEAD
+export const getAnalyticsSummary = async () => {
+  const response = await client.get("/billing/analytics/summary");
+  return response.data;
+};
+
+export const getAnalyticsReports = async () => {
+  const response = await client.get("/billing/analytics/reports");
+=======
 // ==========================================
 // 13. Admin Lab Pricing Catalog API Endpoints
 // ==========================================
@@ -819,6 +838,7 @@ export const updateLabPricingItem = async (id, payload) => {
 
 export const deleteLabPricingItem = async (id) => {
   const response = await client.delete(`/lab/pricing-catalog/${id}`);
+>>>>>>> 676f96cf3c75019bec9a9e488d5f2c6e2e0de7f5
   return response.data;
 };
 

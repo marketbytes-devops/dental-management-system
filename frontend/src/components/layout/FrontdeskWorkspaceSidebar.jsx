@@ -104,7 +104,7 @@ export default function FrontdeskWorkspaceSidebar() {
             >
               <ws.icon className={`w-6 h-6 mb-1 ${isActive ? "text-white" : ""}`} />
               <span className={`text-[9px] font-bold ${isActive ? "text-white" : ""}`}>
-                {ws.id === "receptionist" ? "Front Desk" : "Finance"}
+                {ws.id === "receptionist" ? "Front Desk" : "Accountant"}
               </span>
               {ws.id === "receptionist" && (receptionistContext?.unreadCount || 0) > 0 && (
                 <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-900 shadow-sm animate-pulse" />

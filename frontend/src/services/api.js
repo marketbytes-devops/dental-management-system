@@ -331,6 +331,11 @@ export const callPatient = async (id, statusStr) => {
   return response.data;
 };
 
+export const markAppointmentMissed = async (id) => {
+  const response = await client.post(`/frontdesk/appointments/${id}/mark-missed`);
+  return response.data;
+};
+
 // ==========================================
 // 5. Leave & Roster API Endpoints
 // ==========================================
@@ -803,6 +808,7 @@ export const updateConsultationFees = async (tariffData) => {
   return response.data;
 };
 
+<<<<<<< HEAD
 export const getAnalyticsSummary = async () => {
   const response = await client.get("/billing/analytics/summary");
   return response.data;
@@ -810,6 +816,29 @@ export const getAnalyticsSummary = async () => {
 
 export const getAnalyticsReports = async () => {
   const response = await client.get("/billing/analytics/reports");
+=======
+// ==========================================
+// 13. Admin Lab Pricing Catalog API Endpoints
+// ==========================================
+
+export const getLabPricingCatalog = async () => {
+  const response = await client.get("/lab/pricing-catalog");
+  return response.data;
+};
+
+export const createLabPricingItem = async (payload) => {
+  const response = await client.post("/lab/pricing-catalog", payload);
+  return response.data;
+};
+
+export const updateLabPricingItem = async (id, payload) => {
+  const response = await client.put(`/lab/pricing-catalog/${id}`, payload);
+  return response.data;
+};
+
+export const deleteLabPricingItem = async (id) => {
+  const response = await client.delete(`/lab/pricing-catalog/${id}`);
+>>>>>>> 676f96cf3c75019bec9a9e488d5f2c6e2e0de7f5
   return response.data;
 };
 

@@ -259,6 +259,11 @@ def process_consultation_payment(db: Session, appt_id: int, payment_in: PaymentR
     appt.status = "Waiting"
     appt.checked_in_at = now
     
+    if hasattr(payment_in, "symptoms") and payment_in.symptoms:
+        appt.symptoms = payment_in.symptoms
+    if hasattr(payment_in, "is_emergency") and payment_in.is_emergency:
+        appt.priority = "Emergency"
+    
     today = date.today()
     if appt.appointment_date == today:
         if appt.priority == "Emergency":
@@ -317,6 +322,34 @@ def direct_checkin_bypass(db: Session, appt_id: int, priority: str = "Routine", 
     db.refresh(appt)
     return appt
 
+def auto_mark_missed_appointments(db: Session):
+    """Automatically marks unhandled appointments whose date is in the past as 'Missed' and notifies the patient."""
+    today = date.today()
+    past_appts = db.query(AppointmentModel).filter(
+        AppointmentModel.appointment_date < today,
+        AppointmentModel.status.in_(["Confirmed", "Pending", "Pending OTP", "Scheduled"])
+    ).all()
+
+    for appt in past_appts:
+        appt.status = "Missed"
+        patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+        if patient and patient.token:
+            from modules.patient.router import create_patient_notification
+            try:
+                create_patient_notification(
+                    db=db,
+                    patient_token=patient.token,
+                    sender_role="system",
+                    type="appointment_missed",
+                    title="Missed Appointment Alert",
+                    message=f"You missed your scheduled appointment on {appt.appointment_date} at {appt.appointment_time} with {appt.doctor_name}. Click to reschedule."
+                )
+            except Exception as e:
+                logger.warning(f"Could not create missed notification for patient {patient.token}: {e}")
+
+    if past_appts:
+        db.commit()
+
 def update_appointment_status(db: Session, appt_id: int, status_str: str) -> AppointmentModel:
     appt = db.query(AppointmentModel).filter(AppointmentModel.id == appt_id).first()
     if not appt:
@@ -325,8 +358,25 @@ def update_appointment_status(db: Session, appt_id: int, status_str: str) -> App
             detail="Appointment not found."
         )
         
+    old_status = appt.status
     appt.status = status_str
     
+    if status_str == "Missed" and old_status != "Missed":
+        patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+        if patient and patient.token:
+            from modules.patient.router import create_patient_notification
+            try:
+                create_patient_notification(
+                    db=db,
+                    patient_token=patient.token,
+                    sender_role="system",
+                    type="appointment_missed",
+                    title="Missed Appointment Alert",
+                    message=f"Your appointment on {appt.appointment_date} at {appt.appointment_time} with {appt.doctor_name} was marked as Missed. Please reschedule your visit."
+                )
+            except Exception as e:
+                logger.warning(f"Could not trigger patient notification for missed appointment: {e}")
+
     # If the doctor calls patient to chair
     if status_str == "In Chair":
         # Wait time remains 0 or update
@@ -337,7 +387,7 @@ def update_appointment_status(db: Session, appt_id: int, status_str: str) -> App
     
     # Re-calculate estimated waiting times for all other waiting patients of this doctor
     # when status changes to Completed or Cancelled (or any status other than Waiting)
-    if status_str in ["Completed", "Cancelled", "In Chair"]:
+    if status_str in ["Completed", "Cancelled", "In Chair", "Missed"]:
         recalculate_queue_times(db, appt.doctor_name)
         
     return appt

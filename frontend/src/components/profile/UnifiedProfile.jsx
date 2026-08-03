@@ -12,6 +12,7 @@ import {
   uploadProfilePicture,
   uploadPatientProfilePicture
 } from "@/services/api";
+import { getImageUrl } from "@/utils/imageUtils";
 
 export default function UnifiedProfile({ role }) {
   const router = useRouter();
@@ -335,7 +336,7 @@ export default function UnifiedProfile({ role }) {
         <div className="relative group w-20 h-20 rounded-2xl overflow-hidden bg-primary/10 flex items-center justify-center border border-gray-100">
           {profile.profilePicture ? (
             <img 
-              src={profile.profilePicture.startsWith("http") ? profile.profilePicture : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${profile.profilePicture}`} 
+              src={getImageUrl(profile.profilePicture)} 
               alt={profile.name} 
               className="w-full h-full object-cover"
             />

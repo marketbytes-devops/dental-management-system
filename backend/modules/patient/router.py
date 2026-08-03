@@ -59,13 +59,33 @@ router = APIRouter(prefix="/patient", tags=["patient"])
 def get_available_doctors(db: Session = Depends(get_db)):
     """Public endpoint for the patient portal to list doctors for appointment booking."""
     from modules.auth.models import UserModel
-    doctors = db.query(DoctorModel).filter(DoctorModel.status != "Inactive").all()
+    
+    all_users = db.query(UserModel).all()
+    doctor_users = [u for u in all_users if any(r.lower() == "doctor" for r in (u.roles or []))]
     
     result = []
-    for doc in doctors:
-        user = db.query(UserModel).filter(UserModel.id == doc.user_id).first()
-        profile_picture = user.profile_picture if user else None
+    for user in doctor_users:
+        clean_name = user.name.replace("Dr.", "").strip()
+        doc = db.query(DoctorModel).filter(
+            (DoctorModel.user_id == user.id) | 
+            (DoctorModel.name.ilike(f"%{clean_name}%"))
+        ).first()
         
+        if not doc:
+            specialty_str = ", ".join(user.specialties) if user.specialties else "General Dentistry"
+            doc = DoctorModel(
+                name=user.name if user.name.startswith("Dr. ") else f"Dr. {user.name}",
+                specialty=specialty_str,
+                status="Off Duty",
+                user_id=user.id
+            )
+            db.add(doc)
+            db.commit()
+            db.refresh(doc)
+        
+        if doc.status == "Inactive":
+            continue
+            
         user_specs = user.specialties if (user and user.specialties) else []
         if not user_specs and doc.specialty:
             user_specs = [s.strip() for s in doc.specialty.split(",") if s.strip()]
@@ -77,8 +97,8 @@ def get_available_doctors(db: Session = Depends(get_db)):
             "name": doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}",
             "specialty": doc.specialty or "General Dentistry",
             "specialties": user_specs,
-            "status": "On Duty" if doc.status == "Active" else doc.status,
-            "profile_picture": profile_picture
+            "status": "Off Duty" if (not doc.status or doc.status == "-") else doc.status,
+            "profile_picture": user.profile_picture
         })
     return result
 
@@ -103,21 +123,35 @@ def get_doctor_available_slots(doctor_id: int, date: str, db: Session = Depends(
 
     # Read working_hours from the doctor model
     working_hours = doctor.working_hours or {}
-    schedule = working_hours.get(day_name, {})
+    schedule = working_hours.get(day_name)
     
-    if schedule.get("is_off", True):
+    if schedule is None:
+        if day_name == "Sunday":
+            return {"date": date, "available_slots": []}
+        schedule = {
+            "start": "09:00 AM",
+            "end": "05:00 PM",
+            "is_off": False
+        }
+    elif schedule.get("is_off", False):
         return {"date": date, "available_slots": []}
 
     # Check if the doctor is on leave
+    clean_name = doctor.name.replace("Dr.", "").strip()
     is_on_leave = db.query(LeaveRequestModel).filter(
-        LeaveRequestModel.user_id == doctor.user_id,
         LeaveRequestModel.status == "Approved",
+        (LeaveRequestModel.user_id == doctor.user_id) | (LeaveRequestModel.staff_name.ilike(f"%{clean_name}%")),
         LeaveRequestModel.start_date <= date,
         LeaveRequestModel.end_date >= date
     ).first()
 
     if is_on_leave:
-        return {"date": date, "available_slots": []}
+        return {
+            "date": date,
+            "available_slots": [],
+            "on_leave": True,
+            "leave_reason": is_on_leave.reason or "Approved Leave"
+        }
 
     # Generate slots
     slots = []
@@ -1486,11 +1520,11 @@ def save_clinical_note_route(
         status="Pending",
         source_type="consultation",
         procedures=[{
-            "name": "Clinical Consultation Charge",
+            "name": "Consultation Fee",
             "rate": 500.0,
             "source": "consultation"
         }],
-        notes=f"Automated consultation charge for diagnosis visit ({note_date[:10] if note_date else 'Today'})"
+        notes=None
     )
     db.add(consultation_charge)
 

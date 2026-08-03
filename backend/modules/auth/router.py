@@ -43,6 +43,30 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
                 detail="This account has been deactivated. Please contact support."
             )
         
+        # Mark doctor as On Duty when they log in
+        is_doctor = any(r.lower() == "doctor" for r in (user.roles or []))
+        if is_doctor:
+            clean_name = user.name.replace("Dr.", "").strip()
+            doctor_record = db.query(DoctorModel).filter(
+                (DoctorModel.user_id == user.id) | 
+                (DoctorModel.name.ilike(f"%{clean_name}%"))
+            ).first()
+            if doctor_record:
+                if not doctor_record.user_id:
+                    doctor_record.user_id = user.id
+                doctor_record.status = "On Duty"
+                db.commit()
+            else:
+                specialty_str = ", ".join(user.specialties) if user.specialties else "General Dentistry"
+                new_doc = DoctorModel(
+                    name=user.name if user.name.startswith("Dr. ") else f"Dr. {user.name}",
+                    specialty=specialty_str,
+                    status="On Duty",
+                    user_id=user.id
+                )
+                db.add(new_doc)
+                db.commit()
+        
         print("[DEBUG LOGIN] Generating access token for staff...", flush=True)
         token = create_access_token({
             "sub": user.username,
@@ -130,21 +154,44 @@ def get_profile(
 
     is_doctor = any(r.lower() == "doctor" for r in (user.roles or []))
     if is_doctor:
-        doctor = db.query(DoctorModel).filter(DoctorModel.user_id == user.id).first()
+        clean_name = user.name.replace("Dr.", "").strip()
+        doctor = db.query(DoctorModel).filter(
+            (DoctorModel.user_id == user.id) | 
+            (DoctorModel.name.ilike(f"%{clean_name}%"))
+        ).first()
         if doctor:
+            if not doctor.user_id:
+                doctor.user_id = user.id
+            if doctor.status != "On Break":
+                doctor.status = "On Duty"
+            db.commit()
+
             user.dob = doctor.dob
             user.phone = doctor.phone
             user.address = doctor.address
             user.licence_id = doctor.licence_id
             user.chair_setup = doctor.chair_setup
             user.board = doctor.board
-        else:
-            user.dob = None
-            user.phone = None
-            user.address = None
-            user.licence_id = None
-            user.chair_setup = None
-            user.board = None
+            user.duty_status = doctor.status
+        if not doctor:
+            specialty_str = ", ".join(user.specialties) if user.specialties else "General Dentistry"
+            doctor = DoctorModel(
+                name=user.name if user.name.startswith("Dr. ") else f"Dr. {user.name}",
+                specialty=specialty_str,
+                status="On Duty",
+                user_id=user.id
+            )
+            db.add(doctor)
+            db.commit()
+            db.refresh(doctor)
+            
+            user.dob = doctor.dob
+            user.phone = doctor.phone
+            user.address = doctor.address
+            user.licence_id = doctor.licence_id
+            user.chair_setup = doctor.chair_setup
+            user.board = doctor.board
+            user.duty_status = doctor.status
     else:
         profile = db.query(StaffProfileModel).filter(StaffProfileModel.user_id == user.id).first()
         if profile:
@@ -498,7 +545,11 @@ def get_doctors_list(
     
     roster = []
     for idx, doc in enumerate(doctors):
-        doctor = db.query(DoctorModel).filter(DoctorModel.user_id == doc.id).first()
+        clean_name = doc.name.replace("Dr.", "").strip()
+        doctor = db.query(DoctorModel).filter(
+            (DoctorModel.user_id == doc.id) | 
+            (DoctorModel.name.ilike(f"%{clean_name}%"))
+        ).first()
         
         today_str = today.isoformat()
         has_leave_today = db.query(LeaveRequestModel).filter(
@@ -508,13 +559,13 @@ def get_doctors_list(
             LeaveRequestModel.end_date >= today_str
         ).first()
         
-        status_map = "Available"
+        status_map = "Off Duty"
         if has_leave_today:
             status_map = "On Leave"
-        elif doc.status == "Inactive":
+        elif doctor and doctor.status and doctor.status != "-":
+            status_map = doctor.status
+        else:
             status_map = "Off Duty"
-        elif doc.status == "On Break":
-            status_map = "On Break"
             
         slots = build_doctor_slots(db, doc.name, status_map, today_appointments, doctor.working_hours if doctor else None)
         
@@ -529,7 +580,8 @@ def get_doctors_list(
             "shift": doctor.working_hours if doctor else None,
             "status": status_map,
             "slots": slots,
-            "patientsCount": booked_count
+            "patientsCount": booked_count,
+            "profile_picture": doc.profile_picture
         })
         
     return roster
@@ -555,23 +607,20 @@ def update_my_status(
         )
     
     new_status = status_data.get("status")
-    if new_status not in ["Active", "On Break", "Inactive"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid status value. Must be 'Active', 'On Break', or 'Inactive'"
-        )
+    duty_str = "Off Duty"
+    if new_status in ["Active", "On Duty"]:
+        duty_str = "On Duty"
+    elif new_status == "On Break":
+        duty_str = "On Break"
+    elif new_status in ["Inactive", "Off Duty", "-"]:
+        duty_str = "Off Duty"
         
-    user.status = new_status
-    db.commit()
-    db.refresh(user)
-    
-    # Update DoctorModel status as well if user is a doctor
     doctor = db.query(DoctorModel).filter(DoctorModel.user_id == user.id).first()
     if doctor:
-        doctor.status = new_status
+        doctor.status = duty_str
         db.commit()
         
-    return {"id": user.id, "status": user.status}
+    return {"id": user.id, "status": duty_str}
 
 
 @router.put("/doctors/{doctor_id}/status")

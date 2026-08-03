@@ -22,6 +22,17 @@ export default function ReceptionistLayout({ children }) {
   const [readTabMap, setReadTabMap] = useState({});
   const [readNotifIds, setReadNotifIds] = useState({});
 
+  const getNotifStorageKey = () => {
+    if (typeof window === "undefined") return "receptionist_read_notif_ids";
+    try {
+      const savedUser = localStorage.getItem("staff_user");
+      const userId = savedUser ? JSON.parse(savedUser).id : null;
+      return userId ? `read_notif_ids_${userId}` : "receptionist_read_notif_ids";
+    } catch (e) {
+      return "receptionist_read_notif_ids";
+    }
+  };
+
   // Load read tab map & read notifications from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -29,7 +40,7 @@ export default function ReceptionistLayout({ children }) {
         const savedTabMap = localStorage.getItem("receptionist_tab_read_map");
         if (savedTabMap) setReadTabMap(JSON.parse(savedTabMap));
 
-        const savedNotifIds = localStorage.getItem("receptionist_read_notif_ids");
+        const savedNotifIds = localStorage.getItem(getNotifStorageKey());
         if (savedNotifIds) setReadNotifIds(JSON.parse(savedNotifIds));
       } catch (e) {
         console.warn("Failed to parse receptionist notification cache:", e);
@@ -152,7 +163,7 @@ export default function ReceptionistLayout({ children }) {
     setReadNotifIds((prev) => {
       const updated = { ...prev, [id]: true };
       try {
-        localStorage.setItem("receptionist_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {
         // ignore
       }
@@ -167,7 +178,7 @@ export default function ReceptionistLayout({ children }) {
         updated[n.id] = true;
       });
       try {
-        localStorage.setItem("receptionist_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {
         // ignore
       }

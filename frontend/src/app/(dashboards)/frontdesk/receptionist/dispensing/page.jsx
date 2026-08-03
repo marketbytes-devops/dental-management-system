@@ -9,24 +9,23 @@ import {
   Search,
   User,
   Stethoscope,
-  Printer,
   X,
   Receipt,
   Folder,
   FolderOpen,
   ChevronDown,
   ChevronUp,
-  CreditCard,
-  AlertCircle,
   Sparkles,
-  Calendar
+  Calendar,
+  Send,
+  Eye,
+  AlertCircle
 } from "lucide-react";
 import {
   getDispensingQueue,
   getLabOrdersForReceptionist,
   updateDispenseStatus,
-  collectDispensingPayment,
-  collectLabOrderPayment
+  createBillingRequest
 } from "@/services/api";
 
 export default function MedicinesToDispensePage() {
@@ -36,16 +35,10 @@ export default function MedicinesToDispensePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
 
-  // Modals state
-  const [paymentModalItem, setPaymentModalItem] = useState(null); // Item being paid for
-  const [selectedReceipt, setSelectedReceipt] = useState(null);   // Item for printable receipt
+  // Encounter modal & state
+  const [selectedEncounter, setSelectedEncounter] = useState(null);
   const [expandedPatients, setExpandedPatients] = useState({});
-
-  // Payment form states
-  const [paymentOption, setPaymentOption] = useState("50_PERCENT"); // "50_PERCENT" or "FULL"
-  const [paymentMethod, setPaymentMethod] = useState("Cash");
-  const [customAmountPaid, setCustomAmountPaid] = useState("");
-  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [sentToAccountantMap, setSentToAccountantMap] = useState({});
   const [toastMessage, setToastMessage] = useState("");
 
   const triggerToast = (msg) => {
@@ -95,9 +88,81 @@ export default function MedicinesToDispensePage() {
           item.id === id ? { ...item, status: "Dispensed", dispensed_at: new Date().toISOString() } : item
         )
       );
-      triggerToast("Prescription marked as Dispensed!");
+
+      if (selectedEncounter) {
+        setSelectedEncounter((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            items: prev.items.map((it) =>
+              it.id === id ? { ...it, status: "Dispensed" } : it
+            )
+          };
+        });
+      }
+
+      triggerToast("Medicine Dispensed successfully!");
     } catch (err) {
       console.error("Failed to mark as dispensed:", err);
+      triggerToast("Failed to mark medicine dispensed.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleSendToAccountant = async (item) => {
+    setUpdatingId(item.id || item.unique_key);
+    try {
+      let procs = [];
+      let srcType = "consultation";
+
+      if (item.item_type === "lab") {
+        srcType = "lab";
+        procs = [{
+          name: `Lab Order (${item.prosthetic_type || item.order_category || "Prosthetic"})`,
+          title: `Lab Order (${item.prosthetic_type || item.order_category || "Prosthetic"})`,
+          rate: Number(item.total_amount || item.patient_total_amount || 3500)
+        }];
+      } else {
+        srcType = "consultation";
+        procs = (item.medications || []).map((m) => ({
+          name: `Medicine: ${m.medicine || m.name}`,
+          title: `Medicine: ${m.medicine || m.name}`,
+          rate: Number(m.line_total || m.unit_price || 0)
+        }));
+      }
+
+      await createBillingRequest({
+        patient_token: item.patient_token,
+        doctor_name: item.doctor_name || "Doctor",
+        total_amount: Number(item.total_amount || 0),
+        source_type: srcType,
+        procedures: procs.length > 0 ? procs : [{ name: "Post-Consultation Charge", title: "Post-Consultation Charge", rate: item.total_amount || 0 }],
+        notes: null
+      });
+
+      setSentToAccountantMap((prev) => ({ ...prev, [item.unique_key]: true }));
+      triggerToast(`Sent bill for ${item.patient_name} to Accountant!`);
+    } catch (err) {
+      console.error("Failed to send bill to accountant:", err);
+      triggerToast("Failed to send bill to Accountant.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleSendAllEncounterToAccountant = async (encounter) => {
+    if (!encounter || !encounter.items || encounter.items.length === 0) return;
+    setUpdatingId("all");
+    try {
+      for (const item of encounter.items) {
+        if (!sentToAccountantMap[item.unique_key]) {
+          await handleSendToAccountant(item);
+        }
+      }
+      triggerToast(`All encounter bills for ${encounter.patientName} sent to Accountant!`);
+    } catch (err) {
+      console.error("Failed to send all encounter bills:", err);
     } finally {
       setUpdatingId(null);
     }
@@ -110,84 +175,24 @@ export default function MedicinesToDispensePage() {
     }));
   };
 
-  // Open Payment Modal with initial threshold calculation
-  const handleOpenPaymentModal = (item) => {
-    const total = item.total_amount || item.patient_total_amount || (item.item_type === "lab" ? 3500 : 500);
-    const requiresFull = total < 1000;
-    
-    setPaymentModalItem(item);
-    setPaymentOption(requiresFull ? "FULL" : "50_PERCENT");
-    setCustomAmountPaid(requiresFull ? total.toString() : (total / 2).toString());
-    setPaymentMethod("Cash");
-  };
-
-  const handleProcessPayment = async (e) => {
-    e.preventDefault();
-    if (!paymentModalItem) return;
-
-    setIsSubmittingPayment(true);
-    const total = paymentModalItem.total_amount || paymentModalItem.patient_total_amount || (paymentModalItem.item_type === "lab" ? 3500 : 500);
-    let amountToPay = parseFloat(customAmountPaid);
-    if (isNaN(amountToPay) || amountToPay <= 0) {
-      amountToPay = paymentOption === "FULL" ? total : total / 2;
-    }
-
-    const payload = {
-      total_amount: total,
-      amount_paid: amountToPay,
-      payment_method: paymentMethod
-    };
-
-    try {
-      if (paymentModalItem.item_type === "prescription") {
-        await collectDispensingPayment(paymentModalItem.id, payload);
-      } else {
-        await collectLabOrderPayment(paymentModalItem.id, payload);
-      }
-
-      triggerToast(`Payment of ₹${amountToPay.toFixed(2)} received successfully!`);
-      setPaymentModalItem(null);
-      fetchAllOrders();
-    } catch (err) {
-      console.error("Failed to collect payment:", err);
-      triggerToast("Failed to process payment.");
-    } finally {
-      setIsSubmittingPayment(false);
-    }
-  };
-
-  // Normalize & Combine Prescription & Lab Entries into single list
+  // Combine Prescription & Lab Entries
   const combinedEntries = useMemo(() => {
     const list = [];
 
-    // 1. Map Prescriptions
     dispenseList.forEach((rx) => {
       const total = rx.total_amount || 0;
-      const paid = rx.amount_paid || 0;
-      const bal = rx.balance_due !== undefined ? rx.balance_due : maxZero(total - paid);
-      const payStatus = rx.payment_status || (paid >= total && total > 0 ? "Paid in Full" : (paid > 0 ? "50% Advance Paid" : "Pending Payment"));
-
       list.push({
         ...rx,
         unique_key: `rx-${rx.id}`,
         item_type: "prescription",
         title: "Medicine Prescription",
         total_amount: total,
-        amount_paid: paid,
-        balance_due: bal,
-        payment_status: payStatus,
-        payment_method: rx.payment_method || "Cash",
         date_received: rx.date_received || rx.dispensed_at || rx.created_at
       });
     });
 
-    // 2. Map Lab Orders
     labOrdersList.forEach((lab) => {
       const total = lab.patient_total_amount || 3500.0;
-      const paid = lab.patient_amount_paid || 0.0;
-      const bal = lab.patient_balance_due !== undefined ? lab.patient_balance_due : maxZero(total - paid);
-      const payStatus = lab.payment_status || (paid >= total && total > 0 ? "Paid in Full" : (paid > 0 ? "50% Advance Paid" : "Pending Payment"));
-
       list.push({
         ...lab,
         unique_key: `lab-${lab.id}`,
@@ -197,10 +202,6 @@ export default function MedicinesToDispensePage() {
         patient_token: lab.patient_token,
         patient_name: lab.patient_name || "Patient",
         total_amount: total,
-        amount_paid: paid,
-        balance_due: bal,
-        payment_status: payStatus,
-        payment_method: lab.payment_method || "Cash",
         date_received: lab.date_received || lab.created_at,
         created_at: lab.created_at
       });
@@ -209,7 +210,7 @@ export default function MedicinesToDispensePage() {
     return list;
   }, [dispenseList, labOrdersList]);
 
-  // Filter combined list by search query
+  // Filter combined list
   const filteredList = combinedEntries.filter((item) => {
     const q = searchQuery.toLowerCase();
     return (
@@ -224,41 +225,66 @@ export default function MedicinesToDispensePage() {
     );
   });
 
-  // Group by patient folder
+  const todayStr = new Date().toLocaleDateString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric"
+  });
+
+  // Group by Patient -> Group by Visit Date & Time
   const patientGroups = useMemo(() => {
     const groups = {};
     filteredList.forEach((item) => {
-      const key = item.patient_token || item.patient_name || "Unknown";
-      if (!groups[key]) {
-        groups[key] = {
-          key,
+      const pKey = item.patient_token || item.patient_name || "Unknown";
+      if (!groups[pKey]) {
+        groups[pKey] = {
+          key: pKey,
           patient_name: item.patient_name || "Patient",
           patient_token: item.patient_token || "—",
-          entries: [],
-          pendingPaymentCount: 0,
+          visitsMap: {},
           totalAmount: 0,
-          totalPaid: 0,
-          totalBalance: 0,
+          hasNewVisit: false
         };
       }
-      groups[key].entries.push(item);
-      if (item.payment_status === "Pending Payment") groups[key].pendingPaymentCount += 1;
-      groups[key].totalAmount += item.total_amount || 0;
-      groups[key].totalPaid += item.amount_paid || 0;
-      groups[key].totalBalance += item.balance_due || 0;
+
+      const rawDate = item.date_received || item.created_at || new Date().toISOString();
+      const dateObj = new Date(rawDate);
+      const dateStr = !isNaN(dateObj.getTime())
+        ? dateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+        : "Recent Visit";
+
+      const timeStr = !isNaN(dateObj.getTime())
+        ? dateObj.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+        : "";
+
+      if (!groups[pKey].visitsMap[dateStr]) {
+        groups[pKey].visitsMap[dateStr] = {
+          dateStr,
+          timeStr,
+          rawDate,
+          isToday: dateStr === todayStr,
+          doctorName: item.doctor_name || item.dentist_name || "Doctor",
+          items: [],
+          totalAmount: 0
+        };
+      }
+
+      if (dateStr === todayStr) {
+        groups[pKey].hasNewVisit = true;
+      }
+
+      groups[pKey].visitsMap[dateStr].items.push(item);
+      groups[pKey].visitsMap[dateStr].totalAmount += item.total_amount || 0;
+      groups[pKey].totalAmount += item.total_amount || 0;
     });
 
-    // Sort entries within each patient folder
-    Object.values(groups).forEach((g) => {
-      g.entries.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    return Object.values(groups).map((g) => {
+      const visitList = Object.values(g.visitsMap);
+      visitList.sort((a, b) => new Date(b.rawDate || 0) - new Date(a.rawDate || 0));
+      return {
+        ...g,
+        visits: visitList
+      };
     });
-
-    return Object.values(groups);
-  }, [filteredList]);
-
-  const totalPendingPayments = combinedEntries.filter((i) => i.payment_status === "Pending Payment").length;
-  const totalAdvancePaid = combinedEntries.filter((i) => i.payment_status === "50% Advance Paid").length;
-  const totalPaidInFull = combinedEntries.filter((i) => i.payment_status === "Paid in Full").length;
+  }, [filteredList, todayStr]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 text-left">
@@ -278,58 +304,11 @@ export default function MedicinesToDispensePage() {
               <Pill className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-black text-gray-900 tracking-tight">Post-Consultation Orders & Receipts</h1>
+              <h1 className="text-2xl font-black text-gray-900 tracking-tight">Post-Consultation Dispensing & Routing</h1>
               <p className="text-xs font-semibold text-gray-500 mt-0.5">
-                Automatic prescription dispensing & lab order checkout with smart 50% / 100% payment rules.
+                Clear distinction between Today's New Visits and Past Visits. Dispense medicines and route bills to Accountant.
               </p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4.5 rounded-2xl border border-gray-150 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total Patient Folders</p>
-            <h3 className="text-2xl font-black text-gray-900 mt-1">{patientGroups.length}</h3>
-            <p className="text-[10px] text-gray-400 font-medium">{combinedEntries.length} Total Orders</p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
-            <User className="w-4 h-4" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4.5 rounded-2xl border border-amber-200 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Pending Payment</p>
-            <h3 className="text-2xl font-black text-amber-700 mt-1">{totalPendingPayments}</h3>
-            <p className="text-[10px] text-amber-600 font-medium">Awaiting payment collection</p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-            <Clock className="w-4 h-4 animate-pulse" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4.5 rounded-2xl border border-blue-200 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">50% Advance Paid</p>
-            <h3 className="text-2xl font-black text-blue-700 mt-1">{totalAdvancePaid}</h3>
-            <p className="text-[10px] text-blue-600 font-medium">Deposit collected upfront</p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <CreditCard className="w-4 h-4" />
-          </div>
-        </div>
-
-        <div className="bg-white p-4.5 rounded-2xl border border-emerald-200 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Paid in Full</p>
-            <h3 className="text-2xl font-black text-emerald-700 mt-1">{totalPaidInFull}</h3>
-            <p className="text-[10px] text-emerald-600 font-medium">Fully settled orders</p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-            <CheckCircle2 className="w-4 h-4" />
           </div>
         </div>
       </div>
@@ -341,7 +320,7 @@ export default function MedicinesToDispensePage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by patient name, token, doctor, medicine, or lab case ID..."
+          placeholder="Search patient name, token, doctor, medicine or lab case ID..."
           className="w-full text-xs font-semibold text-gray-800 placeholder-gray-400 bg-transparent border-none focus:outline-none"
         />
       </div>
@@ -350,15 +329,12 @@ export default function MedicinesToDispensePage() {
       <div className="space-y-4">
         {loading ? (
           <div className="p-12 text-center text-xs font-semibold text-gray-400 bg-white rounded-2xl border border-gray-150">
-            Loading post-consultation orders & receipts...
+            Loading patient encounter folders...
           </div>
         ) : patientGroups.length === 0 ? (
           <div className="p-12 text-center space-y-2 bg-white rounded-2xl border border-gray-150">
             <Pill className="w-8 h-8 text-gray-300 mx-auto" />
-            <p className="text-xs font-bold text-gray-600">No post-consultation checkout entries found</p>
-            <p className="text-[11px] text-gray-400">
-              When doctors order lab fabrication or prescribe medications, they automatically appear here grouped by patient folder.
-            </p>
+            <p className="text-xs font-bold text-gray-600">No post-consultation orders found</p>
           </div>
         ) : (
           patientGroups.map((group) => {
@@ -366,13 +342,19 @@ export default function MedicinesToDispensePage() {
             return (
               <div
                 key={group.key}
-                className="bg-white rounded-2xl border border-teal-200/80 shadow-xs overflow-hidden transition-all"
+                className={`bg-white rounded-2xl border ${
+                  group.hasNewVisit
+                    ? "border-red-300 shadow-sm shadow-red-500/10"
+                    : "border-gray-200 shadow-xs"
+                } overflow-hidden transition-all`}
               >
                 {/* Patient Folder Header */}
                 <button
                   type="button"
                   onClick={() => togglePatient(group.key)}
-                  className="w-full p-4 bg-gray-50/80 hover:bg-gray-100/70 border-b border-gray-200 flex items-center justify-between transition cursor-pointer text-left"
+                  className={`w-full p-4.5 ${
+                    group.hasNewVisit ? "bg-red-50/30 hover:bg-red-50/50" : "bg-slate-50/80 hover:bg-slate-100/80"
+                  } border-b border-gray-200 flex items-center justify-between transition cursor-pointer text-left`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold shrink-0">
@@ -381,21 +363,17 @@ export default function MedicinesToDispensePage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-extrabold text-base text-gray-900">{group.patient_name}</h3>
-                        {group.pendingPaymentCount > 0 && (
-                          <span
-                            className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-white shadow-xs animate-pulse shrink-0"
-                            title="Needs Payment Collection"
-                          />
-                        )}
-                        <span className="text-xs font-semibold text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">
+                        <span className="text-xs font-semibold text-gray-600 bg-white px-2.5 py-0.5 rounded-full border border-gray-200">
                           {group.patient_token}
                         </span>
+                        {group.hasNewVisit && (
+                          <span className="bg-red-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white" /> NEW TODAY
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {group.entries.length} Order{group.entries.length > 1 ? "s" : ""} (Lab & Prescriptions)
-                        {group.pendingPaymentCount > 0 && (
-                          <span className="text-amber-600 font-bold ml-2">• {group.pendingPaymentCount} Pending Payment</span>
-                        )}
+                        {group.visits.length} Visit Encounter{group.visits.length > 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
@@ -403,13 +381,10 @@ export default function MedicinesToDispensePage() {
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">
-                        Folder Summary (Total / Paid)
+                        Total Encounter Value
                       </span>
                       <span className="text-sm font-black text-gray-900">
                         ₹{group.totalAmount.toFixed(2)}
-                      </span>
-                      <span className="text-[11px] text-emerald-600 font-bold block">
-                        Paid: ₹{group.totalPaid.toFixed(2)}
                       </span>
                     </div>
                     <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-500">
@@ -418,196 +393,101 @@ export default function MedicinesToDispensePage() {
                   </div>
                 </button>
 
-                {/* Patient Entries Table (Accordion Content) */}
+                {/* Visit Dates Cards Grid */}
                 {isExpanded && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-white border-b border-gray-150 text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                          <th className="py-3 px-5">Type / ID</th>
-                          <th className="py-3 px-5">Prescribing Doctor</th>
-                          <th className="py-3 px-5">Prescription / Lab Specification Breakdown</th>
-                          <th className="py-3 px-5 text-right">Total Cost</th>
-                          <th className="py-3 px-5">Payment Rule & Status</th>
-                          <th className="py-3 px-5 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 text-xs">
-                        {group.entries.map((item) => {
-                          const isLab = item.item_type === "lab";
-                          const total = item.total_amount || 0;
-                          const paid = item.amount_paid || 0;
-                          const bal = item.balance_due || maxZero(total - paid);
-                          const requiresFullPayment = total < 1000;
+                  <div className="p-5 bg-white space-y-3">
+                    <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                      Encounter Visits Timeline (Newest First)
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {group.visits.map((visit, vIdx) => {
+                        const rxItems = visit.items.filter((i) => i.item_type === "prescription");
+                        const labItems = visit.items.filter((i) => i.item_type === "lab");
+                        const hasPendingAction = visit.items.some(
+                          (i) => i.status !== "Dispensed" || !sentToAccountantMap[i.unique_key]
+                        );
+                        const isNewVisit = visit.isToday || hasPendingAction || vIdx === 0;
 
-                          const dateFormatted = item.date_received || item.created_at
-                            ? new Date(item.date_received || item.created_at).toLocaleString("en-IN", {
-                                day: "2-digit",
-                                month: "short",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: true
-                              })
-                            : "—";
-
-                          return (
-                            <tr key={item.unique_key} className="hover:bg-gray-50/60 transition-colors">
-                              <td className="py-4 px-5 font-semibold text-gray-700 whitespace-nowrap">
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${
-                                      isLab ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"
-                                    }`}
-                                  >
-                                    {isLab ? <FlaskConical className="w-3.5 h-3.5" /> : <Pill className="w-3.5 h-3.5" />}
-                                  </div>
-                                  <div>
-                                    <span className="font-extrabold text-gray-900 block text-xs">
-                                      {isLab ? `Lab Order (${item.id})` : `Prescription`}
-                                    </span>
-                                    <span className="text-[10px] text-gray-400 font-semibold">{dateFormatted}</span>
-                                  </div>
+                        return (
+                          <div
+                            key={visit.dateStr}
+                            className={`p-4 rounded-2xl border ${
+                              isNewVisit
+                                ? "border-red-300 bg-red-50/20 shadow-xs shadow-red-500/10"
+                                : "border-gray-200 bg-gray-50/50"
+                            } hover:border-blue-300 transition-all flex flex-col justify-between space-y-3`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className={`p-2 rounded-xl font-bold ${isNewVisit ? "bg-red-100 text-red-700" : "bg-purple-50 text-purple-600"}`}>
+                                  <Calendar className="w-4 h-4" />
                                 </div>
-                              </td>
-
-                              <td className="py-4 px-5">
-                                <div className="flex items-center gap-1.5 text-gray-800 font-bold text-xs">
-                                  <Stethoscope className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                  <span>{item.doctor_name || item.dentist_name || "Doctor"}</span>
-                                </div>
-                              </td>
-
-                              {/* Breakdown Column */}
-                              <td className="py-4 px-5 max-w-md">
-                                {isLab ? (
-                                  <div className="bg-purple-50/60 p-2.5 rounded-xl border border-purple-100 space-y-1">
-                                    <div className="flex items-center justify-between text-[11px]">
-                                      <span className="font-bold text-purple-950">
-                                        {item.prosthetic_type || item.order_category || "Prosthetic Fabrication"}
-                                      </span>
-                                      {item.material && (
-                                        <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-purple-200 font-semibold text-purple-700">
-                                          {item.material}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="text-[10px] text-purple-800 font-medium space-x-2">
-                                      {item.shade && <span>Shade: <strong>{item.shade}</strong></span>}
-                                      {(item.tooth_quadrant || item.tooth_number) && <span>Tooth: <strong>{item.tooth_quadrant || item.tooth_number}</strong></span>}
-                                      {item.notes && <span className="block truncate italic mt-0.5 text-purple-700">"{item.notes}"</span>}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  item.medications && item.medications.length > 0 ? (
-                                    <div className="space-y-1.5">
-                                      {item.medications.map((med, idx) => (
-                                        <div
-                                          key={idx}
-                                          className="text-[11px] font-medium text-gray-800 bg-gray-50/80 px-2.5 py-1.5 rounded-lg border border-gray-200 flex items-center justify-between gap-2"
-                                        >
-                                          <div>
-                                            <span className="font-bold text-gray-900">{med.medicine || med.name}</span>
-                                            <div className="text-[10px] text-gray-500 mt-0.5">
-                                              {med.schedule && <span>{med.schedule}</span>}
-                                              {med.timing && <span> • {med.timing}</span>}
-                                              {med.duration && <span> • {med.duration}</span>}
-                                              {med.total_pills > 0 && (
-                                                <span className="font-bold text-gray-700 ml-1">({med.total_pills} pills)</span>
-                                              )}
-                                            </div>
-                                          </div>
-                                          <div className="text-right shrink-0">
-                                            <div className="font-bold text-emerald-700">₹{(med.line_total || 0).toFixed(2)}</div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <span className="text-gray-400 italic text-[11px]">No medications prescribed</span>
-                                  )
-                                )}
-                              </td>
-
-                              <td className="py-4 px-5 text-right font-black text-sm text-gray-900 whitespace-nowrap">
-                                ₹{total.toFixed(2)}
-                              </td>
-
-                              {/* Payment Rule & Status */}
-                              <td className="py-4 px-5 whitespace-nowrap">
-                                <div className="space-y-1">
-                                  {/* Rule tag */}
-                                  <span
-                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
-                                      requiresFullPayment
-                                        ? "bg-amber-100 text-amber-800 border border-amber-300"
-                                        : "bg-blue-100 text-blue-800 border border-blue-300"
-                                    }`}
-                                  >
-                                    {requiresFullPayment ? "100% Upfront (< ₹1k)" : "50% Advance (≥ ₹1k)"}
-                                  </span>
-
-                                  {/* Payment status badge */}
+                                <div>
                                   <div className="flex items-center gap-1.5">
-                                    {item.payment_status === "Paid in Full" ? (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black">
-                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Paid in Full
-                                      </span>
-                                    ) : item.payment_status === "50% Advance Paid" ? (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-black">
-                                        <CreditCard className="w-3 h-3 text-blue-600" /> Paid 50% (Bal: ₹{bal.toFixed(0)})
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black">
-                                        <Clock className="w-3 h-3 text-amber-600 animate-pulse" /> Pending Payment
-                                      </span>
-                                    )}
+                                    <span className="text-xs font-black text-gray-900">
+                                      {visit.dateStr} {visit.timeStr && `• ${visit.timeStr}`}
+                                    </span>
                                   </div>
+                                  <span className="text-[11px] text-gray-500 font-semibold flex items-center gap-1 mt-0.5">
+                                    <Stethoscope className="w-3 h-3 text-blue-500" /> {visit.doctorName}
+                                  </span>
                                 </div>
-                              </td>
+                              </div>
 
-                              {/* Actions */}
-                              <td className="py-4 px-5 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-2">
-                                  {/* Collect Payment Button */}
-                                  {item.payment_status !== "Paid in Full" && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenPaymentModal(item)}
-                                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all border-none cursor-pointer flex items-center gap-1.5"
-                                    >
-                                      <CreditCard className="w-3.5 h-3.5" />
-                                      {item.payment_status === "50% Advance Paid" ? "Pay Remaining" : "Collect Payment"}
-                                    </button>
-                                  )}
+                              {/* NEW / STATUS BADGES */}
+                              {visit.isToday ? (
+                                <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-white" /> TODAY'S VISIT (NEW)
+                                </span>
+                              ) : hasPendingAction ? (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                                  <Clock className="w-2.5 h-2.5" /> ACTION REQUIRED
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="w-2.5 h-2.5" /> Past Visit (Settled)
+                                </span>
+                              )}
+                            </div>
 
-                                  {/* Receipt Button */}
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedReceipt(item)}
-                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-all border border-gray-200 flex items-center gap-1.5 cursor-pointer"
-                                  >
-                                    <Printer className="w-3.5 h-3.5" /> Receipt
-                                  </button>
+                            {/* Items Breakdown Pills */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {rxItems.length > 0 && (
+                                <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold flex items-center gap-1">
+                                  <Pill className="w-3 h-3" /> Medicine Prescription ({rxItems.length})
+                                </span>
+                              )}
+                              {labItems.length > 0 && (
+                                <span className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold flex items-center gap-1">
+                                  <FlaskConical className="w-3 h-3" /> Lab Order ({labItems.length})
+                                </span>
+                              )}
+                            </div>
 
-                                  {/* Dispense Action for Prescription */}
-                                  {!isLab && item.status !== "Dispensed" && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleMarkDispensed(item.id)}
-                                      disabled={updatingId === item.id}
-                                      className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] rounded-xl transition-all border border-blue-200 cursor-pointer disabled:opacity-50"
-                                      title="Mark Medicine Dispensed"
-                                    >
-                                      {updatingId === item.id ? "..." : "Dispense"}
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                            {/* View & Dispense Action */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedEncounter({
+                                  patientName: group.patient_name,
+                                  patientToken: group.patient_token,
+                                  dateStr: visit.dateStr,
+                                  timeStr: visit.timeStr,
+                                  doctorName: visit.doctorName,
+                                  items: visit.items
+                                })
+                              }
+                              className={`w-full py-2 ${
+                                isNewVisit ? "bg-red-600 hover:bg-red-700 text-white" : "bg-slate-900 hover:bg-slate-800 text-white"
+                              } text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs border-none`}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              {isNewVisit ? "Open Today's Visit & Dispense" : "View Past Visit Details"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -616,365 +496,179 @@ export default function MedicinesToDispensePage() {
         )}
       </div>
 
-      {/* Collect Payment Modal */}
-      {paymentModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-5 border border-gray-200 text-left animate-fade-in">
-            <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-emerald-600" />
-                <h3 className="text-base font-extrabold text-gray-900">Collect Checkout Payment</h3>
+      {/* Encounter Modal */}
+      {selectedEncounter && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 shadow-2xl space-y-5 border border-gray-100 text-left animate-fade-in my-8 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Pill className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-gray-900">
+                      Encounter: {selectedEncounter.patientName}
+                    </h3>
+                    {selectedEncounter.dateStr === todayStr && (
+                      <span className="bg-red-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full animate-pulse">
+                        TODAY'S NEW VISIT
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">
+                    Token: <strong>{selectedEncounter.patientToken}</strong> · Visit: <strong>{selectedEncounter.dateStr} {selectedEncounter.timeStr}</strong>
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setPaymentModalItem(null)}
-                className="p-1 text-gray-400 hover:text-gray-700 rounded-lg"
+                onClick={() => setSelectedEncounter(null)}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition cursor-pointer border-none bg-transparent"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Order Summary & Smart Rule Banner */}
-            <div className="bg-teal-50/70 border border-teal-200 rounded-2xl p-4 space-y-2">
-              <div className="flex justify-between items-start text-xs font-bold text-gray-900">
-                <span>{paymentModalItem.patient_name} ({paymentModalItem.patient_token})</span>
-                <span className="text-teal-800 font-black">{paymentModalItem.title}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm font-black text-gray-900 pt-1 border-t border-teal-200/60">
-                <span>Total Order Cost:</span>
-                <span className="text-base">
-                  ₹{(paymentModalItem.total_amount || paymentModalItem.patient_total_amount || 0).toFixed(2)}
-                </span>
-              </div>
+            {/* Modal Body - Items List */}
+            <div className="space-y-4">
+              {selectedEncounter.items.map((item) => {
+                const isLab = item.item_type === "lab";
+                const isSent = !!sentToAccountantMap[item.unique_key];
+                const needsDispensing = !isLab && item.status !== "Dispensed";
 
-              {/* Threshold Rule Explainer */}
-              <div className="pt-2">
-                {(paymentModalItem.total_amount || paymentModalItem.patient_total_amount || 0) < 1000 ? (
-                  <div className="bg-amber-100/80 border border-amber-300 text-amber-900 text-[11px] p-2.5 rounded-xl font-semibold flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>Rule (&lt; ₹1,000):</strong> Total cost is below ₹1,000 threshold. 100% full payment is collected upfront.
-                    </span>
-                  </div>
-                ) : (
-                  <div className="bg-blue-100/80 border border-blue-300 text-blue-900 text-[11px] p-2.5 rounded-xl font-semibold flex items-start gap-2">
-                    <Sparkles className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
-                    <span>
-                      <strong>Rule (≥ ₹1,000):</strong> Order total is ₹1,000 or higher. Minimum 50% advance deposit is collected upfront.
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <form onSubmit={handleProcessPayment} className="space-y-4">
-              {/* Payment Option Radio Buttons */}
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-2">
-                  Select Payment Amount
-                </label>
-                {(paymentModalItem.total_amount || paymentModalItem.patient_total_amount || 0) >= 1000 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentOption("50_PERCENT");
-                        const tot = paymentModalItem.total_amount || paymentModalItem.patient_total_amount || 0;
-                        setCustomAmountPaid((tot / 2).toString());
-                      }}
-                      className={`p-3 rounded-xl border text-left cursor-pointer transition ${
-                        paymentOption === "50_PERCENT"
-                          ? "bg-blue-50 border-blue-600 text-blue-950 shadow-xs"
-                          : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                      }`}
-                    >
-                      <span className="block text-[10px] font-black uppercase text-blue-600">50% Advance Deposit</span>
-                      <span className="text-sm font-black block mt-0.5">
-                        ₹{((paymentModalItem.total_amount || paymentModalItem.patient_total_amount || 0) / 2).toFixed(2)}
+                return (
+                  <div
+                    key={item.unique_key}
+                    className={`p-4 rounded-2xl border ${
+                      needsDispensing || !isSent ? "border-amber-300 bg-amber-50/30" : "border-gray-200 bg-gray-50/60"
+                    } space-y-3`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${
+                            isLab ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {isLab ? <FlaskConical className="w-4 h-4" /> : <Pill className="w-4 h-4" />}
+                        </div>
+                        <span className="font-extrabold text-sm text-gray-900">
+                          {isLab ? `Lab Order (${item.id})` : "Prescription Medicine"}
+                        </span>
+                      </div>
+                      <span className="text-sm font-black text-gray-900">
+                        ₹{(item.total_amount || 0).toFixed(2)}
                       </span>
-                    </button>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentOption("FULL");
-                        const tot = paymentModalItem.total_amount || paymentModalItem.patient_total_amount || 0;
-                        setCustomAmountPaid(tot.toString());
-                      }}
-                      className={`p-3 rounded-xl border text-left cursor-pointer transition ${
-                        paymentOption === "FULL"
-                          ? "bg-emerald-50 border-emerald-600 text-emerald-950 shadow-xs"
-                          : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                      }`}
-                    >
-                      <span className="block text-[10px] font-black uppercase text-emerald-600">100% Full Payment</span>
-                      <span className="text-sm font-black block mt-0.5">
-                        ₹{(paymentModalItem.total_amount || paymentModalItem.patient_total_amount || 0).toFixed(2)}
-                      </span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs font-black">
-                    100% Full Payment Required: ₹{(paymentModalItem.total_amount || paymentModalItem.patient_total_amount || 0).toFixed(2)}
-                  </div>
-                )}
-              </div>
-
-              {/* Custom Amount Input */}
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                  Amount Received (₹)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={customAmountPaid}
-                  onChange={(e) => setCustomAmountPaid(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-black text-gray-900 focus:outline-none focus:border-emerald-600"
-                />
-              </div>
-
-              {/* Payment Method Dropdown */}
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                  Payment Method
-                </label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:border-emerald-600"
-                >
-                  <option value="Cash">Cash</option>
-                  <option value="UPI">UPI / GPay / PhonePe</option>
-                  <option value="Card">Credit / Debit Card</option>
-                </select>
-              </div>
-
-              {/* Auto Stamped Date Received */}
-              <div className="text-[11px] text-gray-500 font-semibold flex items-center justify-between pt-1">
-                <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-gray-400" /> Date Received:</span>
-                <span className="font-bold text-gray-800">{new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setPaymentModalItem(null)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl border-none cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingPayment}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-xs border-none cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {isSubmittingPayment ? "Processing..." : "Confirm & Issue Receipt"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Printable Itemized Official Receipt Modal */}
-      {selectedReceipt && (
-        <div
-          id="post-consultation-receipt-print-wrapper"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-xs p-4 overflow-y-auto"
-        >
-          <style>{`
-            @media print {
-              body * {
-                visibility: hidden !important;
-              }
-              #post-consultation-receipt-print-wrapper,
-              #post-consultation-receipt-print-wrapper * {
-                visibility: visible !important;
-              }
-              #post-consultation-receipt-print-wrapper {
-                position: fixed !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                background: white !important;
-                z-index: 999999 !important;
-                overflow: visible !important;
-              }
-              #post-consultation-receipt-card {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                max-width: 100% !important;
-                margin: 0 !important;
-                padding: 24px !important;
-                box-shadow: none !important;
-                border: none !important;
-                border-radius: 0 !important;
-                background: white !important;
-              }
-              .no-print {
-                display: none !important;
-              }
-            }
-          `}</style>
-
-          <div
-            id="post-consultation-receipt-card"
-            className="bg-white rounded-2xl w-full max-w-2xl p-8 shadow-2xl space-y-6 border border-gray-200 animate-fadeIn my-6 text-left"
-          >
-            {/* Header Actions (Hidden when printing) */}
-            <div className="flex justify-between items-center pb-4 border-b border-gray-100 no-print">
-              <div className="flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-gray-900">
-                  {selectedReceipt.item_type === "lab" ? "Lab Order Fabrication Receipt" : "Pharmacy Prescription Receipt"}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition flex items-center gap-1.5 cursor-pointer shadow-xs border-none"
-                >
-                  <Printer className="w-4 h-4" /> Print Official Receipt
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedReceipt(null)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition border-none bg-transparent cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Print Document Area */}
-            <div className="space-y-6">
-              {/* Clinic Branding */}
-              <div className="flex justify-between items-start border-b-2 border-gray-900 pb-4">
-                <div>
-                  <h2 className="text-xl font-black text-gray-900 tracking-tight">SMILECARE DENTAL CLINIC</h2>
-                  <p className="text-xs text-gray-600 font-semibold mt-0.5">
-                    Official Post-Consultation Patient Receipt
-                  </p>
-                  <p className="text-[11px] text-gray-500 mt-1">123 Dental Plaza, Jubilee Hills, Hyderabad — 500001</p>
-                  <p className="text-[11px] text-gray-500">Phone: +91 40 2345 6789 | Email: billing@smilecare.com</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold text-gray-800">Receipt #: REC-2026-{(selectedReceipt.id || 101)}</p>
-                  <p className="text-xs font-semibold text-gray-600 mt-1">
-                    Date Received: {selectedReceipt.date_received || selectedReceipt.created_at ? new Date(selectedReceipt.date_received || selectedReceipt.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleDateString("en-IN")}
-                  </p>
-                </div>
-              </div>
-
-              {/* Patient & Doctor Details */}
-              <div className="grid grid-cols-2 gap-6 py-2 border-b border-gray-200 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Patient Details</span>
-                  <p className="font-extrabold text-gray-900 text-sm mt-0.5">{selectedReceipt.patient_name || "Patient"}</p>
-                  <p className="text-gray-500 font-semibold mt-0.5">Token: {selectedReceipt.patient_token}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Prescribing Doctor</span>
-                  <p className="font-extrabold text-gray-900 text-sm mt-0.5">{selectedReceipt.doctor_name || selectedReceipt.dentist_name || "Dr. Anoop Nair"}</p>
-                </div>
-              </div>
-
-              {/* Itemized Table */}
-              <div>
-                <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
-                  {selectedReceipt.item_type === "lab" ? "Lab Order Specifications" : "Prescribed Medications Breakdown"}
-                </h4>
-                <table className="w-full text-left border-collapse border border-gray-300 text-xs">
-                  <thead>
-                    <tr className="bg-gray-100 border-b border-gray-300 text-[10px] font-black uppercase text-gray-700">
-                      <th className="p-3 border-r border-gray-300">#</th>
-                      <th className="p-3 border-r border-gray-300">Item Description</th>
-                      <th className="p-3 border-r border-gray-300">Specifications / Dosage</th>
-                      <th className="p-3 text-right">Amount (₹)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-300">
-                    {selectedReceipt.item_type === "lab" ? (
-                      <tr>
-                        <td className="p-3 border-r border-gray-300 font-semibold text-gray-600">1</td>
-                        <td className="p-3 border-r border-gray-300 font-bold text-gray-900">
-                          {selectedReceipt.prosthetic_type || selectedReceipt.order_category || "Prosthetic Crown / Fabrication"}
-                        </td>
-                        <td className="p-3 border-r border-gray-300 text-gray-700">
-                          Material: {selectedReceipt.material || "Zirconia"} • Shade: {selectedReceipt.shade || "A2"} • Tooth: {selectedReceipt.tooth_quadrant || selectedReceipt.tooth_number || "Full Arch"}
-                        </td>
-                        <td className="p-3 text-right font-extrabold text-gray-900">
-                          ₹{(selectedReceipt.total_amount || selectedReceipt.patient_total_amount || 3500).toFixed(2)}
-                        </td>
-                      </tr>
+                    {/* Breakdown */}
+                    {isLab ? (
+                      <div className="bg-purple-50/80 p-3 rounded-xl border border-purple-100 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-purple-950">
+                            {item.prosthetic_type || item.order_category || "Prosthetic Fabrication"}
+                          </span>
+                          {item.material && (
+                            <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-purple-200 font-bold text-purple-700">
+                              {item.material}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-purple-800 space-x-2">
+                          {item.shade && <span>Shade: <strong>{item.shade}</strong></span>}
+                          {(item.tooth_quadrant || item.tooth_number) && <span>Tooth: <strong>{item.tooth_quadrant || item.tooth_number}</strong></span>}
+                        </div>
+                      </div>
                     ) : (
-                      (selectedReceipt.medications || []).map((med, idx) => (
-                        <tr key={idx}>
-                          <td className="p-3 border-r border-gray-300 font-semibold text-gray-600">{idx + 1}</td>
-                          <td className="p-3 border-r border-gray-300 font-bold text-gray-900">{med.medicine || med.name}</td>
-                          <td className="p-3 border-r border-gray-300 text-gray-700">
-                            {med.schedule || "1-0-1"} ({med.timing || "As directed"}) • {med.duration || "3 days"} ({med.total_pills || 1} pills)
-                          </td>
-                          <td className="p-3 text-right font-extrabold text-gray-900">₹{(med.line_total || 0).toFixed(2)}</td>
-                        </tr>
-                      ))
+                      item.medications && item.medications.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {item.medications.map((med, idx) => (
+                            <div
+                              key={idx}
+                              className="text-xs font-medium text-gray-800 bg-white p-2.5 rounded-xl border border-gray-200 flex items-center justify-between"
+                            >
+                              <div>
+                                <span className="font-bold text-gray-900">{med.medicine || med.name}</span>
+                                <div className="text-[11px] text-gray-500 mt-0.5">
+                                  {med.schedule && <span>{med.schedule}</span>}
+                                  {med.timing && <span> • {med.timing}</span>}
+                                  {med.duration && <span> • {med.duration}</span>}
+                                </div>
+                              </div>
+                              <span className="font-bold text-emerald-700 text-xs">
+                                ₹{(med.line_total || med.unit_price || 0).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic text-xs">No medications prescribed</span>
+                      )
                     )}
-                  </tbody>
-                </table>
-              </div>
 
-              {/* Financial Calculation Breakdown */}
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-2 text-xs">
-                <div className="flex justify-between text-gray-600 font-semibold">
-                  <span>Total Estimated Order Cost:</span>
-                  <span className="font-bold text-gray-900">₹{(selectedReceipt.total_amount || selectedReceipt.patient_total_amount || 0).toFixed(2)}</span>
-                </div>
+                    {/* Actions Row */}
+                    <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-200/60">
+                      {!isLab && (
+                        item.status !== "Dispensed" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleMarkDispensed(item.id)}
+                            disabled={updatingId === item.id}
+                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all border-none cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                          >
+                            <Pill className="w-3.5 h-3.5" />
+                            {updatingId === item.id ? "Dispensing..." : "Dispense Medicine"}
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-black">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" /> Dispensed
+                          </span>
+                        )
+                      )}
 
-                <div className="flex justify-between text-gray-600 font-semibold">
-                  <span>Payment Condition Applied:</span>
-                  <span className="font-bold text-blue-700">
-                    {(selectedReceipt.total_amount || selectedReceipt.patient_total_amount || 0) < 1000 ? "100% Upfront Required (< ₹1,000)" : "50% Advance Deposit Required (≥ ₹1,000)"}
-                  </span>
-                </div>
+                      {isSent ? (
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Sent to Accountant
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSendToAccountant(item)}
+                          disabled={updatingId === (item.id || item.unique_key)}
+                          className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all border-none cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          <Receipt className="w-3.5 h-3.5" /> Send to Accountant
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-                <div className="flex justify-between text-gray-900 font-black text-sm pt-2 border-t border-gray-300">
-                  <span>Amount Received Upfront ({selectedReceipt.payment_method || "Cash"}):</span>
-                  <span className="text-emerald-700">₹{(selectedReceipt.amount_paid || selectedReceipt.patient_amount_paid || 0).toFixed(2)}</span>
-                </div>
-
-                <div className="flex justify-between text-gray-700 font-bold text-xs pt-1">
-                  <span>Remaining Balance Due on Delivery:</span>
-                  <span className={(selectedReceipt.balance_due || selectedReceipt.patient_balance_due || 0) > 0 ? "text-amber-700" : "text-gray-900"}>
-                    ₹{(selectedReceipt.balance_due || selectedReceipt.patient_balance_due || 0).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Signatures */}
-              <div className="pt-8 grid grid-cols-2 gap-12 text-center text-xs">
-                <div>
-                  <div className="border-t border-gray-400 pt-2 font-bold text-gray-700">Receptionist / Pharmacist Signature</div>
-                </div>
-                <div>
-                  <div className="border-t border-gray-400 pt-2 font-bold text-gray-700">Clinic Stamp</div>
-                </div>
-              </div>
+            {/* Modal Footer */}
+            <div className="pt-4 border-t border-gray-100 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedEncounter(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition cursor-pointer border-none"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSendAllEncounterToAccountant(selectedEncounter)}
+                disabled={updatingId === "all"}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer border-none disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" /> Send All Visit Charges to Accountant
+              </button>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-function maxZero(num) {
-  return num > 0 ? num : 0;
 }

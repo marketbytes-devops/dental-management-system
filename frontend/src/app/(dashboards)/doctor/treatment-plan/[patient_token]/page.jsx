@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { 
   ArrowLeft, 
   Plus, 
@@ -213,24 +213,42 @@ const formatDate = (dateStr) => {
 
 export default function DoctorTreatmentPlanPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const patientToken = params.patient_token;
   const { enrichPatientTimeline, viewingPatient, handleToggleToothState, currentDoctorName } = useDoctor() || {};
 
   const [doctorSpecialty, setDoctorSpecialty] = useState("General Dentistry");
+  const [selectedCatalogSpecialty, setSelectedCatalogSpecialty] = useState("Orthodontics");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    let initialSpec = "General Dentistry";
+    if (searchParams) {
+      const q = searchParams.get("specialty") || searchParams.get("workspace");
+      if (q) {
+        if (q.toLowerCase().includes("ortho")) initialSpec = "Orthodontics";
+        else if (q.toLowerCase().includes("prostho")) initialSpec = "Prosthodontics";
+        else if (q.toLowerCase().includes("surgery")) initialSpec = "Oral Surgery";
+        else if (q.toLowerCase().includes("endo")) initialSpec = "Endodontics";
+        else if (q.toLowerCase().includes("perio")) initialSpec = "Periodontics";
+        else initialSpec = q;
+      }
+    }
+
+    if (initialSpec === "General Dentistry" && typeof window !== "undefined") {
       const savedUser = localStorage.getItem("staff_user");
       if (savedUser) {
         try {
           const user = JSON.parse(savedUser);
-          const spec = user.specialties && user.specialties.length > 0 ? user.specialties[0] : "General Dentistry";
-          setDoctorSpecialty(spec);
+          if (user.specialties && user.specialties.length > 0) {
+            initialSpec = user.specialties[0];
+          }
         } catch (e) {}
       }
     }
-  }, []);
+    setDoctorSpecialty(initialSpec);
+    setSelectedCatalogSpecialty(initialSpec);
+  }, [searchParams]);
 
   const specConfig = SPECIALTY_CONFIGS[doctorSpecialty] || SPECIALTY_CONFIGS["General Dentistry"];
   const PRESET_DIAGNOSES = specConfig.diagnoses;
@@ -881,21 +899,23 @@ export default function DoctorTreatmentPlanPage() {
                 onClick={async () => {
                   if(!confirm("Send the active procedures in this plan to the Accountant for billing?")) return;
                   try {
-                    const completedSteps = steps.filter(s => s.status === "Completed" || s.status === "Planned");
-                    if(completedSteps.length === 0) return alert("No active steps to bill.");
-                    const total = completedSteps.reduce((sum, step) => sum + (step.cost || 0), 0);
+                    const stepsToBill = (steps && steps.length > 0) ? steps : (activePlan?.steps || []);
+                    if(stepsToBill.length === 0) return alert("No treatment plan steps found to bill.");
+                    const total = stepsToBill.reduce((sum, step) => sum + (Number(step.cost) || 0), 0) || (activePlan?.total_cost || 1200);
                     
                     await createBillingRequest({
-                      patient_token: patientToken,
+                      patient_token: decodeURIComponent(patientToken),
                       doctor_name: typeof window !== "undefined" ? (JSON.parse(localStorage.getItem("staff_user"))?.name || "Doctor") : "Doctor",
                       total_amount: total,
-                      procedures: completedSteps.map(s => ({
-                        title: s.title,
-                        cost: s.cost
+                      source_type: "treatment_plan",
+                      procedures: stepsToBill.map(s => ({
+                        name: s.title || "Treatment Plan Procedure",
+                        title: s.title || "Treatment Plan Procedure",
+                        cost: Number(s.cost) || 0
                       })),
-                      notes: "Sent from Clinical Workspace"
+                      notes: null
                     });
-                    alert("Successfully sent to Accountant!");
+                    alert("Successfully sent treatment plan bill to Accountant!");
                   } catch(e) {
                     alert("Failed to send billing request.");
                   }
@@ -1921,6 +1941,24 @@ export default function DoctorTreatmentPlanPage() {
               <span className="text-xs font-bold text-gray-800 uppercase tracking-wider block">Add Step / Procedure</span>
               
               <div className="flex flex-wrap gap-3 items-center">
+                {/* Specialty Category Selector */}
+                <select
+                  value={selectedCatalogSpecialty}
+                  onChange={(e) => {
+                    setSelectedCatalogSpecialty(e.target.value);
+                    setSelectedParentProcName("");
+                    setSelectedSubProcId("");
+                  }}
+                  className="px-3 py-1.5 bg-white border border-primary text-primary font-bold rounded-lg text-xs focus:outline-none"
+                >
+                  <option value="All">All Specialties</option>
+                  <option value="Orthodontics">Orthodontics</option>
+                  <option value="General Dentistry">General Dentistry</option>
+                  <option value="Prosthodontics">Prosthodontics</option>
+                  <option value="Oral Surgery">Oral Surgery</option>
+                </select>
+
+                {/* Procedure Dropdown */}
                 <select
                   value={selectedParentProcName}
                   onChange={(e) => {
@@ -1951,7 +1989,10 @@ export default function DoctorTreatmentPlanPage() {
                   {catalogProcedures
                     .filter(p => {
                       if (p.parent_id) return false;
-                      return p.specialty === doctorSpecialty;
+                      if (selectedCatalogSpecialty && selectedCatalogSpecialty !== "All") {
+                        return p.specialty === selectedCatalogSpecialty;
+                      }
+                      return true;
                     })
                     .map(p => (
                       <option key={p.id} value={p.name}>{p.name}</option>

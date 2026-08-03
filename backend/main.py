@@ -235,23 +235,8 @@ try:
 except Exception as e:
     print(f"Error running database migrations: {e}")
 
-# Seed default admin user if not exists
 db = SessionLocal()
 try:
-    admin_exists = db.query(UserModel).filter(UserModel.username == "admin").first()
-    if not admin_exists:
-        admin_user = UserModel(
-            name="Admin User",
-            email="admin@smilecare.com",
-            username="admin",
-            password_hash=hash_password("admin123"),
-            roles=["Admin"],
-            specialties=[],
-            status="Active"
-        )
-        db.add(admin_user)
-        db.commit()
-    
     # Seed default lab vendors if table is empty
     vendor_count = db.query(LabVendorModel).count()
     if vendor_count == 0:

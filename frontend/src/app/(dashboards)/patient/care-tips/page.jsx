@@ -35,7 +35,7 @@ export default function CareTipsPage() {
         const profile = await getPatientProfile();
         if (profile?.token) {
           const plans = await getPatientTreatmentPlan(profile.token);
-          const active = plans.find(p => p.status === "Active");
+          const active = plans.find(p => p.status === "Active") || plans.find(p => p.status === "Draft") || (plans.length > 0 ? plans[0] : null);
           setActivePlan(active || null);
         }
       } catch (err) {

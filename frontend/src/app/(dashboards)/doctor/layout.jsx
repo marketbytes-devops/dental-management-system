@@ -160,10 +160,22 @@ export default function DoctorLayout({ children }) {
 
   const [readNotifIds, setReadNotifIds] = useState({});
 
+  const getNotifStorageKey = () => {
+    if (typeof window === "undefined") return "doctor_read_notif_ids";
+    try {
+      const savedUser = localStorage.getItem("staff_user");
+      const userId = savedUser ? JSON.parse(savedUser).id : null;
+      return userId ? `read_notif_ids_${userId}` : "doctor_read_notif_ids";
+    } catch (e) {
+      return "doctor_read_notif_ids";
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const saved = localStorage.getItem("doctor_read_notif_ids");
+        const key = getNotifStorageKey();
+        const saved = localStorage.getItem(key);
         if (saved) setReadNotifIds(JSON.parse(saved));
       } catch (e) {
         console.warn("Failed to parse doctor read notification cache:", e);
@@ -175,7 +187,7 @@ export default function DoctorLayout({ children }) {
     setReadNotifIds((prev) => {
       const updated = { ...prev, [id]: true };
       try {
-        localStorage.setItem("doctor_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -194,7 +206,7 @@ export default function DoctorLayout({ children }) {
       const updated = { ...prev };
       delete updated[idOrItemId];
       try {
-        localStorage.setItem("doctor_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -208,7 +220,7 @@ export default function DoctorLayout({ children }) {
         updated[n.id] = true;
       });
       try {
-        localStorage.setItem("doctor_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -704,6 +716,7 @@ export default function DoctorLayout({ children }) {
           }
 
           updated[q.token] = {
+            ...prev[q.token],
             token: q.token,
             name: q.patient_name,
             age: q.age,
@@ -717,7 +730,10 @@ export default function DoctorLayout({ children }) {
             teethChart: prev[q.token]?.teethChart || {},
             timeline: prev[q.token]?.timeline || [
               { date: new Date(q.checked_in_at).toLocaleDateString(), note: "Checked in", type: "Check-In" }
-            ]
+            ],
+            lastVisitedDate: prev[q.token]?.lastVisitedDate,
+            planStepsProgress: prev[q.token]?.planStepsProgress,
+            hasActivePlan: prev[q.token]?.hasActivePlan
           };
         });
         return updated;
@@ -752,6 +768,7 @@ export default function DoctorLayout({ children }) {
             }
 
             updated[p.token] = {
+              ...prev[p.token],
               token: p.token,
               name: p.name,
               age: p.date_of_birth ? new Date().getFullYear() - new Date(p.date_of_birth).getFullYear() : 28,
@@ -763,7 +780,10 @@ export default function DoctorLayout({ children }) {
               teethChart: prev[p.token]?.teethChart || {},
               timeline: prev[p.token]?.timeline || [
                 { date: new Date().toLocaleDateString(), note: "Patient registered in system", type: "Check-In" }
-              ]
+              ],
+              lastVisitedDate: prev[p.token]?.lastVisitedDate,
+              planStepsProgress: prev[p.token]?.planStepsProgress,
+              hasActivePlan: prev[p.token]?.hasActivePlan
             };
           });
           return updated;

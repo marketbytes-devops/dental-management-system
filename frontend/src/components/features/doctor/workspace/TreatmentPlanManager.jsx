@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { getPatientTreatmentPlan } from "@/services/api";
 
-export default function TreatmentPlanManager({ patientToken }) {
+export default function TreatmentPlanManager({ patientToken, specialty }) {
   const router = useRouter();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +44,7 @@ export default function TreatmentPlanManager({ patientToken }) {
     );
   }
 
-  const activePlan = plans.find(p => p.status === "Active");
+  const activePlan = plans.find(p => p.status === "Active") || plans.find(p => p.status === "Draft") || (plans.length > 0 ? plans[0] : null);
 
   // Helper to compute progress bar
   const getProgressBar = (steps) => {
@@ -67,8 +67,12 @@ export default function TreatmentPlanManager({ patientToken }) {
           </h4>
         </div>
         {activePlan ? (
-          <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
-            Active
+          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+            activePlan.status === "Active"
+              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+              : "bg-amber-50 text-amber-700 border-amber-100"
+          }`}>
+            {activePlan.status || "Draft"}
           </span>
         ) : (
           <span className="bg-gray-100 text-gray-500 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
@@ -141,7 +145,10 @@ export default function TreatmentPlanManager({ patientToken }) {
 
       {/* Action Button */}
       <button
-        onClick={() => router.push(`/doctor/treatment-plan/${encodeURIComponent(patientToken)}`)}
+        onClick={() => {
+          const specQuery = specialty ? `?specialty=${encodeURIComponent(specialty)}` : "";
+          router.push(`/doctor/treatment-plan/${encodeURIComponent(patientToken)}${specQuery}`);
+        }}
         className="w-full py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-xl text-xs font-black text-gray-700 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
       >
         <ExternalLink className="w-3.5 h-3.5 text-gray-400" />

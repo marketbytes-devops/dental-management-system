@@ -152,6 +152,10 @@ export default function UsersPage() {
   };
 
   const filteredUsers = users.filter(user => {
+    // Exclude system admin / owner account from staff roster
+    const isAdminAccount = user.username === "admin" || (user.roles && user.roles.some(r => r.toLowerCase() === "admin"));
+    if (isAdminAccount) return false;
+
     const matchesSearch = user.name.toLowerCase().includes(search.toLowerCase()) || 
                           user.email.toLowerCase().includes(search.toLowerCase()) ||
                           (user.specialties && user.specialties.some(s => s.toLowerCase().includes(search.toLowerCase())));

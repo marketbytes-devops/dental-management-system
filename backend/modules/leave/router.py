@@ -247,8 +247,14 @@ def cancel_leave_request(
     if not req:
         raise HTTPException(status_code=404, detail="Leave request not found.")
 
-    if not is_admin and req.user_id != user_id:
-        raise HTTPException(status_code=403, detail="Permission denied to cancel this request.")
+    if not is_admin:
+        if req.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Permission denied to cancel this request.")
+        if req.status in ["Approved", "Rejected"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete a leave request once it has been approved or rejected by Admin."
+            )
 
     db.delete(req)
     db.commit()

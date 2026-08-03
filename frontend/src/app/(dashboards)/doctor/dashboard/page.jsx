@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useDoctor } from "@/app/(dashboards)/doctor/layout";
 import DashboardHeader from "@/components/features/doctor/dashboard/DashboardHeader";
 import KpiCards from "@/components/features/doctor/dashboard/KpiCards";
-import { getDoctorDashboardAppointments } from "@/services/api";
+import { getDoctorDashboardAppointments, getProfile } from "@/services/api";
 import { 
   ArrowRight, 
   Calendar, 
@@ -65,25 +65,40 @@ export default function DoctorDashboardPage() {
   const [selectedSpecialty, setSelectedSpecialty] = useState("general");
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedUser = localStorage.getItem("staff_user");
-      if (savedUser) {
-        try {
-          const user = JSON.parse(savedUser);
-          const isIncomplete = !user.dob || !user.phone || !user.address || !user.licence_id || !user.chair_setup || !user.board;
-          setIsProfileIncomplete(isIncomplete);
+    const fetchFreshProfile = async () => {
+      try {
+        const user = await getProfile();
+        if (typeof window !== "undefined") {
+          localStorage.setItem("staff_user", JSON.stringify(user));
+        }
+        const isIncomplete = !user.dob || !user.phone || !user.address || !user.licence_id || !user.chair_setup || !user.board;
+        setIsProfileIncomplete(isIncomplete);
 
-          const specs = user.specialties || ["General Dentistry"];
-          const mappedSpecs = specs.map(s => SPECIALTY_MAP[s] || "general");
-          setDoctorSpecialties(mappedSpecs);
-          if (mappedSpecs.length > 0) {
-            setSelectedSpecialty(mappedSpecs[0]);
+        const specs = user.specialties || ["General Dentistry"];
+        const mappedSpecs = specs.map(s => SPECIALTY_MAP[s] || "general");
+        setDoctorSpecialties(mappedSpecs);
+        if (mappedSpecs.length > 0) {
+          setSelectedSpecialty(mappedSpecs[0]);
+        }
+      } catch (e) {
+        console.warn("Falling back to local storage profile:", e);
+        if (typeof window !== "undefined") {
+          const savedUser = localStorage.getItem("staff_user");
+          if (savedUser) {
+            try {
+              const user = JSON.parse(savedUser);
+              const isIncomplete = !user.dob || !user.phone || !user.address || !user.licence_id || !user.chair_setup || !user.board;
+              setIsProfileIncomplete(isIncomplete);
+              const specs = user.specialties || ["General Dentistry"];
+              const mappedSpecs = specs.map(s => SPECIALTY_MAP[s] || "general");
+              setDoctorSpecialties(mappedSpecs);
+              if (mappedSpecs.length > 0) setSelectedSpecialty(mappedSpecs[0]);
+            } catch (err) {}
           }
-        } catch (e) {
-          console.error(e);
         }
       }
-    }
+    };
+    fetchFreshProfile();
   }, []);
 
   useEffect(() => {

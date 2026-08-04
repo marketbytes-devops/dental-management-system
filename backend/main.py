@@ -96,6 +96,10 @@ try:
             add_col_if_missing("original_case_id", "VARCHAR")
             add_col_if_missing("tech_notes", "VARCHAR")
             add_col_if_missing("email_sent_at", "VARCHAR")
+            add_col_if_missing("claimed_by", "VARCHAR")
+            add_col_if_missing("claimed_at", "TIMESTAMP")
+            add_col_if_missing("patient_notified_at", "VARCHAR")
+            add_col_if_missing("patient_notified_note", "VARCHAR")
 
             # Also check patient_consents table
             if engine.dialect.name == "sqlite":

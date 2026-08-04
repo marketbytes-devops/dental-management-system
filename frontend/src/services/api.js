@@ -188,7 +188,7 @@ export const getAllConsentsForStaff = async (params = {}) => {
   if (params.status_filter) query.append("status_filter", params.status_filter);
   if (params.doctor_name) query.append("doctor_name", params.doctor_name);
   if (params.patient_token) query.append("patient_token", params.patient_token);
-  
+
   const queryString = query.toString();
   const url = queryString ? `/patient/consents/all-staff?${queryString}` : "/patient/consents/all-staff";
   const response = await client.get(url);
@@ -772,7 +772,7 @@ export const notifyPatientForLabOrder = async (orderId, note) => {
 
 export const getMyComplaints = async () => {
   try {
-    const response = await client.get("/support/complaints");
+    const response = await client.get("/complaints/mine");
     return response.data;
   } catch (err) {
     return [];
@@ -780,18 +780,18 @@ export const getMyComplaints = async () => {
 };
 
 export const submitComplaint = async (data) => {
-  const response = await client.post("/support/complaints", data);
+  const response = await client.post("/complaints", data);
   return response.data;
 };
 
-export const reopenComplaint = async (id, note) => {
-  const response = await client.put(`/support/complaints/${id}/reopen`, { note });
+export const reopenComplaint = async (id, reason) => {
+  const response = await client.post(`/complaints/${id}/reopen`, { reason });
   return response.data;
 };
 
 export const getComplaintLogs = async (id) => {
   try {
-    const response = await client.get(`/support/complaints/${id}/logs`);
+    const response = await client.get(`/complaints/${id}/logs`);
     return response.data;
   } catch (err) {
     return [];
@@ -808,7 +808,6 @@ export const updateConsultationFees = async (tariffData) => {
   return response.data;
 };
 
-<<<<<<< HEAD
 export const getAnalyticsSummary = async () => {
   const response = await client.get("/billing/analytics/summary");
   return response.data;
@@ -816,7 +815,9 @@ export const getAnalyticsSummary = async () => {
 
 export const getAnalyticsReports = async () => {
   const response = await client.get("/billing/analytics/reports");
-=======
+  return response.data;
+};
+
 // ==========================================
 // 13. Admin Lab Pricing Catalog API Endpoints
 // ==========================================
@@ -838,8 +839,5 @@ export const updateLabPricingItem = async (id, payload) => {
 
 export const deleteLabPricingItem = async (id) => {
   const response = await client.delete(`/lab/pricing-catalog/${id}`);
->>>>>>> 676f96cf3c75019bec9a9e488d5f2c6e2e0de7f5
   return response.data;
 };
-
-

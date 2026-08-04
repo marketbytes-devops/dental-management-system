@@ -50,6 +50,10 @@ class LabOrderModel(Base):
     stage = Column(String, default="New Cases")
     tech_notes = Column(String, nullable=True)
     email_sent_at = Column(String, nullable=True)
+    claimed_by = Column(String, nullable=True)
+    claimed_at = Column(DateTime(timezone=True), nullable=True)
+    patient_notified_at = Column(String, nullable=True)
+    patient_notified_note = Column(String, nullable=True)
 
     prosthetic_detail = relationship("ProstheticCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")
     pathology_detail = relationship("PathologyCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")

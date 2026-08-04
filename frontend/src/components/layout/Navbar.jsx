@@ -39,7 +39,7 @@ export default function Navbar() {
           const leaves = await getMyLeaveRequests();
           const roleLeaveHref =
             role === "accountant" ? "/frontdesk/accountant/leave" :
-            role === "lab tech" ? "/labtechnicians/leave" : "/leave";
+              role === "lab tech" ? "/labtechnicians/leave" : "/leave";
 
           const notifs = [];
           (leaves || []).forEach(l => {
@@ -246,7 +246,7 @@ export default function Navbar() {
       <div className="flex items-center gap-6">
         <div>
           <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-            {greeting}, {userGreetingName} <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+            {greeting}, {userGreetingName}
           </p>
           <p className="text-xs text-gray-500">{userSubtitle}</p>
         </div>
@@ -311,8 +311,8 @@ export default function Navbar() {
                           setShowNotifications(false);
                         }}
                         className={`block p-2.5 rounded-xl border border-transparent transition-all text-xs relative ${notif.status === "unread"
-                            ? "bg-gray-50/80 hover:bg-gray-50 border-gray-100 font-semibold"
-                            : "hover:bg-gray-50"
+                          ? "bg-gray-50/80 hover:bg-gray-50 border-gray-100 font-semibold"
+                          : "hover:bg-gray-50"
                           }`}
                       >
                         <div className="flex justify-between items-start">
@@ -402,11 +402,10 @@ export default function Navbar() {
                         }
                         setShowNotifications(false);
                       }}
-                      className={`block p-2.5 rounded-xl border transition-all text-xs relative ${
-                        !notif.read
-                          ? "bg-blue-50/60 hover:bg-blue-50 border-blue-100 font-semibold"
-                          : "bg-white hover:bg-gray-50 border-gray-100"
-                      }`}
+                      className={`block p-2.5 rounded-xl border transition-all text-xs relative ${!notif.read
+                        ? "bg-blue-50/60 hover:bg-blue-50 border-blue-100 font-semibold"
+                        : "bg-white hover:bg-gray-50 border-gray-100"
+                        }`}
                     >
                       <div className="flex justify-between items-start">
                         <p className="font-bold text-gray-900 flex items-center gap-1.5 capitalize">
@@ -480,11 +479,10 @@ export default function Navbar() {
                         }
                         setShowNotifications(false);
                       }}
-                      className={`block p-2.5 rounded-xl border transition-all text-xs relative ${
-                        !notif.read
-                          ? "bg-amber-50/60 hover:bg-amber-50 border-amber-200 font-semibold"
-                          : "bg-white hover:bg-gray-50 border-gray-100"
-                      }`}
+                      className={`block p-2.5 rounded-xl border transition-all text-xs relative ${!notif.read
+                        ? "bg-amber-50/60 hover:bg-amber-50 border-amber-200 font-semibold"
+                        : "bg-white hover:bg-gray-50 border-gray-100"
+                        }`}
                     >
                       <div className="flex justify-between items-start">
                         <p className="font-bold text-gray-900 flex items-center gap-1.5 capitalize">
@@ -542,11 +540,10 @@ export default function Navbar() {
                         setReadStaffLeaveIds(prev => ({ ...prev, [notif.id]: true }));
                         setShowNotifications(false);
                       }}
-                      className={`block p-2.5 rounded-xl border transition-all text-xs relative ${
-                        !readStaffLeaveIds[notif.id]
-                          ? "bg-blue-50/60 hover:bg-blue-50 border-blue-100 font-semibold"
-                          : "bg-white hover:bg-gray-50 border-gray-100"
-                      }`}
+                      className={`block p-2.5 rounded-xl border transition-all text-xs relative ${!readStaffLeaveIds[notif.id]
+                        ? "bg-blue-50/60 hover:bg-blue-50 border-blue-100 font-semibold"
+                        : "bg-white hover:bg-gray-50 border-gray-100"
+                        }`}
                     >
                       <div className="flex justify-between items-start">
                         <p className="font-bold text-gray-900 flex items-center gap-1.5 capitalize">
@@ -583,7 +580,7 @@ export default function Navbar() {
               className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-xs font-bold text-gray-700 cursor-pointer outline-none"
             >
               <span className={`w-2.5 h-2.5 rounded-full ${currentStatus === "Active" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
-                  currentStatus === "On Break" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-gray-400"
+                currentStatus === "On Break" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-gray-400"
                 }`} />
               {currentStatus === "Active" ? "On Duty" :
                 currentStatus === "On Break" ? "On Break" : "Off Duty"}

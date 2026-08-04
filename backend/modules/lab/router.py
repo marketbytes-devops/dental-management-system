@@ -364,8 +364,8 @@ def get_receptionist_lab_orders(db: Session = Depends(get_db)):
             "tech_notes": order.tech_notes or "",
             "created_at": order.created_at.isoformat() if order.created_at else None,
             "expected_return_date": order.expected_return_date or "",
-            "claimed_by": order.claimed_by,
-            "claimed_at": order.claimed_at.isoformat() if order.claimed_at else None,
+            "claimed_by": getattr(order, "claimed_by", None),
+            "claimed_at": getattr(order, "claimed_at", None).isoformat() if getattr(order, "claimed_at", None) else None,
             # Patient notification tracking
             "patient_notified_at": getattr(order, "patient_notified_at", None),
             "patient_notified_note": getattr(order, "patient_notified_note", None),

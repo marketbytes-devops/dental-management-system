@@ -6,8 +6,8 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Stethoscope } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
 import { ROLE_NAV_ITEMS } from "./navigationConfig";
-import { useDoctor } from "@/app/(dashboards)/doctor/layout";
-import { useReceptionist } from "@/app/(dashboards)/frontdesk/receptionist/layout";
+import { useDoctor } from "@/context/DoctorContext";
+import { useReceptionist } from "@/context/ReceptionistContext";
 import { useAdmin } from "@/app/(dashboards)/admin/layout";
 import { getImageUrl } from "@/utils/imageUtils";
 

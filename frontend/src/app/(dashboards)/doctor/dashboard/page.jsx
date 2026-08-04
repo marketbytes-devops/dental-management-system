@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useDoctor } from "@/app/(dashboards)/doctor/layout";
+import { useDoctor } from "@/context/DoctorContext";
 import DashboardHeader from "@/components/features/doctor/dashboard/DashboardHeader";
 import KpiCards from "@/components/features/doctor/dashboard/KpiCards";
 import { getDoctorDashboardAppointments, getProfile } from "@/services/api";

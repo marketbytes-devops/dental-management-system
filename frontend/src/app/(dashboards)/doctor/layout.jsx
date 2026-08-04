@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import DoctorSidebar from "@/components/layout/Sidebar";
 import DoctorNavbar from "@/components/layout/Navbar";
@@ -31,17 +31,8 @@ import {
   getPatientClinicalNotes,
   getMyLeaveRequests
 } from "@/services/api";
-
-// Create context
-const DoctorContext = createContext(null);
-
-export function useDoctor() {
-  const context = useContext(DoctorContext);
-  if (!context) {
-    throw new Error("useDoctor must be used within a DoctorProvider");
-  }
-  return context;
-}
+import { DoctorContext, useDoctor } from "@/context/DoctorContext";
+export { useDoctor };
 
 export default function DoctorLayout({ children }) {
   const router = useRouter();

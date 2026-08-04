@@ -1,26 +1,64 @@
 "use client";
 
-import { useState } from "react";
-import { RefreshCw, CheckCircle2 } from "lucide-react";
-
-const TIME_SLOTS = [
-  "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM",
-  "11:00 AM", "11:30 AM", "12:00 PM",
-  "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
-  "4:00 PM", "4:30 PM", "5:00 PM",
-];
+import { useState, useEffect } from "react";
+import { RefreshCw, CheckCircle2, Clock, Loader2, AlertCircle } from "lucide-react";
+import { getAvailableDoctors, getDoctorAvailableSlots } from "@/services/api";
 
 export default function RescheduleModal({ appointment, onClose, onReschedule }) {
   const today = new Date().toISOString().split("T")[0];
 
-  const [newDate, setNewDate] = useState(appointment?.date ?? "");
+  const [newDate, setNewDate] = useState(appointment?.date ?? today);
   const [newTime, setNewTime] = useState(appointment?.time ?? "");
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [doctorObj, setDoctorObj] = useState(null);
+
+  // Fetch doctor ID and available shift slots when newDate or appointment changes
+  useEffect(() => {
+    async function loadShiftSlots() {
+      if (!appointment?.doctor || !newDate) return;
+      setLoadingSlots(true);
+      try {
+        const allDoctors = await getAvailableDoctors();
+        const doc = allDoctors.find(
+          (d) => d.name?.toLowerCase() === appointment.doctor?.toLowerCase()
+        );
+        setDoctorObj(doc || null);
+
+        if (doc?.id) {
+          const slotRes = await getDoctorAvailableSlots(doc.id, newDate);
+          setTimeSlots(slotRes.available_slots || []);
+        } else {
+          setTimeSlots([]);
+        }
+      } catch (err) {
+        console.error("Failed to load shift slots for doctor:", err);
+        setTimeSlots([]);
+      } finally {
+        setLoadingSlots(false);
+      }
+    }
+    loadShiftSlots();
+  }, [appointment?.doctor, newDate]);
 
   if (!appointment) return null;
+
+  const isPastTime = (timeStr, selectedDate) => {
+    if (!selectedDate || selectedDate !== today) return false;
+    const now = new Date();
+    const [timePart, modifier] = timeStr.split(" ");
+    let [hours, minutes] = timePart.split(":").map(Number);
+    if (modifier === "PM" && hours !== 12) hours += 12;
+    if (modifier === "AM" && hours === 12) hours = 0;
+
+    const slotDate = new Date();
+    slotDate.setHours(hours, minutes, 0, 0);
+    return slotDate <= now;
+  };
 
   function validate() {
     const errs = {};
@@ -37,7 +75,7 @@ export default function RescheduleModal({ appointment, onClose, onReschedule }) 
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, 600));
     setSubmitting(false);
     setSuccess(true);
 
@@ -56,7 +94,7 @@ export default function RescheduleModal({ appointment, onClose, onReschedule }) 
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><RefreshCw className="w-5 h-5 text-primary" /> Reschedule Appointment</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Choose a new date & time for your visit</p>
+            <p className="text-xs text-gray-500 mt-0.5">Shift-based doctor slot availability</p>
           </div>
           <button
             onClick={onClose}
@@ -96,33 +134,58 @@ export default function RescheduleModal({ appointment, onClose, onReschedule }) 
                 type="date"
                 min={today}
                 value={newDate}
-                onChange={(e) => { setNewDate(e.target.value); setErrors((p) => ({ ...p, date: undefined })); }}
+                onChange={(e) => { setNewDate(e.target.value); setNewTime(""); setErrors((p) => ({ ...p, date: undefined })); }}
                 className={`w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 bg-gray-50 ${errors.date ? "border-danger/50 bg-danger/5" : "border-gray-200"
                   }`}
               />
               {errors.date && <p className="mt-1 text-xs text-danger">{errors.date}</p>}
             </div>
 
-            {/* New time */}
+            {/* Shift-based Time slots */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                New Time Slot <span className="text-danger">*</span>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center justify-between">
+                <span>Doctor Shift Time Slots for {newDate} <span className="text-danger">*</span></span>
+                {loadingSlots && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />}
               </label>
-              <div className="grid grid-cols-4 gap-2">
-                {TIME_SLOTS.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => { setNewTime(t); setErrors((p) => ({ ...p, time: undefined })); }}
-                    className={`text-[11px] font-semibold py-2 px-1 rounded-xl border transition-all ${newTime === t
-                        ? "bg-primary text-white border-primary shadow-sm shadow-primary/30"
-                        : "bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/30 hover:text-primary"
-                      }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
+
+              {loadingSlots ? (
+                <div className="flex items-center justify-center p-6 bg-gray-50 rounded-xl border border-gray-150 text-xs text-gray-500 gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  Fetching Dr. {appointment.doctor}'s shift schedule...
+                </div>
+              ) : timeSlots.length > 0 ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
+                  {timeSlots.map((slot) => {
+                    const isPast = isPastTime(slot.time, newDate);
+                    const isDisabled = slot.is_full || isPast;
+
+                    return (
+                      <button
+                        key={slot.time}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => { setNewTime(slot.time); setErrors((p) => ({ ...p, time: undefined })); }}
+                        className={`text-[11px] font-semibold py-2 px-1 rounded-xl border transition-all ${
+                          isDisabled
+                            ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                            : newTime === slot.time
+                              ? "bg-primary text-white border-primary shadow-sm shadow-primary/30 font-bold"
+                              : "bg-gray-50 text-gray-700 border-gray-200 hover:border-primary/40 hover:text-primary"
+                        }`}
+                      >
+                        {slot.time}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center text-amber-800 text-xs font-medium space-y-1">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mx-auto" />
+                  <p className="font-bold">No active shift slots available on this date.</p>
+                  <p className="text-[11px] text-amber-700">Dr. {appointment.doctor} may be off-duty or on leave. Please select a different date.</p>
+                </div>
+              )}
+
               {errors.time && <p className="mt-1 text-xs text-danger">{errors.time}</p>}
             </div>
 
@@ -168,3 +231,4 @@ export default function RescheduleModal({ appointment, onClose, onReschedule }) 
     </div>
   );
 }
+

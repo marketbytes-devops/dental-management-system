@@ -30,7 +30,7 @@ const INDIAN_STATES = [
 ];
 
 // Form sections for step indicator
-const STEPS = ["Personal Info", "Address", "Emergency & Medical"];
+const STEPS = ["Personal Info", "Address", "Emergency Contact"];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -51,10 +51,9 @@ export default function RegisterPage() {
     city: "",
     state: "",
     pincode: "",
-    // Step 2 — Emergency & Medical
+    // Step 2 — Emergency Contact
     emergency_contact_name: "",
     emergency_contact_phone: "",
-    known_allergies: "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -121,7 +120,7 @@ export default function RegisterPage() {
         pincode: formData.pincode.trim() || null,
         emergency_contact_name: formData.emergency_contact_name.trim() || null,
         emergency_contact_phone: formData.emergency_contact_phone.trim() || null,
-        known_allergies: formData.known_allergies.trim() || null,
+        known_allergies: null,
       };
 
       const data = await registerPatient(payload);
@@ -214,7 +213,7 @@ export default function RegisterPage() {
             <p className="text-slate-400 text-xs mt-1 font-medium">
               {step === 0 && "Enter your basic personal details to get started"}
               {step === 1 && "Add your address so we can keep your records complete"}
-              {step === 2 && "Optional but important for your safety during treatment"}
+              {step === 2 && "Add an emergency contact for your safety (optional)"}
             </p>
           </div>
 
@@ -399,7 +398,7 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* ── STEP 2: Emergency & Medical ── */}
+          {/* ── STEP 2: Emergency Contact ── */}
           {step === 2 && (
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -429,21 +428,8 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className={labelCls}>
-                  <AlertCircle className="w-3 h-3 inline mr-1" />
-                  Known Allergies
-                </label>
-                <textarea
-                  value={formData.known_allergies}
-                  onChange={(e) => set("known_allergies", e.target.value)}
-                  placeholder="e.g. Penicillin, Latex, Aspirin — or write None"
-                  rows={3}
-                  className={`${inputCls} resize-none`}
-                />
-                <p className="text-[9px] text-slate-500">
-                  Mention any drug or material allergies important for dental treatment.
-                </p>
+              <div className="p-3 bg-slate-800/60 border border-slate-700/50 rounded-xl text-[10px] text-slate-400 font-medium">
+                💡 <strong className="text-slate-300">Note:</strong> Medical history and known allergies can be added anytime in your secure Patient Profile after registration.
               </div>
 
               {authError && (

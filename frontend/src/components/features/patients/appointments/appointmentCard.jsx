@@ -51,6 +51,16 @@ const STATUS_CONFIG = {
     dateBg: "bg-danger/5",
     dateText: "text-danger",
   },
+
+  Missed: {
+    label: "Missed",
+    description: "You missed this appointment. Please reschedule your visit.",
+    badge: "bg-amber-100 text-amber-800 border-amber-200",
+    dot: "bg-amber-500",
+    icon: AlertCircle,
+    dateBg: "bg-amber-50",
+    dateText: "text-amber-700",
+  },
 };
 
 export default function AppointmentCard({
@@ -78,6 +88,7 @@ export default function AppointmentCard({
 
   const isCompleted = status === "Completed";
   const isCancelled = status === "Cancelled";
+  const isMissed = status === "Missed";
 
   const dateObj = new Date(date);
 
@@ -264,7 +275,7 @@ export default function AppointmentCard({
       </div>
 
       {/* Actions */}
-      {isUpcoming && (
+      {(isUpcoming || isMissed) && (
         <div className="flex flex-col gap-2 flex-shrink-0">
           <button
             onClick={() =>
@@ -274,41 +285,42 @@ export default function AppointmentCard({
               px-3
               py-1.5
               text-xs
-              font-semibold
-              bg-primary/5
+              font-bold
+              bg-amber-500
+              text-white
               border
-              border-primary/20
-              text-primary
+              border-amber-600
               rounded-xl
-              hover:bg-primary
-              hover:text-white
-              hover:border-primary
+              hover:bg-amber-600
+              shadow-sm
               transition-colors
             "
           >
             Reschedule
           </button>
 
-          <button
-            onClick={() =>
-              onCancel?.(appointment)
-            }
-            className="
-              px-3
-              py-1.5
-              text-xs
-              font-semibold
-              border
-              border-danger/20
-              text-danger
-              rounded-xl
-              hover:bg-danger
-              hover:text-white
-              transition-colors
-            "
-          >
-            Cancel
-          </button>
+          {isUpcoming && (
+            <button
+              onClick={() =>
+                onCancel?.(appointment)
+              }
+              className="
+                px-3
+                py-1.5
+                text-xs
+                font-semibold
+                border
+                border-danger/20
+                text-danger
+                rounded-xl
+                hover:bg-danger
+                hover:text-white
+                transition-colors
+              "
+            >
+              Cancel
+            </button>
+          )}
         </div>
       )}
 

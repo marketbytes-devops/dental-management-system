@@ -121,9 +121,25 @@ export default function LeaveApplicationForm({
       return;
     }
 
-    // Calculate duration
-    const diffTime = Math.abs(end - start);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    // Calculate duration excluding Sundays (Sunday = 0 in JS getDay())
+    const [sY, sM, sD] = startDate.split('-').map(Number);
+    const [eY, eM, eD] = endDate.split('-').map(Number);
+    const startDt = new Date(sY, sM - 1, sD);
+    const endDt = new Date(eY, eM - 1, eD);
+
+    let diffDays = 0;
+    const curr = new Date(startDt);
+    while (curr <= endDt) {
+      if (curr.getDay() !== 0) {
+        diffDays++;
+      }
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    if (diffDays === 0) {
+      setErrorMsg("The selected date range contains only Sundays (which are non-working days).");
+      return;
+    }
 
     // Balance check
     const balance = balances[leaveType];

@@ -4,7 +4,7 @@ from database import get_db
 from dependencies import get_current_active_user, require_admin
 from modules.auth.models import UserModel
 from modules.leave.models import LeaveRequestModel
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 router = APIRouter(prefix="/leave", tags=["leave"])
 
@@ -71,7 +71,18 @@ def apply_leave(
                 detail="End date must be on or after start date."
             )
 
-        days = (end_dt - start_dt).days + 1
+        days = 0
+        curr_dt = start_dt
+        while curr_dt <= end_dt:
+            if curr_dt.weekday() != 6:  # 6 is Sunday
+                days += 1
+            curr_dt += timedelta(days=1)
+
+        if days == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="The selected date range contains only Sundays (which are non-working days)."
+            )
 
     except HTTPException:
         raise

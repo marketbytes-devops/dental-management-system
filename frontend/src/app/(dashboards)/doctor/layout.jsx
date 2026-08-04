@@ -694,25 +694,17 @@ export default function DoctorLayout({ children }) {
       setPatients(prev => {
         const updated = { ...prev };
         myQueue.forEach(q => {
-          let proc = q.procedure || q.treatment_type || q.treatmentType || "";
+          let proc = prev[q.token]?.procedure || q.procedure || q.treatment_type || q.treatmentType || "";
 
-          if ((!proc || proc === "Consultation" || proc === "Routine Checkup") && q.chief_complaint) {
+          if ((!proc || proc === "General Dentistry" || proc === "Routine Checkup") && q.chief_complaint) {
             if (q.chief_complaint.includes("[Specialty:")) {
               const match = q.chief_complaint.match(/\[Specialty:\s*([^\]]+)\]/i);
               if (match && match[1]) proc = match[1].trim();
             }
           }
 
-          if (!proc || proc === "Consultation") {
-            if ((q.patient_name && q.patient_name.toLowerCase().includes("anita")) || (q.token && q.token.includes("68852"))) {
-              proc = "Orthodontics";
-            } else if (q.patient_name && q.patient_name.toLowerCase().includes("tom")) {
-              proc = "Orthodontics";
-            } else if (q.patient_name && q.patient_name.toLowerCase().includes("sisily")) {
-              proc = "General Dentistry";
-            } else {
-              proc = "General Dentistry";
-            }
+          if (!proc) {
+            proc = "Consultation";
           }
 
           updated[q.token] = {
@@ -752,20 +744,7 @@ export default function DoctorLayout({ children }) {
           allPats.forEach(p => {
             if (!p.token) return;
             
-            let matchedProc = prev[p.token]?.procedure || "General Dentistry";
-            
-            const pLab = (labOrders || []).find(l => l.patient_token === p.token || l.patientToken === p.token);
-            if (pLab) {
-              matchedProc = pLab.prosthetic_type || pLab.order_category || "Orthodontics";
-            }
-
-            if ((p.name && p.name.toLowerCase().includes("anita")) || (p.token && p.token.includes("68852"))) {
-              matchedProc = "Orthodontics";
-            } else if (p.name && p.name.toLowerCase().includes("tom")) {
-              matchedProc = "Orthodontics";
-            } else if (p.name && p.name.toLowerCase().includes("sisily")) {
-              matchedProc = "Consultation";
-            }
+            const matchedProc = prev[p.token]?.procedure || "Consultation";
 
             updated[p.token] = {
               ...prev[p.token],
@@ -1296,14 +1275,14 @@ export default function DoctorLayout({ children }) {
         });
       }
 
-      // Add patient referrals and consultations to timeline
+      // Add patient referrals to timeline
       const patientRefs = referrals.filter(r => r.patientToken === token);
       patientRefs.forEach(ref => {
         if (ref.status === "Completed") {
           timelineEvents.push({
             date: ref.date,
             note: `Referral Consultation Completed by ${ref.targetDoctor || "Specialist"}: ${ref.myConsultationNotes}`,
-            type: "Consultation",
+            type: "Referral",
             doctor_name: ref.targetDoctor
           });
         } else {

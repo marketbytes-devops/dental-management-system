@@ -408,7 +408,9 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
   const patientOrders = labOrders?.filter(o => o.patient_token === effectiveViewingPatient.token) || [];
   
   const diagnosisNotes = effectiveViewingPatient.timeline?.filter(event => 
-    event.type === "Clinical Note" || event.type === "Consultation" || event.type === "Diagnosis" || event.type === "Treatment"
+    (event.type === "Clinical Note" || event.type === "Consultation" || event.type === "Diagnosis" || event.type === "Treatment") &&
+    event.type !== "Referral" &&
+    !event.note?.toLowerCase().startsWith("referral")
   ) || [];
 
   const patientRefs = referrals?.filter(r => r.patientToken === effectiveViewingPatient.token || r.patient_token === effectiveViewingPatient.token) || [];

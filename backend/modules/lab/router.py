@@ -156,7 +156,7 @@ def upload_lab_file(file: UploadFile = File(...)):
 def create_lab_order(
     order_data: LabOrderCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_optional_current_user)
 ):
     # 1. Fetch patient name if not provided
     patient_name = order_data.patient_name
@@ -171,7 +171,7 @@ def create_lab_order(
     dentist_name = order_data.dentist_name
     dentist_contact = order_data.dentist_contact
     
-    user_id = current_user.get("user_id")
+    user_id = current_user.get("user_id") if current_user else None
     if user_id:
         user = db.query(UserModel).filter(UserModel.id == user_id).first()
         if user:

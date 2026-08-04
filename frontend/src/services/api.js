@@ -331,6 +331,11 @@ export const callPatient = async (id, statusStr) => {
   return response.data;
 };
 
+export const markAppointmentMissed = async (id) => {
+  const response = await client.post(`/frontdesk/appointments/${id}/mark-missed`);
+  return response.data;
+};
+
 // ==========================================
 // 5. Leave & Roster API Endpoints
 // ==========================================
@@ -771,6 +776,16 @@ export const sendLabBillingRequest = async (payload) => {
   return response.data;
 };
 
+export const getExpenses = async () => {
+  const response = await client.get("/billing/expenses");
+  return response.data;
+};
+
+export const createExpense = async (expenseData) => {
+  const response = await client.post("/billing/expense", expenseData);
+  return response.data;
+};
+
 // ==========================================
 // 14. Receptionist Lab Order Pickups
 // ==========================================
@@ -840,3 +855,14 @@ export const reopenComplaint = async (complaintId, reason) => {
   const response = await client.post(`/complaints/${complaintId}/reopen`, { reason });
   return response.data;
 };
+export const getAnalyticsSummary = async () => {
+  const response = await client.get("/billing/analytics/summary");
+  return response.data;
+};
+
+export const getAnalyticsReports = async () => {
+  const response = await client.get("/billing/analytics/reports");
+  return response.data;
+};
+
+

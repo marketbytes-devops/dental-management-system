@@ -17,13 +17,15 @@ import {
   Clock,
   ExternalLink,
   Map,
-  FileDown
+  FileDown,
+  ShieldAlert
 } from "lucide-react";
+import Link from "next/link";
 import PrescriptionCard from "@/components/features/patients/records/prescriptionCard";
 import ActivePrescriptions from "@/components/features/patients/records/activePrescriptions";
 import ReferralCard from "@/components/features/patients/records/referralCard";
 import ConsentFormViewer from "@/components/features/patients/documents/consentFormViewer";
-import { getPatientTreatmentPlan, getPendingConsents, getPatientPrescriptions, getPatientReferrals, getMyClinicalNotes } from "@/services/api";
+import { getPatientTreatmentPlan, getPendingConsents, getPatientPrescriptions, getPatientReferrals, getMyClinicalNotes, getPatientProfile } from "@/services/api";
 
 const parseCustomDate = (dateStr) => {
   if (!dateStr) return new Date();
@@ -104,6 +106,9 @@ export default function PatientRecordsPage() {
   const [clinicalNotesLoading, setClinicalNotesLoading] = useState(false);
   const [expandedNotes, setExpandedNotes] = useState({});
 
+  // Patient Allergies State
+  const [patientAllergies, setPatientAllergies] = useState(null);
+
   const patientToken = typeof window !== "undefined" ? localStorage.getItem("patient_token") : null;
 
   const fetchPlans = async () => {
@@ -172,6 +177,22 @@ export default function PatientRecordsPage() {
       fetchReferrals();
     }
   }, [activeTab, patientToken]);
+
+  useEffect(() => {
+    const fetchAllergies = async () => {
+      try {
+        const data = await getPatientProfile();
+        if (data && data.known_allergies) {
+          setPatientAllergies(data.known_allergies);
+        } else {
+          setPatientAllergies("");
+        }
+      } catch (err) {
+        console.error("Error fetching allergies for records:", err);
+      }
+    };
+    fetchAllergies();
+  }, []);
 
   // Initiate signing workflow
   const triggerSignConsent = async (consentId) => {
@@ -726,6 +747,35 @@ export default function PatientRecordsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">My Medical Records</h1>
       </div>
+
+      {/* Allergies & Safety Banner */}
+      {patientAllergies !== null && (
+        <div className="bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-100 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-500/10 flex items-center justify-center shrink-0">
+              <ShieldAlert className="w-5 h-5 text-rose-600" />
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase text-rose-700 tracking-wider">Medical Safety &amp; Allergies</span>
+              {patientAllergies ? (
+                <p className="text-xs font-bold text-gray-800 mt-0.5">
+                  Known Allergies on File: <span className="text-rose-700 font-extrabold">{patientAllergies}</span>
+                </p>
+              ) : (
+                <p className="text-xs font-medium text-gray-600 mt-0.5">
+                  No drug or material allergies recorded in your medical profile.
+                </p>
+              )}
+            </div>
+          </div>
+          <Link
+            href="/patient/profile"
+            className="text-xs font-bold text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 px-4 py-2 rounded-xl transition-all shadow-sm shrink-0 text-center"
+          >
+            {patientAllergies ? "Update Allergies" : "Add Known Allergies"} &rarr;
+          </Link>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 overflow-x-auto no-scrollbar gap-6">

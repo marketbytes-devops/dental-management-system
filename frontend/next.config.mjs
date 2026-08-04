@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  async redirects() {
+    return [
+      {
+        source: "/expenses",
+        destination: "/frontdesk/accountant/expenses",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

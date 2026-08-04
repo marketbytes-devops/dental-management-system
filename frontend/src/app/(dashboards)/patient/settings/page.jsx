@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState, useContext, createContext } from "react";
-import axios from "axios";
+import client from "@/services/api";
 import { Loader2, Shield, Key, User, Moon, Sun, Monitor } from "lucide-react";
 
 // ---------- Settings Context ----------
@@ -20,15 +20,15 @@ const SettingsProvider = ({ children }) => {
     linkedAccounts: []
   });
 
-  // Fetch settings from backend (placeholder endpoint)
+  // Fetch settings from backend
   const loadSettings = async () => {
     try {
-      const response = await axios.get("/api/patient/settings", {
-        withCredentials: true
-      });
-      setSettings(prev => ({ ...prev, ...response.data }));
+      const response = await client.get("/patient/settings");
+      if (response && response.data) {
+        setSettings(prev => ({ ...prev, ...response.data }));
+      }
     } catch (e) {
-      console.error("Failed to load settings", e);
+      console.warn("Using fallback local settings", e);
     } finally {
       setLoading(false);
     }
@@ -40,13 +40,10 @@ const SettingsProvider = ({ children }) => {
 
   const updateSettings = async (updates) => {
     setSettings(prev => ({ ...prev, ...updates }));
-    // Send PATCH to backend (ignore response for now)
     try {
-      await axios.patch("/api/patient/settings", updates, {
-        withCredentials: true
-      });
+      await client.patch("/patient/settings", updates);
     } catch (e) {
-      console.error("Failed to update settings", e);
+      console.warn("Could not sync settings with backend", e);
     }
   };
 

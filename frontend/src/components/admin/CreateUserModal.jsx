@@ -134,7 +134,6 @@ export default function CreateUserModal({ isOpen, onClose, onCreateUser, editUse
   };
 
   const availableRoles = [
-    { value: "admin", label: "Admin" },
     { value: "doctor", label: "Doctor" },
     { value: "receptionist", label: "Receptionist" },
     { value: "accountant", label: "Accountant" },

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, JSON, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, JSON, Text, Float
 from sqlalchemy.sql import func
 from database import Base
 
@@ -127,6 +127,12 @@ class MedicineDispenseModel(Base):
     doctor_name = Column(String, nullable=False)
     medications = Column(JSON, nullable=False)  # list of medication objects
     status = Column(String, default="Pending")   # Pending, Dispensed
+    total_amount = Column(Float, default=0.0)
+    amount_paid = Column(Float, default=0.0)
+    balance_due = Column(Float, default=0.0)
+    payment_status = Column(String, default="Pending Payment") # Pending Payment, 50% Advance Paid, Paid in Full
+    payment_method = Column(String, nullable=True) # Cash, Card, UPI
+    date_received = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     dispensed_at = Column(DateTime(timezone=True), nullable=True)
 

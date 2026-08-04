@@ -52,6 +52,7 @@ class UserResponse(BaseModel):
     chair_setup: Optional[str] = None
     board: Optional[str] = None
     profile_picture: Optional[str] = None
+    duty_status: Optional[str] = None
     working_hours: Optional[dict] = None
     created_at: datetime
 

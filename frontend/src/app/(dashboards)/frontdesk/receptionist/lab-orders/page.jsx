@@ -479,11 +479,14 @@ export default function LabOrderPickupsPage() {
                   <AlertTriangle className="w-3.5 h-3.5" /> No phone number on file
                 </p>
               )}
-              <div className="pt-1 text-[11px] font-semibold text-gray-600 space-y-0.5">
+              <div className="flex justify-between items-center pt-1 border-t border-teal-100/60">
+                <span className="text-[10px] font-black text-teal-800 uppercase tracking-wider">Associated Orders ({notifyTarget.orders.length})</span>
+              </div>
+              <div className="pt-0.5 text-[11px] font-semibold text-gray-600 space-y-1 max-h-36 overflow-y-auto pr-1">
                 {notifyTarget.orders.map((o) => (
-                  <div key={o.id} className="flex justify-between text-[10px] bg-white px-2 py-1 rounded border border-teal-100">
-                    <span className="font-bold text-gray-800">{o.order_type} (#{o.id})</span>
-                    <span className="text-teal-700 font-black">{o.status}</span>
+                  <div key={o.id} className="flex justify-between text-[10px] bg-white px-2.5 py-1.5 rounded-lg border border-teal-100 shadow-2xs items-center">
+                    <span className="font-bold text-gray-800">{o.order_type || o.prosthetic_type || "Lab Order"} (#{o.id})</span>
+                    <span className="text-teal-700 font-black px-1.5 py-0.5 bg-teal-50 rounded">{o.status}</span>
                   </div>
                 ))}
               </div>

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from database import get_db
-from dependencies import get_current_user
+from dependencies import get_current_user, get_optional_current_user
 from modules.lab.models import (
     LabOrderModel, 
     LabNotificationModel, 
@@ -156,7 +156,7 @@ def upload_lab_file(file: UploadFile = File(...)):
 def create_lab_order(
     order_data: LabOrderCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_optional_current_user)
 ):
     # 1. Fetch patient name if not provided
     patient_name = order_data.patient_name
@@ -171,7 +171,7 @@ def create_lab_order(
     dentist_name = order_data.dentist_name
     dentist_contact = order_data.dentist_contact
     
-    user_id = current_user.get("user_id")
+    user_id = current_user.get("user_id") if current_user else None
     if user_id:
         user = db.query(UserModel).filter(UserModel.id == user_id).first()
         if user:
@@ -187,14 +187,21 @@ def create_lab_order(
     if not dentist_contact:
         dentist_contact = "+91 98765 43210"
 
-    # 3. Generate a case ID
-    random_suffix = f"{random.randint(1, 999):03d}"
-    case_id = f"CASE-2026-{random_suffix}"
-    
-    # Check uniqueness
-    while db.query(LabOrderModel).filter(LabOrderModel.id == case_id).first():
-        random_suffix = f"{random.randint(1, 999):03d}"
-        case_id = f"CASE-2026-{random_suffix}"
+    # 3. Generate Case ID atomically (SELECT ... FOR UPDATE lock)
+    last_order = db.query(LabOrderModel).with_for_update().order_by(LabOrderModel.created_at.desc()).first()
+    next_num = 631
+    if last_order and last_order.id and "CASE-2026-" in last_order.id:
+        try:
+            num = int(last_order.id.replace("CASE-2026-", ""))
+            next_num = max(631, num + 1)
+        except Exception:
+            pass
+
+    while True:
+        case_id = f"CASE-2026-{next_num:03d}"
+        if not db.query(LabOrderModel).filter(LabOrderModel.id == case_id).first():
+            break
+        next_num += 1
 
     initial_status = order_data.status or "Pending Review"
     if order_data.order_category in ["Diagnostic", "Blood Work", "Pathology", "Blood Work / Pathology"] and not order_data.status:
@@ -235,10 +242,40 @@ def create_lab_order(
         original_case_id=order_data.original_case_id,
         stage=order_data.stage or "New Cases",
         tech_notes=order_data.tech_notes,
-        email_sent_at=order_data.email_sent_at
+        email_sent_at=order_data.email_sent_at,
+        rework_history=[],
+        physical_mold_sent=(order_data.impression_type == "Physical" or bool(order_data.notes and "physical" in order_data.notes.lower())),
+        physical_opposing_mold_sent=bool(order_data.opposing_bite_scan or (order_data.notes and "opposing" in order_data.notes.lower()))
     )
 
     db.add(new_order)
+
+    # Automatically create pending Receptionist Billing Request so Receptionist can collect payment beforehand
+    try:
+        from modules.billing.models import BillingRequestModel
+        clinic_price = 3500.0
+        if order_data.order_category == "Prosthetic":
+            price_record = db.query(LabItemPriceModel).filter(LabItemPriceModel.item_name.ilike(f"%{order_data.prosthetic_type or 'Crown'}%")).first()
+            if price_record and price_record.patient_price:
+                clinic_price = price_record.patient_price
+
+        billing_req = BillingRequestModel(
+            patient_token=order_data.patient_token,
+            doctor_name=dentist_name,
+            total_amount=clinic_price,
+            status="Pending",
+            source_type="lab",
+            procedures=[{
+                "name": f"Lab Prescription ({order_data.prosthetic_type or order_data.order_category})",
+                "cost": clinic_price,
+                "tooth": order_data.tooth_number or order_data.tooth_quadrant or "Full Arch"
+            }],
+            notes=f"Prescription charges for Lab Case {case_id}"
+        )
+        db.add(billing_req)
+    except Exception as b_err:
+        print(f"[RECEPTIONIST BILLING INTEGRATION] Warning: {b_err}", flush=True)
+
     db.commit()
     db.refresh(new_order)
 
@@ -303,7 +340,7 @@ def create_lab_order(
 @router.get("/orders", response_model=List[LabOrderResponse])
 def get_lab_orders(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_optional_current_user)
 ):
     orders = (
         db.query(LabOrderModel)
@@ -617,8 +654,44 @@ SmileCare Lab Management System
     )
     db.add(audit)
 
-    # Generate notification
-    if new_status == "Pending Review":
+    # Generate notification (Doctor receives notifications ONLY for Flagged/Revision/Sent Back/Rejected)
+    if new_status in ["Flagged", "flagged", "Sent Back"]:
+        notif = LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title=f"Lab Case {order_id} Flagged by Lab Tech",
+            desc=f"Lab Technician flagged Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} (Token: {order.patient_token}). Reason/Missing: {status_data.rejection_reason or status_data.tech_notes or 'Missing required case parameters.'}",
+            read=False
+        )
+        db.add(notif)
+    elif new_status in ["Revision Requested", "Revision"]:
+        notif = LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title="Revision Requested for Lab Case",
+            desc=f"Tech has requested a revision on Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} (Token: {order.patient_token}). Tech Notes: {status_data.tech_notes or order.rejection_reason or 'Revision requested.'}",
+            read=False
+        )
+        db.add(notif)
+    elif new_status in ["Rejected", "rejected"]:
+        notif = LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title=f"Lab Case {order_id} Rejected by Lab Tech",
+            desc=f"Lab Technician rejected Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} (Token: {order.patient_token}). Reason: {status_data.rejection_reason or status_data.tech_notes or 'Order rejected.'}",
+            read=False
+        )
+        db.add(notif)
+    elif new_status in ["Confirmed", "Doctor Accepted"]:
+        notif = LabNotificationModel(
+            recipient_role="lab tech",
+            type="Orders",
+            title="Lab Order Confirmed by Doctor",
+            desc=f"Case {order_id} has been reviewed and confirmed by {user_name}.",
+            read=False
+        )
+        db.add(notif)
+    elif new_status == "Pending Review":
         notif = LabNotificationModel(
             recipient_role="lab tech",
             type="Orders",
@@ -626,54 +699,6 @@ SmileCare Lab Management System
             desc=f"Case {order_id} has been submitted for review by Dr. {user_name}.",
             read=False
         )
-        db.add(notif)
-    elif new_status == "Confirmed by Tech":
-        notif = LabNotificationModel(
-            recipient_role="doctor",
-            type="labs",
-            title="Lab Order Confirmed by Tech",
-            desc=f"Case {order_id} has been confirmed by lab technician. Ready for external send approval.",
-            read=False
-        )
-        db.add(notif)
-    elif new_status == "Revision Requested":
-        notif = LabNotificationModel(
-            recipient_role="doctor",
-            type="labs",
-            title="Revision Requested for Lab Case",
-            desc=f"Tech has requested a revision on Case {order_id}. Tech Notes: {status_data.tech_notes or order.rejection_reason}",
-            read=False
-        )
-        db.add(notif)
-    elif new_status == "Sent to Lab":
-        notif = LabNotificationModel(
-            recipient_role="doctor",
-            type="labs",
-            title="Lab Order Sent to External Lab",
-            desc=f"Case {order_id} approved. Pre-filled dispatch email successfully sent to the external lab.",
-            read=False
-        )
-        db.add(notif)
-    else:
-        if new_status in ["Confirmed", "Doctor Accepted"]:
-            notif = LabNotificationModel(
-                recipient_role="lab tech",
-                type="Orders",
-                title="Lab Order Confirmed by Doctor",
-                desc=f"Case {order_id} has been reviewed and confirmed by {user_name}.",
-                read=False
-            )
-        else:
-            desc = f"Case {order_id} for patient {order.patient_name or 'Walk-in Patient'} has been updated to '{new_status}' by Lab Technician."
-            if status_data.rejection_reason:
-                desc += f" Note/Reason: {status_data.rejection_reason}"
-            notif = LabNotificationModel(
-                recipient_role="doctor",
-                type="labs",
-                title=f"Lab Case {order_id} Updated",
-                desc=desc,
-                read=False
-            )
         db.add(notif)
     db.commit()
 
@@ -947,14 +972,7 @@ SmileCare Lab Management System
 
         send_smtp_email(vendor_email, f"New Lab Order Request: Case {order.id}", email_body, attachment_files)
         
-        db.add(LabNotificationModel(
-            recipient_role="doctor",
-            type="labs",
-            title="Lab Order Sent to External Lab",
-            desc=f"Case {order_id} approved. Pre-filled dispatch email successfully sent to the external lab.",
-            read=False
-        ))
-        db.commit()
+
 
     return serialize_order(order)
 
@@ -972,23 +990,34 @@ def create_lab_rework_order(
     if not original_order:
         raise HTTPException(status_code=404, detail="Original lab order not found")
 
-    # Reopen the case - set status back to Submitted
-    original_order.status = "Submitted"
+    user_name = current_user.get("name") or current_user.get("sub") or "User"
+    
+    # Append rework event object to rework_history array
+    history = list(original_order.rework_history or [])
+    rework_entry = {
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "rework_count": len(history) + 1,
+        "category": status_data.rejection_category or "Correction / Adjustment",
+        "reason": status_data.rejection_reason or "Return for correction",
+        "notes": status_data.tech_notes or status_data.rejection_reason or "Rework requested.",
+        "submitted_by": user_name,
+        "files": status_data.attachments or []
+    }
+    history.append(rework_entry)
+
+    original_order.rework_history = history
+    original_order.status = "Rework Requested"
+    original_order.stage = "In Rework"
     original_order.rejection_reason = status_data.rejection_reason
     original_order.rejection_category = status_data.rejection_category
     original_order.is_rework = True
     if not original_order.original_case_id:
         original_order.original_case_id = order_id
         
-    db.commit()
-    db.refresh(original_order)
-    
-    # Audit trail for the reopened order
-    user_name = current_user.get("name") or "Doctor"
     db.add(LabAuditTrailModel(
         order_id=order_id,
         user_name=user_name,
-        action="Returned for Correction",
+        action=f"Returned for Correction (Attempt #{len(history)})",
         note=f"Category: {status_data.rejection_category}. Reason: {status_data.rejection_reason}"
     ))
     
@@ -996,13 +1025,225 @@ def create_lab_rework_order(
     db.add(LabNotificationModel(
         recipient_role="lab tech",
         type="Orders",
-        title="Rework Order Submitted",
-        desc=f"Case {order_id} returned for correction by doctor. Reason: {status_data.rejection_reason}",
+        title=f"Case {order_id} Returned for Rework",
+        desc=f"Case {order_id} returned for correction (Attempt #{len(history)}). Reason: {status_data.rejection_reason}",
         read=False
     ))
     
     db.commit()
+    db.refresh(original_order)
     return serialize_order(original_order)
+
+# -------------------------------------------------------------
+# Soft Concurrency Claim Lock Endpoint
+# -------------------------------------------------------------
+@router.post("/orders/{order_id}/claim", response_model=LabOrderResponse)
+def claim_lab_order(
+    order_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Soft concurrency lock: allows a lab tech to claim a pending review case.
+    Prevents two lab techs from simultaneously editing/dispatching the same case.
+    """
+    user_name = current_user.get("name") or current_user.get("sub") or "Lab Tech"
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).with_for_update().first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Lab order not found")
+
+    if order.claimed_by and order.claimed_by != user_name and order.claimed_at:
+        diff_mins = (datetime.now() - order.claimed_at.replace(tzinfo=None)).total_seconds() / 60
+        if diff_mins < 15:
+            raise HTTPException(
+                status_code=409, 
+                detail=f"Case {order_id} is currently claimed by {order.claimed_by} for active review."
+            )
+
+    order.claimed_by = user_name
+    order.claimed_at = datetime.now()
+    db.commit()
+    db.refresh(order)
+    return serialize_order(order)
+
+# -------------------------------------------------------------
+# Vendor Inbound Email Parser / Webhook
+# -------------------------------------------------------------
+# -------------------------------------------------------------
+# Vendor Inbound Email Parser / Proposal Webhook
+# -------------------------------------------------------------
+@router.post("/inbound-email")
+def handle_inbound_vendor_email(payload: dict, db: Session = Depends(get_db)):
+    """
+    Parses incoming email replies from external lab vendors.
+    Instead of silently mutating status, creates a human-in-the-loop pending update proposal
+    surfaced to the lab tech for 1-click verification.
+    """
+    subject = payload.get("subject", "")
+    body = payload.get("body", "")
+    from_email = payload.get("from_email", "vendor@apexdental.com")
+
+    # Extract Case ID
+    case_match = re.search(r"CASE-2026-\d+", f"{subject} {body}", re.IGNORECASE)
+    if not case_match:
+        return {"success": False, "message": "No valid Case ID found in email body/subject"}
+
+    case_id = case_match.group(0).upper()
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == case_id).first()
+    if not order:
+        return {"success": False, "message": f"Case {case_id} not found in database"}
+
+    body_lower = body.lower()
+    subject_lower = subject.lower()
+
+    extracted_tracking = None
+    tracking_match = re.search(r"(?:tracking|courier|trk|waybill|shipment)\s*(?:id|num|#)?[:\s\-]*([A-Z0-9]{6,16})", f"{subject} {body}", re.IGNORECASE)
+    if tracking_match:
+        extracted_tracking = tracking_match.group(1).upper()
+    elif "track" in body_lower or "courier" in body_lower or "shipped" in body_lower:
+        extracted_tracking = f"TRK-{random.randint(10000, 99999)}"
+
+    proposed_status = None
+    if any(k in body_lower or k in subject_lower for k in ["work completed", "dispatched", "shipped", "on route", "courier", "en route", "tracking"]):
+        proposed_status = "Arriving"
+    elif any(k in body_lower or k in subject_lower for k in ["confirmed", "order confirmed", "accepted"]):
+        proposed_status = "Confirmed"
+
+    if not proposed_status:
+        return {"success": False, "message": "No actionable status detected in email body."}
+
+    eta_date = (date.today() + timedelta(days=3)).strftime("%Y-%m-%d")
+
+    proposal = {
+        "case_id": case_id,
+        "proposed_status": proposed_status,
+        "proposed_stage": "Arriving / In Transit" if proposed_status == "Arriving" else "Production / Confirmed",
+        "tracking_number": extracted_tracking or f"TRK-{random.randint(10000, 99999)}",
+        "expected_return_date": eta_date,
+        "vendor_email": from_email,
+        "email_subject": subject,
+        "detected_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+    }
+
+    # Store proposed update on order without mutating actual order status silently!
+    order.pending_email_proposal = proposal
+
+    desc_msg = f"Detected: Apex/Vendor update for {case_id}: Proposed Status '{proposed_status}'"
+    if proposal["tracking_number"]:
+        desc_msg += f", Tracking #{proposal['tracking_number']}"
+    desc_msg += f", ETA {eta_date} — Click Accept to apply."
+
+    db.add(LabNotificationModel(
+        recipient_role="lab tech",
+        type="Orders",
+        title=f"Detected Email Update: Case {case_id}",
+        desc=desc_msg,
+        read=False
+    ))
+
+    db.commit()
+    db.refresh(order)
+    return {
+        "success": True,
+        "proposed": True,
+        "case_id": case_id,
+        "proposal": proposal
+    }
+
+# -------------------------------------------------------------
+# Accept & Dismiss Email Proposal Endpoints
+# -------------------------------------------------------------
+@router.post("/orders/{order_id}/accept-email-update", response_model=LabOrderResponse)
+def accept_email_update(
+    order_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Lab order not found")
+
+    if not order.pending_email_proposal:
+        raise HTTPException(status_code=400, detail="No pending email proposal found for this case.")
+
+    proposal = order.pending_email_proposal
+    user_name = current_user.get("name") or current_user.get("sub") or "Lab Technician"
+
+    # Apply proposed status changes
+    order.status = proposal.get("proposed_status", "Confirmed")
+    order.stage = proposal.get("proposed_stage", "Production / Confirmed")
+    if proposal.get("tracking_number"):
+        order.tracking_number = proposal["tracking_number"]
+    if proposal.get("expected_return_date"):
+        order.expected_return_date = proposal["expected_return_date"]
+
+    # Clear pending proposal
+    order.pending_email_proposal = None
+
+    # Audit Trail
+    db.add(LabAuditTrailModel(
+        order_id=order_id,
+        user_name=user_name,
+        action="Accepted Email Proposal",
+        note=f"Applied status '{order.status}', tracking #{order.tracking_number}, ETA {order.expected_return_date}"
+    ))
+
+    # Notify doctor if arriving
+    if order.status == "Arriving":
+        db.add(LabNotificationModel(
+            recipient_role="doctor",
+            type="labs",
+            title=f"Lab Case {order_id} En Route (Arriving)",
+            desc=f"Case {order_id} for patient {order.patient_name or 'Walk-in'} is arriving. Courier Tracking ID: {order.tracking_number}. Estimated Delivery: {order.expected_return_date}.",
+            read=False
+        ))
+
+    db.commit()
+    db.refresh(order)
+    return serialize_order(order)
+
+@router.post("/orders/{order_id}/dismiss-email-update", response_model=LabOrderResponse)
+def dismiss_email_update(
+    order_id: str,
+    db: Session = Depends(get_db)
+):
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Lab order not found")
+
+    order.pending_email_proposal = None
+    db.commit()
+    db.refresh(order)
+    return serialize_order(order)
+
+@router.post("/orders/{order_id}/collect-payment", response_model=LabOrderResponse)
+def collect_lab_order_payment(
+    order_id: str,
+    payload: dict,
+    db: Session = Depends(get_db)
+):
+    order = db.query(LabOrderModel).filter(LabOrderModel.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Lab order not found")
+
+    amount_paid = float(payload.get("amount_paid", 0.0))
+    payment_method = payload.get("payment_method", "Cash")
+    total_amount = float(payload.get("total_amount", order.patient_total_amount or 3500.0))
+
+    order.patient_total_amount = total_amount
+    order.patient_amount_paid = amount_paid
+    order.patient_balance_due = max(0.0, total_amount - amount_paid)
+    order.payment_method = payment_method
+    order.date_received = datetime.now()
+
+    if order.patient_balance_due <= 0:
+        order.payment_status = "Paid in Full"
+    else:
+        order.payment_status = "50% Advance Paid"
+
+    db.commit()
+    db.refresh(order)
+    return serialize_order(order)
 
 # -------------------------------------------------------------
 # Comments Endpoints
@@ -1111,6 +1352,22 @@ def get_lab_notifications(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
+    # Purge any existing non-flagged/non-rejected doctor notifications from database
+    if recipient_role == "doctor":
+        all_doc_notifs = db.query(LabNotificationModel).filter(LabNotificationModel.recipient_role == "doctor").all()
+        for notif in all_doc_notifs:
+            title_lower = (notif.title or "").lower()
+            desc_lower = (notif.desc or "").lower()
+            is_allowed = (
+                "flagged" in title_lower or "flagged" in desc_lower or
+                "revision" in title_lower or "revision" in desc_lower or
+                "sent back" in title_lower or "sent back" in desc_lower or
+                "reject" in title_lower or "reject" in desc_lower
+            )
+            if not is_allowed:
+                db.delete(notif)
+        db.commit()
+
     query = db.query(LabNotificationModel)
     if recipient_role:
         query = query.filter(LabNotificationModel.recipient_role == recipient_role)

@@ -59,13 +59,33 @@ router = APIRouter(prefix="/patient", tags=["patient"])
 def get_available_doctors(db: Session = Depends(get_db)):
     """Public endpoint for the patient portal to list doctors for appointment booking."""
     from modules.auth.models import UserModel
-    doctors = db.query(DoctorModel).filter(DoctorModel.status != "Inactive").all()
+    
+    all_users = db.query(UserModel).all()
+    doctor_users = [u for u in all_users if any(r.lower() == "doctor" for r in (u.roles or []))]
     
     result = []
-    for doc in doctors:
-        user = db.query(UserModel).filter(UserModel.id == doc.user_id).first()
-        profile_picture = user.profile_picture if user else None
+    for user in doctor_users:
+        clean_name = user.name.replace("Dr.", "").strip()
+        doc = db.query(DoctorModel).filter(
+            (DoctorModel.user_id == user.id) | 
+            (DoctorModel.name.ilike(f"%{clean_name}%"))
+        ).first()
         
+        if not doc:
+            specialty_str = ", ".join(user.specialties) if user.specialties else "General Dentistry"
+            doc = DoctorModel(
+                name=user.name if user.name.startswith("Dr. ") else f"Dr. {user.name}",
+                specialty=specialty_str,
+                status="Off Duty",
+                user_id=user.id
+            )
+            db.add(doc)
+            db.commit()
+            db.refresh(doc)
+        
+        if doc.status == "Inactive":
+            continue
+            
         user_specs = user.specialties if (user and user.specialties) else []
         if not user_specs and doc.specialty:
             user_specs = [s.strip() for s in doc.specialty.split(",") if s.strip()]
@@ -77,8 +97,8 @@ def get_available_doctors(db: Session = Depends(get_db)):
             "name": doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}",
             "specialty": doc.specialty or "General Dentistry",
             "specialties": user_specs,
-            "status": "On Duty" if doc.status == "Active" else doc.status,
-            "profile_picture": profile_picture
+            "status": "Off Duty" if (not doc.status or doc.status == "-") else doc.status,
+            "profile_picture": user.profile_picture
         })
     return result
 
@@ -103,21 +123,35 @@ def get_doctor_available_slots(doctor_id: int, date: str, db: Session = Depends(
 
     # Read working_hours from the doctor model
     working_hours = doctor.working_hours or {}
-    schedule = working_hours.get(day_name, {})
+    schedule = working_hours.get(day_name)
     
-    if schedule.get("is_off", True):
+    if schedule is None:
+        if day_name == "Sunday":
+            return {"date": date, "available_slots": []}
+        schedule = {
+            "start": "09:00 AM",
+            "end": "05:00 PM",
+            "is_off": False
+        }
+    elif schedule.get("is_off", False):
         return {"date": date, "available_slots": []}
 
     # Check if the doctor is on leave
+    clean_name = doctor.name.replace("Dr.", "").strip()
     is_on_leave = db.query(LeaveRequestModel).filter(
-        LeaveRequestModel.user_id == doctor.user_id,
         LeaveRequestModel.status == "Approved",
+        (LeaveRequestModel.user_id == doctor.user_id) | (LeaveRequestModel.staff_name.ilike(f"%{clean_name}%")),
         LeaveRequestModel.start_date <= date,
         LeaveRequestModel.end_date >= date
     ).first()
 
     if is_on_leave:
-        return {"date": date, "available_slots": []}
+        return {
+            "date": date,
+            "available_slots": [],
+            "on_leave": True,
+            "leave_reason": is_on_leave.reason or "Approved Leave"
+        }
 
     # Generate slots
     slots = []
@@ -1486,11 +1520,11 @@ def save_clinical_note_route(
         status="Pending",
         source_type="consultation",
         procedures=[{
-            "name": "Clinical Consultation Charge",
+            "name": "Consultation Fee",
             "rate": 500.0,
             "source": "consultation"
         }],
-        notes=f"Automated consultation charge for diagnosis visit ({note_date[:10] if note_date else 'Today'})"
+        notes=None
     )
     db.add(consultation_charge)
 
@@ -1659,13 +1693,23 @@ def get_dispensing_queue(db: Session = Depends(get_db)):
                 "line_total": line_total
             })
 
+        calc_total = round(total_amount, 2)
+        paid = d.amount_paid or 0.0
+        bal = max(0.0, calc_total - paid) if d.amount_paid is not None else calc_total
+        p_status = d.payment_status or ("Paid in Full" if bal == 0 and paid > 0 else "Pending Payment")
+
         result.append({
             "id": d.id,
             "patient_token": d.patient_token,
             "patient_name": d.patient_name,
             "doctor_name": d.doctor_name,
             "medications": enriched_meds,
-            "total_amount": round(total_amount, 2),
+            "total_amount": calc_total,
+            "amount_paid": paid,
+            "balance_due": bal,
+            "payment_status": p_status,
+            "payment_method": d.payment_method or "Cash",
+            "date_received": d.date_received.isoformat() if d.date_received else None,
             "status": d.status,
             "created_at": d.created_at.isoformat() if d.created_at else None,
             "dispensed_at": d.dispensed_at.isoformat() if d.dispensed_at else None
@@ -1692,6 +1736,45 @@ def update_dispense_status(dispense_id: int, payload: dict, db: Session = Depend
         "id": dispense.id,
         "status": dispense.status,
         "dispensed_at": dispense.dispensed_at.isoformat() if dispense.dispensed_at else None
+    }
+
+
+@router.post("/dispensing/{dispense_id}/collect-payment")
+def collect_dispensing_payment(dispense_id: int, payload: dict, db: Session = Depends(get_db)):
+    from .models import MedicineDispenseModel
+    dispense = db.query(MedicineDispenseModel).filter(MedicineDispenseModel.id == dispense_id).first()
+    if not dispense:
+        raise HTTPException(status_code=404, detail="Dispensing record not found")
+
+    amount_paid = float(payload.get("amount_paid", 0.0))
+    payment_method = payload.get("payment_method", "Cash")
+    total_amount = float(payload.get("total_amount", dispense.total_amount or 0.0))
+
+    dispense.total_amount = total_amount
+    dispense.amount_paid = amount_paid
+    dispense.balance_due = max(0.0, total_amount - amount_paid)
+    dispense.payment_method = payment_method
+    dispense.date_received = datetime.datetime.now()
+
+    if dispense.balance_due <= 0:
+        dispense.payment_status = "Paid in Full"
+        dispense.status = "Dispensed"
+        dispense.dispensed_at = datetime.datetime.now()
+    else:
+        dispense.payment_status = "50% Advance Paid"
+
+    db.commit()
+    db.refresh(dispense)
+    return {
+        "success": True,
+        "id": dispense.id,
+        "total_amount": dispense.total_amount,
+        "amount_paid": dispense.amount_paid,
+        "balance_due": dispense.balance_due,
+        "payment_status": dispense.payment_status,
+        "payment_method": dispense.payment_method,
+        "date_received": dispense.date_received.isoformat() if dispense.date_received else None,
+        "status": dispense.status
     }
 
 

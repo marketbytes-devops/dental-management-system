@@ -264,8 +264,8 @@ export default function PatientRecordsPage() {
     medications: ref.my_medications || []
   }));
 
-  const activePlan = plans.find(p => p.status === "Active");
-  const pastPlans = plans.filter(p => p.status !== "Active");
+  const activePlan = plans.find(p => p.status === "Active") || plans.find(p => p.status === "Draft") || (plans.length > 0 ? plans[0] : null);
+  const pastPlans = plans.filter(p => p !== activePlan);
 
   const renderTabContent = () => {
     switch (activeTab) {

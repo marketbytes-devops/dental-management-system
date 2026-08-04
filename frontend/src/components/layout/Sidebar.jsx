@@ -9,6 +9,7 @@ import { ROLE_NAV_ITEMS } from "./navigationConfig";
 import { useDoctor } from "@/app/(dashboards)/doctor/layout";
 import { useReceptionist } from "@/app/(dashboards)/frontdesk/receptionist/layout";
 import { useAdmin } from "@/app/(dashboards)/admin/layout";
+import { getImageUrl } from "@/utils/imageUtils";
 
 export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
   const pathname = usePathname();
@@ -391,15 +392,15 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
           >
             {currentUser?.profile_picture ? (
               <img
-                src={currentUser.profile_picture.startsWith("http") ? currentUser.profile_picture : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${currentUser.profile_picture}`}
+                src={getImageUrl(currentUser.profile_picture)}
                 alt={currentUser.name}
                 className="w-full h-full object-cover"
               />
-            ) : role === "doctor" ? (
+            ) : (role === "doctor" ? (
               <Stethoscope className="w-5 h-5 text-primary" />
             ) : (
               avatarChar
-            )}
+            ))}
           </div>
           {!isMinimized && (
             <div className="flex flex-col min-w-0">

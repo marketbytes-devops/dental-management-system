@@ -53,11 +53,9 @@ export default function DoctorManagementPage() {
           ? specArr.join(", ") 
           : "General Dentistry";
           
-        let defaultStatus = "On Duty";
-        if (user.status === "Inactive") {
-          defaultStatus = "Off Duty";
-        } else if (user.status === "On Break") {
-          defaultStatus = "On Break";
+        let defaultStatus = "Off Duty";
+        if (rosterItem && rosterItem.status && rosterItem.status !== "-") {
+          defaultStatus = rosterItem.status;
         }
 
         return {
@@ -88,9 +86,9 @@ export default function DoctorManagementPage() {
   };
 
   useEffect(() => {
-    setTimeout(() => {
-      fetchDoctors();
-    }, 0);
+    fetchDoctors();
+    const interval = setInterval(fetchDoctors, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const toggleStatus = async (id) => {
@@ -123,8 +121,9 @@ export default function DoctorManagementPage() {
     switch (status) {
       case "On Duty": return "bg-emerald-50 border border-emerald-200 text-emerald-700";
       case "On Break": return "bg-amber-50 border border-amber-200 text-amber-700";
-      case "Off Duty": return "bg-gray-50 border border-gray-200 text-gray-400";
-      default: return "bg-gray-100 text-gray-600";
+      case "On Leave": return "bg-purple-50 border border-purple-200 text-purple-700";
+      case "Off Duty":
+      default: return "bg-gray-100 border border-gray-200 text-gray-500 font-bold";
     }
   };
 
@@ -267,12 +266,6 @@ export default function DoctorManagementPage() {
                         </span>
                       </td>
                       <td className="py-4 px-6 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => toggleStatus(doc.id)}
-                          className="px-3 py-1 bg-gray-50 hover:bg-primary/5 hover:text-primary border border-gray-200 hover:border-primary/25 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"
-                        >
-                          Cycle Status
-                        </button>
                         <button
                           onClick={() => setExpandedDoctorId(expandedDoctorId === doc.id ? null : doc.id)}
                           className="px-3 py-1 bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20 rounded-lg text-xs font-bold transition-all cursor-pointer mr-2 outline-none"

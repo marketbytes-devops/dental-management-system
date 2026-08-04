@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { getAvailableDoctors, getDoctorAvailableSlots } from "@/services/api";
+import { getImageUrl } from "@/utils/imageUtils";
 import { Calendar, User, ArrowLeft, Award, BookOpen, Clock, X } from "lucide-react";
 import Link from "next/link";
 import PublicFooter from "@/components/layout/PublicFooter";
@@ -133,7 +134,7 @@ export default function DoctorProfile({ params }) {
                 {doctor.profile_picture ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`http://localhost:8000${doctor.profile_picture}`}
+                    src={getImageUrl(doctor.profile_picture)}
                     alt={doctor.name}
                     className="w-full h-full object-cover object-[center_80%] group-hover:scale-110 transition-transform duration-500"
                   />

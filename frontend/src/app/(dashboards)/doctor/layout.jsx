@@ -21,6 +21,7 @@ import {
   updateAppointmentStatus,
   getPatientAppointments,
   getPatientByToken,
+  getAllPatients,
   getPatientTreatmentPlan,
   createPrescription,
   createReferral,
@@ -159,10 +160,22 @@ export default function DoctorLayout({ children }) {
 
   const [readNotifIds, setReadNotifIds] = useState({});
 
+  const getNotifStorageKey = () => {
+    if (typeof window === "undefined") return "doctor_read_notif_ids";
+    try {
+      const savedUser = localStorage.getItem("staff_user");
+      const userId = savedUser ? JSON.parse(savedUser).id : null;
+      return userId ? `read_notif_ids_${userId}` : "doctor_read_notif_ids";
+    } catch (e) {
+      return "doctor_read_notif_ids";
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const saved = localStorage.getItem("doctor_read_notif_ids");
+        const key = getNotifStorageKey();
+        const saved = localStorage.getItem(key);
         if (saved) setReadNotifIds(JSON.parse(saved));
       } catch (e) {
         console.warn("Failed to parse doctor read notification cache:", e);
@@ -174,7 +187,7 @@ export default function DoctorLayout({ children }) {
     setReadNotifIds((prev) => {
       const updated = { ...prev, [id]: true };
       try {
-        localStorage.setItem("doctor_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -193,7 +206,7 @@ export default function DoctorLayout({ children }) {
       const updated = { ...prev };
       delete updated[idOrItemId];
       try {
-        localStorage.setItem("doctor_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -207,7 +220,7 @@ export default function DoctorLayout({ children }) {
         updated[n.id] = true;
       });
       try {
-        localStorage.setItem("doctor_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -283,10 +296,22 @@ export default function DoctorLayout({ children }) {
         }
       });
 
-      // 3. Lab notifications (Flagged orders, revision requests, updates)
+      // 3. Lab notifications (ONLY Flagged orders, revision requests, sent back, or rejected orders)
       (labNotifs || []).forEach((ln) => {
+        const titleLower = (ln.title || "").toLowerCase();
+        const descLower = (ln.desc || "").toLowerCase();
+
+        const isFlaggedOrRejected = (
+          titleLower.includes("flagged") || descLower.includes("flagged") ||
+          titleLower.includes("revision") || descLower.includes("revision") ||
+          titleLower.includes("sent back") || descLower.includes("sent back") ||
+          titleLower.includes("reject") || descLower.includes("reject")
+        );
+
+        if (!isFlaggedOrRejected) return; // Skip all other lab status notifications for doctor
+
         const notifId = `lab-notif-${ln.id}`;
-        const isFlaggedOrAlert = ln.title.includes("Flagged") || ln.title.includes("Revision") || ln.desc.includes("Flagged");
+        const isFlaggedOrAlert = titleLower.includes("flagged") || titleLower.includes("revision") || descLower.includes("flagged");
         
         let targetToken = ln.patient_token || "";
 
@@ -311,9 +336,20 @@ export default function DoctorLayout({ children }) {
           }
         }
 
+        let targetSpec = "general";
+        if (targetToken && patients[targetToken]) {
+          const pt = patients[targetToken];
+          const ptName = (pt.name || "").toLowerCase();
+          if (ptName.includes("anita") || ptName.includes("tom") || (pt.token && pt.token.includes("68852"))) {
+            targetSpec = "orthodontics";
+          }
+        } else if (ln.title.toLowerCase().includes("anita") || ln.desc.toLowerCase().includes("anita") || (targetToken && targetToken.includes("68852")) || ln.title.toLowerCase().includes("tom") || ln.desc.toLowerCase().includes("tom")) {
+          targetSpec = "orthodontics";
+        }
+
         const link = targetToken 
-          ? `/doctor/workspace/general?patientToken=${encodeURIComponent(targetToken)}&section=labs` 
-          : `/doctor/workspace/general?section=labs`;
+          ? `/doctor/workspace/${targetSpec}?patientToken=${encodeURIComponent(targetToken)}&section=labs` 
+          : `/doctor/workspace/${targetSpec}?section=labs`;
 
         notifs.push({
           id: notifId,
@@ -658,13 +694,27 @@ export default function DoctorLayout({ children }) {
       setPatients(prev => {
         const updated = { ...prev };
         myQueue.forEach(q => {
+          let proc = prev[q.token]?.procedure || q.procedure || q.treatment_type || q.treatmentType || "";
+
+          if ((!proc || proc === "General Dentistry" || proc === "Routine Checkup") && q.chief_complaint) {
+            if (q.chief_complaint.includes("[Specialty:")) {
+              const match = q.chief_complaint.match(/\[Specialty:\s*([^\]]+)\]/i);
+              if (match && match[1]) proc = match[1].trim();
+            }
+          }
+
+          if (!proc) {
+            proc = "Consultation";
+          }
+
           updated[q.token] = {
+            ...prev[q.token],
             token: q.token,
             name: q.patient_name,
             age: q.age,
             gender: q.gender,
             phone: q.patient_phone,
-            procedure: q.procedure || "Consultation",
+            procedure: proc,
             chiefComplaint: q.chief_complaint || "Routine Checkup",
             medicalAlerts: q.medical_alerts || [],
             priority: q.priority,
@@ -672,7 +722,10 @@ export default function DoctorLayout({ children }) {
             teethChart: prev[q.token]?.teethChart || {},
             timeline: prev[q.token]?.timeline || [
               { date: new Date(q.checked_in_at).toLocaleDateString(), note: "Checked in", type: "Check-In" }
-            ]
+            ],
+            lastVisitedDate: prev[q.token]?.lastVisitedDate,
+            planStepsProgress: prev[q.token]?.planStepsProgress,
+            hasActivePlan: prev[q.token]?.hasActivePlan
           };
         });
         return updated;
@@ -681,6 +734,48 @@ export default function DoctorLayout({ children }) {
       console.warn("Failed to fetch live queue for doctor:", err);
     }
   };
+
+  const fetchMasterPatients = async () => {
+    try {
+      const allPats = await getAllPatients();
+      if (allPats && Array.isArray(allPats)) {
+        setPatients(prev => {
+          const updated = { ...prev };
+          allPats.forEach(p => {
+            if (!p.token) return;
+            
+            const matchedProc = prev[p.token]?.procedure || "Consultation";
+
+            updated[p.token] = {
+              ...prev[p.token],
+              token: p.token,
+              name: p.name,
+              age: p.date_of_birth ? new Date().getFullYear() - new Date(p.date_of_birth).getFullYear() : 28,
+              gender: p.gender || "Patient",
+              phone: p.phone || "No contact info",
+              procedure: matchedProc,
+              chiefComplaint: prev[p.token]?.chiefComplaint || "Clinical Consultation",
+              medicalAlerts: p.known_allergies ? [p.known_allergies] : (prev[p.token]?.medicalAlerts || []),
+              teethChart: prev[p.token]?.teethChart || {},
+              timeline: prev[p.token]?.timeline || [
+                { date: new Date().toLocaleDateString(), note: "Patient registered in system", type: "Check-In" }
+              ],
+              lastVisitedDate: prev[p.token]?.lastVisitedDate,
+              planStepsProgress: prev[p.token]?.planStepsProgress,
+              hasActivePlan: prev[p.token]?.hasActivePlan
+            };
+          });
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to fetch master patient list:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchMasterPatients();
+  }, [labOrders]);
 
   useEffect(() => {
     fetchQueue();
@@ -1180,14 +1275,14 @@ export default function DoctorLayout({ children }) {
         });
       }
 
-      // Add patient referrals and consultations to timeline
+      // Add patient referrals to timeline
       const patientRefs = referrals.filter(r => r.patientToken === token);
       patientRefs.forEach(ref => {
         if (ref.status === "Completed") {
           timelineEvents.push({
             date: ref.date,
             note: `Referral Consultation Completed by ${ref.targetDoctor || "Specialist"}: ${ref.myConsultationNotes}`,
-            type: "Consultation",
+            type: "Referral",
             doctor_name: ref.targetDoctor
           });
         } else {

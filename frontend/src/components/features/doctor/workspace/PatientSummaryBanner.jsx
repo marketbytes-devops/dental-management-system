@@ -45,28 +45,22 @@ export default function PatientSummaryBanner({
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          {completedPatientHistory && completedPatientHistory.length > 0 && (
-            <button
-              onClick={onViewPreviousPatient}
-              className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
-            >
-              <span>📂</span> Previous Patient
-            </button>
-          )}
           {!isHistorical && (
-            <button
-              onClick={onCompleteConsultation}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/10 cursor-pointer border-none"
-            >
-              <CheckCircle2 className="w-4 h-4" /> Complete Consultation
-            </button>
+            <>
+              <button
+                onClick={onCompleteConsultation}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/10 cursor-pointer border-none"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Complete Consultation
+              </button>
+              <button
+                onClick={onCallNextPatient}
+                className="px-4 py-2 bg-primary text-white hover:bg-primary/95 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-primary/10 cursor-pointer border-none"
+              >
+                Call Next Patient <ArrowRight className="w-4 h-4" />
+              </button>
+            </>
           )}
-          <button
-            onClick={onCallNextPatient}
-            className="px-4 py-2 bg-primary text-white hover:bg-primary/95 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-primary/10 cursor-pointer border-none"
-          >
-            Call Next Patient <ArrowRight className="w-4 h-4" />
-          </button>
         </div>
       </div>
 

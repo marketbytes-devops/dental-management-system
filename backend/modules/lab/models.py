@@ -50,12 +50,6 @@ class LabOrderModel(Base):
     stage = Column(String, default="New Cases")
     tech_notes = Column(String, nullable=True)
     email_sent_at = Column(String, nullable=True)
-<<<<<<< HEAD
-    claimed_by = Column(String, nullable=True)
-    claimed_at = Column(DateTime(timezone=True), nullable=True)
-    patient_notified_at = Column(String, nullable=True)
-    patient_notified_note = Column(String, nullable=True)
-=======
     
     # Extended Rework History, Soft Lock & Physical Molds
     rework_history = Column(JSON, default=list)  # List of objects: [{"date": "", "category": "", "reason": "", "notes": "", "files": []}]
@@ -71,7 +65,6 @@ class LabOrderModel(Base):
     payment_status = Column(String, default="Pending Payment") # Pending Payment, 50% Advance Paid, Paid in Full
     payment_method = Column(String, nullable=True) # Cash, Card, UPI
     date_received = Column(DateTime(timezone=True), nullable=True)
->>>>>>> d6caa895b3f2033da5deb56596a5dfe1517cdeff
 
     prosthetic_detail = relationship("ProstheticCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")
     pathology_detail = relationship("PathologyCaseDetailModel", back_populates="lab_case", uselist=False, cascade="all, delete-orphan")

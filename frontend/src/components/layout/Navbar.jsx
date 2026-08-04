@@ -34,7 +34,7 @@ export default function Navbar() {
         const storageKey = `read_notif_ids_${currentUser.id}`;
         const saved = localStorage.getItem(storageKey);
         if (saved) setReadStaffLeaveIds(JSON.parse(saved));
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [currentUser]);
 
@@ -44,7 +44,7 @@ export default function Navbar() {
       try {
         const storageKey = currentUser?.id ? `read_notif_ids_${currentUser.id}` : "staff_read_notif_ids";
         localStorage.setItem(storageKey, JSON.stringify(updated));
-      } catch (e) {}
+      } catch (e) { }
       return updated;
     });
   };
@@ -617,13 +617,8 @@ export default function Navbar() {
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-xs font-bold text-gray-700 cursor-pointer outline-none"
             >
-<<<<<<< HEAD
-              <span className={`w-2.5 h-2.5 rounded-full ${currentStatus === "Active" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
-                currentStatus === "On Break" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-gray-400"
-=======
               <span className={`w-2.5 h-2.5 rounded-full ${(currentStatus === "Active" || currentStatus === "On Duty") ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
-                  currentStatus === "On Break" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-gray-400"
->>>>>>> d6caa895b3f2033da5deb56596a5dfe1517cdeff
+                currentStatus === "On Break" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-gray-400"
                 }`} />
               {(currentStatus === "Active" || currentStatus === "On Duty") ? "On Duty" :
                 currentStatus === "On Break" ? "On Break" : "Off Duty"}

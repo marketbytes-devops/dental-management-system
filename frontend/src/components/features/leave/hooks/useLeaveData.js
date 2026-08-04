@@ -130,10 +130,16 @@ export default function useLeaveData(userId, role, staffName) {
   const cancelLeave = async (id) => {
     const req = requests.find(r => r.id === id);
     const dbId = req ? req.dbId : id;
+    if (req && req.status !== "Pending" && !isManagerMode) {
+      alert("Cannot delete a leave request once it has been approved or rejected by Admin.");
+      return;
+    }
+    if (!confirm("Are you sure you want to delete this pending leave request?")) return;
     try {
       await deleteLeaveRequest(dbId);
       await fetchLeaveData();
     } catch (err) {
+      alert(err.response?.data?.detail || "Failed to delete leave request.");
       console.error("Error cancelling leave:", err);
     }
   };

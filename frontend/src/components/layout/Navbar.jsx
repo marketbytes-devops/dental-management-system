@@ -29,6 +29,27 @@ export default function Navbar() {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined" && currentUser?.id) {
+      try {
+        const storageKey = `read_notif_ids_${currentUser.id}`;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) setReadStaffLeaveIds(JSON.parse(saved));
+      } catch (e) {}
+    }
+  }, [currentUser]);
+
+  const markStaffNotifAsRead = (notifId) => {
+    setReadStaffLeaveIds((prev) => {
+      const updated = { ...prev, [notifId]: true };
+      try {
+        const storageKey = currentUser?.id ? `read_notif_ids_${currentUser.id}` : "staff_read_notif_ids";
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
+  useEffect(() => {
     if (role === "patient") {
       fetchPatientNotifs();
       const interval = setInterval(fetchPatientNotifs, 5000);
@@ -44,13 +65,15 @@ export default function Navbar() {
           const notifs = [];
           (leaves || []).forEach(l => {
             if (l.status === "Approved" || l.status === "Rejected") {
+              const notifId = `leave-${l.id}-${l.status}`;
               notifs.push({
-                id: `leave-${l.id}-${l.status}`,
+                id: notifId,
                 type: "leave",
                 title: `Leave Application ${l.status}`,
                 message: `Your ${l.type} request (${l.start_date} to ${l.end_date}) was ${l.status.toLowerCase()} by Admin.`,
                 link: roleLeaveHref,
-                timestamp: l.start_date
+                timestamp: l.start_date,
+                status: readStaffLeaveIds[notifId] ? "read" : "unread"
               });
             }
           });
@@ -64,7 +87,7 @@ export default function Navbar() {
       const interval = setInterval(fetchLeaves, 5000);
       return () => clearInterval(interval);
     }
-  }, [role]);
+  }, [role, currentUser, readStaffLeaveIds]);
 
   const getPatientNotifLink = (type) => {
     switch (type) {
@@ -155,8 +178,14 @@ export default function Navbar() {
               return val;
             };
 
-            setRole(normalizeRole(rawRole));
-            setCurrentStatus(parsed.status || "Active");
+            const normRole = normalizeRole(rawRole);
+            setRole(normRole);
+            if (normRole === "doctor") {
+              const docStat = parsed.duty_status || "On Duty";
+              setCurrentStatus((docStat === "Active" || !docStat) ? "On Duty" : docStat);
+            } else {
+              setCurrentStatus(parsed.status || "Active");
+            }
           }, 0);
         } catch (e) {
           console.error("Failed to parse staff_user", e);
@@ -188,11 +217,12 @@ export default function Navbar() {
   const handleStatusChange = async (newStatus) => {
     try {
       const data = await updateAuthStatus({ status: newStatus });
-      setCurrentStatus(data.status);
+      const activeStat = (data.status === "Active" || data.status === "On Duty") ? "On Duty" : data.status;
+      setCurrentStatus(activeStat);
       setShowStatusDropdown(false);
 
       if (currentUser) {
-        const updatedUser = { ...currentUser, status: data.status };
+        const updatedUser = { ...currentUser, status: activeStat, duty_status: activeStat };
         localStorage.setItem("staff_user", JSON.stringify(updatedUser));
         setCurrentUser(updatedUser);
       }
@@ -201,7 +231,14 @@ export default function Navbar() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (role === "doctor") {
+      try {
+        await updateAuthStatus({ status: "Off Duty" });
+      } catch (e) {
+        console.warn("Failed to set doctor off-duty status on logout:", e);
+      }
+    }
     localStorage.removeItem("staff_jwt_token");
     localStorage.removeItem("staff_user");
     localStorage.removeItem("patient_jwt_token");
@@ -308,6 +345,7 @@ export default function Navbar() {
                             setViewingPatientToken(notif.patientId);
                           }
                           if (markAsRead) markAsRead(notif.id);
+                          markStaffNotifAsRead(notif.id);
                           setShowNotifications(false);
                         }}
                         className={`block p-2.5 rounded-xl border border-transparent transition-all text-xs relative ${notif.status === "unread"
@@ -582,10 +620,10 @@ export default function Navbar() {
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-xs font-bold text-gray-700 cursor-pointer outline-none"
             >
-              <span className={`w-2.5 h-2.5 rounded-full ${currentStatus === "Active" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+              <span className={`w-2.5 h-2.5 rounded-full ${(currentStatus === "Active" || currentStatus === "On Duty") ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
                   currentStatus === "On Break" ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-gray-400"
                 }`} />
-              {currentStatus === "Active" ? "On Duty" :
+              {(currentStatus === "Active" || currentStatus === "On Duty") ? "On Duty" :
                 currentStatus === "On Break" ? "On Break" : "Off Duty"}
               <span className="text-[8px] text-gray-400">▼</span>
             </button>
@@ -593,7 +631,7 @@ export default function Navbar() {
             {showStatusDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-150 rounded-2xl shadow-xl z-50 p-1.5 space-y-0.5 animate-fade-in">
                 <button
-                  onClick={() => handleStatusChange("Active")}
+                  onClick={() => handleStatusChange("On Duty")}
                   className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -607,7 +645,7 @@ export default function Navbar() {
                   Go On Break
                 </button>
                 <button
-                  onClick={() => handleStatusChange("Inactive")}
+                  onClick={() => handleStatusChange("Off Duty")}
                   className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-55 hover:text-gray-900 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
                 >
                   <span className="w-2 h-2 rounded-full bg-gray-400" />

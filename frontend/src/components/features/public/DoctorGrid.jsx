@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getAvailableDoctors, getDoctorAvailableSlots } from "@/services/api";
 import { Calendar, User, X, ArrowLeft } from "lucide-react";
+import { getImageUrl } from "@/utils/imageUtils";
 import { getAllUniqueSpecialties, doctorHasSpecialty, parseDoctorSpecialties } from "@/utils/specialtyUtils";
-
 
 export default function DoctorGrid() {
   const [doctors, setDoctors] = useState([]);
@@ -25,13 +25,22 @@ export default function DoctorGrid() {
 
   const router = useRouter();
 
+  const [isDoctorOnLeave, setIsDoctorOnLeave] = useState(false);
+  const [leaveReason, setLeaveReason] = useState("");
+
   useEffect(() => {
     const fetchSlots = async () => {
       if (!selectedDate || !selectedDoctorForBooking) return;
       setLoadingSlots(true);
+      setIsDoctorOnLeave(false);
+      setLeaveReason("");
       try {
         const data = await getDoctorAvailableSlots(selectedDoctorForBooking.id, selectedDate);
         setAvailableSlots(data.available_slots || []);
+        if (data.on_leave) {
+          setIsDoctorOnLeave(true);
+          setLeaveReason(data.leave_reason || "Approved Leave");
+        }
         setSelectedSlot(""); // reset selected slot when date changes
       } catch (error) {
         console.error("Failed to fetch slots:", error);
@@ -56,7 +65,7 @@ export default function DoctorGrid() {
 
   const handleConfirmBooking = () => {
     if (selectedDate && selectedSlot && selectedDoctorForBooking) {
-      router.push(`/login?roles=patient&doctorId=${selectedDoctorForBooking.id}&date=${selectedDate}&time=${selectedSlot}`);
+      router.push(`/login?role=patient&doctorId=${selectedDoctorForBooking.id}&date=${selectedDate}&time=${selectedSlot}`);
     }
   };
 
@@ -166,7 +175,7 @@ export default function DoctorGrid() {
             {doctor.profile_picture ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={`http://localhost:8000${doctor.profile_picture}`}
+                src={getImageUrl(doctor.profile_picture)}
                 alt={doctor.name}
                 className="w-full h-full object-cover object-[center_80%] group-hover:scale-105 transition-transform duration-500"
               />
@@ -281,6 +290,14 @@ export default function DoctorGrid() {
                         </button>
                         );
                       })}
+                    </div>
+                  ) : isDoctorOnLeave ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center mt-2 space-y-1">
+                      <p className="text-sm text-amber-900 font-extrabold flex items-center justify-center gap-1.5">
+                        ⚠️ Doctor is On Leave on this date
+                      </p>
+                      <p className="text-xs text-amber-700 font-semibold">{leaveReason || "Approved Leave"}</p>
+                      <p className="text-[11px] text-amber-600 mt-1">Please select a different date from the calendar above.</p>
                     </div>
                   ) : (
                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center mt-2">

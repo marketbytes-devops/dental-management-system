@@ -28,7 +28,7 @@ import {
   Flag,
   Mail
 } from "lucide-react";
-import { getLabOrders, updateLabOrderStatus, updateLabOrder, getLabVendors, uploadLabFile } from "@/services/api";
+import { getLabOrders, updateLabOrderStatus, updateLabOrder, getLabVendors, uploadLabFile, acceptEmailUpdate, dismissEmailUpdate } from "@/services/api";
 import { validateLabOrderFields } from "@/services/labValidation";
 
 
@@ -78,7 +78,13 @@ export default function LabOrders() {
         testType: o.test_type || "",
         sampleType: o.sample_type || "",
         reasonForTest: o.reason_for_test || "",
-        sampleCollectedConfirm: o.sample_collected_confirm || false
+        sampleCollectedConfirm: o.sample_collected_confirm || false,
+        reworkHistory: o.rework_history || [],
+        claimedBy: o.claimed_by || null,
+        physicalMoldSent: o.physical_mold_sent || false,
+        physicalOpposingMoldSent: o.physical_opposing_mold_sent || false,
+        trackingNumber: o.tracking_number || "",
+        pendingEmailProposal: o.pending_email_proposal || null
       }));
       setOrders(mapped);
     } catch (err) {
@@ -751,20 +757,94 @@ export default function LabOrders() {
     const missing = validateOrderFields(order);
     const hasMissing = missing.length > 0;
     
+    let actionButtons = null;
     if (isProsthetic) {
       if (order.status === "Revision Requested") {
-        return (
+        actionButtons = (
           <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded border border-rose-100">
             Awaiting Doctor Revision
           </span>
         );
-      }
-      if (["submitted", "Submitted", "Pending", "Pending Review", "Confirmed by Tech", "Flagged", "flagged"].includes(order.status)) {
-        return (
+      } else if (["Arriving", "Arriving / In Transit", "Order Sent to Lab", "Sent to Lab", "in_design", "in_fabrication", "quality_check"].includes(order.status)) {
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            {order.trackingNumber && (
+              <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded font-black">
+                📦 Tracking: {order.trackingNumber}
+              </span>
+            )}
+            <button
+              onClick={() => updateDbStatus(order.id, "Arrived")}
+              className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              Mark Arrived
+            </button>
+            <button
+              onClick={() => handleOpenReworkModal(order)}
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Return for Correction
+            </button>
+          </div>
+        );
+      } else if (["Arrived", "Order Received", "Received from Lab", "received_from_lab"].includes(order.status)) {
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <button
+              onClick={() => updateDbStatus(order.id, "Completed")}
+              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              Complete Order
+            </button>
+            <button
+              onClick={() => handleOpenReworkModal(order)}
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Return for Correction
+            </button>
+          </div>
+        );
+      } else if (order.status === "Completed" || order.status === "completed") {
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <button
+              onClick={async () => {
+                try {
+                  const { sendLabBillingRequest } = await import("@/services/api");
+                  await sendLabBillingRequest({
+                    patient_token: order.patientToken || "PT-WALKIN",
+                    doctor_name: order.dentistName || "Lab Technician",
+                    amount: order.externalCost || 3500.0,
+                    notes: `Vendor Invoice for Case ${order.id} (${order.prostheticType || order.orderCategory})`,
+                    procedures: [{
+                      name: `Vendor Invoice (${order.prostheticType || order.orderCategory})`,
+                      cost: order.externalCost || 3500.0,
+                      tooth: order.toothQuadrant || "Full Arch"
+                    }]
+                  });
+                  triggerToast(`Case ${order.id} vendor invoice sent to Accountant.`);
+                } catch (err) {
+                  triggerToast("Failed to send invoice to Accountant.", "error");
+                }
+              }}
+              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
+            >
+              <span>💳</span> Send to Accountant
+            </button>
+            <button
+              onClick={() => handleOpenReworkModal(order)}
+              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Return for Correction
+            </button>
+          </div>
+        );
+      } else {
+        actionButtons = (
           <div className="flex gap-2 items-center flex-wrap">
             <button
               onClick={() => handleOpenDispatchModal(order)}
-              className="px-2.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
               Send to Lab
             </button>
@@ -784,84 +864,10 @@ export default function LabOrders() {
           </div>
         );
       }
-      if (["Confirmed", "confirmed", "Doctor Accepted"].includes(order.status)) {
-        return (
-          <button
-            onClick={() => handleOpenDispatchModal(order)}
-            className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-650 hover:text-white border border-indigo-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
-          >
-            Send to Lab
-          </button>
-        );
-      }
-      if (["Sent to Lab", "sent_to_lab", "Order Sent to Lab", "in_design", "in_fabrication", "quality_check"].includes(order.status)) {
-        return (
-          <div className="flex gap-2 items-center flex-wrap">
-            <button
-              onClick={() => updateDbStatus(order.id, "Order Received")}
-              className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-600 text-purple-650 hover:text-white border border-purple-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
-            >
-              Mark as Received from Lab
-            </button>
-            <button
-              onClick={() => handleOpenReworkModal(order)}
-              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
-            >
-              Return for Correction
-            </button>
-          </div>
-        );
-      }
-      if (["Received from Lab", "received_from_lab", "Order Received"].includes(order.status)) {
-        return (
-          <div className="flex gap-2 items-center flex-wrap">
-            <button
-              onClick={() => updateDbStatus(order.id, "Fitted")}
-              className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-500 text-teal-500 hover:text-white border border-teal-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
-            >
-              Mark as Delivered to Clinic
-            </button>
-            <button
-              onClick={() => handleOpenReworkModal(order)}
-              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
-            >
-              Return for Correction
-            </button>
-          </div>
-        );
-      }
-      if (order.status === "Fitted" || order.status === "fitted") {
-        return (
-          <div className="flex gap-2 items-center flex-wrap">
-            <button
-              onClick={() => updateDbStatus(order.id, "Completed")}
-              className="px-2.5 py-1.5 bg-success/15 hover:bg-success text-success hover:text-white border border-success/20 rounded-lg text-xs font-bold transition-all cursor-pointer"
-            >
-              Complete Order
-            </button>
-            <button
-              onClick={() => handleOpenReworkModal(order)}
-              className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
-            >
-              Return for Correction
-            </button>
-          </div>
-        );
-      }
-      if (order.status === "Completed" || order.status === "completed") {
-        return (
-          <button
-            onClick={() => handleOpenReworkModal(order)}
-            className="px-2.5 py-1.5 bg-danger/10 hover:bg-danger text-danger hover:text-white border border-danger/10 rounded-lg text-xs font-bold transition-all cursor-pointer"
-          >
-            Return for Correction
-          </button>
-        );
-      }
     } else {
       // Diagnostic / Pathology
-      if (order.status === "Ordered" || order.status === "ordered" || order.status === "Pending" || order.status === "submitted" || order.status === "Submitted") {
-        return (
+      if (["Ordered", "ordered", "Pending", "submitted", "Submitted"].includes(order.status)) {
+        actionButtons = (
           <button
             onClick={() => updateDbStatus(order.id, "Sample Collected")}
             className="px-2.5 py-1.5 bg-primary text-white hover:bg-primary/95 rounded-lg text-xs font-bold transition-all cursor-pointer"
@@ -869,9 +875,8 @@ export default function LabOrders() {
             Confirm Sample Collection
           </button>
         );
-      }
-      if (order.status === "Sample Collected" || order.status === "sample_collected") {
-        return (
+      } else if (["Sample Collected", "sample_collected"].includes(order.status)) {
+        actionButtons = (
           <button
             onClick={() => handleOpenDispatchModal(order)}
             className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-650 hover:text-white border border-indigo-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
@@ -879,9 +884,8 @@ export default function LabOrders() {
             Send to Lab
           </button>
         );
-      }
-      if (["Sent to Lab", "sent_to_lab", "Order Sent to Lab"].includes(order.status)) {
-        return (
+      } else if (["Sent to Lab", "sent_to_lab", "Order Sent to Lab"].includes(order.status)) {
+        actionButtons = (
           <button
             onClick={() => updateDbStatus(order.id, "Report Received")}
             className="px-2.5 py-1.5 bg-purple-50 hover:bg-purple-600 text-purple-650 hover:text-white border border-purple-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
@@ -889,9 +893,8 @@ export default function LabOrders() {
             Mark as Report Received
           </button>
         );
-      }
-      if (order.status === "Report Received" || order.status === "report_received") {
-        return (
+      } else if (["Report Received", "report_received"].includes(order.status)) {
+        actionButtons = (
           <button
             onClick={() => updateDbStatus(order.id, "Reviewed by Doctor")}
             className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-500 text-teal-500 hover:text-white border border-teal-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
@@ -899,9 +902,8 @@ export default function LabOrders() {
             Mark as Reviewed by Doctor
           </button>
         );
-      }
-      if (order.status === "Reviewed by Doctor" || order.status === "reviewed_by_doctor") {
-        return (
+      } else if (["Reviewed by Doctor", "reviewed_by_doctor"].includes(order.status)) {
+        actionButtons = (
           <button
             onClick={() => updateDbStatus(order.id, "Completed")}
             className="px-2.5 py-1.5 bg-success/15 hover:bg-success text-success hover:text-white border border-success/20 rounded-lg text-xs font-bold transition-all cursor-pointer"
@@ -911,7 +913,67 @@ export default function LabOrders() {
         );
       }
     }
-    return null;
+
+    return (
+      <div className="flex flex-col gap-1.5 w-full items-end">
+        {order.pendingEmailProposal && (
+          <div className="w-full my-1 p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-xs text-left">
+            <div className="flex items-start gap-2">
+              <span className="text-base shrink-0">🤖</span>
+              <div>
+                <span className="font-extrabold text-indigo-950 block text-[10px] uppercase tracking-wider">
+                  Detected Vendor Email Update ({order.pendingEmailProposal.case_id})
+                </span>
+                <p className="text-[11px] text-indigo-900 font-medium">
+                  Proposed Status: <strong className="text-indigo-950 font-black">{order.pendingEmailProposal.proposed_status}</strong>
+                  {order.pendingEmailProposal.tracking_number && (
+                    <> • Tracking: <strong className="text-indigo-950 font-black">{order.pendingEmailProposal.tracking_number}</strong></>
+                  )}
+                  {order.pendingEmailProposal.expected_return_date && (
+                    <> • ETA: <strong>{order.pendingEmailProposal.expected_return_date}</strong></>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    await acceptEmailUpdate(order.id);
+                    triggerToast(`Email update accepted for Case ${order.id}.`);
+                    fetchOrders();
+                  } catch (err) {
+                    triggerToast("Failed to accept update.", "error");
+                  }
+                }}
+                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] rounded-lg shadow-xs cursor-pointer border-none"
+              >
+                ✓ Accept Update
+              </button>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    await dismissEmailUpdate(order.id);
+                    triggerToast(`Proposal dismissed for Case ${order.id}.`);
+                    fetchOrders();
+                  } catch (err) {
+                    triggerToast("Failed to dismiss proposal.", "error");
+                  }
+                }}
+                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-[11px] rounded-lg cursor-pointer border-none"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+        {actionButtons}
+      </div>
+    );
   };
 
   const BOARD_COLUMNS = activeCategory === "Dental Prosthetics" ? [

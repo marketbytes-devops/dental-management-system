@@ -13,7 +13,6 @@ import {
   Download, 
   Eye, 
   PenTool, 
-  RefreshCw, 
   Loader2, 
   FileText,
   User,
@@ -144,13 +143,6 @@ export default function ReceptionistConsentsPage() {
             Track, print, collect digital signatures, or upload paper consent forms for clinic patients.
           </p>
         </div>
-
-        <button
-          onClick={fetchConsents}
-          className="self-start md:self-auto px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh List
-        </button>
       </div>
 
       {/* Filter & Search Bar Card */}

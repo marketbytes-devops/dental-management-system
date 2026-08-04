@@ -8,6 +8,19 @@ from modules.patient.models import PatientModel
 from shared.utils.auth import verify_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
+
+def get_optional_current_user(
+    token: str = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db)
+):
+    if not token:
+        return None
+    try:
+        payload = verify_token(token)
+        return payload
+    except Exception:
+        return None
 
 
 def get_current_user(

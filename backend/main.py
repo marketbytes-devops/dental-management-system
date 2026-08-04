@@ -96,6 +96,12 @@ try:
             add_col_if_missing("original_case_id", "VARCHAR")
             add_col_if_missing("tech_notes", "VARCHAR")
             add_col_if_missing("email_sent_at", "VARCHAR")
+            add_col_if_missing("patient_total_amount", "FLOAT DEFAULT 3500.0")
+            add_col_if_missing("patient_amount_paid", "FLOAT DEFAULT 0.0")
+            add_col_if_missing("patient_balance_due", "FLOAT DEFAULT 3500.0")
+            add_col_if_missing("payment_status", "VARCHAR DEFAULT 'Pending Payment'")
+            add_col_if_missing("payment_method", "VARCHAR")
+            add_col_if_missing("date_received", "TIMESTAMP WITH TIME ZONE")
 
             # Also check patient_consents table
             if engine.dialect.name == "sqlite":
@@ -135,6 +141,25 @@ try:
             add_inv_col_if_missing("expiry_date", "VARCHAR")
             add_inv_col_if_missing("batch_number", "VARCHAR")
             add_inv_col_if_missing("unit_price", "FLOAT")
+
+            # Also check medicine_dispenses table
+            if engine.dialect.name == "sqlite":
+                disp_col_query = conn.execute(text("PRAGMA table_info(medicine_dispenses);")).fetchall()
+                existing_disp_cols = [row[1] for row in disp_col_query]
+            else:
+                disp_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='medicine_dispenses';")).fetchall()
+                existing_disp_cols = [row[0] for row in disp_col_query]
+
+            def add_disp_col_if_missing(col_name, col_type):
+                if col_name not in existing_disp_cols:
+                    conn.execute(text(f"ALTER TABLE medicine_dispenses ADD COLUMN {col_name} {col_type};"))
+
+            add_disp_col_if_missing("total_amount", "FLOAT DEFAULT 0.0")
+            add_disp_col_if_missing("amount_paid", "FLOAT DEFAULT 0.0")
+            add_disp_col_if_missing("balance_due", "FLOAT DEFAULT 0.0")
+            add_disp_col_if_missing("payment_status", "VARCHAR DEFAULT 'Pending Payment'")
+            add_disp_col_if_missing("payment_method", "VARCHAR")
+            add_disp_col_if_missing("date_received", "TIMESTAMP WITH TIME ZONE")
 
             # Also check procedures table
             if engine.dialect.name == "sqlite":
@@ -210,23 +235,8 @@ try:
 except Exception as e:
     print(f"Error running database migrations: {e}")
 
-# Seed default admin user if not exists
 db = SessionLocal()
 try:
-    admin_exists = db.query(UserModel).filter(UserModel.username == "admin").first()
-    if not admin_exists:
-        admin_user = UserModel(
-            name="Admin User",
-            email="admin@smilecare.com",
-            username="admin",
-            password_hash=hash_password("admin123"),
-            roles=["Admin"],
-            specialties=[],
-            status="Active"
-        )
-        db.add(admin_user)
-        db.commit()
-    
     # Seed default lab vendors if table is empty
     vendor_count = db.query(LabVendorModel).count()
     if vendor_count == 0:

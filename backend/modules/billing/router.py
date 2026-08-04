@@ -276,7 +276,32 @@ def get_payments(db: Session = Depends(get_db)):
 
 @router.post("/payment", response_model=PaymentResponse)
 def create_payment(payment: PaymentCreate, db: Session = Depends(get_db)):
-    new_payment = PaymentModel(**payment.dict())
+    pay_data = payment.dict()
+    inv_id = pay_data.get("invoice_id")
+
+    inv = db.query(InvoiceModel).filter(InvoiceModel.id == inv_id).first() if inv_id else None
+    if not inv:
+        inv = db.query(InvoiceModel).first()
+        if not inv:
+            inv = InvoiceModel(
+                patient_token="PAT-GENERAL",
+                total_amount=pay_data.get("amount", 0.0),
+                amount_paid=pay_data.get("amount", 0.0),
+                balance_due=0.0,
+                status="Paid"
+            )
+            db.add(inv)
+            db.commit()
+            db.refresh(inv)
+        pay_data["invoice_id"] = inv.id
+
+    new_payment = PaymentModel(
+        invoice_id=pay_data["invoice_id"],
+        amount=pay_data["amount"],
+        payment_method=pay_data["payment_method"],
+        transaction_id=pay_data.get("transaction_id"),
+        type=pay_data.get("type", "Payment")
+    )
     db.add(new_payment)
     db.commit()
     db.refresh(new_payment)
@@ -343,7 +368,17 @@ def get_patient_ledgers(db: Session = Depends(get_db)):
         if not token:
             continue
         pat = patient_map.get(token)
-        patient_name = pat.name if pat else "Unknown Patient"
+        if not pat:
+            token_clean = token.replace("PT-", "").replace("CASE-", "")
+            for p_tok, p_obj in patient_map.items():
+                if token_clean and (token_clean in p_tok or p_tok.replace("PT-", "") in token):
+                    pat = p_obj
+                    break
+
+        if not pat or pat.name == "Unknown Patient":
+            continue
+
+        patient_name = pat.name
         patient_phone = pat.phone if pat else ""
 
         br_list = requests_by_patient.get(token, [])
@@ -358,14 +393,24 @@ def get_patient_ledgers(db: Session = Depends(get_db)):
             if not source_tag or source_tag == 'None':
                 source_tag = 'consultation'
 
+            # Clean notes (remove Clinical Workspace and Automated Consultation text)
+            clean_notes = br.notes
+            if clean_notes:
+                cn_lower = clean_notes.lower()
+                if "clinical workspace" in cn_lower or "automated consultation" in cn_lower or "diagnosis visit" in cn_lower:
+                    clean_notes = None
+
             # Build a meaningful title from procedures or notes
             if br.procedures and isinstance(br.procedures, list) and len(br.procedures) > 0:
-                proc_names = [p.get("name", "") for p in br.procedures if p.get("name")]
-                item_title = ", ".join(proc_names) if proc_names else f"{source_tag.capitalize()} Charge"
-            elif br.notes and br.notes.strip():
-                item_title = br.notes.strip()
+                proc_names = [p.get("name") or p.get("title", "") for p in br.procedures if (p.get("name") or p.get("title"))]
+                item_title = ", ".join(proc_names) if proc_names else ("Treatment Plan" if "treatment" in source_tag else "Treatment Fee")
+            elif clean_notes and clean_notes.strip():
+                item_title = clean_notes.strip()
             else:
-                item_title = f"{source_tag.capitalize()} Charge"
+                item_title = "Treatment Plan" if "treatment" in source_tag else "Treatment Fee"
+
+            if "consultation" in item_title.lower() or "clinical" in item_title.lower():
+                item_title = "Treatment Fee"
 
             stacked_items.append({
                 "id": f"br-{br.id}",
@@ -375,7 +420,7 @@ def get_patient_ledgers(db: Session = Depends(get_db)):
                 "doctor_name": br.doctor_name,
                 "amount": float(br.total_amount or 0.0),
                 "status": br.status,
-                "notes": br.notes,
+                "notes": clean_notes,
                 "procedures": br.procedures or [],
                 "date": br.created_at.isoformat() if br.created_at else None
             })
@@ -428,8 +473,13 @@ def get_patient_ledgers(db: Session = Depends(get_db)):
             "payments": patient_payments
         })
 
-    # Sort ledgers by total_charges desc
-    ledgers.sort(key=lambda x: x["total_charges"], reverse=True)
+    # Sort ledgers: New/unpaid bills (outstanding_balance > 0 or pending items) FIRST, then latest date desc
+    def ledger_sort_key(l):
+        has_pending = 1 if l["outstanding_balance"] > 0 or any(i.get("status") == "Pending" for i in l["stacked_items"]) else 0
+        latest_date = max([i.get("date") or "" for i in l["stacked_items"]], default="")
+        return (has_pending, latest_date)
+
+    ledgers.sort(key=ledger_sort_key, reverse=True)
     return ledgers
 
 
@@ -476,14 +526,39 @@ def get_receipt(billing_request_id: int, db: Session = Depends(get_db)):
         doctor_working_hours = doctor_model.working_hours or {}
 
     # Build medication line items with prices
-    medications = dispense.medications if dispense and dispense.medications else []
+    raw_meds = []
+    if br.procedures and isinstance(br.procedures, list):
+        for p in br.procedures:
+            p_name = str(p.get("name") or p.get("title") or "").strip()
+            if "medicine:" in p_name.lower():
+                clean_name = p_name.replace("Medicine:", "").replace("medicine:", "").strip()
+                raw_meds.append({
+                    "medicine": clean_name,
+                    "unit_price": float(p.get("rate") or p.get("cost") or 0.0),
+                    "schedule": p.get("schedule", ""),
+                    "timing": p.get("timing", ""),
+                    "duration": p.get("duration", "")
+                })
+
+    if not raw_meds and dispense and dispense.medications:
+        for m in dispense.medications:
+            raw_meds.append({
+                "medicine": m.get("medicine") or m.get("name") or "",
+                "unit_price": float(m.get("line_total") or m.get("unit_price") or 0.0),
+                "schedule": m.get("schedule", ""),
+                "timing": m.get("timing", ""),
+                "duration": m.get("duration", "")
+            })
+
     medication_line_items = []
     medication_total = 0.0
 
-    for med in medications:
+    for med in raw_meds:
         med_name = (med.get("medicine") or med.get("name") or "").strip()
+        if not med_name:
+            continue
         inventory_entry = inventory_price_map.get(med_name.lower())
-        unit_price = inventory_entry["unit_price"] if inventory_entry else 0.0
+        unit_price = med.get("unit_price") if med.get("unit_price") and med.get("unit_price") > 0 else (inventory_entry["unit_price"] if inventory_entry else 0.0)
         medication_total += unit_price
 
         medication_line_items.append({
@@ -492,7 +567,7 @@ def get_receipt(billing_request_id: int, db: Session = Depends(get_db)):
             "timing": med.get("timing", ""),
             "duration": med.get("duration", ""),
             "unit_price": unit_price,
-            "found_in_inventory": inventory_entry is not None
+            "found_in_inventory": inventory_entry is not None or unit_price > 0
         })
 
     # Fetch dynamic active consultation tariff from admin clinic settings
@@ -531,15 +606,27 @@ def get_receipt(billing_request_id: int, db: Session = Depends(get_db)):
         "website": "www.smilecare.com"
     }
 
+    proc_name = "Treatment Procedure"
+    if br.procedures and isinstance(br.procedures, list) and len(br.procedures) > 0:
+        proc_names = [p.get("name") or p.get("title", "") for p in br.procedures if (p.get("name") or p.get("title"))]
+        if proc_names:
+            proc_name = ", ".join(proc_names)
+    elif br.source_type == "consultation":
+        proc_name = "Treatment Procedure"
+    else:
+        proc_name = "Treatment Plan Procedure"
+
     return {
         "clinic": clinic_info,
         "receipt_id": f"RCP-{br.id:05d}",
         "visit_date": br.created_at.isoformat() if br.created_at else None,
         "doctor_name": br.doctor_name,
         "doctor_working_hours": doctor_working_hours,
-        "patient_name": patient.name if patient else "Unknown Patient",
+        "patient_name": patient.name if patient else "Patient",
         "patient_token": br.patient_token,
         "patient_phone": patient.phone if patient else "",
+        "source_type": br.source_type or "treatment",
+        "procedure_name": proc_name,
         "consultation_fee": consultation_fee,
         "medications": medication_line_items,
         "medication_total": medication_total,

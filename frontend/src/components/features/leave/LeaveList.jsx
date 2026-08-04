@@ -74,6 +74,15 @@ export default function LeaveList({ userId, requests, onCancel, isAdmin = false,
                   <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${getStatusBadge(req.status)}`}>
                     {req.status}
                   </span>
+                  {(isPending || isAdmin) && onCancel && (
+                    <button
+                      onClick={() => onCancel(req.id)}
+                      className="text-[10px] text-red-600 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer hover:underline transition-colors mt-1"
+                      title={isAdmin ? "Delete leave request" : "Delete pending request"}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
+                  )}
                 </div>
               </div>
 

@@ -7,7 +7,7 @@ import { parseDoctorSpecialties } from "@/utils/specialtyUtils";
 
 
 const STATUS_MAP = {
-  "Available": { key: "available", label: "Available", accent: "bg-green-500", avatar: "bg-green-50 text-green-800", pill: "bg-green-50 text-green-800 border-green-300" },
+  "On Duty": { key: "on_duty", label: "On Duty", accent: "bg-green-500", avatar: "bg-green-50 text-green-800", pill: "bg-green-50 text-green-800 border-green-300" },
   "In Treatment": { key: "treatment", label: "In treatment", accent: "bg-blue-500", avatar: "bg-blue-50 text-blue-800", pill: "bg-blue-50 text-blue-800 border-blue-300" },
   "On Break": { key: "break", label: "On break", accent: "bg-amber-500", avatar: "bg-amber-50 text-amber-800", pill: "bg-amber-50 text-amber-800 border-amber-300" },
   "Off Duty": { key: "off", label: "Off duty", accent: "bg-red-400", avatar: "bg-red-50 text-red-800", pill: "bg-red-50 text-red-800 border-red-300" },
@@ -15,7 +15,7 @@ const STATUS_MAP = {
 
 const FILTERS = [
   { key: "all", label: "All doctors" },
-  { key: "available", label: "Available" },
+  { key: "on_duty", label: "On Duty" },
   { key: "treatment", label: "In treatment" },
   { key: "break", label: "On break" },
   { key: "off", label: "Off duty" },
@@ -23,7 +23,7 @@ const FILTERS = [
 
 const STATS = [
   { key: "all", label: "Total", numCls: "text-gray-900" },
-  { key: "available", label: "Available", numCls: "text-green-800" },
+  { key: "on_duty", label: "On Duty", numCls: "text-green-800" },
   { key: "treatment", label: "In treatment", numCls: "text-blue-800" },
   { key: "break", label: "On break", numCls: "text-amber-800" },
   { key: "off", label: "Off duty", numCls: "text-red-700" },
@@ -46,7 +46,11 @@ export default function ReceptionistDoctors() {
     }
   };
 
-  useEffect(() => { fetchDoctors(); }, []);
+  useEffect(() => {
+    fetchDoctors();
+    const interval = setInterval(fetchDoctors, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleToggleStatus = async (id) => {
     try {
@@ -71,7 +75,7 @@ export default function ReceptionistDoctors() {
 
   const activePillCls = {
     all: "bg-gray-100 text-gray-800 border-gray-300",
-    available: "bg-green-50 text-green-800 border-green-300",
+    on_duty: "bg-green-50 text-green-800 border-green-300",
     treatment: "bg-blue-50 text-blue-800 border-blue-300",
     break: "bg-amber-50 text-amber-800 border-amber-300",
     off: "bg-red-50 text-red-800 border-red-300",

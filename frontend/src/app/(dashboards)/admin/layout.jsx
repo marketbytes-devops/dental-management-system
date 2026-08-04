@@ -21,13 +21,24 @@ export default function AdminLayout({ children }) {
   const [readTabMap, setReadTabMap] = useState({});
   const [readNotifIds, setReadNotifIds] = useState({});
 
+  const getNotifStorageKey = () => {
+    if (typeof window === "undefined") return "admin_read_notif_ids";
+    try {
+      const savedUser = localStorage.getItem("staff_user");
+      const userId = savedUser ? JSON.parse(savedUser).id : null;
+      return userId ? `read_notif_ids_${userId}` : "admin_read_notif_ids";
+    } catch (e) {
+      return "admin_read_notif_ids";
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
         const savedTabMap = localStorage.getItem("admin_tab_read_map");
         if (savedTabMap) setReadTabMap(JSON.parse(savedTabMap));
 
-        const savedNotifIds = localStorage.getItem("admin_read_notif_ids");
+        const savedNotifIds = localStorage.getItem(getNotifStorageKey());
         if (savedNotifIds) setReadNotifIds(JSON.parse(savedNotifIds));
       } catch (e) {
         console.warn("Failed to parse admin notification cache:", e);
@@ -140,7 +151,7 @@ export default function AdminLayout({ children }) {
     setReadNotifIds((prev) => {
       const updated = { ...prev, [id]: true };
       try {
-        localStorage.setItem("admin_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {
         // ignore
       }
@@ -155,7 +166,7 @@ export default function AdminLayout({ children }) {
         updated[n.id] = true;
       });
       try {
-        localStorage.setItem("admin_read_notif_ids", JSON.stringify(updated));
+        localStorage.setItem(getNotifStorageKey(), JSON.stringify(updated));
       } catch (e) {
         // ignore
       }

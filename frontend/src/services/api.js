@@ -435,6 +435,28 @@ export const createLabRework = async (id, statusData) => {
   return response.data;
 };
 
+export const claimLabOrder = async (id) => {
+  const response = await client.post(`/lab/orders/${id}/claim`);
+  return response.data;
+};
+
+export const simulateVendorInboundEmail = async (payload) => {
+  const response = await client.post("/lab/inbound-email", payload);
+  return response.data;
+};
+
+
+
+export const acceptEmailUpdate = async (id) => {
+  const response = await client.post(`/lab/orders/${id}/accept-email-update`);
+  return response.data;
+};
+
+export const dismissEmailUpdate = async (id) => {
+  const response = await client.post(`/lab/orders/${id}/dismiss-email-update`);
+  return response.data;
+};
+
 export const getLabComments = async (id) => {
   const response = await client.get(`/lab/orders/${id}/comments`);
   return response.data;
@@ -542,6 +564,8 @@ export const deleteTreatmentPlanStep = async (stepId) => {
   const response = await client.delete(`/treatment-plan/step/${stepId}`);
   return response.data;
 };
+
+
 
 // ==========================================
 // 8. Prescriptions & Referrals API Endpoints
@@ -722,6 +746,16 @@ export const updateDispenseStatus = async (dispenseId, status = "Dispensed") => 
   return response.data;
 };
 
+export const collectDispensingPayment = async (dispenseId, payload) => {
+  const response = await client.post(`/patient/dispensing/${dispenseId}/collect-payment`, payload);
+  return response.data;
+};
+
+export const collectLabOrderPayment = async (orderId, payload) => {
+  const response = await client.post(`/lab/orders/${orderId}/collect-payment`, payload);
+  return response.data;
+};
+
 export const getPatientLedgers = async () => {
   const response = await client.get("/billing/patient-ledgers");
   return response.data;
@@ -766,37 +800,6 @@ export const notifyPatientForLabOrder = async (orderId, note) => {
   return response.data;
 };
 
-// ==========================================
-// 15. Support & Complaint Management
-// ==========================================
-
-export const getMyComplaints = async () => {
-  try {
-    const response = await client.get("/support/complaints");
-    return response.data;
-  } catch (err) {
-    return [];
-  }
-};
-
-export const submitComplaint = async (data) => {
-  const response = await client.post("/support/complaints", data);
-  return response.data;
-};
-
-export const reopenComplaint = async (id, note) => {
-  const response = await client.put(`/support/complaints/${id}/reopen`, { note });
-  return response.data;
-};
-
-export const getComplaintLogs = async (id) => {
-  try {
-    const response = await client.get(`/support/complaints/${id}/logs`);
-    return response.data;
-  } catch (err) {
-    return [];
-  }
-};
 
 export const getConsultationFees = async () => {
   const response = await client.get("/payment/consultation-fees");
@@ -808,7 +811,50 @@ export const updateConsultationFees = async (tariffData) => {
   return response.data;
 };
 
-<<<<<<< HEAD
+
+// ==========================================
+// 14. Support & Complaints API Endpoints
+// ==========================================
+
+/**
+ * Fetch all complaints filed by the currently logged-in staff member.
+ * @returns {Array} List of complaint objects
+ */
+export const getMyComplaints = async () => {
+  const response = await client.get("/complaints/mine");
+  return response.data;
+};
+
+/**
+ * Submit a new support/bug-report ticket.
+ * @param {{ subject: string, body: string, related_complaint_id?: number }} payload
+ * @returns {Object} The newly created complaint record
+ */
+export const submitComplaint = async (payload) => {
+  const response = await client.post("/complaints/", payload);
+  return response.data;
+};
+
+/**
+ * Fetch the full audit log (status history) for a given complaint ticket.
+ * @param {number} complaintId
+ * @returns {Array} List of log entries
+ */
+export const getComplaintLogs = async (complaintId) => {
+  const response = await client.get(`/complaints/${complaintId}/logs`);
+  return response.data;
+};
+
+/**
+ * Reopen a resolved or closed complaint with a reason.
+ * @param {number} complaintId
+ * @param {string} reason - Text reason for re-opening
+ * @returns {Object} Updated complaint record
+ */
+export const reopenComplaint = async (complaintId, reason) => {
+  const response = await client.post(`/complaints/${complaintId}/reopen`, { reason });
+  return response.data;
+};
 export const getAnalyticsSummary = async () => {
   const response = await client.get("/billing/analytics/summary");
   return response.data;
@@ -816,29 +862,6 @@ export const getAnalyticsSummary = async () => {
 
 export const getAnalyticsReports = async () => {
   const response = await client.get("/billing/analytics/reports");
-=======
-// ==========================================
-// 13. Admin Lab Pricing Catalog API Endpoints
-// ==========================================
-
-export const getLabPricingCatalog = async () => {
-  const response = await client.get("/lab/pricing-catalog");
-  return response.data;
-};
-
-export const createLabPricingItem = async (payload) => {
-  const response = await client.post("/lab/pricing-catalog", payload);
-  return response.data;
-};
-
-export const updateLabPricingItem = async (id, payload) => {
-  const response = await client.put(`/lab/pricing-catalog/${id}`, payload);
-  return response.data;
-};
-
-export const deleteLabPricingItem = async (id) => {
-  const response = await client.delete(`/lab/pricing-catalog/${id}`);
->>>>>>> 676f96cf3c75019bec9a9e488d5f2c6e2e0de7f5
   return response.data;
 };
 

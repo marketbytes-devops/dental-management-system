@@ -453,13 +453,18 @@ def get_doctors_roster(db: Session = Depends(get_db)):
             LeaveRequestModel.end_date >= today_str
         ).first()
         
-        status_map = "On Duty"
+        clean_name = doc.name.replace("Dr.", "").strip()
+        doctor_obj = db.query(DoctorModel).filter(
+            (DoctorModel.user_id == doc.id) | 
+            (DoctorModel.name.ilike(f"%{clean_name}%"))
+        ).first()
+        status_map = "Off Duty"
         if has_leave_today:
             status_map = "On Leave"
-        elif doc.status == "Inactive":
+        elif doctor_obj and doctor_obj.status and doctor_obj.status != "-":
+            status_map = doctor_obj.status
+        else:
             status_map = "Off Duty"
-        elif doc.status == "On Break":
-            status_map = "On Break"
             
         roster.append({
             "id": doc.id,
@@ -468,7 +473,8 @@ def get_doctors_roster(db: Session = Depends(get_db)):
             "operatory": f"Operatory {idx % 6 + 1}", 
             "shift": "09:00 AM - 05:00 PM" if idx % 2 == 0 else "10:00 AM - 06:00 PM",
             "status": status_map,
-            "patientsCount": active_count
+            "patientsCount": active_count,
+            "profile_picture": doc.profile_picture
         })
         
     return roster

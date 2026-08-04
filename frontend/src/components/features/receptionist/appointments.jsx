@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { CalendarDays, Clock, CheckCircle2, Loader2, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { 
+import client, { 
   getDoctorLeaves, 
   getTodayAppointments, 
   getTomorrowAppointments, 

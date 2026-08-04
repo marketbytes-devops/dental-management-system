@@ -74,8 +74,8 @@ function LoginContent() {
   const [portalType, setPortalType] = useState(null); // 'patient', 'staff', or null
 
   useEffect(() => {
-    const roleParam = searchParams.get("role");
-    if (roleParam === "patient") {
+    const roleParam = searchParams.get("role") || searchParams.get("roles");
+    if (roleParam === "patient" || searchParams.get("doctorId")) {
       setPortalType("patient");
     } else if (roleParam === "staff") {
       setPortalType("staff");

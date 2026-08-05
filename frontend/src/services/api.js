@@ -245,11 +245,15 @@ export const getDoctorAvailableSlots = async (doctorId, date) => {
 // 4. Appointments & Queue API Endpoints
 // ==========================================
 
-export const getFrontdeskDoctors = async (date) => {
-  const url = date ? `/frontdesk/doctors?date=${encodeURIComponent(date)}` : "/frontdesk/doctors";
+export const getFrontdeskDoctors = async (date, includeAll = false) => {
+  const params = [];
+  if (date) params.push(`date=${encodeURIComponent(date)}`);
+  if (includeAll) params.push("include_all=true");
+  const url = params.length > 0 ? `/frontdesk/doctors?${params.join("&")}` : "/frontdesk/doctors";
   const response = await client.get(url);
   return response.data;
 };
+
 
 export const createAppointment = async (appointmentData) => {
   const response = await client.post("/frontdesk/appointments", appointmentData);

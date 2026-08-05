@@ -39,22 +39,21 @@ export default function PrintableTokenSheet({
     if (typeof window !== "undefined") {
       setTimeout(() => {
         window.print();
-      }, 150);
+      }, 100);
     }
   };
 
   const patientName = patientProfile?.name || appointment?.patient_name || appointment?.patient?.name || "Patient";
   const patientToken = patientProfile?.token || appointment?.patient_token || appointment?.patient?.token || `PT-${appointment?.patient_id || '001'}`;
   const phone = patientProfile?.phone || appointment?.patient_phone || appointment?.patient?.phone || "N/A";
-  const doctorName = appointment?.doctor || appointment?.doctor_name || "Dr. Anoop Nair";
-  const treatment = appointment?.treatment || appointment?.treatment_type || "General Consultation";
+  const doctorName = appointment?.doctor || appointment?.doctor_name || "Dr. Priya";
+  const treatment = appointment?.treatment || appointment?.treatment_type || "Consultation";
   const date = appointment?.date || appointment?.appointment_date || new Date().toISOString().split("T")[0];
-  const time = appointment?.time || appointment?.appointment_time || "10:00 AM";
-  const symptoms = appointment?.symptoms || "Routine dental checkup and screening.";
+  const time = appointment?.time || appointment?.appointment_time || "12:30 PM";
+  const symptoms = appointment?.symptoms || appointment?.chiefComplaint || "Reason: routine | Pain: 3/10 | Symptoms: sensitivity";
   const txnId = paymentDetails?.transactionId || appointment?.transaction_id || `TXN-${Date.now().toString().slice(-6)}`;
   const payMethod = paymentDetails?.method || appointment?.payment_method || "UPI / Online";
 
-  // Determine actual payment made from paymentDetails, appointment props, or consultation tariff database
   const getActualPaidAmount = () => {
     if (paymentDetails?.amount !== undefined && paymentDetails?.amount !== null) {
       return Number(paymentDetails.amount);
@@ -72,7 +71,6 @@ export default function PrintableTokenSheet({
       return Number(appointment.amount);
     }
 
-    // Fallback to fetched active consultation tariffs from database
     if (fetchedFee) {
       const trLower = String(treatment).toLowerCase();
       if (trLower.includes("follow") || trLower.includes("follow-up")) {
@@ -84,10 +82,12 @@ export default function PrintableTokenSheet({
       return Number(fetchedFee.general_consultation_fee || 500);
     }
 
-    return 500; // Default consultation tariff
+    return 200;
   };
 
   const amountPaid = getActualPaidAmount();
+  const formattedTokenNo = queueNo ? `#${queueNo}` : "#1";
+  const formattedPassId = `OPD-${(appointment?.id || Date.now()).toString().slice(-6)}`;
 
   return (
     <div className="space-y-5">
@@ -101,7 +101,7 @@ export default function PrintableTokenSheet({
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-gray-900">Hospital Medical Pass & Receipt</h3>
               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase">
-                OPD Token Issued
+                OPD TOKEN ISSUED
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
@@ -122,11 +122,11 @@ export default function PrintableTokenSheet({
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────────────
-          HOSPITAL MEDICAL PASS (Standard OPD Receipt & Queue Pass - Half Paper Layout)
+          HOSPITAL MEDICAL PASS (Clean Layout - Borderless on Print)
           ───────────────────────────────────────────────────────────────────────────── */}
       <div className="printable-pass-sheet bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-5 text-gray-900 max-w-2xl mx-auto">
         
-        {/* Hospital Header with SmileCare ToothIcon Logo */}
+        {/* Hospital Header */}
         <div className="border-b border-gray-200 pb-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-sm">
@@ -152,19 +152,19 @@ export default function PrintableTokenSheet({
               Date: <span className="text-gray-900 font-mono font-bold">{new Date().toLocaleDateString("en-IN")}</span>
             </div>
             <div className="text-[10px] text-gray-400 font-mono">
-              PASS ID: #OPD-{Date.now().toString().slice(-6)}
+              PASS ID: #{formattedPassId}
             </div>
           </div>
         </div>
 
-        {/* Token & Cabin Banner (Clean, Bright Professional Style) */}
-        <div className="bg-gradient-to-r from-teal-50/70 to-emerald-50/70 border border-teal-100 rounded-xl p-4 grid grid-cols-3 gap-4 items-center">
+        {/* Token & Cabin Banner */}
+        <div className="bg-teal-50/70 border border-teal-100 rounded-xl p-4 grid grid-cols-3 gap-4 items-center print-banner">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 block">
               QUEUE TOKEN NO.
             </span>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-4xl font-black text-teal-900 tracking-tight">#{queueNo || '01'}</span>
+              <span className="text-4xl font-black text-teal-900 tracking-tight">{formattedTokenNo}</span>
               <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                 isEmergency 
                   ? "bg-rose-100 text-rose-700 border border-rose-200" 
@@ -175,12 +175,9 @@ export default function PrintableTokenSheet({
             </div>
           </div>
 
-          <div className="border-x border-teal-200/60 px-4">
+          <div className="border-x border-teal-200/60 px-4 flex flex-col justify-center">
             <span className="text-[10px] font-bold uppercase text-teal-800 block">ASSIGNED CABIN</span>
             <span className="text-base font-extrabold text-gray-900 block mt-0.5">ROOM 3 • STAGE 1</span>
-            <span className="text-[11px] text-gray-600 font-medium block mt-0.5">
-              {waitTime !== null && waitTime !== undefined ? `Est. Wait: ${waitTime} mins` : "Ready for consultation"}
-            </span>
           </div>
 
           <div className="text-right">
@@ -196,7 +193,7 @@ export default function PrintableTokenSheet({
         </div>
 
         {/* Patient & Consulting Surgeon Information Grid */}
-        <div className="grid grid-cols-2 gap-4 border border-gray-200 rounded-xl p-4 bg-gray-50/50 text-xs">
+        <div className="grid grid-cols-2 gap-4 border border-gray-200 rounded-xl p-4 bg-gray-50/50 text-xs print-grid">
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-gray-400 uppercase block">PATIENT DETAILS</span>
             <p className="font-extrabold text-gray-900 text-sm">{patientName}</p>
@@ -213,7 +210,7 @@ export default function PrintableTokenSheet({
         </div>
 
         {/* OPD Consultation Receipt Table */}
-        <div className="border border-gray-200 rounded-xl overflow-hidden text-xs">
+        <div className="border border-gray-200 rounded-xl overflow-hidden text-xs print-table">
           <div className="bg-gray-100/80 px-4 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider flex justify-between items-center border-b border-gray-200">
             <span>FEE ITEMIZATION</span>
             <span>RECEIPT DETAIL</span>
@@ -251,55 +248,93 @@ export default function PrintableTokenSheet({
           <div>
             <p className="font-semibold text-gray-700">Important Note:</p>
             <p className="text-[10px] text-gray-500 mt-0.5">
-              • Please present this OPD consultation pass at Cabin Room 3 when Token #{queueNo || '01'} is announced.
+              • Please present this OPD consultation pass at Cabin Room 3 when Token {formattedTokenNo} is announced.
             </p>
           </div>
 
           <div className="text-right w-36">
             <div className="border-b border-gray-300 h-6 mb-1"></div>
-            <span className="text-[10px] font-bold uppercase text-gray-400 block">Authorized Registrar</span>
+            <span className="text-[10px] font-bold uppercase text-gray-400 block">AUTHORIZED REGISTRAR</span>
           </div>
         </div>
 
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────────────
-          PRINT STYLES (Half-Paper Receipt Format)
+          PURE PRINT CSS (Hides Browser Headers/Footers & Outer Box Frames)
           ───────────────────────────────────────────────────────────────────────────── */}
       <style jsx global>{`
         @media print {
-          body * {
-            visibility: hidden !important;
-          }
-          .no-print, .no-print * {
+          /* Hide non-printable elements */
+          .no-print, 
+          nav, 
+          aside, 
+          header, 
+          footer, 
+          button {
             display: none !important;
           }
-          .printable-pass-sheet, .printable-pass-sheet * {
-            visibility: visible !important;
+
+          /* Reset page body */
+          html, body {
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            box-shadow: none !important;
           }
+
+          /* Completely strip borders, shadows, rounded corners, padding, and background frames from all parent elements */
+          body *, 
+          div:not(.printable-pass-sheet):not(.printable-pass-sheet *) {
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          /* Format printable pass sheet to render cleanly on paper without an outer card box */
           .printable-pass-sheet {
+            display: block !important;
             position: absolute !important;
-            left: 0 !important;
             top: 0 !important;
+            left: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
-            padding: 16px !important;
+            padding: 15mm 20mm !important;
+            border: none !important;
+            border-radius: 0 !important;
             box-shadow: none !important;
-            border: 1px solid #ddd !important;
-            background: white !important;
-            max-height: 140mm !important;
-            page-break-after: avoid !important;
-            page-break-inside: avoid !important;
+            background: #ffffff !important;
+            color: #000000 !important;
           }
+
+          .print-banner {
+            background: #f0fdf4 !important;
+            border: 1px solid #bbf7d0 !important;
+            border-radius: 6px !important;
+            padding: 12px !important;
+          }
+
+          .print-grid, .print-table {
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 6px !important;
+            background: #ffffff !important;
+            padding: 12px !important;
+          }
+
+          /* Setting page margin: 0 hides default browser print header (date/title) & footer (URL/page#) */
           @page {
             size: A4 portrait;
-            margin: 10mm;
+            margin: 0;
           }
+
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-            color-adjust: exact !important;
           }
         }
       `}</style>

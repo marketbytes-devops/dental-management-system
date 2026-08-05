@@ -48,6 +48,7 @@ export default function DoctorLayout({ children }) {
   const [completedPatientHistory, setCompletedPatientHistory] = useState([]);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [currentDoctorName, setCurrentDoctorName] = useState("Dr. Anoop Nair");
+  const [currentDoctorSpecialty, setCurrentDoctorSpecialty] = useState("General Dentistry");
 
   const getTodayString = () => {
     const d = new Date();
@@ -65,10 +66,16 @@ export default function DoctorLayout({ children }) {
           const user = JSON.parse(savedUser);
           const name = user.name.startsWith("Dr.") ? user.name : `Dr. ${user.name}`;
           setCurrentDoctorName(name);
+          if (user.specialty) {
+            setCurrentDoctorSpecialty(user.specialty);
+          } else if (user.specialties && user.specialties.length > 0) {
+            setCurrentDoctorSpecialty(user.specialties.join(", "));
+          }
         } catch (e) { }
       }
     }
   }, []);
+
 
   const [emergencyAlert, setEmergencyAlert] = useState(null);
   const [hasTriggeredAutoEmergency, setHasTriggeredAutoEmergency] = useState(false);
@@ -519,17 +526,19 @@ export default function DoctorLayout({ children }) {
     const [docName, docSpec] = doctorNameWithSpeciality.split(" - ");
     const refId = `REF-${Math.floor(200 + Math.random() * 800)}`;
     const refDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
-    const clinicNotes = patients[patientToken]?.chiefComplaint || "";
+    const clinicNotes = patients[patientToken]?.chiefComplaint || patients[patientToken]?.clinicalNotes || "";
 
     const newRef = {
       id: refId,
       patientToken,
       referredBy: currentDoctorName,
+      referred_by_specialty: currentDoctorSpecialty || "General Dentistry",
       speciality: docSpec || "General Dentistry",
       targetDoctor: docName,
       date: refDate,
       reason: reason,
       clinicalNotes: clinicNotes,
+      referred_from_notes: clinicNotes,
       teethChart: patients[patientToken]?.teethChart || {},
       status: "Pending",
       myConsultationNotes: "",
@@ -543,11 +552,13 @@ export default function DoctorLayout({ children }) {
         id: newRef.id,
         patient_token: newRef.patientToken,
         referred_by: newRef.referredBy,
+        referred_by_specialty: newRef.referred_by_specialty,
         speciality: newRef.speciality,
         target_doctor: newRef.targetDoctor,
         date: newRef.date,
         reason: newRef.reason,
         clinical_notes: newRef.clinicalNotes,
+        referred_from_notes: newRef.referred_from_notes,
         referral_type: newRef.referralType,
         external_facility: newRef.externalFacility
       });
@@ -564,7 +575,7 @@ export default function DoctorLayout({ children }) {
         ...prev,
         [patientToken]: {
           ...prev[patientToken],
-          timeline: [timelineEvent, ...prev[patientToken].timeline]
+          timeline: [timelineEvent, ...(prev[patientToken]?.timeline || [])]
         }
       }));
       showNotification(`Referral created successfully for patient.`);
@@ -573,6 +584,7 @@ export default function DoctorLayout({ children }) {
       showNotification("Failed to create referral in database: " + (err.message || ""));
     }
   };
+
 
   // Incoming referral response handler
   const handleCompleteReferral = async (refId, consultationNotes, medications) => {
@@ -833,31 +845,60 @@ export default function DoctorLayout({ children }) {
   };
 
   const handleCompleteConsultation = async () => {
-    if (!activeAppointmentId) {
-      showNotification("No active appointment found to complete.");
-      return;
-    }
+    const targetToken = viewingPatientToken || activePatientToken;
+    const currentPatient = patients[targetToken];
 
-    try {
-      await callPatient(activeAppointmentId, "Completed");
-      showNotification(`Consultation completed for ${patients[activePatientToken]?.name || "patient"}.`);
+    // Check if this consultation is for an incoming referral to Doctor B
+    const incomingRef = referrals.find(r => {
+      const matchToken = r.patientToken === targetToken || r.patient_token === targetToken;
+      if (!matchToken) return false;
+      const targetDoc = (r.targetDoctor || r.target_doctor || "").toLowerCase();
+      const targetSpec = (r.speciality || r.specialty || "").toLowerCase();
+      const myName = (currentDoctorName || "").toLowerCase();
+      const mySpec = (currentDoctorSpecialty || "").toLowerCase();
+      return (targetDoc && myName && targetDoc.includes(myName)) || (targetSpec && mySpec && targetSpec.includes(mySpec));
+    });
 
-      if (activePatientToken && !completedPatientHistory.includes(activePatientToken)) {
-        setCompletedPatientHistory(prev => [...prev, activePatientToken]);
+    if (incomingRef) {
+      try {
+        const docBNotes = currentPatient?.clinicalNotes || currentPatient?.chiefComplaint || "Specialty consultation completed.";
+        const docBTreatments = currentPatient?.treatmentPlan || [];
+        await updateReferral(incomingRef.id, {
+          status: "Completed",
+          my_consultation_notes: docBNotes,
+          doctor_b_notes: docBNotes,
+          doctor_b_treatment_plan: docBTreatments
+        });
+        await fetchReferrals();
+        showNotification(`Referral completed & consultation billing recorded for ${incomingRef.referredBy || "Doctor A"}'s patient.`);
+      } catch (refErr) {
+        console.warn("Could not update referral completion status:", refErr);
       }
-
-      setActivePatientToken("");
-      setViewingPatientToken("");
-      setActiveAppointmentId(null);
-      setRxDraft([]);
-
-      router.push("/doctor/dashboard");
-      await fetchQueue();
-    } catch (err) {
-      console.error("Failed to complete consultation:", err);
-      showNotification("Error completing consultation: " + (err.message || "Failed."));
     }
+
+    if (activeAppointmentId) {
+      try {
+        await callPatient(activeAppointmentId, "Completed");
+        await fetchQueue();
+      } catch (err) {
+        console.error("Failed to complete consultation in backend:", err);
+      }
+    }
+
+    showNotification(`Consultation completed for ${currentPatient?.name || "patient"}.`);
+
+    if (targetToken && !completedPatientHistory.includes(targetToken)) {
+      setCompletedPatientHistory(prev => [...prev, targetToken]);
+    }
+
+    setActivePatientToken("");
+    setViewingPatientToken("");
+    setActiveAppointmentId(null);
+    setRxDraft([]);
+
+    router.push("/doctor/dashboard");
   };
+
 
   const handleViewPreviousPatient = () => {
     if (completedPatientHistory.length === 0) {
@@ -1457,7 +1498,8 @@ export default function DoctorLayout({ children }) {
         markAsUnread,
         markAllAsRead,
         setBellAnimating,
-        currentDoctorName
+        currentDoctorName,
+        currentDoctorSpecialty
       }}>
         <div className="flex h-screen bg-background overflow-hidden">
           {/* Sidebar Nav */}

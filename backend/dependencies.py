@@ -1,5 +1,6 @@
 # dependencies.py - Shared authentication & session dependencies
 from fastapi import Depends, HTTPException, status
+from typing import Optional
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from database import get_db

@@ -3,6 +3,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Dict, Any
 from database import get_db
+from dependencies import get_current_user
+import os
+import hmac
+import hashlib
+import razorpay
 from datetime import datetime, timedelta
 import calendar
 from .models import (
@@ -481,6 +486,328 @@ def get_patient_ledgers(db: Session = Depends(get_db)):
 
     ledgers.sort(key=ledger_sort_key, reverse=True)
     return ledgers
+
+@router.get("/patient/me")
+def get_my_ledger(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """Fetch the ledger for the currently logged-in patient."""
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload: not a patient")
+    
+    from modules.patient.models import PatientModel
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+        
+    token = patient.token or ""
+    
+    billing_requests = db.query(BillingRequestModel).filter(
+        (BillingRequestModel.patient_token == token) | (BillingRequestModel.patient_token.ilike(f"%{token.replace('PT-', '')}%"))
+    ).all() if token else []
+    
+    invoices = db.query(InvoiceModel).filter(
+        InvoiceModel.patient_id == str(patient_id)
+    ).all()
+    
+    inv_ids = [inv.id for inv in invoices]
+    payments = db.query(PaymentModel).filter(PaymentModel.invoice_id.in_(inv_ids)).all() if inv_ids else []
+
+    payments_by_invoice = {}
+    for p in payments:
+        payments_by_invoice.setdefault(p.invoice_id, []).append(p)
+
+    stacked_items = []
+    total_charges = 0.0
+
+    for br in billing_requests:
+        total_charges += float(br.total_amount or 0.0)
+        source_tag = getattr(br, 'source_type', None) or 'consultation'
+        if not source_tag or source_tag == 'None':
+            source_tag = 'consultation'
+
+        clean_notes = br.notes
+        if clean_notes:
+            cn_lower = clean_notes.lower()
+            if "clinical workspace" in cn_lower or "automated consultation" in cn_lower or "diagnosis visit" in cn_lower:
+                clean_notes = None
+
+        if br.procedures and isinstance(br.procedures, list) and len(br.procedures) > 0:
+            proc_names = [p.get("name") or p.get("title", "") for p in br.procedures if (p.get("name") or p.get("title"))]
+            item_title = ", ".join(proc_names) if proc_names else ("Treatment Plan" if "treatment" in source_tag else "Treatment Fee")
+        elif clean_notes and clean_notes.strip():
+            item_title = clean_notes.strip()
+        else:
+            item_title = "Treatment Plan" if "treatment" in source_tag else "Treatment Fee"
+
+        if "consultation" in item_title.lower() or "clinical" in item_title.lower():
+            item_title = "Treatment Fee"
+
+        stacked_items.append({
+            "id": f"br-{br.id}",
+            "type": "billing_request",
+            "source_type": source_tag,
+            "title": item_title,
+            "doctor_name": br.doctor_name,
+            "amount": float(br.total_amount or 0.0),
+            "status": br.status,
+            "notes": clean_notes,
+            "procedures": br.procedures or [],
+            "date": br.created_at.isoformat() if br.created_at else None
+        })
+
+    for inv in invoices:
+        if not inv.billing_request_id:
+            total_charges += float(inv.net_amount or 0.0)
+            stacked_items.append({
+                "id": f"inv-{inv.id}",
+                "type": "invoice",
+                "source_type": "treatment",
+                "title": f"Invoice #{inv.invoice_number}",
+                "doctor_name": "Clinic Staff",
+                "amount": float(inv.net_amount or 0.0),
+                "status": inv.status,
+                "notes": f"Invoice #{inv.invoice_number}",
+                "procedures": [],
+                "date": inv.created_at.isoformat() if inv.created_at else None
+            })
+
+    patient_payments = []
+    total_paid = 0.0
+    for inv in invoices:
+        inv_pay_list = payments_by_invoice.get(inv.id, [])
+        for p in inv_pay_list:
+            total_paid += float(p.amount or 0.0)
+            patient_payments.append({
+                "id": p.id,
+                "amount": float(p.amount),
+                "payment_method": p.payment_method,
+                "transaction_id": p.transaction_id,
+                "date": p.created_at.isoformat() if p.created_at else None
+            })
+
+    stacked_items.sort(key=lambda x: x["date"] or "", reverse=True)
+    outstanding_balance = max(0.0, total_charges - total_paid)
+
+    # Fetch consultation charges (actual paid transactions)
+    from modules.frontdesk.models import TransactionModel
+    from modules.payment.models import ConsultationPaymentModel
+    from modules.frontdesk.models import AppointmentModel
+
+    consultation_transactions = []
+    
+    # 1. Fetch from TransactionModel
+    txs = db.query(TransactionModel, AppointmentModel).join(
+        AppointmentModel, TransactionModel.appointment_id == AppointmentModel.id
+    ).filter(TransactionModel.patient_id == patient_id).all()
+    
+    for tx, appt in txs:
+        consultation_transactions.append({
+            "id": f"tx-{tx.id}",
+            "type": "consultation",
+            "invoiceNo": f"CNS-{tx.id}",
+            "title": appt.treatment_type or "General Consultation",
+            "doctor_name": appt.doctor_name,
+            "amount": float(tx.amount),
+            "status": "Paid",
+            "payment_method": tx.payment_method,
+            "date": tx.transaction_date.isoformat() if tx.transaction_date else (appt.appointment_date.isoformat() if appt.appointment_date else None)
+        })
+        
+    # 2. Fetch from ConsultationPaymentModel (Razorpay online payments)
+    if token:
+        online_txs = db.query(ConsultationPaymentModel, AppointmentModel).join(
+            AppointmentModel, ConsultationPaymentModel.appointment_id == AppointmentModel.id
+        ).filter(ConsultationPaymentModel.patient_token == token).all()
+        
+        for c_tx, appt in online_txs:
+            # Avoid duplicates if the same transaction was logged in both places
+            if any(c.get("amount") == float(c_tx.amount) and c.get("title") == (appt.treatment_type or "General Consultation") and c.get("date").startswith(str(appt.appointment_date)) for c in consultation_transactions):
+                continue
+                
+            consultation_transactions.append({
+                "id": f"ctx-{c_tx.id}",
+                "type": "consultation",
+                "invoiceNo": f"ONL-{c_tx.id}",
+                "title": appt.treatment_type or "General Consultation",
+                "doctor_name": appt.doctor_name,
+                "amount": float(c_tx.amount),
+                "status": "Paid",
+                "payment_method": c_tx.payment_method,
+                "date": c_tx.created_at.isoformat() if c_tx.created_at else (appt.appointment_date.isoformat() if appt.appointment_date else None)
+            })
+
+    consultation_transactions.sort(key=lambda x: x["date"] or "", reverse=True)
+
+    return {
+        "patient_token": token,
+        "patient_name": patient.name,
+        "patient_phone": patient.phone or "",
+        "total_charges": total_charges,
+        "total_paid": total_paid,
+        "outstanding_balance": outstanding_balance,
+        "stacked_items": stacked_items,
+        "payments": patient_payments,
+        "consultations": consultation_transactions
+    }
+
+
+def _get_razorpay_credentials():
+    from dotenv import load_dotenv
+    backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    env_path = os.path.join(backend_root, ".env")
+    load_dotenv(dotenv_path=env_path, override=True)
+    key_id = os.getenv("RAZORPAY_KEY_ID", "")
+    key_secret = os.getenv("RAZORPAY_KEY_SECRET", "")
+    if not key_id or not key_secret or "rzp_test_XXXX" in key_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Payment gateway not configured. Please contact the clinic administrator.",
+        )
+    return key_id, key_secret
+
+
+@router.post("/patient/payment/create-order")
+def create_patient_payment_order(body: dict, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    item_id_str = body.get("item_id") # e.g., 'br-12' or 'inv-15'
+    amount = float(body.get("amount", 0.0))
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Invalid amount")
+
+    key_id, key_secret = _get_razorpay_credentials()
+    rz_client = razorpay.Client(auth=(key_id, key_secret))
+    amount_paise = int(amount * 100)
+
+    # In a real transaction we'd link this order to a pending payment table,
+    # but since this relies on standard flow, we just generate the order.
+    order_data = {
+        "amount": amount_paise,
+        "currency": "INR",
+        "receipt": f"item_{item_id_str}",
+        "notes": {
+            "item_id": item_id_str,
+            "patient_id": str(patient_id)
+        },
+    }
+
+    try:
+        rz_order = rz_client.order.create(data=order_data)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to create payment order: {str(e)}")
+
+    return {
+        "razorpay_order_id": rz_order["id"],
+        "amount": amount_paise,
+        "currency": "INR",
+        "key_id": key_id,
+        "item_id": item_id_str,
+    }
+
+
+@router.post("/patient/payment/verify")
+def verify_patient_payment(body: dict, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    patient_id = current_user.get("patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    razorpay_order_id = body.get("razorpay_order_id")
+    razorpay_payment_id = body.get("razorpay_payment_id")
+    razorpay_signature = body.get("razorpay_signature")
+    item_id_str = body.get("item_id")
+    amount = float(body.get("amount", 0.0))
+
+    _, key_secret = _get_razorpay_credentials()
+    expected_signature = hmac.new(
+        key_secret.encode("utf-8"),
+        f"{razorpay_order_id}|{razorpay_payment_id}".encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected_signature, razorpay_signature):
+        raise HTTPException(status_code=400, detail="Payment verification failed: invalid signature.")
+
+    # Mark as paid in DB
+    # item_id_str could be 'br-12' or 'inv-15'
+    from modules.patient.models import PatientModel
+    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
+    
+    invoice_id_to_pay = None
+    if item_id_str.startswith("br-"):
+        br_id = int(item_id_str.replace("br-", ""))
+        br = db.query(BillingRequestModel).filter(BillingRequestModel.id == br_id).first()
+        if br:
+            br.status = "Paid"
+            
+            # Find associated invoice if any, or create one
+            inv = db.query(InvoiceModel).filter(InvoiceModel.billing_request_id == br.id).first()
+            if not inv:
+                inv = InvoiceModel(
+                    patient_id=str(patient.id),
+                    invoice_number=f"INV-{int(datetime.utcnow().timestamp())}",
+                    billing_request_id=br.id,
+                    total_amount=amount,
+                    net_amount=amount,
+                    status="Paid"
+                )
+                db.add(inv)
+                db.commit()
+                db.refresh(inv)
+            else:
+                inv.status = "Paid"
+            db.commit()
+            invoice_id_to_pay = inv.id
+    elif item_id_str.startswith("inv-"):
+        inv_id = int(item_id_str.replace("inv-", ""))
+        inv = db.query(InvoiceModel).filter(InvoiceModel.id == inv_id).first()
+        if inv:
+            inv.amount_paid = getattr(inv, 'amount_paid', 0.0) + amount
+            inv.balance_due = max(0, float(inv.net_amount or 0) - float(inv.amount_paid))
+            db.commit()
+            invoice_id_to_pay = inv.id
+    elif item_id_str.startswith("appt-"):
+        appt_id = int(item_id_str.replace("appt-", ""))
+        from modules.frontdesk.models import AppointmentModel
+        appt = db.query(AppointmentModel).filter(AppointmentModel.id == appt_id).first()
+        if appt:
+            appt.payment_status = "Paid"
+            db.commit()
+            
+            # Also insert into ConsultationPaymentModel
+            from modules.payment.models import ConsultationPaymentModel
+            payment_record = ConsultationPaymentModel(
+                appointment_id=appt.id,
+                patient_token=patient.token,
+                patient_name=patient.name,
+                doctor_name=appt.doctor_name,
+                payment_method="Razorpay",
+                razorpay_order_id=razorpay_order_id,
+                razorpay_payment_id=razorpay_payment_id,
+                amount=amount,
+                currency="INR",
+                status="Paid",
+                receptionist_name="Online Self-Pay",
+                is_reconciled=False
+            )
+            db.add(payment_record)
+            db.commit()
+
+    if invoice_id_to_pay:
+        # Create payment record
+        new_payment = PaymentModel(
+            invoice_id=invoice_id_to_pay,
+            amount=amount,
+            payment_method="Razorpay",
+            transaction_id=razorpay_payment_id,
+            type="Online Payment"
+        )
+        db.add(new_payment)
+        db.commit()
+
+    return {"status": "success", "message": "Payment verified and recorded."}
+
 
 
 # --- Receipt Endpoint for a Billing Request ---

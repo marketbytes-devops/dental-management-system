@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { createPaymentOrder, verifyPayment } from "@/services/api";
+import { createPatientPaymentOrder, verifyPatientPayment } from "@/services/api";
 
 export default function PaymentModal({ invoice, onClose, onPaymentSuccess }) {
   const [paymentState, setPaymentState] = useState("loading"); // loading | verifying | success | error | idle
@@ -11,8 +11,8 @@ export default function PaymentModal({ invoice, onClose, onPaymentSuccess }) {
 
     try {
       // Step 1: Create order on backend → get Razorpay order details
-      // Note: We use invoice.id (which maps to appointment ID) and the patientDue amount
-      const order = await createPaymentOrder(invoice.id, invoice.patientDue);
+      // Note: We use invoice.id (which maps to billing request or invoice ID) and the patientDue amount
+      const order = await createPatientPaymentOrder(invoice.id, invoice.patientDue);
 
       // Step 2: Dynamically load the Razorpay checkout script
       await new Promise((resolve, reject) => {
@@ -50,8 +50,9 @@ export default function PaymentModal({ invoice, onClose, onPaymentSuccess }) {
           try {
             setPaymentState("verifying");
             // Step 4: Verify payment signature on the backend
-            await verifyPayment({
-              appointment_id: invoice.id,
+            await verifyPatientPayment({
+              item_id: invoice.id,
+              amount: invoice.patientDue,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,

@@ -749,52 +749,70 @@ export const verifyPayment = async (payload) => {
 export const getDispensingQueue = async () => {
   const response = await client.get("/patient/dispensing");
   return response.data;
-};
+}
 
 export const updateDispenseStatus = async (dispenseId, status = "Dispensed") => {
   const response = await client.put(`/patient/dispensing/${dispenseId}/status`, { status });
   return response.data;
-};
+}
 
 export const collectDispensingPayment = async (dispenseId, payload) => {
   const response = await client.post(`/patient/dispensing/${dispenseId}/collect-payment`, payload);
   return response.data;
-};
+}
 
 export const collectLabOrderPayment = async (orderId, payload) => {
   const response = await client.post(`/lab/orders/${orderId}/collect-payment`, payload);
   return response.data;
-};
+}
 
 export const getPatientLedgers = async () => {
   const response = await client.get("/billing/patient-ledgers");
   return response.data;
-};
+}
+
+export const getMyPatientLedger = async () => {
+  const response = await client.get("/billing/patient/me");
+  return response.data;
+}
+
+export const createPatientPaymentOrder = async (itemId, amount) => {
+  const response = await client.post("/billing/patient/payment/create-order", {
+    item_id: itemId,
+    amount: amount,
+  });
+  return response.data;
+}
+
+export const verifyPatientPayment = async (payload) => {
+  const response = await client.post("/billing/patient/payment/verify", payload);
+  return response.data;
+}
 
 export const createPayment = async (paymentData) => {
   const response = await client.post("/billing/payment", paymentData);
   return response.data;
-};
+}
 
 export const getReceipt = async (billingRequestId) => {
   const response = await client.get(`/billing/receipt/${billingRequestId}`);
   return response.data;
-};
+}
 
 export const sendLabBillingRequest = async (payload) => {
   const response = await client.post("/billing/lab-request", payload);
   return response.data;
-};
+}
 
 export const getExpenses = async () => {
   const response = await client.get("/billing/expenses");
   return response.data;
-};
+}
 
 export const createExpense = async (expenseData) => {
   const response = await client.post("/billing/expense", expenseData);
   return response.data;
-};
+}
 
 // ==========================================
 // 14. Receptionist Lab Order Pickups

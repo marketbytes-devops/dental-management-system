@@ -7,62 +7,71 @@ import OutstandingBanner from "@/components/features/patients/billing/outstandin
 import MyInvoiceList from "@/components/features/patients/billing/myInvoiceList";
 import InvoiceDetailCard from "@/components/features/patients/billing/invoiceDetailCard";
 import PaymentModal from "@/components/features/patients/billing/paymentModal";
-const initialInvoices = [
-  { id: "INV-089", date: "2026-05-12", treatment: "Scaling & Polishing", gross: 1500, insurancePaid: 1050, patientDue: 450, status: "Paid" },
-  { id: "INV-094", date: "2026-06-15", treatment: "Root Canal Treatment", gross: 8000, insurancePaid: 5600, patientDue: 2400, status: "Pending" },
-  { id: "INV-072", date: "2026-03-20", treatment: "Dental Filling & X-Ray", gross: 2500, insurancePaid: 1750, patientDue: 750, status: "Paid" },
-];
-import { getPatientProfile, getPatientAppointments } from "@/services/api";
+import { getMyPatientLedger } from "@/services/api";
 
 export default function PatientBillingPage() {
   const [invoices, setInvoices] = useState([]);
+  const [consultations, setConsultations] = useState([]);
+  const [activeTab, setActiveTab] = useState("bills"); // "bills" | "consultations"
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [payTarget, setPayTarget] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [ledgerStats, setLedgerStats] = useState({
+    totalBilled: 0,
+    totalPaid: 0,
+    outstanding: 0,
+  });
+  const [patientDetails, setPatientDetails] = useState(null);
 
   const loadBillingData = async () => {
     try {
-      const profileData = await getPatientProfile();
-      const appts = await getPatientAppointments(profileData.id);
+      const ledger = await getMyPatientLedger();
       
-      const treatmentCosts = {
-        "checkup": 500,
-        "cleaning": 1000,
-        "root canal": 5000,
-        "crown": 8000,
-        "extraction": 1500,
-        "filling": 1200,
-        "consultation": 1500
-      };
+      setLedgerStats({
+        totalBilled: ledger.total_charges || 0,
+        totalPaid: ledger.total_paid || 0,
+        outstanding: ledger.outstanding_balance || 0,
+      });
       
-      const mappedInvoices = appts.map((appt) => {
-        const treatment = (appt.treatment_type || "Consultation").toLowerCase();
-        let gross = 1500;
-        for (const [key, cost] of Object.entries(treatmentCosts)) {
-          if (treatment.includes(key)) {
-            gross = cost;
-            break;
-          }
-        }
-        const insurancePaid = Math.round(gross * 0.7); // 70% insurance coverage
-        const patientDue = gross - insurancePaid;
-        const status = appt.payment_status === "Paid" ? "Paid" : "Pending";
-        
+      setPatientDetails({
+        name: ledger.patient_name || "",
+        phone: ledger.patient_phone || "",
+        token: ledger.patient_token || "",
+      });
+      
+      const mappedInvoices = (ledger.stacked_items || []).map((item) => {
+        const isPaid = item.status === "Paid";
         return {
-          id: appt.id,
-          invoiceNo: `INV-${appt.id + 100}`,
-          treatment: appt.treatment_type || "General Consultation",
-          doctor: appt.doctor_name || "Clinic Dentist",
-          date: appt.appointment_date,
-          status: status,
-          gross: gross,
-          insurancePaid: insurancePaid,
-          patientDue: status === "Paid" ? 0 : patientDue,
+          id: item.id,
+          invoiceNo: item.id.toUpperCase(),
+          treatment: item.title || "Treatment Fee",
+          doctor: item.doctor_name || "Clinic Staff",
+          date: item.date ? new Date(item.date).toISOString().split('T')[0] : "-",
+          status: isPaid ? "Paid" : "Pending",
+          gross: item.amount,
+          insurancePaid: 0,
+          patientDue: isPaid ? 0 : item.amount,
         };
       });
       
       setInvoices(mappedInvoices);
+      
+      const mappedConsultations = (ledger.consultations || []).map((item) => {
+        return {
+          id: item.id,
+          invoiceNo: item.invoiceNo,
+          treatment: item.title,
+          doctor: item.doctor_name,
+          date: item.date ? new Date(item.date).toISOString().split('T')[0] : "-",
+          status: item.status,
+          gross: item.amount,
+          insurancePaid: 0,
+          patientDue: 0,
+          paymentMethod: item.payment_method
+        };
+      });
+      setConsultations(mappedConsultations);
     } catch (err) {
       console.error("Failed to load patient billing:", err);
       setError(err.message || "Failed to load billing history.");
@@ -75,21 +84,10 @@ export default function PatientBillingPage() {
     loadBillingData();
   }, []);
 
-  // Derived stats
-  const totalBilled = invoices.reduce((sum, inv) => sum + inv.gross, 0);
-  const totalPaid = invoices
-    .filter((inv) => inv.status === "Paid")
-    .reduce((sum, inv) => sum + inv.gross - inv.insurancePaid, 0);
-  const outstanding = invoices
-    .filter((inv) => inv.status === "Pending")
-    .reduce((sum, inv) => sum + inv.patientDue, 0);
-
   const handlePaymentSuccess = (invoiceId) => {
-    setInvoices((prev) =>
-      prev.map((inv) => (inv.id === invoiceId ? { ...inv, status: "Paid", patientDue: 0 } : inv))
-    );
+    // Reload the entire ledger to get updated balances
+    loadBillingData();
     setPayTarget(null);
-    alert("Payment received! Thank you. Your invoice status is now updated to Paid.");
   };
 
   const handlePayBannerClick = () => {
@@ -128,19 +126,40 @@ export default function PatientBillingPage() {
       </div>
 
       {/* Outstanding Banner */}
-      <OutstandingBanner amount={outstanding} onPayClick={handlePayBannerClick} />
+      <OutstandingBanner amount={ledgerStats.outstanding} onPayClick={handlePayBannerClick} />
 
       {/* Overview stats */}
       <BillingOverview
-        totalBilled={totalBilled}
-        totalPaid={totalPaid}
-        outstanding={outstanding}
+        totalBilled={ledgerStats.totalBilled}
+        totalPaid={ledgerStats.totalPaid}
+        outstanding={ledgerStats.outstanding}
       />
 
       {/* Main Invoice List Table */}
       <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+        <div className="flex space-x-2 mb-6 p-1 bg-gray-50 rounded-xl w-fit">
+          <button
+            onClick={() => setActiveTab("bills")}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+              activeTab === "bills" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Treatment Bills
+          </button>
+          <button
+            onClick={() => setActiveTab("consultations")}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+              activeTab === "consultations" ? "bg-white text-primary shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Consultation Charges
+          </button>
+        </div>
+        
         <MyInvoiceList
-          invoices={invoices}
+          invoices={activeTab === "bills" ? invoices : consultations}
+          activeTab={activeTab}
+          patientDetails={patientDetails}
           onSelectInvoice={(inv) => setSelectedInvoice(inv)}
           onPayInvoice={(inv) => setPayTarget(inv)}
         />

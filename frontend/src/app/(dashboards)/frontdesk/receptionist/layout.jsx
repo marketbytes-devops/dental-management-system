@@ -1,16 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getDispensingQueue, getLabOrdersForReceptionist, getMyLeaveRequests } from "@/services/api";
+import { ReceptionistContext, useReceptionist } from "@/context/ReceptionistContext";
 
-const ReceptionistContext = createContext(null);
-
-export function useReceptionist() {
-  return useContext(ReceptionistContext);
-}
+export { useReceptionist };
 
 export default function ReceptionistLayout({ children }) {
   const pathname = usePathname();

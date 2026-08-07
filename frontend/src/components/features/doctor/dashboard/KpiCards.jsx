@@ -7,11 +7,12 @@ export default function KpiCards({
   activePatientToken,
   totalWaiting,
   totalAlerts,
+  flaggedCasesCount = 0,
   hasUrgentInQueue,
   activePatientHref = "/doctor/workspace"
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Card 1: Active Patient */}
       {activePatientToken ? (
         <Link
@@ -70,6 +71,23 @@ export default function KpiCards({
         </h3>
         <p className="text-xs mt-3 font-semibold text-danger">
           Safety alert warnings
+        </p>
+      </Link>
+
+      {/* Card 4: Flagged Lab Cases */}
+      <Link
+        href="/doctor/flagged-cases"
+        className={`text-left block w-full rounded-2xl p-5 shadow-sm border transition-all relative overflow-hidden group cursor-pointer outline-none bg-white hover:border-rose-300 ${
+          flaggedCasesCount > 0 ? "border-rose-200 ring-2 ring-rose-400/60 animate-pulse bg-rose-50/30" : "border-gray-100"
+        }`}
+      >
+        <div className="absolute top-0 right-0 w-20 h-20 rounded-bl-full -mr-4 -mt-4 bg-rose-100/50"></div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Flagged Cases</p>
+        <h3 className="text-2xl font-black mt-1.5 text-gray-900">
+          {flaggedCasesCount} Case{flaggedCasesCount === 1 ? "" : "s"}
+        </h3>
+        <p className={`text-xs mt-3 font-bold ${flaggedCasesCount > 0 ? "text-rose-700" : "text-gray-400"}`}>
+          {flaggedCasesCount > 0 ? "🚩 Doctor Action Required" : "No Pending Flagged Cases"}
         </p>
       </Link>
     </div>

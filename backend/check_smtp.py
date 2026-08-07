@@ -8,21 +8,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-smtp_host = os.getenv("SMTP_HOST")
-smtp_port = os.getenv("SMTP_PORT")
-smtp_user = os.getenv("SMTP_USER")
-smtp_password = os.getenv("SMTP_PASSWORD")
-smtp_from = os.getenv("SMTP_FROM", smtp_user)
+smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+smtp_port = os.getenv("SMTP_PORT", "587")
+lab_email = os.getenv("LAB_EMAIL")
+lab_password = os.getenv("LAB_EMAIL_APP_PASSWORD")
 
-print("SMTP Configurations:")
+print("SMTP & Email Configurations:")
 print(f"Host: {smtp_host}")
 print(f"Port: {smtp_port}")
-print(f"User: {smtp_user}")
-print(f"From: {smtp_from}")
-print(f"Password set: {bool(smtp_password)}")
+print(f"Lab Email: {lab_email}")
+print(f"App Password set: {bool(lab_password)}")
 
-if not all([smtp_host, smtp_port, smtp_user, smtp_password]):
-    print("Error: Missing SMTP environment variables.")
+if not all([smtp_host, smtp_port, lab_email, lab_password]):
+    print("Error: Missing LAB_EMAIL or LAB_EMAIL_APP_PASSWORD environment variables in .env")
     exit(1)
 
 try:
@@ -31,12 +29,12 @@ try:
     print("Connected! Starting TLS...")
     server.starttls()
     print("TLS started. Logging in...")
-    server.login(smtp_user, smtp_password)
+    server.login(lab_email, lab_password)
     print("Login successful! Constructing test email with attachment...")
     
     msg = MIMEMultipart('mixed')
-    msg['From'] = smtp_from
-    msg['To'] = smtp_user
+    msg['From'] = lab_email
+    msg['To'] = lab_email
     msg['Subject'] = "SmileCare SMTP Attachment Diagnostics"
     
     # Attach body
@@ -54,8 +52,8 @@ try:
             msg.attach(part)
             print(f"Attached file: {file_path}")
             
-    print(f"Sending test email with attachment to {smtp_user}...")
-    server.sendmail(smtp_from, smtp_user, msg.as_string())
+    print(f"Sending test email with attachment to {lab_email}...")
+    server.sendmail(lab_email, lab_email, msg.as_string())
     server.quit()
     print("\n[SUCCESS] Diagnostic email with attachment sent successfully!")
 except Exception as e:

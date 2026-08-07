@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Users, Calculator, Briefcase } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
-import { useReceptionist } from "@/app/(dashboards)/frontdesk/receptionist/layout";
+import { useReceptionist } from "@/context/ReceptionistContext";
 
 export default function FrontdeskWorkspaceSidebar() {
   const pathname = usePathname();

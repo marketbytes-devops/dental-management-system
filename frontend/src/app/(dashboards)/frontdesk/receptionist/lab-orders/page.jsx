@@ -19,20 +19,18 @@ import {
   Filter,
   Package
 } from "lucide-react";
-import { getLabOrdersForReceptionist, notifyPatientForLabOrder } from "@/services/api";
+import { getLabOrdersForReceptionist, notifyPatientForLabOrder, logReceptionistCommunication } from "@/services/api";
 
 const STATUS_COLORS = {
+  "Item Received at Clinic": "bg-teal-50 text-teal-800 border-teal-200 font-bold",
+  "item_received_at_clinic": "bg-teal-50 text-teal-800 border-teal-200 font-bold",
+  "Bill Ready": "bg-emerald-50 text-emerald-800 border-emerald-200 font-bold",
+  "Case Completed": "bg-sky-50 text-sky-700 border-sky-200",
+  "Order Sent to Lab": "bg-indigo-50 text-indigo-700 border-indigo-200",
+  "Accepted by Lab": "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Pending Lab Review": "bg-amber-50 text-amber-700 border-amber-200",
   "Completed": "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "completed": "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "Ready for Pickup": "bg-teal-50 text-teal-700 border-teal-200",
-  "Dispatched": "bg-sky-50 text-sky-700 border-sky-200",
-  "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
-  "In Fabrication": "bg-blue-50 text-blue-700 border-blue-200",
-  "Pending Review": "bg-amber-50 text-amber-700 border-amber-200",
-  "Rejected": "bg-red-50 text-red-700 border-red-200",
-  "Revision Requested": "bg-orange-50 text-orange-700 border-orange-200",
-  "Returned for Rework": "bg-rose-50 text-rose-700 border-rose-200",
-  "Ordered": "bg-purple-50 text-purple-700 border-purple-200",
+  "Flagged": "bg-rose-50 text-rose-700 border-rose-200"
 };
 
 function getStatusColor(status) {
@@ -40,8 +38,8 @@ function getStatusColor(status) {
 }
 
 function isOrderReady(order) {
-  const doneStatuses = ["Completed", "completed", "Ready for Pickup", "Dispatched"];
-  return doneStatuses.includes(order.status);
+  const doneStatuses = ["Completed", "completed", "Ready for Pickup", "Dispatched", "Item Received at Clinic", "item_received_at_clinic"];
+  return doneStatuses.includes(order.status) || Boolean(order.receptionist_notified);
 }
 
 export default function LabOrderPickupsPage() {
@@ -115,27 +113,13 @@ export default function LabOrderPickupsPage() {
     if (!notifyTarget || !contactNote.trim()) return;
     setSubmitting(true);
     try {
-      const fullNote = `[${contactMethod}] ${contactNote.trim()}`;
-      
-      // Update notification for all selected orders for this patient
+      // Log communication for each order via backend API
       await Promise.all(
-        notifyTarget.orders.map((o) => notifyPatientForLabOrder(o.id, fullNote))
+        notifyTarget.orders.map((o) => logReceptionistCommunication(o.id, { comm_type: contactMethod, notes: contactNote.trim() }))
       );
 
-      const timeStr = new Date().toLocaleString("en-IN", {
-        day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit", hour12: true
-      });
-
-      setNotificationLogs((prev) => {
-        const next = { ...prev };
-        notifyTarget.orders.forEach((o) => {
-          next[o.id] = [...(next[o.id] || []), { note: fullNote, time: timeStr }];
-        });
-        return next;
-      });
-
-      setNotifySuccess("Patient contact logged successfully for all orders!");
+      setNotifySuccess("Patient contact logged successfully!");
+      fetchOrders();
       setTimeout(() => {
         setNotifyTarget(null);
       }, 1200);
@@ -409,6 +393,40 @@ export default function LabOrderPickupsPage() {
                                 <span className="font-bold text-gray-400 block text-[9px] uppercase">Notes:</span>
                                 {order.notes}
                               </p>
+                            )}
+
+                            {/* Read-Only Finalized Patient Bill Badge */}
+                            <div className="pt-2 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                {order.accountant_bill_status === "Bill Ready" ? (
+                                  <span className="text-[11px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                                    💳 Final Patient Bill: ₹{(order.final_patient_bill_amount || order.patient_total_amount || 3500).toLocaleString("en-IN")} (Bill Ready)
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1" title="Receptionist cannot edit bill - Accountant review in progress">
+                                    ⏳ Pending Accountant Approval (Amount Pending)
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => window.location.href = `/frontdesk/receptionist/appointments?patientName=${encodeURIComponent(order.patient_name)}`}
+                                className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                              >
+                                <Calendar className="w-3.5 h-3.5" /> Schedule Fitting
+                              </button>
+                            </div>
+
+                            {/* Database Communication Logs */}
+                            {order.communication_logs && order.communication_logs.length > 0 && (
+                              <div className="pt-2 border-t border-gray-100 space-y-1 text-left">
+                                <span className="text-[9px] font-black uppercase text-gray-400">Communication Logs</span>
+                                {order.communication_logs.map((log, idx) => (
+                                  <div key={idx} className="text-[11px] font-semibold text-gray-800 bg-slate-50 p-2 rounded-lg border border-gray-200 flex justify-between items-center">
+                                    <span><strong>[{log.type}]</strong> {log.notes} <em className="text-[10px] text-gray-400">({log.by})</em></span>
+                                    <span className="text-gray-400 text-[10px] shrink-0 ml-2">{log.timestamp}</span>
+                                  </div>
+                                ))}
+                              </div>
                             )}
 
                             {/* Contact Logs */}

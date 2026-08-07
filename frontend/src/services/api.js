@@ -4,18 +4,24 @@ import axios from "axios";
 // 1. Axios Client Configuration & Interceptors
 // ==========================================
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const getApiBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  return "http://127.0.0.1:8000";
+};
 
 const client = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Dynamic request interceptor to automatically attach authorization tokens
+// Dynamic request interceptor to automatically attach authorization tokens and resolve host
 client.interceptors.request.use(
   (config) => {
+    config.baseURL = getApiBaseUrl();
     if (typeof window !== "undefined") {
       let token = null;
       const isPatientRequest = config.url && config.url.startsWith("/patient");
@@ -245,11 +251,15 @@ export const getDoctorAvailableSlots = async (doctorId, date) => {
 // 4. Appointments & Queue API Endpoints
 // ==========================================
 
-export const getFrontdeskDoctors = async (date) => {
-  const url = date ? `/frontdesk/doctors?date=${encodeURIComponent(date)}` : "/frontdesk/doctors";
+export const getFrontdeskDoctors = async (date, includeAll = false) => {
+  const params = [];
+  if (date) params.push(`date=${encodeURIComponent(date)}`);
+  if (includeAll) params.push("include_all=true");
+  const url = params.length > 0 ? `/frontdesk/doctors?${params.join("&")}` : "/frontdesk/doctors";
   const response = await client.get(url);
   return response.data;
 };
+
 
 export const createAppointment = async (appointmentData) => {
   const response = await client.post("/frontdesk/appointments", appointmentData);
@@ -862,6 +872,227 @@ export const getAnalyticsSummary = async () => {
 
 export const getAnalyticsReports = async () => {
   const response = await client.get("/billing/analytics/reports");
+  return response.data;
+};
+
+// ==========================================
+// 15. External Dental Lab Portal API Endpoints
+// ==========================================
+
+export const sendOrderToVendor = async (orderId, vendorPayload) => {
+  const response = await client.post(`/lab/orders/${orderId}/send-to-vendor`, vendorPayload || {});
+  return response.data;
+};
+
+export const getExternalLabCase = async (token) => {
+  const response = await client.get(`/lab/external-respond/${token}`);
+  return response.data;
+};
+
+export const acceptExternalLabCase = async (token) => {
+  const response = await client.post(`/lab/external-respond/${token}/accept`);
+  return response.data;
+};
+
+export const rejectExternalLabCase = async (token, reason) => {
+  const response = await client.post(`/lab/external-respond/${token}/reject`, { rejection_reason: reason });
+  return response.data;
+};
+
+export const uploadExternalLabResult = async (token, formData) => {
+  const response = await client.post(`/lab/external-respond/${token}/upload-result`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
+export const markItemReceivedAtClinic = async (orderId, payload) => {
+  const response = await client.post(`/lab/orders/${orderId}/mark-item-received`, payload);
+  return response.data;
+};
+
+export const getLabReadyCasesForReceptionist = async () => {
+  const response = await client.get("/lab/receptionist/ready-cases");
+  return response.data;
+};
+
+export const completeLabReadyCaseSchedule = async (orderId) => {
+  const response = await client.post(`/lab/receptionist/ready-cases/${orderId}/schedule-complete`);
+  return response.data;
+};
+
+export const getAccountantPendingLabTasks = async () => {
+  const response = await client.get("/lab/accountant/pending-tasks");
+  return response.data;
+};
+
+export const finalizeAccountantLabBill = async (orderId, payload) => {
+  const response = await client.post(`/lab/accountant/finalize-bill/${orderId}`, payload);
+  return response.data;
+};
+
+export const getReceptionistLabPickups = async () => {
+  const response = await client.get("/lab/receptionist/pickups");
+  return response.data;
+};
+
+export const logReceptionistCommunication = async (orderId, payload) => {
+  const response = await client.post(`/lab/receptionist/communication-log/${orderId}`, payload);
+  return response.data;
+};
+
+export const uploadVendorInvoiceFile = async (orderId, formData) => {
+  const response = await client.post(`/lab/orders/${orderId}/upload-vendor-invoice`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
+// External Lab Request & Single Active Token Workflow Endpoints
+export const sendOrderToExternalLab = async (orderId, payload) => {
+  const response = await client.post(`/lab/orders/${orderId}/send-external`, payload);
+  return response.data;
+};
+
+export const sendExternalLabReminder = async (orderId) => {
+  const response = await client.post(`/lab/orders/${orderId}/reminder`);
+  return response.data;
+};
+
+export const cancelExternalLabRequest = async (orderId) => {
+  const response = await client.post(`/lab/orders/${orderId}/cancel-external`);
+  return response.data;
+};
+
+// Email Completion Processing & Unmatched Emails
+export const processCompletionEmail = async (payload) => {
+  const response = await client.post("/lab/orders/process-completion-email", payload);
+  return response.data;
+};
+
+export const confirmCompletionEmail = async (orderId, payload = {}) => {
+  const response = await client.post(`/lab/orders/${orderId}/confirm-completion-email`, payload);
+  return response.data;
+};
+
+export const dismissCompletionEmail = async (orderId) => {
+  const response = await client.post(`/lab/orders/${orderId}/dismiss-completion-email`);
+  return response.data;
+};
+
+export const getUnmatchedEmails = async () => {
+  const response = await client.get("/lab/unmatched-emails");
+  return response.data;
+};
+
+export const assignUnmatchedEmail = async (emailId, orderId) => {
+  const response = await client.post(`/lab/unmatched-emails/${emailId}/assign/${orderId}`);
+  return response.data;
+};
+
+export const dismissUnmatchedEmail = async (emailId) => {
+  const response = await client.delete(`/lab/unmatched-emails/${emailId}`);
+  return response.data;
+};
+
+// External Lab Portal: Rework Accept/Reject
+export const externalLabAcceptRework = async (token) => {
+  const response = await client.post(`/lab/external-respond/${token}/accept-rework`);
+  return response.data;
+};
+
+export const externalLabRejectRework = async (token, reason) => {
+  const response = await client.post(`/lab/external-respond/${token}/reject-rework`, { rejection_reason: reason });
+  return response.data;
+};
+
+// Doctor: Approve or Request Rework
+export const doctorApproveRestoration = async (orderId, payload = {}) => {
+  const response = await client.post(`/lab/orders/${orderId}/doctor-approve`, payload);
+  return response.data;
+};
+
+export const doctorRequestRework = async (orderId, payload) => {
+  const response = await client.post(`/lab/orders/${orderId}/doctor-request-rework`, payload);
+  return response.data;
+};
+
+// Lab Technician: Send rework to external vendor
+export const sendReworkToExternalLab = async (orderId, payload = {}) => {
+  const response = await client.post(`/lab/orders/${orderId}/send-rework-external`, payload);
+  return response.data;
+};
+
+// Receptionist: Schedule fitting appointment
+export const scheduleFittingAppointment = async (orderId, payload) => {
+  const response = await client.post(`/lab/orders/${orderId}/schedule-fitting`, payload);
+  return response.data;
+};
+
+// Contract Pricing & Financial Report APIs
+export const getAdminLabPricing = async (vendorId) => {
+  const url = vendorId ? `/lab/admin/pricing?vendor_id=${vendorId}` : "/lab/admin/pricing";
+  const response = await client.get(url);
+  return response.data;
+};
+
+export const saveAdminLabPricing = async (payload) => {
+  const response = await client.post("/lab/admin/pricing", payload);
+  return response.data;
+};
+
+export const deleteAdminLabPricing = async (pricingId) => {
+  const response = await client.delete(`/lab/admin/pricing/${pricingId}`);
+  return response.data;
+};
+
+export const checkVendorLabPricing = async (vendorId, restorationType, material) => {
+  const params = new URLSearchParams({ restoration_type: restorationType });
+  if (material) params.append("material", material);
+  const response = await client.get(`/lab/vendors/${vendorId}/pricing-check?${params.toString()}`);
+  return response.data;
+};
+
+export const getAdminLabFinancialReport = async () => {
+  const response = await client.get("/lab/admin/financial-reports");
+  return response.data;
+};
+
+// Authoritative Workflow Helper APIs
+export const flagDoctorLabOrder = async (orderId, payload) => {
+  const response = await client.post(`/lab/orders/${orderId}/flag-doctor`, payload);
+  return response.data;
+};
+
+export const doctorResubmitLabOrder = async (orderId, payload) => {
+  const response = await client.post(`/lab/orders/${orderId}/doctor-resubmit`, payload);
+  return response.data;
+};
+
+export const submitDoctorFittingOutcome = async (orderId, payload) => {
+  const response = await client.post(`/lab/orders/${orderId}/fitting-outcome`, payload);
+  return response.data;
+};
+
+export const getSupplierPayables = async (supplierType, status) => {
+  const params = new URLSearchParams();
+  if (supplierType) params.append("supplier_type", supplierType);
+  if (status) params.append("status", status);
+  const response = await client.get(`/lab/supplier-payables?${params.toString()}`);
+  return response.data;
+};
+
+export const createSupplierPayable = async (payload) => {
+  const response = await client.post("/lab/supplier-payables", payload);
+  return response.data;
+};
+
+export const paySupplierPayable = async (payableId, payload) => {
+  const response = await client.post(`/lab/supplier-payables/${payableId}/pay`, payload);
   return response.data;
 };
 

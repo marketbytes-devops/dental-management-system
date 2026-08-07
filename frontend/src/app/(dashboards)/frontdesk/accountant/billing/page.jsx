@@ -24,7 +24,7 @@ import {
   Calendar,
   Sparkles
 } from "lucide-react";
-import { getPatientLedgers, createPayment, getReceipt } from "@/services/api";
+import { getPatientLedgers, createPayment, getReceipt, getAccountantPendingLabTasks, finalizeAccountantLabBill } from "@/services/api";
 
 // --------------------------------------------------------------------------
 // Printable Receipt Component
@@ -293,6 +293,72 @@ export default function AccountantBillingPage() {
   const [receiptData, setReceiptData] = useState(null);
   const [loadingReceiptId, setLoadingReceiptId] = useState(null);
 
+  // Pending External Dental Lab Billing States
+  const [pendingLabCases, setPendingLabCases] = useState([]);
+  const [viewCaseModal, setViewCaseModal] = useState(null);
+  const [generateBillModal, setGenerateBillModal] = useState(null);
+  const [billingForm, setBillingForm] = useState({
+    vendorInvoiceNumber: "",
+    vendorCost: 1200,
+    doctorFee: 3000,
+    consultationFee: 500,
+    handlingFee: 1000,
+    extraCharge: 0,
+    discountPercent: 0,
+    taxPercent: 0,
+    notes: ""
+  });
+
+  const fetchPendingLabCases = async () => {
+    try {
+      const data = await getAccountantPendingLabTasks();
+      const pending = (data || []).filter(
+        c => c.accountant_bill_status !== "Bill Ready"
+      );
+      setPendingLabCases(pending);
+    } catch (err) {
+      console.warn("Failed to fetch pending lab cases:", err);
+    }
+  };
+
+  const calculateBillTotals = () => {
+    const vc = Number(billingForm.vendorCost) || 0;
+    const df = Number(billingForm.doctorFee) || 0;
+    const cf = Number(billingForm.consultationFee) || 0;
+    const hf = Number(billingForm.handlingFee) || 0;
+    const ec = Number(billingForm.extraCharge) || 0;
+    
+    const clinicCharges = df + cf + hf + ec;
+    const subtotal = vc + clinicCharges;
+    const discountAmt = subtotal * ((Number(billingForm.discountPercent) || 0) / 100);
+    const taxableAmt = subtotal - discountAmt;
+    const taxAmt = taxableAmt * ((Number(billingForm.taxPercent) || 0) / 100);
+    const grandTotal = Math.round(taxableAmt + taxAmt);
+    
+    return { vc, clinicCharges, subtotal, discountAmt, taxAmt, grandTotal };
+  };
+
+  const handleFinalizeBillSubmit = async (e) => {
+    e.preventDefault();
+    if (!generateBillModal) return;
+    const { grandTotal } = calculateBillTotals();
+    try {
+      await finalizeAccountantLabBill(generateBillModal.id, {
+        vendor_invoice_number: billingForm.vendorInvoiceNumber || `LAB-INV-${generateBillModal.id}`,
+        vendor_invoice_amount: Number(billingForm.vendorCost) || 0,
+        final_patient_bill_amount: grandTotal,
+        notes: billingForm.notes
+      });
+      alert(`Patient bill for ${generateBillModal.patientName || generateBillModal.patient_name} finalized (₹${grandTotal.toLocaleString("en-IN")})! Receptionist notified.`);
+      setGenerateBillModal(null);
+      fetchPendingLabCases();
+      fetchLedgers();
+    } catch (err) {
+      console.error("Failed to finalize bill:", err);
+      alert("Failed to finalize lab bill.");
+    }
+  };
+
   const fetchLedgers = async () => {
     setLoading(true);
     try {
@@ -313,6 +379,7 @@ export default function AccountantBillingPage() {
 
   useEffect(() => {
     fetchLedgers();
+    fetchPendingLabCases();
   }, []);
 
   const toggleExpand = (token) => {
@@ -512,6 +579,81 @@ export default function AccountantBillingPage() {
             <AlertCircle className="w-5 h-5" />
           </div>
         </div>
+      </div>
+
+      {/* 💳 Pending Lab Billing Section */}
+      <div className="bg-white border-2 border-indigo-100 rounded-3xl p-6 shadow-sm space-y-4 font-sans text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-4">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">
+              Lab Case Financial Pipeline
+            </span>
+            <h2 className="text-lg font-black text-gray-900 mt-1 flex items-center gap-2">
+              <span>💳</span> Pending Lab Billing ({pendingLabCases.length})
+            </h2>
+            <p className="text-xs font-semibold text-gray-500">
+              Prosthetic lab cases confirmed received at clinic requiring final patient bill generation.
+            </p>
+          </div>
+        </div>
+
+        {pendingLabCases.length === 0 ? (
+          <div className="text-center py-6 text-xs font-semibold text-gray-400 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+            ✓ No pending lab bills! All received external lab cases have been finalized & approved.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingLabCases.map((item) => (
+              <div key={item.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs flex flex-col justify-between space-y-3 relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-amber-500" />
+                <div>
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] font-bold text-gray-400">#{item.id}</span>
+                    <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                      {item.accountant_bill_status || "Pending Billing"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 text-xs font-semibold text-gray-800">
+                    <p className="text-sm font-black text-gray-900">Patient: <span className="text-primary font-bold">{item.patientName || item.patient_name}</span></p>
+                    <p className="text-gray-600">Doctor: <span className="font-bold text-gray-800">{item.dentistName || item.dentist_name}</span></p>
+                    <p className="text-gray-600">Procedure: <span className="font-bold text-teal-700">{item.prostheticType || item.orderCategory}</span></p>
+                    <p className="text-gray-600">External Lab: <span className="font-bold text-gray-800">{item.vendor_name || "Apex Dental Lab"}</span></p>
+                    <p className="text-gray-600">Lab Invoice Amount: <span className="font-black text-rose-600">₹{(item.vendor_invoice_amount || 1200).toLocaleString("en-IN")}</span></p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => setViewCaseModal(item)}
+                    className="px-3 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+                  >
+                    View Case
+                  </button>
+                  <button
+                    onClick={() => {
+                      setGenerateBillModal(item);
+                      setBillingForm({
+                        vendorInvoiceNumber: item.vendor_invoice_number || `LAB-INV-${item.id}`,
+                        vendorCost: item.vendor_invoice_amount || 1200,
+                        doctorFee: 3000,
+                        consultationFee: 500,
+                        handlingFee: 1000,
+                        extraCharge: 0,
+                        discountPercent: 0,
+                        taxPercent: 0,
+                        notes: ""
+                      });
+                    }}
+                    className="px-4 py-1.5 text-xs font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    Generate Bill ↗
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Search */}
@@ -804,6 +946,268 @@ export default function AccountantBillingPage() {
       {receiptData && (
         <ReceiptModal receiptData={receiptData} onClose={() => setReceiptData(null)} />
       )}
+
+      {/* View Case Modal */}
+      {viewCaseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-100 font-sans text-left">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-indigo-50/50">
+              <div>
+                <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">External Lab Case Details</span>
+                <h3 className="text-lg font-bold text-gray-900 mt-0.5">#{viewCaseModal.id}</h3>
+              </div>
+              <button 
+                onClick={() => setViewCaseModal(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-xs font-semibold text-gray-800">
+              <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Patient Name</span>
+                  <span className="text-sm font-black text-gray-900">{viewCaseModal.patientName || viewCaseModal.patient_name}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Ordering Doctor</span>
+                  <span className="text-sm font-black text-gray-900">{viewCaseModal.dentistName || viewCaseModal.dentist_name}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase block">Procedure / Restoration</span>
+                  <span className="text-teal-700 font-bold">{viewCaseModal.prostheticType || viewCaseModal.orderCategory}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase block">External Vendor</span>
+                  <span className="text-indigo-700 font-bold">{viewCaseModal.vendor_name || "Apex Dental Lab"}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p><strong className="text-gray-500">Tooth Number:</strong> {viewCaseModal.toothNumber || viewCaseModal.tooth_number || "Full Arch"}</p>
+                <p><strong className="text-gray-500">Material & Shade:</strong> {viewCaseModal.material || "Zirconia"} (Shade {viewCaseModal.shade || "A2"})</p>
+                <p><strong className="text-gray-500">Clinic Arrival Date:</strong> {viewCaseModal.clinicReceivedAt ? new Date(viewCaseModal.clinicReceivedAt).toLocaleString() : "05-Aug-2026"}</p>
+                <p><strong className="text-gray-500">External Lab Invoice Amount:</strong> <span className="text-rose-600 font-bold">₹{(viewCaseModal.vendor_invoice_amount || 1200).toLocaleString()}</span></p>
+              </div>
+
+              {viewCaseModal.notes && (
+                <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-indigo-900 text-xs">
+                  <span className="font-bold block text-[10px] uppercase text-indigo-500">Lab Notes / Instructions:</span>
+                  {viewCaseModal.notes}
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-gray-100 flex justify-end">
+                <button
+                  onClick={() => setViewCaseModal(null)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate Bill Modal */}
+      {generateBillModal && (() => {
+        const { vc, clinicCharges, subtotal, discountAmt, taxAmt, grandTotal } = calculateBillTotals();
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden border border-gray-100 font-sans text-left my-8">
+              <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-indigo-50/50">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700">Accountant Billing Terminal</span>
+                  <h3 className="text-lg font-black text-gray-900 mt-0.5 flex items-center gap-2">
+                    <span>💳</span> Generate Bill for #{generateBillModal.id}
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setGenerateBillModal(null)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleFinalizeBillSubmit} className="p-6 space-y-4">
+                {/* Header Case Details */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-gray-400 block">Patient Name</span>
+                    <span className="font-black text-gray-900 text-sm">{generateBillModal.patientName || generateBillModal.patient_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-gray-400 block">Ordering Doctor</span>
+                    <span className="font-black text-gray-900 text-sm">{generateBillModal.dentistName || generateBillModal.dentist_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-gray-400 block">Procedure</span>
+                    <span className="font-bold text-teal-700">{generateBillModal.prostheticType || generateBillModal.orderCategory}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-gray-400 block">External Lab</span>
+                    <span className="font-bold text-indigo-700">{generateBillModal.vendor_name || "Apex Dental Lab"}</span>
+                  </div>
+                </div>
+
+                {/* External Lab Invoice Verification */}
+                <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                    <span>📑</span> External Lab Vendor Invoice (Reference)
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Vendor Invoice #</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={billingForm.vendorInvoiceNumber}
+                        onChange={(e) => setBillingForm({ ...billingForm, vendorInvoiceNumber: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500"
+                        placeholder="e.g. LAB-INV-9921"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Vendor Invoice Amount (₹)</label>
+                      <input 
+                        type="number" 
+                        required
+                        value={billingForm.vendorCost}
+                        onChange={(e) => setBillingForm({ ...billingForm, vendorCost: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clinic Charges Section */}
+                <div className="p-4 bg-indigo-50/40 border border-indigo-150 rounded-2xl space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
+                    <span>🏥</span> Clinic Charges & Fees
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Doctor Procedure Fee (₹)</label>
+                      <input 
+                        type="number" 
+                        value={billingForm.doctorFee}
+                        onChange={(e) => setBillingForm({ ...billingForm, doctorFee: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Consultation Fee (₹)</label>
+                      <input 
+                        type="number" 
+                        value={billingForm.consultationFee}
+                        onChange={(e) => setBillingForm({ ...billingForm, consultationFee: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Lab Handling & Material (₹)</label>
+                      <input 
+                        type="number" 
+                        value={billingForm.handlingFee}
+                        onChange={(e) => setBillingForm({ ...billingForm, handlingFee: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Extra Charges (₹)</label>
+                      <input 
+                        type="number" 
+                        value={billingForm.extraCharge}
+                        onChange={(e) => setBillingForm({ ...billingForm, extraCharge: e.target.value })}
+                        className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Taxes & Discounts */}
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Discount (%)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      max="100"
+                      value={billingForm.discountPercent}
+                      onChange={(e) => setBillingForm({ ...billingForm, discountPercent: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tax / GST (%)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      max="50"
+                      value={billingForm.taxPercent}
+                      onChange={(e) => setBillingForm({ ...billingForm, taxPercent: e.target.value })}
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Calculations Summary Card */}
+                <div className="bg-slate-900 text-white rounded-2xl p-4 space-y-2 text-xs">
+                  <div className="flex justify-between text-slate-300">
+                    <span>External Lab Cost:</span>
+                    <span>₹{vc.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Clinic Fees & Charges:</span>
+                    <span>₹{clinicCharges.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Subtotal:</span>
+                    <span>₹{subtotal.toLocaleString()}</span>
+                  </div>
+                  {discountAmt > 0 && (
+                    <div className="flex justify-between text-emerald-400">
+                      <span>Discount ({billingForm.discountPercent}%):</span>
+                      <span>- ₹{discountAmt.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {taxAmt > 0 && (
+                    <div className="flex justify-between text-amber-400">
+                      <span>Tax / GST ({billingForm.taxPercent}%):</span>
+                      <span>+ ₹{taxAmt.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-slate-700 flex justify-between items-center text-sm font-black">
+                    <span className="text-slate-100">Final Patient Payable Amount:</span>
+                    <span className="text-emerald-400 text-lg">₹{grandTotal.toLocaleString("en-IN")}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      alert(`Billing draft saved for ${generateBillModal.patientName || generateBillModal.patient_name}!`);
+                      setGenerateBillModal(null);
+                    }}
+                    className="px-4 py-2 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Save as Draft
+                  </button>
+                  <button 
+                    type="submit"
+                    className="px-6 py-2.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    Finalize Bill & Notify Receptionist ↗
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

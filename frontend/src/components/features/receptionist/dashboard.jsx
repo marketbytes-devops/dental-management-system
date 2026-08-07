@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import {
   getTodayAppointments, getQueue, updateAppointmentStatus,
-  getAppointmentsByMonth,
+  getAppointmentsByMonth, getLabReadyCasesForReceptionist, completeLabReadyCaseSchedule
 } from "@/services/api";
 import { getDoctors } from "@/services/api";
 import { useRouter } from "next/navigation";
@@ -353,10 +353,25 @@ export default function ReceptionistDashboard() {
     }
   };
 
+  const [labReadyCases, setLabReadyCases] = useState([]);
+
+  const fetchLabReadyCases = async () => {
+    try {
+      const data = await getLabReadyCasesForReceptionist();
+      setLabReadyCases(data.filter(c => !c.appointment_scheduled));
+    } catch (err) {
+      console.error("Failed to fetch lab ready cases:", err);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
     fetchDoctorStats();
-    const interval = setInterval(fetchDashboardData, 5000);
+    fetchLabReadyCases();
+    const interval = setInterval(() => {
+      fetchDashboardData();
+      fetchLabReadyCases();
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -448,6 +463,70 @@ export default function ReceptionistDashboard() {
           </span>
         </div>
       </div>
+
+      {/* 🔔 Automatic Lab Case Ready Notifications for Receptionist */}
+      {labReadyCases.length > 0 && (
+        <div className="space-y-4 font-sans text-left">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+              <span className="text-xl animate-bounce">🔔</span>
+              Lab Case Ready Notifications ({labReadyCases.length})
+            </h3>
+            <span className="text-xs font-bold text-teal-700 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
+              Action Required: Contact Patient & Schedule Fitting
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {labReadyCases.map((item) => (
+              <div key={item.id} className="bg-white border-2 border-teal-500/30 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-teal-500" />
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-teal-800 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-md flex items-center gap-1">
+                      🔔 Lab Case Ready
+                    </span>
+                    <span className="text-[10px] font-extrabold text-gray-400">#{item.id}</span>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs font-semibold text-gray-800">
+                    <p className="text-sm font-black text-gray-900">Patient: <span className="text-primary font-bold">{item.patientName}</span></p>
+                    <p className="text-gray-600">Doctor: <span className="font-bold text-gray-800">{item.dentistName}</span></p>
+                    <p className="text-gray-600">Procedure: <span className="font-bold text-teal-700">{item.prostheticType || item.orderCategory}</span></p>
+                    <p className="text-gray-600">Received: <span className="font-bold text-gray-900">{item.clinicReceivedAt ? new Date(item.clinicReceivedAt).toLocaleDateString() : new Date().toLocaleDateString()}</span></p>
+                    {item.itemCondition && (
+                      <p className="text-[11px] font-bold text-gray-500 flex items-center gap-1.5 mt-1">
+                        Condition: 
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${item.itemCondition === 'Good' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-rose-100 text-rose-800 border border-rose-200'}`}>
+                          {item.itemCondition}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-4 mt-4 border-t border-gray-100 flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-gray-400 font-medium">Auto-notified</span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await completeLabReadyCaseSchedule(item.id);
+                        fetchLabReadyCases();
+                        router.push(`/frontdesk/receptionist/appointments?patientName=${encodeURIComponent(item.patientName)}`);
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold rounded-xl shadow-md shadow-teal-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Calendar className="w-3.5 h-3.5" /> Schedule Appointment
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Emergency Notifications */}
       {emergencyPatients.length > 0 && (

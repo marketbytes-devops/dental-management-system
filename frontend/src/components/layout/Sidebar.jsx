@@ -6,8 +6,8 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Stethoscope } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
 import { ROLE_NAV_ITEMS } from "./navigationConfig";
-import { useDoctor } from "@/app/(dashboards)/doctor/layout";
-import { useReceptionist } from "@/app/(dashboards)/frontdesk/receptionist/layout";
+import { useDoctor } from "@/context/DoctorContext";
+import { useReceptionist } from "@/context/ReceptionistContext";
 import { useAdmin } from "@/app/(dashboards)/admin/layout";
 import { getImageUrl } from "@/utils/imageUtils";
 
@@ -150,6 +150,9 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
 
   const getUnreadCount = (href) => {
     if (role !== "doctor") return 0;
+    if (href === "/doctor/flagged-cases") {
+      return doctorContext?.flaggedCasesCount || 0;
+    }
     if (href === "/doctor/notifications") {
       return notifications ? notifications.filter(n => n.status === "unread").length : 0;
     }

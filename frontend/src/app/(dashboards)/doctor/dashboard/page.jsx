@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useDoctor } from "@/app/(dashboards)/doctor/layout";
+import { useDoctor } from "@/context/DoctorContext";
 import DashboardHeader from "@/components/features/doctor/dashboard/DashboardHeader";
 import KpiCards from "@/components/features/doctor/dashboard/KpiCards";
 import { getDoctorDashboardAppointments, getProfile } from "@/services/api";
@@ -49,6 +49,8 @@ export default function DoctorDashboardPage() {
     activePatientToken,
     queue,
     labOrders,
+    flaggedCases = [],
+    flaggedCasesCount = 0,
     activePatient,
     hasUrgentInQueue,
     currentDoctorName,
@@ -255,9 +257,35 @@ export default function DoctorDashboardPage() {
         activePatientToken={activePatientTokenForSpec}
         totalWaiting={totalWaiting}
         totalAlerts={totalAlerts}
+        flaggedCasesCount={flaggedCasesCount}
         hasUrgentInQueue={hasUrgentInQueue}
         activePatientHref={activePatientTokenForSpec ? `/doctor/workspace/${selectedSpecialty}?patientToken=${activePatientTokenForSpec}` : `/doctor/workspace/${selectedSpecialty}`}
       />
+
+      {/* Flagged Cases Quick Widget */}
+      {flaggedCasesCount > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-3xl p-5 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-rose-500 text-white rounded-2xl shrink-0 shadow-md shadow-rose-500/20">
+              <span className="text-lg">🚩</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-rose-950 uppercase tracking-wide">
+                {flaggedCasesCount} Lab Order{flaggedCasesCount === 1 ? "" : "s"} Flagged for Review
+              </h3>
+              <p className="text-xs text-rose-800 font-semibold mt-0.5">
+                Internal Lab Tech flagged parameter corrections. Review and resubmit directly without searching patient files.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/doctor/flagged-cases"
+            className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-rose-600/20 shrink-0 text-center flex items-center gap-1.5"
+          >
+            Review Flagged Cases <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
 
       {/* Appointments Section */}
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm mt-8 overflow-hidden">

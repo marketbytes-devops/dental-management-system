@@ -21,19 +21,24 @@ import {
   Search
 } from "lucide-react";
 import ToothIcon from "@/components/ui/shared/ToothIcon";
+import { useRouter } from "next/navigation";
+import SpecialtySheetModal from "@/components/features/doctor/workspace/SpecialtySheetModal";
 
 export default function DoctorReferralsPage() {
+  const router = useRouter();
   const { 
-    referrals, 
+    referrals = [], 
     handleCompleteReferral,
-    patients,
+    patients = {},
     notifications = [],
     markAsRead,
     markAsUnread,
     currentDoctorName
-  } = useDoctor();
+  } = useDoctor() || {};
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [newlyAddedIds, setNewlyAddedIds] = useState([]);
+
   const newlyAddedIdsRef = useRef([]);
 
   useEffect(() => {
@@ -352,13 +357,23 @@ export default function DoctorReferralsPage() {
                   Age: {selectedPatient?.age} • Gender: {selectedPatient?.gender} • Phone: {selectedPatient?.phone}
                 </p>
               </div>
-              <button 
-                onClick={() => setSelectedReferralId(null)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-all cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1.5 border-none"
+                >
+                  <Stethoscope className="w-4 h-4" /> Open Specialty Sheet
+                </button>
+                <button 
+                  onClick={() => setSelectedReferralId(null)}
+                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
+
 
             {/* Referral Reason Box */}
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4.5 space-y-2">
@@ -373,61 +388,6 @@ export default function DoctorReferralsPage() {
               <p className="text-sm font-medium text-gray-700 italic">"{selectedReferral.reason}"</p>
             </div>
 
-            {/* Read-Only Tooth Chart of Patient */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
-                <ToothIcon className="w-4.5 h-4.5 text-primary" /> Patient Tooth Chart
-              </h4>
-              <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/20 overflow-x-auto">
-                <div className="min-w-[450px] flex flex-col items-center gap-3">
-                  {/* Upper Row */}
-                  <div className="flex gap-1">
-                    {upperTeeth.map(tooth => (
-                      <div 
-                        key={tooth} 
-                        className={`w-7 h-7 rounded border text-[9px] font-bold flex flex-col items-center justify-center ${getToothStyles(selectedReferral.teethChart || selectedPatient?.teethChart || {}, tooth)}`}
-                      >
-                        {tooth}
-                        <span className="text-[6px]">{getToothEmoji(selectedReferral.teethChart || selectedPatient?.teethChart || {}, tooth)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Lower Row */}
-                  <div className="flex gap-1">
-                    {lowerTeeth.map(tooth => (
-                      <div 
-                        key={tooth} 
-                        className={`w-7 h-7 rounded border text-[9px] font-bold flex flex-col items-center justify-center ${getToothStyles(selectedReferral.teethChart || selectedPatient?.teethChart || {}, tooth)}`}
-                      >
-                        {tooth}
-                        <span className="text-[6px]">{getToothEmoji(selectedReferral.teethChart || selectedPatient?.teethChart || {}, tooth)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Patient Clinical History Timeline (Read Only) */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
-                <Clock className="w-4.5 h-4.5 text-primary" /> Past Clinical History
-              </h4>
-              <div className="max-h-[140px] overflow-y-auto border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/20">
-                {selectedPatient?.timeline.map((event, idx) => (
-                  <div key={idx} className="flex gap-3 text-left">
-                    <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0"></div>
-                    <div>
-                      <p className="text-[11px] font-bold text-gray-400">{event.date} • {event.type}</p>
-                      <p className="text-xs text-gray-700 font-medium mt-0.5">{event.note}</p>
-                    </div>
-                  </div>
-                ))}
-                {(!selectedPatient?.timeline || selectedPatient.timeline.length === 0) && (
-                  <p className="text-xs text-gray-400 text-center py-2">No past history recorded.</p>
-                )}
-              </div>
-            </div>
 
             {/* RESPOND FORM (Only if Pending and Tab is Incoming) */}
             {selectedReferral.status === "Pending" && activeTab === "incoming" ? (
@@ -548,6 +508,19 @@ export default function DoctorReferralsPage() {
         )}
 
       </div>
+
+      {/* Specialty Clinical Sheet Modal */}
+      <SpecialtySheetModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        referral={selectedReferral}
+        patient={selectedPatient}
+        currentDoctorName={currentDoctorName}
+        onCompleteConsultation={(refId, notes, meds) => {
+          handleCompleteReferral(refId, notes, meds);
+        }}
+      />
     </div>
   );
 }
+

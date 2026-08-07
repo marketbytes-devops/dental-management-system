@@ -524,7 +524,7 @@ export default function BookAppointmentModal({ patientId, initialData, onClose, 
               <h3 className="font-semibold text-gray-800 mb-4">Select a Doctor</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {doctors.map((d) => {
-                  const isAvailable = d.status === "On Duty" || d.status === "Active";
+                  const isAvailable = true;
                   return (
                     <button
                       key={d.id || d.name}

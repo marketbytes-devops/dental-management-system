@@ -4,6 +4,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 def lookup_vendor_contract_pricing(db: Session, vendor_id: int, restoration_type: str, material: str = None):
     if not vendor_id or not restoration_type:

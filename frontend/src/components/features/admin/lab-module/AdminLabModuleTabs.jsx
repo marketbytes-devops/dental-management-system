@@ -15,6 +15,8 @@ import LabOrdersView from "./LabOrdersView";
 import SuppliersView from "./SuppliersView";
 import LabPricingView from "./LabPricingView";
 
+import SupplierPayablesView from "@/components/features/accountant/SupplierPayablesView";
+
 export default function AdminLabModuleTabs() {
   const searchParams = useSearchParams();
   const urlTab = searchParams ? searchParams.get("tab") : null;
@@ -40,7 +42,8 @@ export default function AdminLabModuleTabs() {
 
   const TABS = [
     { id: "orders", label: "Lab Orders", icon: Microscope },
-    { id: "pricing", label: "Fee & Pricing Catalog", icon: DollarSign },
+    { id: "pricing", label: "Contract Pricing & Financials", icon: DollarSign },
+    { id: "payables", label: "Supplier Payables", icon: Truck },
     { id: "inventory", label: "Inventory & Restock", icon: Package },
     { id: "suppliers", label: "Suppliers & Vendors", icon: Truck }
   ];
@@ -79,6 +82,7 @@ export default function AdminLabModuleTabs() {
       <div className="max-w-7xl mx-auto p-6 space-y-6 text-left">
         {activeTab === "orders" && <LabOrdersView />}
         {activeTab === "pricing" && <LabPricingView />}
+        {activeTab === "payables" && <SupplierPayablesView />}
         {activeTab === "inventory" && (
           <div className="animate-scale-up">
             <AdminInventory />

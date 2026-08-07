@@ -1,7 +1,8 @@
 # schemas.py - Pydantic request/response models
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any, List, Union
 from datetime import date, datetime
+
 
 
 class PatientBase(BaseModel):
@@ -140,11 +141,13 @@ class ReferralCreate(BaseModel):
     id: str
     patient_token: str
     referred_by: str
+    referred_by_specialty: Optional[str] = None
     speciality: str
     target_doctor: Optional[str] = None
     date: str
     reason: str
     clinical_notes: Optional[str] = None
+    referred_from_notes: Optional[str] = None
     referral_type: Optional[str] = "Internal"
     external_facility: Optional[str] = None
 
@@ -153,16 +156,22 @@ class ReferralResponse(BaseModel):
     id: str
     patient_token: str
     referred_by: str
+    referred_by_specialty: Optional[str] = None
     speciality: str
     target_doctor: Optional[str] = None
     date: str
     reason: str
     clinical_notes: Optional[str] = None
+    referred_from_notes: Optional[str] = None
     status: str
     referral_type: str
     external_facility: Optional[str] = None
     my_consultation_notes: Optional[str] = None
     my_medications: Optional[list] = None
+    doctor_b_notes: Optional[str] = None
+    doctor_b_treatment_plan: Optional[Any] = None
+    completed_at: Optional[str] = None
+    billing_request_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -172,6 +181,11 @@ class ReferralUpdate(BaseModel):
     status: str
     my_consultation_notes: Optional[str] = None
     my_medications: Optional[list] = None
+    doctor_b_notes: Optional[str] = None
+    doctor_b_treatment_plan: Optional[Any] = None
+    completed_at: Optional[str] = None
+    billing_request_id: Optional[int] = None
+
 # --- Patient Notification Schemas ---
 class PatientNotificationResponse(BaseModel):
     id: int

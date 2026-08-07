@@ -150,6 +150,9 @@ export default function Sidebar({ isMinimized = false, onToggleMinimize }) {
 
   const getUnreadCount = (href) => {
     if (role !== "doctor") return 0;
+    if (href === "/doctor/flagged-cases") {
+      return doctorContext?.flaggedCasesCount || 0;
+    }
     if (href === "/doctor/notifications") {
       return notifications ? notifications.filter(n => n.status === "unread").length : 0;
     }

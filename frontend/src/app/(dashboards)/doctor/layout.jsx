@@ -1443,6 +1443,11 @@ export default function DoctorLayout({ children }) {
     }
   }, [viewingPatientToken, referrals]);
 
+  const flaggedCases = (labOrders || []).filter(o =>
+    ["Flagged", "flagged", "Flagged - Waiting for Doctor Review", "Revision Requested", "revision_requested"].includes(o.status)
+  );
+  const flaggedCasesCount = flaggedCases.length;
+
   return (
     <AuthGuard allowedRoles={["doctor"]} type="staff">
       <DoctorContext.Provider value={{
@@ -1490,6 +1495,9 @@ export default function DoctorLayout({ children }) {
         sidebarMinimized,
         setSidebarMinimized,
         notifications: allNotifications,
+        flaggedCases,
+        flaggedCasesCount,
+        fetchLabOrders,
         activeToast,
         toastAnimation,
         bellAnimating,

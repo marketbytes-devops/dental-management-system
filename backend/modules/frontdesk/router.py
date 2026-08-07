@@ -388,11 +388,11 @@ def get_live_queue(db: Session = Depends(get_db)):
     return queue_items
 
 @router.get("/doctors")
-def get_public_doctors(date: str = None, db: Session = Depends(get_db)):
+def get_public_doctors(date: str = None, include_all: bool = False, db: Session = Depends(get_db)):
     all_users = db.query(UserModel).filter(UserModel.status == "Active").all()
     doctors = [u for u in all_users if any(r.lower() == "doctor" for r in (u.roles or []))]
     
-    if date:
+    if date and not include_all:
         from modules.leave.models import LeaveRequestModel
         on_leave_user_ids = db.query(LeaveRequestModel.user_id).filter(
             LeaveRequestModel.status == "Approved",
@@ -409,7 +409,12 @@ def get_public_doctors(date: str = None, db: Session = Depends(get_db)):
     
     result = []
     for doc in doctors:
-        specialty = ", ".join(doc.specialties) if doc.specialties else "General Dentistry"
+        doctor_details = db.query(DoctorModel).filter(
+            (DoctorModel.user_id == doc.id) |
+            (DoctorModel.name.ilike(f"%{doc.name.replace('Dr.', '').strip()}%"))
+        ).first()
+
+        specialty = ", ".join(doc.specialties) if (doc.specialties and len(doc.specialties) > 0) else (doctor_details.specialty if (doctor_details and doctor_details.specialty) else "General Dentistry")
         name = doc.name if doc.name.startswith("Dr. ") else f"Dr. {doc.name}"
         
         # Determine shift from working_hours
@@ -417,7 +422,6 @@ def get_public_doctors(date: str = None, db: Session = Depends(get_db)):
         end_time = "05:00 PM"
         is_off = False
         
-        doctor_details = db.query(DoctorModel).filter(DoctorModel.user_id == doc.id).first()
         if doctor_details and doctor_details.working_hours:
             today_hours = doctor_details.working_hours.get(day_of_week)
             if today_hours:
@@ -426,8 +430,9 @@ def get_public_doctors(date: str = None, db: Session = Depends(get_db)):
                     start_time = today_hours["start"]
                     end_time = today_hours["end"]
                     
-        if is_off:
+        if is_off and not include_all:
             continue
+
             
         def parse_to_minutes(t_str: str) -> int:
             try:

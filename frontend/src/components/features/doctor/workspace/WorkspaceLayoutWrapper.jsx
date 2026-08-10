@@ -10,7 +10,9 @@ import LabOrderForm from "./LabOrderForm";
 import ClinicalNotes from "./ClinicalNotes";
 import ReferralForm from "./ReferralForm";
 import TreatmentPlanManager from "./TreatmentPlanManager";
+import SpecialtySheetModal from "./SpecialtySheetModal";
 import { updateLabOrderStatus } from "@/services/api";
+
 
 import { 
   FileText, 
@@ -111,9 +113,12 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
     handleReferPatient,
     patients,
     handleCompleteConsultation,
+    handleCompleteReferral,
     labOrders,
     referrals,
-    fetchLabOrders
+    fetchLabOrders,
+    currentDoctorName,
+    currentDoctorSpecialty
   } = useDoctor() || {};
 
   // Specialty mapping configuration to procedures/treatments
@@ -404,8 +409,10 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
     router.push(`/doctor/workspace/${specialtyId}`);
   };
 
-  // 1. Calculate Patient Statistics for Tabs
+  const [isSpecialtyModalOpen, setIsSpecialtyModalOpen] = useState(false);
+
   const patientOrders = labOrders?.filter(o => o.patient_token === effectiveViewingPatient.token) || [];
+
   
   const diagnosisNotes = effectiveViewingPatient.timeline?.filter(event => 
     (event.type === "Clinical Note" || event.type === "Consultation" || event.type === "Diagnosis" || event.type === "Treatment") &&
@@ -414,6 +421,21 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
   ) || [];
 
   const patientRefs = referrals?.filter(r => r.patientToken === effectiveViewingPatient.token || r.patient_token === effectiveViewingPatient.token) || [];
+
+  const incomingReferral = referrals?.find(r => {
+    if (!effectiveViewingPatient) return false;
+    const matchToken = r.patientToken === effectiveViewingPatient.token || r.patient_token === effectiveViewingPatient.token;
+    if (!matchToken) return false;
+
+    const targetDoc = (r.targetDoctor || r.target_doctor || "").toLowerCase();
+    const targetSpec = (r.speciality || r.specialty || "").toLowerCase();
+    const myName = (currentDoctorName || "").toLowerCase();
+    const mySpec = (specialtyId || "").toLowerCase();
+
+    if (targetDoc && myName && targetDoc.includes(myName)) return true;
+    if (targetSpec && mySpec && (targetSpec.includes(mySpec) || checkSpecMatch(targetSpec, mySpec))) return true;
+    return false;
+  });
 
   const prescriptionEvents = effectiveViewingPatient.timeline?.filter(event => 
     event.type === "Prescription"
@@ -480,8 +502,66 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
 
       {/* Main clinical sheet single-column body */}
       <div className="w-full p-6 space-y-6 text-left">
+        {/* Referred-to-Me Banner for Doctor B */}
+        {incomingReferral && (
+          <div className="bg-gradient-to-r from-indigo-50/90 via-purple-50/70 to-indigo-50/90 border border-indigo-200 rounded-2xl p-5 shadow-sm space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                  <Share2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-indigo-950 uppercase tracking-wider">
+                      REFERRED FROM: {incomingReferral.referredBy || "Doctor A"}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 uppercase">
+                      {incomingReferral.referred_by_specialty || "Referring Doctor Sheet"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-indigo-700/90 font-medium mt-0.5">
+                    This specialty clinical sheet was spawned from an incoming referral. Work in your own Diagnosis & Treatment Plan below.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSpecialtyModalOpen(true)}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 border-none"
+                >
+                  <FileText className="w-3.5 h-3.5" /> View Main Doctor Modal
+                </button>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${
+                  incomingReferral.status === "Completed"
+                    ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                    : incomingReferral.status === "In Progress"
+                    ? "bg-blue-100 text-blue-800 border-blue-200"
+                    : "bg-amber-100 text-amber-800 border-amber-200"
+                }`}>
+                  Status: {incomingReferral.status || "Pending"}
+                </span>
+              </div>
+            </div>
+
+            {/* Pre-filled Read-Only Context Box */}
+            <div className="bg-white/80 border border-indigo-150 rounded-xl p-3.5 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div>
+                <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider block">Reason for Referral</span>
+                <p className="font-semibold text-gray-900 mt-0.5">{incomingReferral.reason}</p>
+              </div>
+              <div>
+                <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wider block">Doctor A's Diagnosis & Notes</span>
+                <p className="font-semibold text-gray-800 mt-0.5">{incomingReferral.referred_from_notes || incomingReferral.clinicalNotes || "No prior notes provided."}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeKpiSection === "reports" && (
           <div className="space-y-4 animate-scale-up">
+
 
             {/* Header */}
             <div className="flex justify-between items-center bg-white p-4 border border-gray-150 rounded-2xl shadow-xs">
@@ -1118,7 +1198,19 @@ function WorkspaceLayoutWrapperInner({ specialtyId, children }) {
             )}
           </div>
         )}
-      </div>
+
+      {/* Specialty Clinical Sheet Modal */}
+      <SpecialtySheetModal
+        isOpen={isSpecialtyModalOpen}
+        onClose={() => setIsSpecialtyModalOpen(false)}
+        referral={incomingReferral}
+        patient={effectiveViewingPatient}
+        currentDoctorName={currentDoctorName}
+        onCompleteConsultation={(refId, notes, meds) => {
+          if (handleCompleteReferral) handleCompleteReferral(refId, notes, meds);
+        }}
+      />
+    </div>
     </div>
   );
 }

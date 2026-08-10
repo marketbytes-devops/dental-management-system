@@ -201,6 +201,8 @@ class LabOrderResponse(BaseModel):
     stage: Optional[str] = "New Cases"
     tech_notes: Optional[str] = None
     email_sent_at: Optional[str] = None
+    external_token: Optional[str] = None
+    external_token_created_at: Optional[datetime] = None
     rework_history: Optional[List[Any]] = []
     claimed_by: Optional[str] = None
     claimed_at: Optional[datetime] = None
@@ -213,9 +215,58 @@ class LabOrderResponse(BaseModel):
     payment_status: Optional[str] = "Pending Payment"
     payment_method: Optional[str] = None
     date_received: Optional[datetime] = None
+    item_condition: Optional[str] = "Good"
+    item_remarks: Optional[str] = None
+    received_by: Optional[str] = None
+    clinic_received_at: Optional[datetime] = None
+    receptionist_notified: Optional[bool] = False
+    appointment_scheduled: Optional[bool] = False
+    accountant_notified: Optional[bool] = False
+    accountant_bill_status: Optional[str] = "Pending Accountant Review"
+    final_patient_bill_amount: Optional[float] = 3500.0
+    vendor_invoice_verified: Optional[bool] = False
+    vendor_name: Optional[str] = None
+    vendor_invoice_number: Optional[str] = None
+    vendor_invoice_amount: Optional[float] = 0.0
+    vendor_invoice_file_url: Optional[str] = None
+    communication_logs: Optional[List[Any]] = []
+
+    # Rework Fields
+    rework_count: Optional[int] = 0
+    rework_reason: Optional[str] = None
+    rework_notes: Optional[str] = None
+    rework_attachments: Optional[List[Any]] = []
+    rework_status: Optional[str] = None
+    rework_history: Optional[List[Any]] = []
+
+    # Financial Contract Pricing Fields
+    supplier_cost: Optional[float] = None
+    patient_charge: Optional[float] = None
+    gross_profit: Optional[float] = None
+    pricing_configured: Optional[bool] = False
 
     class Config:
         from_attributes = True
+
+class LabItemReceivedCreate(BaseModel):
+    received_date: Optional[str] = None
+    received_by: Optional[str] = None
+    item_condition: Optional[str] = "Good"
+    item_remarks: Optional[str] = None
+    vendor_name: Optional[str] = None
+    vendor_invoice_number: Optional[str] = None
+    vendor_invoice_amount: Optional[float] = 0.0
+    vendor_invoice_file_url: Optional[str] = None
+
+class LabAccountantBillFinalize(BaseModel):
+    vendor_invoice_number: Optional[str] = None
+    vendor_invoice_amount: Optional[float] = 0.0
+    final_patient_bill_amount: float
+    notes: Optional[str] = None
+
+class LabCommunicationLogCreate(BaseModel):
+    comm_type: str # Phone Call, WhatsApp, SMS, Email
+    notes: str
 
 class LabVendorCreate(BaseModel):
     name: str
@@ -365,4 +416,149 @@ class LabItemPriceResponse(LabItemPriceBase):
 
     class Config:
         from_attributes = True
+
+
+# ── NEW: Workflow Enhancement Schemas ────────────────────────────────────────
+
+class ProcessCompletionEmailCreate(BaseModel):
+    """Payload for processing a completion email reply."""
+    raw_email_text: str
+    sender_email: Optional[str] = None
+    subject: Optional[str] = None
+
+class ConfirmCompletionEmailCreate(BaseModel):
+    """Lab tech confirms or edits extracted email completion proposal."""
+    courier_name: Optional[str] = None
+    tracking_number: Optional[str] = None
+    expected_delivery_date: Optional[str] = None
+    remarks: Optional[str] = None
+
+class UnmatchedEmailResponse(BaseModel):
+    id: int
+    sender_email: Optional[str] = None
+    subject: Optional[str] = None
+    raw_body: str
+    extracted_data: Optional[Any] = None
+    status: str
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class DoctorApproveCreate(BaseModel):
+    """Doctor approves restoration – marks case Completed."""
+    notes: Optional[str] = None
+
+class DoctorReworkRequestCreate(BaseModel):
+    """Doctor requests rework – sends back to lab tech."""
+    reason: str
+    notes: Optional[str] = None
+    attachments: Optional[List[Any]] = None   # [{url, name, type}]
+
+class SendReworkToExternalLabCreate(BaseModel):
+    """Lab tech dispatches rework request to the same external vendor."""
+    vendor_email: Optional[str] = None        # Override only if different vendor
+    additional_notes: Optional[str] = None
+
+class ExternalReworkResponseCreate(BaseModel):
+    """External lab accepts or rejects a rework request."""
+    rejection_reason: Optional[str] = None    # only needed on reject
+
+class ScheduleFittingCreate(BaseModel):
+    """Receptionist schedules a fitting appointment."""
+    appointment_date: str
+    appointment_time: Optional[str] = None
+    notes: Optional[str] = None
+
+
+# ── CONTRACT PRICING & FINANCIAL REPORT SCHEMAS ─────────────────────────────
+
+class LabVendorPricingCreate(BaseModel):
+    vendor_id: int
+    restoration_type: str
+    material: Optional[str] = None
+    supplier_cost: float  # Clinic pays
+    patient_charge: float # Patient bills
+
+class LabVendorPricingResponse(BaseModel):
+    id: int
+    vendor_id: int
+    vendor_name: Optional[str] = None
+    restoration_type: str
+    material: Optional[str] = None
+    supplier_cost: float
+    patient_charge: float
+    gross_profit: float
+    margin_percentage: float
+    is_active: bool
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class LabFinancialReportResponse(BaseModel):
+    total_orders: int
+    total_supplier_cost: float
+    total_patient_billing: float
+    total_gross_profit: float
+    profit_margin_percentage: float
+    breakdown_by_vendor: List[Any]
+    breakdown_by_restoration: List[Any]
+
+
+# ── AUTHORITATIVE WORKFLOW SCHEMAS ──────────────────────────────────────────
+
+class DoctorFlagCreate(BaseModel):
+    reason: str
+    notes: Optional[str] = None
+
+class DoctorResubmitCreate(BaseModel):
+    order_details: Optional[dict] = None
+    notes: Optional[str] = None
+    attachments: Optional[List[Any]] = None
+
+class FittingAppointmentCreate(BaseModel):
+    appointment_date: str
+    appointment_time: Optional[str] = None
+    doctor_name: Optional[str] = None
+    chair_number: Optional[str] = None
+    notes: Optional[str] = None
+
+class DoctorFittingOutcomeCreate(BaseModel):
+    outcome: str # "Fit Successful" or "Requires Lab Adjustment"
+    rework_reason: Optional[str] = None
+    notes: Optional[str] = None
+    attachments: Optional[List[Any]] = None
+
+class SupplierPayableCreate(BaseModel):
+    supplier_name: str
+    supplier_type: Optional[str] = "External Lab" # External Lab, Medicine, Other Vendor
+    invoice_number: Optional[str] = None
+    supplier_cost: float
+    due_date: Optional[str] = None
+    lab_case_id: Optional[str] = None
+    invoice_file_url: Optional[str] = None
+
+class SupplierPayablePayCreate(BaseModel):
+    payment_reference: str
+    payment_date: Optional[str] = None
+
+class SupplierPayableResponse(BaseModel):
+    id: int
+    supplier_name: str
+    supplier_type: str
+    invoice_number: Optional[str] = None
+    supplier_cost: float
+    due_date: Optional[str] = None
+    status: str
+    payment_date: Optional[str] = None
+    payment_reference: Optional[str] = None
+    lab_case_id: Optional[str] = None
+    invoice_file_url: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 

@@ -419,11 +419,13 @@ def create_referral_route(
         id=req.id,
         patient_token=req.patient_token,
         referred_by=req.referred_by,
+        referred_by_specialty=req.referred_by_specialty,
         speciality=req.speciality,
         target_doctor=req.target_doctor,
         date=req.date,
         reason=req.reason,
         clinical_notes=req.clinical_notes,
+        referred_from_notes=req.referred_from_notes or req.clinical_notes,
         status="Pending",
         referral_type=req.referral_type,
         external_facility=req.external_facility
@@ -469,19 +471,53 @@ def update_referral_route(
     current_user=Depends(get_current_user)
 ):
     from modules.doctor.models import ReferralModel
+    from modules.billing.models import BillingRequestModel
+    from datetime import datetime
+
     ref = db.query(ReferralModel).filter(ReferralModel.id == ref_id).first()
     if not ref:
         raise HTTPException(status_code=404, detail="Referral not found")
     
+    previous_status = ref.status
     ref.status = req.status
     if req.my_consultation_notes is not None:
         ref.my_consultation_notes = req.my_consultation_notes
     if req.my_medications is not None:
         ref.my_medications = req.my_medications
+    if req.doctor_b_notes is not None:
+        ref.doctor_b_notes = req.doctor_b_notes
+    if req.doctor_b_treatment_plan is not None:
+        ref.doctor_b_treatment_plan = req.doctor_b_treatment_plan
+
+    if req.status == "Completed":
+        ref.completed_at = datetime.now().isoformat()
+        # Automatically trigger Doctor B's billing line item if not already billed
+        if not ref.billing_request_id:
+            try:
+                doctor_b_name = ref.target_doctor or "Specialist Doctor"
+                billing_charge = BillingRequestModel(
+                    patient_token=ref.patient_token,
+                    doctor_name=doctor_b_name,
+                    total_amount=500.0,
+                    status="Pending",
+                    source_type="referral_consultation",
+                    procedures=[{
+                        "name": f"Specialty Referral Consultation ({ref.speciality or 'Specialist'})",
+                        "rate": 500.0,
+                        "source": "referral_consultation"
+                    }],
+                    notes=f"Referral from {ref.referred_by or 'Doctor A'}"
+                )
+                db.add(billing_charge)
+                db.flush()
+                ref.billing_request_id = billing_charge.id
+            except Exception as e:
+                print(f"Error auto-creating billing request for referral {ref_id}:", e)
         
     db.commit()
     db.refresh(ref)
     return ref
+
 
 # ---------------------------------------------------------------------------
 # Public: doctor listing (no auth)
@@ -1032,82 +1068,8 @@ def get_prescriptions_route(
     return rx_list
 
 # ---------------------------------------------------------------------------
-# Referrals
+# Oral Health Details
 # ---------------------------------------------------------------------------
-
-@router.post("/referrals", response_model=ReferralResponse)
-def create_referral_route(
-    req: ReferralCreate,
-    db: Session = Depends(get_db)
-):
-    from modules.doctor.models import ReferralModel
-    new_ref = ReferralModel(
-        id=req.id,
-        patient_token=req.patient_token,
-        referred_by=req.referred_by,
-        speciality=req.speciality,
-        target_doctor=req.target_doctor,
-        date=req.date,
-        reason=req.reason,
-        clinical_notes=req.clinical_notes,
-        status="Pending",
-        referral_type=req.referral_type,
-        external_facility=req.external_facility
-    )
-    db.add(new_ref)
-    db.commit()
-    db.refresh(new_ref)
-    return new_ref
-
-@router.get("/referrals", response_model=List[ReferralResponse])
-def get_referrals_route(
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    patient_id = current_user.get("patient_id")
-    if not patient_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-    
-    patient = db.query(PatientModel).filter(PatientModel.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
-
-    from modules.doctor.models import ReferralModel
-    ref_list = db.query(ReferralModel).filter(ReferralModel.patient_token == patient.token).order_by(ReferralModel.date.desc()).all()
-    return ref_list
-
-
-@router.get("/referrals/all", response_model=List[ReferralResponse])
-def get_all_referrals_route(
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
-):
-    from modules.doctor.models import ReferralModel
-    ref_list = db.query(ReferralModel).order_by(ReferralModel.date.desc()).all()
-    return ref_list
-
-
-@router.put("/referrals/{ref_id}", response_model=ReferralResponse)
-def update_referral_route(
-    ref_id: str,
-    req: ReferralUpdate,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
-):
-    from modules.doctor.models import ReferralModel
-    ref = db.query(ReferralModel).filter(ReferralModel.id == ref_id).first()
-    if not ref:
-        raise HTTPException(status_code=404, detail="Referral not found")
-    
-    ref.status = req.status
-    if req.my_consultation_notes is not None:
-        ref.my_consultation_notes = req.my_consultation_notes
-    if req.my_medications is not None:
-        ref.my_medications = req.my_medications
-        
-    db.commit()
-    db.refresh(ref)
-    return ref
 
 
 @router.get("/oral-health-details")

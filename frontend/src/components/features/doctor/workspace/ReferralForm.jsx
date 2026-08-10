@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Share2, Globe, Building } from "lucide-react";
-import { getFrontdeskDoctors } from "@/services/api";
+import { getFrontdeskDoctors, getAvailableDoctors } from "@/services/api";
 
 
 export default function ReferralForm({ patientToken, onReferPatient }) {
@@ -13,9 +13,12 @@ export default function ReferralForm({ patientToken, onReferPatient }) {
   useEffect(() => {
     async function fetchDoctors() {
       try {
-        const data = await getFrontdeskDoctors();
-        setClinicDoctors(data);
-        if (data.length > 0) {
+        let data = await getFrontdeskDoctors(null, true);
+        if (!data || data.length === 0) {
+          data = await getAvailableDoctors();
+        }
+        setClinicDoctors(data || []);
+        if (data && data.length > 0) {
           setSelectedDoctor(`${data[0].name} - ${data[0].specialty}`);
         }
       } catch (err) {
@@ -24,6 +27,7 @@ export default function ReferralForm({ patientToken, onReferPatient }) {
     }
     fetchDoctors();
   }, []);
+
   const [externalDoctor, setExternalDoctor] = useState("");
   const [externalSpeciality, setExternalSpeciality] = useState("");
   const [externalFacility, setExternalFacility] = useState("");

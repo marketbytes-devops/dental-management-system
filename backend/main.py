@@ -27,7 +27,7 @@ from modules.auth.models import UserModel
 from modules.patient.models import PatientModel, PatientConsentModel, PatientPrescriptionModel, PatientNotificationModel, DoctorFeedbackModel
 from modules.frontdesk.models import AppointmentModel
 from modules.frontdesk.communication_models import CommunicationLogModel
-from modules.lab.models import LabOrderModel, LabNotificationModel, LabVendorModel, LabOrderCommentModel, LabAuditTrailModel, InventoryItemModel, RestockRequestModel, ClinicalEncounterModel, ProstheticCaseDetailModel, PathologyCaseDetailModel
+from modules.lab.models import LabOrderModel, LabNotificationModel, LabVendorModel, LabOrderCommentModel, LabAuditTrailModel, InventoryItemModel, RestockRequestModel, ClinicalEncounterModel, ProstheticCaseDetailModel, PathologyCaseDetailModel, SupplierPayableModel, FittingAppointmentModel
 from modules.doctor.models import DoctorModel, ReferralModel
 from modules.admin.models import AdminModel
 from modules.leave.models import LeaveRequestModel
@@ -93,15 +93,43 @@ try:
             add_col_if_missing("order_details", "JSON")
             add_col_if_missing("result_document_url", "VARCHAR")
             add_col_if_missing("is_rework", "BOOLEAN DEFAULT FALSE")
+            add_col_if_missing("external_token_active", "BOOLEAN DEFAULT TRUE")
+            add_col_if_missing("rework_count", "INTEGER DEFAULT 0")
+            add_col_if_missing("rework_reason", "VARCHAR")
+            add_col_if_missing("rework_notes", "TEXT")
+            add_col_if_missing("rework_attachments", "JSON")
+            add_col_if_missing("rework_status", "VARCHAR")
+            add_col_if_missing("actual_invoice_amount", "FLOAT DEFAULT 0.0")
             add_col_if_missing("original_case_id", "VARCHAR")
             add_col_if_missing("tech_notes", "VARCHAR")
             add_col_if_missing("email_sent_at", "VARCHAR")
+            add_col_if_missing("external_token", "VARCHAR")
+            add_col_if_missing("external_token_created_at", "TIMESTAMP WITH TIME ZONE")
             add_col_if_missing("patient_total_amount", "FLOAT DEFAULT 3500.0")
             add_col_if_missing("patient_amount_paid", "FLOAT DEFAULT 0.0")
             add_col_if_missing("patient_balance_due", "FLOAT DEFAULT 3500.0")
             add_col_if_missing("payment_status", "VARCHAR DEFAULT 'Pending Payment'")
             add_col_if_missing("payment_method", "VARCHAR")
             add_col_if_missing("date_received", "TIMESTAMP WITH TIME ZONE")
+            add_col_if_missing("item_condition", "VARCHAR DEFAULT 'Good'")
+            add_col_if_missing("item_remarks", "VARCHAR")
+            add_col_if_missing("received_by", "VARCHAR")
+            add_col_if_missing("clinic_received_at", "TIMESTAMP WITH TIME ZONE")
+            add_col_if_missing("receptionist_notified", "BOOLEAN DEFAULT FALSE")
+            add_col_if_missing("appointment_scheduled", "BOOLEAN DEFAULT FALSE")
+            add_col_if_missing("accountant_notified", "BOOLEAN DEFAULT FALSE")
+            add_col_if_missing("supplier_cost", "FLOAT")
+            add_col_if_missing("patient_charge", "FLOAT")
+            add_col_if_missing("gross_profit", "FLOAT")
+            add_col_if_missing("pricing_configured", "BOOLEAN DEFAULT FALSE")
+            add_col_if_missing("accountant_bill_status", "VARCHAR DEFAULT 'Pending Accountant Review'")
+            add_col_if_missing("final_patient_bill_amount", "FLOAT DEFAULT 3500.0")
+            add_col_if_missing("vendor_invoice_verified", "BOOLEAN DEFAULT FALSE")
+            add_col_if_missing("vendor_name", "VARCHAR")
+            add_col_if_missing("vendor_invoice_number", "VARCHAR")
+            add_col_if_missing("vendor_invoice_amount", "FLOAT DEFAULT 0.0")
+            add_col_if_missing("vendor_invoice_file_url", "VARCHAR")
+            add_col_if_missing("communication_logs", "JSON")
 
             # Also check patient_consents table
             if engine.dialect.name == "sqlite":
@@ -138,6 +166,26 @@ try:
                     conn.execute(text(f"ALTER TABLE lab_inventory_items ADD COLUMN {col_name} {col_type};"))
 
             add_inv_col_if_missing("supplier", "VARCHAR")
+
+            # Also check referrals table
+            if engine.dialect.name == "sqlite":
+                ref_col_query = conn.execute(text("PRAGMA table_info(referrals);")).fetchall()
+                existing_ref_cols = [row[1] for row in ref_col_query]
+            else:
+                ref_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='referrals';")).fetchall()
+                existing_ref_cols = [row[0] for row in ref_col_query]
+
+            def add_ref_col_if_missing(col_name, col_type):
+                if col_name not in existing_ref_cols:
+                    conn.execute(text(f"ALTER TABLE referrals ADD COLUMN {col_name} {col_type};"))
+
+            add_ref_col_if_missing("referred_by_specialty", "VARCHAR")
+            add_ref_col_if_missing("referred_from_notes", "VARCHAR")
+            add_ref_col_if_missing("doctor_b_notes", "VARCHAR")
+            add_ref_col_if_missing("doctor_b_treatment_plan", "JSON")
+            add_ref_col_if_missing("completed_at", "VARCHAR")
+            add_ref_col_if_missing("billing_request_id", "INTEGER")
+
             add_inv_col_if_missing("expiry_date", "VARCHAR")
             add_inv_col_if_missing("batch_number", "VARCHAR")
             add_inv_col_if_missing("unit_price", "FLOAT")
@@ -331,9 +379,13 @@ app.include_router(doctor_router)
 app.include_router(procedures_router)
 app.include_router(billing_router)
 app.include_router(payment_router)
-app.include_router(complaint_router)
-
-
+@app.on_event("startup")
+def on_startup():
+    try:
+        from modules.lab.email_listener import start_email_listener
+        start_email_listener()
+    except Exception as e:
+        print(f"[STARTUP WARNING] Could not start IMAP email listener: {e}", flush=True)
 
 
 @app.get("/")

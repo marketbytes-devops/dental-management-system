@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Bell, Sparkles, Share2, Microscope, AlertTriangle, Calendar, CreditCard, ClipboardList, Info, Pill } from "lucide-react";
-import { useDoctor } from "@/app/(dashboards)/doctor/layout";
-import { useReceptionist } from "@/app/(dashboards)/frontdesk/receptionist/layout";
+import { useDoctor } from "@/context/DoctorContext";
+import { useReceptionist } from "@/context/ReceptionistContext";
 import { useAdmin } from "@/app/(dashboards)/admin/layout";
 import { updateAuthStatus, getPatientNotifications, markPatientNotificationAsRead, getMyLeaveRequests } from "@/services/api";
 

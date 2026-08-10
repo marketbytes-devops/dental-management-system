@@ -26,9 +26,12 @@ import {
   FileText,
   Paperclip,
   Flag,
-  Mail
+  Mail,
+  Wrench,
+  Package,
+  Send
 } from "lucide-react";
-import { getLabOrders, updateLabOrderStatus, updateLabOrder, getLabVendors, uploadLabFile, acceptEmailUpdate, dismissEmailUpdate } from "@/services/api";
+import { getLabOrders, updateLabOrderStatus, checkVendorLabPricing, updateLabOrder, getLabVendors, uploadLabFile, acceptEmailUpdate, dismissEmailUpdate, sendOrderToVendor, markItemReceivedAtClinic, uploadVendorInvoiceFile, sendExternalLabReminder, cancelExternalLabRequest, sendReworkToExternalLab, processCompletionEmail, confirmCompletionEmail, dismissCompletionEmail, getUnmatchedEmails, assignUnmatchedEmail, dismissUnmatchedEmail } from "@/services/api";
 import { validateLabOrderFields } from "@/services/labValidation";
 
 
@@ -118,6 +121,83 @@ export default function LabOrders() {
   const [viewMode, setViewMode] = useState("table");
 
   // Flag modal states
+  
+  // ── EMAIL COMPLETION PROPOSALS & UNMATCHED QUEUE STATES ──
+  const [unmatchedEmails, setUnmatchedEmails] = useState([]);
+  const [isUnmatchedModalOpen, setIsUnmatchedModalOpen] = useState(false);
+  const [assignTargetOrderId, setAssignTargetOrderId] = useState("");
+
+  const [isEditProposalModalOpen, setIsEditProposalModalOpen] = useState(false);
+  const [proposalTargetOrder, setProposalTargetOrder] = useState(null);
+  const [proposalFormData, setProposalFormData] = useState({
+    courier_name: "",
+    tracking_number: "",
+    expected_delivery_date: "",
+    remarks: ""
+  });
+
+  const [isSimulateEmailModalOpen, setIsSimulateEmailModalOpen] = useState(false);
+  const [simRawEmailText, setSimRawEmailText] = useState("");
+
+  const fetchUnmatchedEmailsList = async () => {
+    try {
+      const data = await getUnmatchedEmails();
+      setUnmatchedEmails(data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnmatchedEmailsList();
+  }, []);
+
+  const handleOpenEditProposalModal = (order) => {
+    const prop = order.pendingEmailProposal || {};
+    setProposalTargetOrder(order);
+    setProposalFormData({
+      courier_name: prop.courier_name || order.courier_name || "",
+      tracking_number: prop.tracking_number || order.tracking_number || "",
+      expected_delivery_date: prop.expected_delivery_date || order.expected_return_date || "",
+      remarks: prop.remarks || ""
+    });
+    setIsEditProposalModalOpen(true);
+  };
+
+  const handleConfirmEditProposalSubmit = async (e) => {
+    e.preventDefault();
+    if (!proposalTargetOrder) return;
+    try {
+      await confirmCompletionEmail(proposalTargetOrder.id, proposalFormData);
+      triggerToast(`Completion details updated & confirmed for Case ${proposalTargetOrder.id}.`);
+      setIsEditProposalModalOpen(false);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to confirm completion details.", "error");
+    }
+  };
+
+  const handleSimulateEmailSubmit = async (e) => {
+    e.preventDefault();
+    if (!simRawEmailText.trim()) return;
+    try {
+      const res = await processCompletionEmail({ raw_email_text: simRawEmailText });
+      if (res.status === "matched") {
+        triggerToast(res.message);
+      } else {
+        triggerToast(res.message, "error");
+      }
+      setSimRawEmailText("");
+      setIsSimulateEmailModalOpen(false);
+      fetchOrders();
+      fetchUnmatchedEmailsList();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to process email text.", "error");
+    }
+  };
+
   const [isFlagModalOpen, setIsFlagModalOpen] = useState(false);
   const [flagOrder, setFlagOrder] = useState(null);
   const [flagNote, setFlagNote] = useState("");
@@ -177,8 +257,107 @@ export default function LabOrders() {
   const [dispatchOrder, setDispatchOrder] = useState(null);
   const [dispatchFormData, setDispatchFormData] = useState({
     selectedPartnerKey: "apex",
-    email: "apex.dental@labmail.com"
+    email: "apex.dental@labmail.com",
+    vendorName: "",
+    techNotes: ""
   });
+
+  const handleOpenDispatchModal = (order) => {
+    setDispatchOrder(order);
+    const initialKey = Object.keys(LAB_PARTNERS)[0] || "apex";
+    setDispatchFormData({
+      selectedPartnerKey: initialKey,
+      email: order.orderDetails?.lab_email || LAB_PARTNERS[initialKey]?.email || "apex.dental@labmail.com",
+      vendorName: order.labName || LAB_PARTNERS[initialKey]?.name || "Apex Dental Laboratories",
+      techNotes: order.techNotes || ""
+    });
+    setIsDispatchModalOpen(true);
+  };
+
+  const handleDispatchSubmit = async (e) => {
+    e.preventDefault();
+    if (!dispatchOrder) return;
+    try {
+      const selectedPartner = LAB_PARTNERS[dispatchFormData.selectedPartnerKey] || {};
+      const vendorPayload = {
+        vendor_id: selectedPartner.id || null,
+        vendor_name: selectedPartner.name || dispatchFormData.vendorName || "External Dental Lab",
+        vendor_email: dispatchFormData.email || selectedPartner.email || "external-lab@labmail.com",
+        tech_notes: dispatchFormData.techNotes || ""
+      };
+
+      await sendOrderToVendor(dispatchOrder.id, vendorPayload);
+      triggerToast(`Case ${dispatchOrder.id} dispatched to ${vendorPayload.vendor_name}. Email with secure token sent!`);
+      setIsDispatchModalOpen(false);
+      fetchOrders();
+    } catch (err) {
+      console.error("Failed to send order to vendor:", err);
+      triggerToast(err.message || "Failed to send order to lab vendor.", "error");
+    }
+  };
+
+  // Item Received at Clinic Modal States
+  const [isItemReceivedModalOpen, setIsItemReceivedModalOpen] = useState(false);
+  const [itemReceivedOrder, setItemReceivedOrder] = useState(null);
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [uploadingInvoice, setUploadingInvoice] = useState(false);
+  const [itemReceivedFormData, setItemReceivedFormData] = useState({
+    received_date: new Date().toISOString().slice(0, 10),
+    received_by: "Alen Joseph (Lab Tech)",
+    item_condition: "Good",
+    item_remarks: "",
+    vendor_name: "ABC Dental Lab",
+    vendor_invoice_number: "INV-2451",
+    vendor_invoice_amount: "2400",
+    vendor_invoice_file_url: ""
+  });
+
+  const handleOpenItemReceivedModal = (order) => {
+    setItemReceivedOrder(order);
+    setInvoiceFile(null);
+    setItemReceivedFormData({
+      received_date: new Date().toISOString().slice(0, 10),
+      received_by: "Alen Joseph (Lab Tech)",
+      item_condition: "Good",
+      item_remarks: "",
+      vendor_name: order.vendor_name || order.vendorName || "ABC Dental Lab",
+      vendor_invoice_number: order.vendor_invoice_number || `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+      vendor_invoice_amount: order.vendor_invoice_amount || "2400",
+      vendor_invoice_file_url: order.vendor_invoice_file_url || ""
+    });
+    setIsItemReceivedModalOpen(true);
+  };
+
+  const handleItemReceivedSubmit = async (e) => {
+    e.preventDefault();
+    if (!itemReceivedOrder) return;
+    try {
+      let uploadedUrl = itemReceivedFormData.vendor_invoice_file_url;
+      if (invoiceFile) {
+        setUploadingInvoice(true);
+        const formData = new FormData();
+        formData.append("file", invoiceFile);
+        const uploadRes = await uploadVendorInvoiceFile(itemReceivedOrder.id, formData);
+        uploadedUrl = uploadRes.invoice_url;
+      }
+
+      const payload = {
+        ...itemReceivedFormData,
+        vendor_invoice_amount: parseFloat(itemReceivedFormData.vendor_invoice_amount) || 0.0,
+        vendor_invoice_file_url: uploadedUrl
+      };
+
+      await markItemReceivedAtClinic(itemReceivedOrder.id, payload);
+      triggerToast(`Case #${itemReceivedOrder.id} marked as received! External Lab Invoice recorded & Accountant automatically notified.`);
+      setIsItemReceivedModalOpen(false);
+      fetchOrders();
+    } catch (err) {
+      console.error("Failed to mark item received:", err);
+      triggerToast("Failed to update status to Item Received at Clinic.", "error");
+    } finally {
+      setUploadingInvoice(false);
+    }
+  };
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -234,30 +413,61 @@ export default function LabOrders() {
     };
   }
 
+  const getMissingDoctorFields = (order) => {
+    if (!order) return [];
+    const missing = [];
+
+    if (order.orderCategory === "Prosthetic" || !order.orderCategory) {
+      const tooth = order.toothQuadrant || order.toothNumber || (order.orderDetails && order.orderDetails.tooth_number);
+      if (!tooth || tooth === "N/A" || tooth === "Unspecified") missing.push("Tooth Number");
+
+      const shade = order.shade || (order.orderDetails && order.orderDetails.shade);
+      if (!shade || shade === "N/A" || shade === "Unspecified") missing.push("Shade");
+
+      const mat = order.material || order.prostheticType || (order.orderDetails && order.orderDetails.material);
+      if (!mat || mat === "N/A" || mat === "Unspecified") missing.push("Material / Specs");
+
+      const imp = order.impressionType || (order.orderDetails && order.orderDetails.impression_type);
+      if (!imp || imp === "N/A" || imp === "Unspecified") missing.push("Impression Type");
+
+      if (!order.notes || !order.notes.trim()) missing.push("Doctor Notes");
+
+      const hasScan = order.scanFile || order.opposingBiteScan || (Array.isArray(order.attachments) && order.attachments.length > 0);
+      if (!hasScan) missing.push("Clinical Scan / Attachment");
+    }
+    return missing;
+  };
+
   const getMeasurementsList = (order) => {
     if (!order) return [];
     const list = [];
     if (order.orderCategory === "Prosthetic") {
-      if (order.prostheticType) list.push({ label: "Prosthetic type", value: order.prostheticType });
-      if (order.toothQuadrant) list.push({ label: "Tooth number", value: order.toothQuadrant });
-      if (order.shade) list.push({ label: "Shade", value: order.shade });
-      if (order.material) list.push({ label: "Material", value: order.material });
-      if (order.impressionType) list.push({ label: "Impression type", value: order.impressionType });
-      if (order.marginDesign) list.push({ label: "Margin design", value: order.marginDesign });
-      if (order.implantSystem) list.push({ label: "Implant system", value: order.implantSystem });
+      const toothVal = order.toothQuadrant || order.toothNumber || (order.orderDetails && order.orderDetails.tooth_number);
+      list.push({ label: "Tooth number", value: toothVal || "Missing", isMissing: !toothVal });
+
+      const shadeVal = order.shade || (order.orderDetails && order.orderDetails.shade);
+      list.push({ label: "Shade", value: shadeVal || "Missing", isMissing: !shadeVal });
+
+      const matVal = order.material || order.prostheticType || (order.orderDetails && order.orderDetails.material);
+      list.push({ label: "Material", value: matVal || "Missing", isMissing: !matVal });
+
+      const impVal = order.impressionType || (order.orderDetails && order.orderDetails.impression_type);
+      list.push({ label: "Impression type", value: impVal || "Missing", isMissing: !impVal });
+
+      if (order.marginDesign) list.push({ label: "Margin design", value: order.marginDesign, isMissing: false });
+      if (order.implantSystem) list.push({ label: "Implant system", value: order.implantSystem, isMissing: false });
     } else {
-      if (order.testType) list.push({ label: "Test Type", value: order.testType });
-      if (order.sampleType) list.push({ label: "Sample Type", value: order.sampleType });
-      if (order.reasonForTest) list.push({ label: "Reason for test", value: order.reasonForTest });
+      if (order.testType) list.push({ label: "Test Type", value: order.testType, isMissing: false });
+      if (order.sampleType) list.push({ label: "Sample Type", value: order.sampleType, isMissing: false });
+      if (order.reasonForTest) list.push({ label: "Reason for test", value: order.reasonForTest, isMissing: false });
     }
-    // Any other extra fields inside orderDetails can also be added dynamically if not already listed
+
     if (order.orderDetails && typeof order.orderDetails === "object") {
       Object.entries(order.orderDetails).forEach(([key, val]) => {
         if (typeof val === "string" && val.trim() && !["address", "notes", "lab_name", "lab_email"].includes(key)) {
           const cleanKey = key.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-          // check if already added
           if (!list.some(item => item.label.toLowerCase() === cleanKey.toLowerCase())) {
-            list.push({ label: cleanKey, value: val });
+            list.push({ label: cleanKey, value: val, isMissing: false });
           }
         }
       });
@@ -485,15 +695,11 @@ export default function LabOrders() {
 
   const totalCases = useMemo(() => categoryFiltered.filter((o) => o.status !== "completed" && o.status !== "Completed").length, [categoryFiltered]);
   const pendingCases = useMemo(() => categoryFiltered.filter((o) => 
-    ["submitted", "Submitted", "Pending", "Flagged", "flagged", "ordered", "Ordered"].includes(o.status)
+    ["Submitted", "submitted", "Pending Review", "Pending Lab Review", "Flagged", "flagged", "Revision Requested"].includes(o.status)
   ).length, [categoryFiltered]);
   const inProductionCases = useMemo(() => categoryFiltered.filter((o) => {
-    if (activeCategory === "Dental Prosthetics") {
-      return ["received_by_lab", "in_design", "in_fabrication", "quality_check", "Accepted", "In Progress", "Confirmed", "Sent to Lab", "Received from Lab", "Fitted"].includes(o.status);
-    } else {
-      return ["Sample Collected", "Sent to Lab", "Report Received", "Reviewed by Doctor"].includes(o.status);
-    }
-  }).length, [categoryFiltered, activeCategory]);
+    return ["Order Sent to Lab", "Sent to Lab", "sent_to_lab", "Accepted by Lab", "accepted_by_lab", "Case Completed", "case_completed"].includes(o.status);
+  }).length, [categoryFiltered]);
   const urgentHighCases = useMemo(() => categoryFiltered.filter((o) => 
     ["Urgent", "High"].includes(o.priority) && o.status !== "completed" && o.status !== "Completed"
   ).length, [categoryFiltered]);
@@ -514,95 +720,75 @@ export default function LabOrders() {
 
   const getStatusLabel = (status) => {
     switch (status) {
+      case "Pending Review":
+      case "pending_review":
       case "Submitted":
       case "submitted":
-        return "Submitted";
-      case "Pending Doctor Confirmation":
-      case "Pending Doctor Review":
-        return "Pending Doctor Confirmation";
-      case "Doctor Accepted":
-      case "Confirmed":
-      case "confirmed":
-        return "Doctor Accepted";
+        return "Pending Lab Review";
+      case "Flagged":
+      case "flagged":
+      case "Revision Requested":
+        return "Flagged";
       case "Order Sent to Lab":
       case "Sent to Lab":
       case "sent_to_lab":
         return "Order Sent to Lab";
-      case "Order Received":
-      case "Received from Lab":
-      case "received_from_lab":
-        return "Order Received";
-      case "Returned for Rework":
-      case "returned_for_rework":
-        return "Returned for Rework";
+      case "Accepted by Lab":
+      case "accepted_by_lab":
+        return "Accepted by Lab";
+      case "Rejected by Lab":
+      case "rejected_by_lab":
+        return "Rejected by Lab";
+      case "Case Completed":
+      case "case_completed":
+        return "Case Completed";
+      case "Item Received at Clinic":
+      case "item_received_at_clinic":
+        return "Item Received at Clinic";
+      case "Bill Ready":
+      case "bill_ready":
+        return "Bill Ready";
       case "Completed":
       case "completed":
         return "Completed";
-      case "Flagged":
-      case "flagged":
-        return "Flagged";
-      case "Rejected":
-        return "Rejected";
-      case "Ordered":
-      case "ordered":
-        return "Ordered";
-      case "Sample Collected":
-      case "sample_collected":
-        return "Sample Collected";
-      case "Report Received":
-      case "report_received":
-        return "Report Received";
-      case "Reviewed by Doctor":
-      case "reviewed_by_doctor":
-        return "Reviewed by Doctor";
       default:
-        return status || "Unknown";
+        return status || "Pending Lab Review";
     }
   };
 
   const getStatusDotColor = (status) => {
     switch (status) {
+      case "Pending Review":
+      case "pending_review":
       case "Submitted":
       case "submitted":
-        return "bg-blue-400";
-      case "Pending Doctor Confirmation":
-      case "Pending Doctor Review":
-        return "bg-warning animate-pulse";
-      case "Doctor Accepted":
-      case "Confirmed":
-      case "confirmed":
-        return "bg-emerald-400";
+        return "bg-amber-400 animate-pulse";
+      case "Flagged":
+      case "flagged":
+      case "Revision Requested":
+        return "bg-rose-500 font-bold";
       case "Order Sent to Lab":
       case "Sent to Lab":
       case "sent_to_lab":
-        return "bg-indigo-600";
-      case "Order Received":
-      case "Received from Lab":
-      case "received_from_lab":
-        return "bg-purple-600";
-      case "Returned for Rework":
-      case "returned_for_rework":
-        return "bg-danger animate-pulse";
+        return "bg-indigo-600 animate-pulse";
+      case "Accepted by Lab":
+      case "accepted_by_lab":
+        return "bg-emerald-500 font-extrabold";
+      case "Rejected by Lab":
+      case "rejected_by_lab":
+        return "bg-rose-600 animate-pulse";
+      case "Case Completed":
+      case "case_completed":
+        return "bg-sky-500 font-bold";
+      case "Item Received at Clinic":
+      case "item_received_at_clinic":
+        return "bg-teal-600 font-black";
+      case "Bill Ready":
+      case "bill_ready":
+        return "bg-emerald-600 font-black";
       case "Completed":
       case "completed":
-        return "bg-success";
-      case "Flagged":
-      case "flagged":
-        return "bg-danger animate-pulse";
-      case "Rejected":
-        return "bg-danger";
-      case "Ordered":
-      case "ordered":
-        return "bg-yellow-500";
-      case "Sample Collected":
-      case "sample_collected":
-        return "bg-emerald-400";
-      case "Report Received":
-      case "report_received":
-        return "bg-purple-600";
-      case "Reviewed by Doctor":
-      case "reviewed_by_doctor":
-        return "bg-teal-500";
+        return "bg-emerald-500";
       default:
         return "bg-gray-400";
     }
@@ -723,26 +909,12 @@ export default function LabOrders() {
     if (!order) return;
 
     let targetStatus = "";
-    if (activeCategory === "Dental Prosthetics") {
-      if (columnId === "Submitted") targetStatus = "Submitted";
-      else if (columnId === "ConfirmedSent") targetStatus = "Doctor Accepted";
-      else if (columnId === "ReceivedFitted") targetStatus = "Order Received";
-      else if (columnId === "Completed") targetStatus = "Completed";
-    } else {
-      if (columnId === "OrderedCollected") targetStatus = "Sample Collected";
-      else if (columnId === "SentReport") targetStatus = "Report Received";
-      else if (columnId === "Reviewed") targetStatus = "Reviewed by Doctor";
-      else if (columnId === "Completed") targetStatus = "Completed";
-    }
+    if (columnId === "PendingReview") targetStatus = "Submitted";
+    else if (columnId === "SentToLab") targetStatus = "Order Sent to Lab";
+    else if (columnId === "CaseCompleted") targetStatus = "Case Completed";
+    else if (columnId === "ReceivedBilled") targetStatus = "Item Received at Clinic";
 
     if (targetStatus && targetStatus !== order.status) {
-      if (activeCategory === "Dental Prosthetics" && columnId !== "Submitted") {
-        const missing = validateOrderFields(order);
-        if (missing.length > 0) {
-          triggerToast(`Cannot move case: missing confirmation fields: ${missing.join(", ")}`, "error");
-          return;
-        }
-      }
       const ok = await updateDbStatus(orderId, targetStatus);
       if (ok) {
         triggerToast(`Case ${orderId} moved to ${targetStatus}.`);
@@ -752,115 +924,257 @@ export default function LabOrders() {
     }
   };
 
+  const handleSendReminder = async (order) => {
+    try {
+      await sendExternalLabReminder(order.id);
+      triggerToast(`Reminder email dispatched to external lab for Case ${order.id}.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to send reminder email.", "error");
+    }
+  };
+
+  const handleCancelRequest = async (order) => {
+    try {
+      await cancelExternalLabRequest(order.id);
+      triggerToast(`External lab request for Case ${order.id} cancelled. Reverted to Pending Lab Review.`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to cancel external lab request.", "error");
+    }
+  };
+
+  const handleSendReworkToLab = async (order) => {
+    try {
+      await sendReworkToExternalLab(order.id, {});
+      triggerToast(`Rework request for Case ${order.id} sent to external lab!`);
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to send rework to external lab.", "error");
+    }
+  };
+
   const renderOrderActions = (order) => {
     const isProsthetic = order.orderCategory === "Prosthetic";
-    const missing = validateOrderFields(order);
-    const hasMissing = missing.length > 0;
     
     let actionButtons = null;
     if (isProsthetic) {
-      if (order.status === "Revision Requested") {
-        actionButtons = (
-          <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded border border-rose-100">
-            Awaiting Doctor Revision
-          </span>
-        );
-      } else if (["Arriving", "Arriving / In Transit", "Order Sent to Lab", "Sent to Lab", "in_design", "in_fabrication", "quality_check"].includes(order.status)) {
+      if (["Order Sent to Lab", "Sent to Lab", "sent_to_lab", "Rework Sent to Lab"].includes(order.status)) {
+        // Awaiting external lab acceptance (initial or rework)
+        const isRework = order.status === "Rework Sent to Lab";
         actionButtons = (
           <div className="flex gap-2 items-center flex-wrap">
-            {order.trackingNumber && (
-              <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-1 rounded font-black">
-                📦 Tracking: {order.trackingNumber}
-              </span>
+            <span className={`text-[11px] font-extrabold px-2.5 py-1.5 rounded border ${
+              isRework ? "text-purple-700 bg-purple-50 border-purple-200" : "text-indigo-700 bg-indigo-50 border-indigo-200"
+            }`}>
+              {isRework ? "Rework Sent – Awaiting Lab Response" : "Awaiting External Lab Response"}
+            </span>
+            {!isRework && (
+              <button
+                onClick={() => handleSendReminder(order)}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+              >
+                Send Reminder
+              </button>
             )}
             <button
-              onClick={() => updateDbStatus(order.id, "Arrived")}
-              className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+              onClick={() => handleCancelRequest(order)}
+              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-lg text-xs font-bold transition-all cursor-pointer"
             >
-              Mark Arrived
-            </button>
-            <button
-              onClick={() => handleOpenReworkModal(order)}
-              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
-            >
-              Return for Correction
+              Cancel Request
             </button>
           </div>
         );
-      } else if (["Arrived", "Order Received", "Received from Lab", "received_from_lab"].includes(order.status)) {
+      } else if (order.status === "Doctor Requested Rework") {
+        // Doctor requested rework → lab tech can send to external vendor
         actionButtons = (
           <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-black text-purple-700 bg-purple-50 px-2.5 py-1 rounded border border-purple-200 flex items-center gap-1">
+              <Wrench className="w-3 h-3" /> Rework Requested by Doctor
+            </span>
             <button
-              onClick={() => updateDbStatus(order.id, "Completed")}
-              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+              onClick={() => handleSendReworkToLab(order)}
+              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
             >
-              Complete Order
+              <Send className="w-3 h-3" /> Send Rework to External Lab
             </button>
             <button
-              onClick={() => handleOpenReworkModal(order)}
-              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              onClick={() => handleOpenFlagModal(order)}
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
             >
-              Return for Correction
+              Flag Doctor
             </button>
           </div>
         );
-      } else if (order.status === "Completed" || order.status === "completed") {
+      } else if (["Rework In Progress"].includes(order.status)) {
+        // Rework accepted by external lab – awaiting completion
         actionButtons = (
           <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-extrabold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded border border-amber-200 flex items-center gap-1">
+              <Wrench className="w-3 h-3" /> Rework In Progress
+            </span>
+          </div>
+        );
+      } else if (["Rework Completed"].includes(order.status)) {
+        // Rework shipped back by external lab → mark received
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-extrabold text-teal-700 bg-teal-50 px-2.5 py-1.5 rounded border border-teal-200 flex items-center gap-1">
+              <Package className="w-3 h-3" /> Rework Completed – Item en Route
+            </span>
             <button
-              onClick={async () => {
-                try {
-                  const { sendLabBillingRequest } = await import("@/services/api");
-                  await sendLabBillingRequest({
-                    patient_token: order.patientToken || "PT-WALKIN",
-                    doctor_name: order.dentistName || "Lab Technician",
-                    amount: order.externalCost || 3500.0,
-                    notes: `Vendor Invoice for Case ${order.id} (${order.prostheticType || order.orderCategory})`,
-                    procedures: [{
-                      name: `Vendor Invoice (${order.prostheticType || order.orderCategory})`,
-                      cost: order.externalCost || 3500.0,
-                      tooth: order.toothQuadrant || "Full Arch"
-                    }]
-                  });
-                  triggerToast(`Case ${order.id} vendor invoice sent to Accountant.`);
-                } catch (err) {
-                  triggerToast("Failed to send invoice to Accountant.", "error");
-                }
-              }}
-              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
+              onClick={() => handleOpenItemReceivedModal(order)}
+              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
-              <span>💳</span> Send to Accountant
-            </button>
-            <button
-              onClick={() => handleOpenReworkModal(order)}
-              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
-            >
-              Return for Correction
+              Mark Rework Received
             </button>
           </div>
         );
-      } else {
+      } else if (["Rework Rejected"].includes(order.status)) {
+        // External lab rejected rework → option to resend or flag
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-black text-rose-700 bg-rose-50 px-2.5 py-1 rounded border border-rose-200 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" /> Rework Rejected by External Lab
+            </span>
+            <button
+              onClick={() => handleSendReworkToLab(order)}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1"
+            >
+              <Send className="w-3 h-3" /> Resend Rework to Lab
+            </button>
+            <button
+              onClick={() => handleOpenFlagModal(order)}
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Flag Doctor
+            </button>
+          </div>
+        );
+      } else if (["Completed by External Lab"].includes(order.status)) {
+        // External lab completed fabrication and shipped → mark received
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-extrabold text-teal-700 bg-teal-50 px-2.5 py-1.5 rounded border border-teal-200 flex items-center gap-1">
+              <Package className="w-3 h-3" /> Completed by External Lab – Item en Route
+            </span>
+            <button
+              onClick={() => handleOpenItemReceivedModal(order)}
+              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              Mark Item Received & Record Invoice
+            </button>
+          </div>
+        );
+      } else if (["Awaiting Doctor Review", "Appointment Scheduled"].includes(order.status)) {
+        // Receptionist scheduled fitting, doctor will review
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-extrabold text-sky-700 bg-sky-50 px-2.5 py-1.5 rounded border border-sky-200">
+              Awaiting Doctor Review (Fitting Scheduled)
+            </span>
+          </div>
+        );
+      } else if (order.status === "Completed") {
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded border border-emerald-200 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" /> Case Completed
+            </span>
+          </div>
+        );
+      } else if (order.status === "Resubmitted by Doctor") {
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-black text-purple-700 bg-purple-50 px-2.5 py-1 rounded border border-purple-200">
+              Resubmitted by Doctor
+            </span>
+            <button
+              onClick={() => handleOpenDispatchModal(order)}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              Send Updated Case
+            </button>
+            <button
+              onClick={() => handleOpenFlagModal(order)}
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Flag Doctor
+            </button>
+          </div>
+        );
+      } else if (["Revision Requested", "Flagged", "flagged", "Flagged - Waiting for Doctor Review"].includes(order.status)) {
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded border border-rose-100 flex items-center gap-1">
+              Flagged - Waiting for Doctor Review
+            </span>
+            <button
+              onClick={() => handleOpenFlagModal(order)}
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Flag Doctor
+            </button>
+          </div>
+        );
+      } else if (["Rejected by Lab", "rejected_by_lab"].includes(order.status)) {
         actionButtons = (
           <div className="flex gap-2 items-center flex-wrap">
             <button
               onClick={() => handleOpenDispatchModal(order)}
-              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
-              Send to Lab
+              Send to External Lab
             </button>
-            {order.status !== "Flagged" && order.status !== "flagged" && (
-              <button
-                onClick={() => handleOpenFlagModal(order)}
-                className="px-2.5 py-1.5 bg-warning/10 hover:bg-warning text-warning hover:text-white rounded-lg text-xs font-bold transition-all cursor-pointer border border-warning/10"
-              >
-                Flag for Doctor
-              </button>
-            )}
-            {hasMissing && (
-              <span className="text-[10px] text-warning font-semibold block w-full mt-1">
-                Missing: {missing.join(", ")}
-              </span>
-            )}
+            <button
+              onClick={() => handleOpenFlagModal(order)}
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Flag Doctor
+            </button>
+          </div>
+        );
+      } else if (["Accepted by Lab", "accepted_by_lab", "In Fabrication"].includes(order.status)) {
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
+              Accepted by Lab / In Fabrication
+            </span>
+            <button
+              onClick={() => handleOpenItemReceivedModal(order)}
+              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              Mark Item Received & Record Invoice
+            </button>
+          </div>
+        );
+      } else if (["Item Received at Clinic", "item_received_at_clinic"].includes(order.status)) {
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="text-[11px] font-extrabold text-teal-800 bg-teal-50 px-2.5 py-1.5 rounded border border-teal-200 flex items-center gap-1">
+              Item Received at Clinic (Accountant Notified)
+            </span>
+          </div>
+        );
+      } else {
+        // Pending Lab Review, Submitted, or Default
+        actionButtons = (
+          <div className="flex gap-2 items-center flex-wrap">
+            <button
+              onClick={() => handleOpenDispatchModal(order)}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-none rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+            >
+              Send to External Lab
+            </button>
+            <button
+              onClick={() => handleOpenFlagModal(order)}
+              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-all cursor-pointer"
+            >
+              Flag Doctor
+            </button>
           </div>
         );
       }
@@ -917,56 +1231,61 @@ export default function LabOrders() {
     return (
       <div className="flex flex-col gap-1.5 w-full items-end">
         {order.pendingEmailProposal && (
-          <div className="w-full my-1 p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-xs text-left">
-            <div className="flex items-start gap-2">
-              <span className="text-base shrink-0">🤖</span>
+          <div className="w-full my-1.5 p-3.5 bg-indigo-50/90 border border-indigo-200 rounded-2xl text-xs text-indigo-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs text-left">
+            <div className="flex items-start gap-2.5">
+              <span className="p-2 bg-indigo-100/80 rounded-xl text-indigo-700 font-bold shrink-0">📩</span>
               <div>
-                <span className="font-extrabold text-indigo-950 block text-[10px] uppercase tracking-wider">
-                  Detected Vendor Email Update ({order.pendingEmailProposal.case_id})
+                <span className="font-extrabold text-indigo-950 block text-[11px] uppercase tracking-wider">
+                  New Completion Email Received ({order.pendingEmailProposal.case_id || order.id})
                 </span>
-                <p className="text-[11px] text-indigo-900 font-medium">
-                  Proposed Status: <strong className="text-indigo-950 font-black">{order.pendingEmailProposal.proposed_status}</strong>
-                  {order.pendingEmailProposal.tracking_number && (
-                    <> • Tracking: <strong className="text-indigo-950 font-black">{order.pendingEmailProposal.tracking_number}</strong></>
-                  )}
-                  {order.pendingEmailProposal.expected_return_date && (
-                    <> • ETA: <strong>{order.pendingEmailProposal.expected_return_date}</strong></>
-                  )}
+                <p className="text-xs text-indigo-900 font-medium mt-0.5 leading-relaxed">
+                  Patient: <strong>{order.patient_name || order.patientName}</strong> • Courier: <strong>{order.pendingEmailProposal.courier_name || "N/A"}</strong> • Tracking: <strong>{order.pendingEmailProposal.tracking_number || "N/A"}</strong> • ETA: <strong>{order.pendingEmailProposal.expected_return_date || "N/A"}</strong>
+                  {order.pendingEmailProposal.remarks && <> • Remarks: <em>"{order.pendingEmailProposal.remarks}"</em></>}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
               <button
                 type="button"
                 onClick={async (e) => {
                   e.stopPropagation();
                   try {
-                    await acceptEmailUpdate(order.id);
-                    triggerToast(`Email update accepted for Case ${order.id}.`);
+                    await confirmCompletionEmail(order.id);
+                    triggerToast(`Completion confirmed for Case ${order.id}.`);
                     fetchOrders();
                   } catch (err) {
-                    triggerToast("Failed to accept update.", "error");
+                    triggerToast("Failed to confirm completion.", "error");
                   }
                 }}
-                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] rounded-lg shadow-xs cursor-pointer border-none"
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs cursor-pointer border-none flex items-center gap-1"
               >
-                ✓ Accept Update
+                ✓ Confirm Completion
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenEditProposalModal(order);
+                }}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl cursor-pointer border-none"
+              >
+                Edit Details
               </button>
               <button
                 type="button"
                 onClick={async (e) => {
                   e.stopPropagation();
                   try {
-                    await dismissEmailUpdate(order.id);
-                    triggerToast(`Proposal dismissed for Case ${order.id}.`);
+                    await dismissCompletionEmail(order.id);
+                    triggerToast(`Completion proposal ignored for Case ${order.id}.`);
                     fetchOrders();
                   } catch (err) {
-                    triggerToast("Failed to dismiss proposal.", "error");
+                    triggerToast("Failed to ignore proposal.", "error");
                   }
                 }}
-                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-[11px] rounded-lg cursor-pointer border-none"
+                className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl cursor-pointer border-none"
               >
-                Dismiss
+                Ignore
               </button>
             </div>
           </div>
@@ -977,16 +1296,36 @@ export default function LabOrders() {
   };
 
   const BOARD_COLUMNS = activeCategory === "Dental Prosthetics" ? [
-    { id: "Submitted", label: "Submitted & Flagged", statuses: ["Pending Review", "Revision Requested", "Submitted", "submitted", "Flagged", "flagged", "Pending", "returned_for_rework", "Returned for Rework"] },
-    { id: "ConfirmedSent", label: "Confirmed & Sent", statuses: ["Confirmed by Tech", "Pending Doctor Confirmation", "Pending Doctor Review", "Confirmed", "confirmed", "Doctor Accepted", "Order Sent to Lab", "Sent to Lab", "In Progress", "Accepted", "received_by_lab", "in_design", "in_fabrication", "quality_check"] },
+    { id: "Submitted", label: "Submitted & Flagged", statuses: ["Pending Review", "Revision Requested", "Submitted", "submitted", "Flagged", "flagged", "Pending", "returned_for_rework", "Returned for Rework", "Rejected by Lab", "rejected_by_lab"] },
+    { id: "ConfirmedSent", label: "Confirmed & Sent", statuses: ["Confirmed by Tech", "Pending Doctor Confirmation", "Pending Doctor Review", "Confirmed", "confirmed", "Doctor Accepted", "Order Sent to Lab", "Sent to Lab", "In Progress", "Accepted by Lab", "accepted_by_lab", "received_by_lab", "in_design", "in_fabrication", "quality_check"] },
     { id: "ReceivedFitted", label: "Received & Fitted", statuses: ["Order Received", "Received from Lab", "received_from_lab", "Fitted", "fitted"] },
-    { id: "Completed", label: "Completed", statuses: ["Completed", "completed"] }
+    { id: "Completed", label: "Completed", statuses: ["Completed", "completed", "Case Completed", "case_completed", "Results Received"] }
   ] : [
     { id: "OrderedCollected", label: "Ordered & Collected", statuses: ["Ordered", "ordered", "Sample Collected", "sample_collected", "Pending"] },
-    { id: "SentReport", label: "Sent & Report", statuses: ["Order Sent to Lab", "Sent to Lab", "sent_to_lab", "Report Received", "report_received"] },
+    { id: "SentReport", label: "Sent & Report", statuses: ["Order Sent to Lab", "Sent to Lab", "sent_to_lab", "Report Received", "report_received", "Accepted by Lab", "accepted_by_lab"] },
     { id: "Reviewed", label: "Reviewed by Doctor", statuses: ["Reviewed by Doctor", "reviewed_by_doctor"] },
-    { id: "Completed", label: "Completed", statuses: ["Completed", "completed"] }
+    { id: "Completed", label: "Completed", statuses: ["Completed", "completed", "Case Completed", "case_completed", "Results Received"] }
   ];
+
+  
+  const [pricingCheck, setPricingCheck] = useState({ loading: false, configured: true, message: "", patient_charge: 0 });
+
+  const verifySelectedVendorPricing = async (vendorId, restorationType) => {
+    if (!vendorId || !restorationType) return;
+    setPricingCheck(prev => ({ ...prev, loading: true }));
+    try {
+      const res = await checkVendorLabPricing(vendorId, restorationType);
+      setPricingCheck({
+        loading: false,
+        configured: res.configured,
+        message: res.message || "",
+        patient_charge: res.patient_charge || 0
+      });
+    } catch (err) {
+      console.error("Pricing check failed", err);
+      setPricingCheck({ loading: false, configured: true, message: "", patient_charge: 0 });
+    }
+  };
 
   const openRejectModal = (orderId) => {
     setRejectTargetId(orderId);
@@ -1069,43 +1408,6 @@ export default function LabOrders() {
     }
   };
 
-  const handleOpenDispatchModal = (order) => {
-    setDispatchOrder(order);
-    const initialKey = Object.keys(LAB_PARTNERS).find(key => LAB_PARTNERS[key].name === order.labName) || Object.keys(LAB_PARTNERS)[0] || "apex";
-    setDispatchFormData({
-      selectedPartnerKey: initialKey,
-      email: LAB_PARTNERS[initialKey]?.email || "apex.dental@labmail.com",
-    });
-    setIsDispatchModalOpen(true);
-  };
-
-  const handleDispatchSubmit = async (e) => {
-    e.preventDefault();
-    if (!dispatchOrder) return;
-    try {
-      const selectedPartner = LAB_PARTNERS[dispatchFormData.selectedPartnerKey];
-      const orderDetailsPayload = {
-        ...dispatchOrder.orderDetails,
-        lab_name: selectedPartner.name,
-        lab_email: selectedPartner.email,
-      };
-
-      await updateLabOrder(dispatchOrder.id, {
-        status: "Sent to Lab",
-        lab_name: selectedPartner.name,
-        vendor_id: selectedPartner.id,
-        order_details: orderDetailsPayload,
-      });
-
-      triggerToast(`Case ${dispatchOrder.id} sent to external lab successfully.`);
-      setIsDispatchModalOpen(false);
-      fetchOrders();
-    } catch (err) {
-      console.error(err);
-      triggerToast("Failed to dispatch order.", "error");
-    }
-  };
-
   const openDetailsDrawer = (order) => {
     handleOpenDispatchModal(order);
   };
@@ -1125,32 +1427,66 @@ export default function LabOrders() {
           <p className="text-sm text-gray-500 mt-1">Manage prosthetic fabrications, track statuses, and coordinate with dentists.</p>
         </div>
         
-        {/* Category Toggle */}
-        <div className="flex bg-gray-100 p-1 rounded-xl shrink-0 border border-gray-200 shadow-xs">
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setActiveCategory("Dental Prosthetics")}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-              activeCategory === "Dental Prosthetics"
-                ? "bg-white text-gray-900 shadow-sm font-extrabold"
-                : "text-gray-500 hover:text-gray-800"
-            }`}
+            onClick={() => setIsSimulateEmailModalOpen(true)}
+            className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs rounded-xl border border-indigo-200 cursor-pointer flex items-center gap-1.5 shadow-2xs"
           >
-            Dental Prosthetics
+            <Mail className="w-4 h-4 text-indigo-600" /> Simulate Lab Email Reply
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveCategory("Blood Work / Pathology")}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-              activeCategory === "Blood Work / Pathology"
-                ? "bg-white text-gray-900 shadow-sm font-extrabold"
-                : "text-gray-500 hover:text-gray-800"
-            }`}
-          >
-            Blood Work / Pathology
-          </button>
+
+          {/* Category Toggle */}
+          <div className="flex bg-gray-100 p-1 rounded-xl shrink-0 border border-gray-200 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setActiveCategory("Dental Prosthetics")}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                activeCategory === "Dental Prosthetics"
+                  ? "bg-white text-gray-900 shadow-sm font-extrabold"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              Dental Prosthetics
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveCategory("Blood Work / Pathology")}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                activeCategory === "Blood Work / Pathology"
+                  ? "bg-white text-gray-900 shadow-sm font-extrabold"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              Blood Work / Pathology
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Unmatched Emails Queue Alert Banner */}
+      {unmatchedEmails.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-950 shadow-xs animate-scale-up">
+          <div className="flex items-center gap-3">
+            <span className="p-2 bg-amber-100 rounded-xl text-amber-700 font-bold shrink-0">⚠️</span>
+            <div>
+              <span className="font-black text-amber-950 uppercase tracking-wider block text-[11px]">
+                Unmatched External Lab Emails Queue ({unmatchedEmails.length})
+              </span>
+              <p className="text-xs text-amber-900 font-medium mt-0.5">
+                {unmatchedEmails.length} external lab completion reply email{unmatchedEmails.length === 1 ? "" : "s"} could not be automatically matched to a case ID.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsUnmatchedModalOpen(true)}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl shadow-sm cursor-pointer border-none shrink-0"
+          >
+            Review Unmatched Queue ({unmatchedEmails.length})
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-150 flex items-center justify-between relative overflow-hidden group hover:border-primary/45 transition-all duration-300">
@@ -1260,19 +1596,17 @@ export default function LabOrders() {
             <select 
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-705 min-w-[110px]"
+              className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-700 min-w-[150px]"
             >
               <option value="">All Statuses</option>
-              <option value="submitted">Submitted</option>
-              <option value="received_by_lab">Received by Lab</option>
-              <option value="in_design">In Design</option>
-              <option value="in_fabrication">In Fabrication</option>
-              <option value="quality_check">Quality Check</option>
-              <option value="shipped">Shipped</option>
-              <option value="received_at_clinic">Received at Clinic</option>
-              <option value="fitted">Fitted</option>
-              <option value="completed">Completed</option>
-              <option value="returned_for_rework">Returned for Rework</option>
+              <option value="Awaiting Lab Review">Awaiting Review</option>
+              <option value="Flagged by Lab">Flagged</option>
+              <option value="Sent to External Lab">Sent</option>
+              <option value="Accepted by External Lab">Accepted</option>
+              <option value="Delivery Delayed">Delivery Delayed</option>
+              <option value="Pending Completion Confirmation">Pending Completion Confirmation</option>
+              <option value="Completed by External Lab">Completed</option>
+              <option value="Rework Requested">Rework</option>
             </select>
 
             <select 
@@ -1375,16 +1709,8 @@ export default function LabOrders() {
                           </div>
                         </div>
 
-                        {/* Middle Left: Dentist info */}
-                        <div className="flex-1 min-w-[150px]">
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ordering Dentist(s)</p>
-                          <p className="text-xs text-gray-700 font-extrabold mt-0.5">
-                            {Array.from(patient.dentists).join(", ") || "N/A"}
-                          </p>
-                        </div>
-
                         {/* Middle Right: Total Orders badge */}
-                        <div className="w-20">
+                        <div className="w-24">
                           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Cases</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="inline-flex items-center justify-center px-2 py-0.5 bg-gray-100 border border-gray-200 text-gray-700 text-xs font-black rounded-md">
@@ -1394,8 +1720,8 @@ export default function LabOrders() {
                         </div>
 
                         {/* Right: Status callout & Chevron */}
-                        <div className="flex items-center justify-between md:justify-end gap-6 md:w-60">
-                          <div className="text-left md:text-right">
+                        <div className="flex items-center justify-between md:justify-end gap-3 shrink-0">
+                          <div className="text-left md:text-right hidden sm:block">
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Recent Activity</p>
                             {patient.newOrdersCount > 0 ? (
                               <span className="text-red-500 font-extrabold text-xs flex items-center md:justify-end gap-1.5 mt-0.5">
@@ -1404,7 +1730,7 @@ export default function LabOrders() {
                               </span>
                             ) : (
                               <span className="text-gray-400 font-bold text-xs block mt-0.5">
-                                No new activity
+                                Active Case
                               </span>
                             )}
                           </div>
@@ -1439,20 +1765,36 @@ export default function LabOrders() {
                                       className="hover:bg-gray-50/70 transition-colors cursor-pointer group"
                                     >
                                       <td className="px-4 py-3.5 font-bold text-gray-900 group-hover:text-primary transition-colors">
-                                        {order.id}
+                                        <div className="font-extrabold text-sm">{order.id}</div>
+                                        <div className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-150 px-2 py-0.5 rounded-md w-fit mt-1">
+                                          {order.dentistName || "Dr. Anoop Nair"}
+                                        </div>
                                       </td>
                                       <td className="px-4 py-3.5">
-                                        {order.orderCategory === "Prosthetic" ? (
-                                          <div>
-                                            <p className="font-semibold text-gray-750">{order.prostheticType}</p>
-                                            <p className="text-[10px] text-gray-400 mt-0.5">{order.material} (Shade: {order.shade})</p>
-                                          </div>
-                                        ) : (
-                                          <div>
-                                            <p className="font-semibold text-gray-750">{order.orderCategory}</p>
-                                            <p className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[200px]">{JSON.stringify(order.orderDetails)}</p>
-                                          </div>
-                                        )}
+                                        {(() => {
+                                          const missing = getMissingDoctorFields(order);
+                                          return order.orderCategory === "Prosthetic" ? (
+                                            <div>
+                                              <p className="font-semibold text-gray-750">{order.prostheticType || "Prosthetic Case"}</p>
+                                              <p className="text-[10px] text-gray-400 mt-0.5">{order.material || "Material Unspecified"} (Shade: {order.shade || "None"})</p>
+                                              {missing.length > 0 && (
+                                                <span className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-extrabold block w-fit mt-1">
+                                                  Missing: {missing.join(", ")}
+                                                </span>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <div>
+                                              <p className="font-semibold text-gray-750">{order.orderCategory}</p>
+                                              <p className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[200px]">{JSON.stringify(order.orderDetails)}</p>
+                                              {missing.length > 0 && (
+                                                <span className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-extrabold block w-fit mt-1">
+                                                  Missing: {missing.join(", ")}
+                                                </span>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
                                       </td>
                                       <td className="px-4 py-3.5">
                                         <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide ${getPriorityStyle(order.priority)}`}>
@@ -1813,246 +2155,410 @@ export default function LabOrders() {
         </div>
       )}
 
-      {/* Send to External Lab Modal */}
-      {isDispatchModalOpen && dispatchOrder && (
+      {/* Mark Item Received at Clinic Modal */}
+      {isItemReceivedModalOpen && itemReceivedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white text-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-gray-100 my-8 font-sans text-left">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-start">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 font-sans text-left my-8">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-teal-50/60">
               <div>
-                <p className="text-xs font-bold text-gray-400">Order #{dispatchOrder.id}</p>
-                <h2 className="text-lg font-bold text-gray-900 mt-1">Patient: {dispatchOrder.patientName}</h2>
+                <span className="text-[10px] font-black uppercase tracking-widest text-teal-800 bg-teal-100 px-2 py-0.5 rounded">
+                  Lab Technician Verification & Receipt
+                </span>
+                <h2 className="text-lg font-bold text-gray-900 mt-1 flex items-center gap-2">
+                  <span>📦</span> Mark Item Received for #{itemReceivedOrder.id}
+                </h2>
               </div>
               <button 
-                onClick={() => setIsDispatchModalOpen(false)}
-                className="text-gray-400 hover:text-gray-650 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                onClick={() => setIsItemReceivedModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleDispatchSubmit} className="p-6 space-y-5">
-              
-              {/* Measurements from doctor */}
-              <div className="bg-gray-50 border border-gray-150 rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-1">
-                  <FileText className="w-4 h-4 text-gray-550" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Measurements from doctor</span>
+            <form onSubmit={handleItemReceivedSubmit} className="p-6 space-y-5">
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase block">Patient</span>
+                  <span className="font-bold text-gray-900">{itemReceivedOrder.patientName}</span>
                 </div>
-
-                <div className="space-y-2 text-xs font-medium text-gray-800">
-                  {getMeasurementsList(dispatchOrder).map(({ label, value }) => (
-                    <div key={label} className="flex justify-between border-b border-gray-200/50 pb-1.5">
-                      <span className="text-gray-500">{label}</span>
-                      <span className="text-gray-900 font-bold">{value}</span>
-                    </div>
-                  ))}
-
-                  {dispatchOrder.notes && (
-                    <div className="pt-2 border-t border-gray-200 mt-2">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Doctor&apos;s notes</p>
-                      <p className="text-gray-800 text-xs font-semibold leading-relaxed bg-white p-2.5 rounded-lg border border-gray-150">{dispatchOrder.notes}</p>
-                    </div>
-                  )}
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase block">Ordering Doctor</span>
+                  <span className="font-bold text-gray-900">{itemReceivedOrder.dentistName}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase block">Restoration / Procedure</span>
+                  <span className="font-bold text-teal-700">{itemReceivedOrder.prostheticType || itemReceivedOrder.orderCategory}</span>
                 </div>
               </div>
 
-              {/* Attachments */}
-              {(dispatchOrder.scanFile || dispatchOrder.opposingBiteScan) && (
-                <div className="bg-gray-50 border border-gray-155 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-1">
-                    <Paperclip className="w-4 h-4 text-gray-500" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Attachments</span>
+              {/* Section 1: Item Receipt */}
+              <div className="p-4 bg-teal-50/40 border border-teal-150 rounded-2xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-teal-800 flex items-center gap-1.5">
+                  <span>🏥</span> Section 1: Physical Item Receipt
+                </h4>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Received Date</label>
+                    <input 
+                      type="date" 
+                      required
+                      value={itemReceivedFormData.received_date}
+                      onChange={(e) => setItemReceivedFormData({ ...itemReceivedFormData, received_date: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-teal-500"
+                    />
                   </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {dispatchOrder.scanFile && (
-                      <a 
-                        href={`/api/lab/files/${dispatchOrder.scanFile}`} 
-                        download
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
-                      >
-                        <Paperclip className="w-3.5 h-3.5" /> {dispatchOrder.scanFile}
-                      </a>
-                    )}
-                    {dispatchOrder.opposingBiteScan && (
-                      <a 
-                        href={`/api/lab/files/${dispatchOrder.opposingBiteScan}`} 
-                        download
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
-                      >
-                        <Paperclip className="w-3.5 h-3.5" /> {dispatchOrder.opposingBiteScan}
-                      </a>
-                    )}
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Received By (Lab Tech)</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={itemReceivedFormData.received_by}
+                      onChange={(e) => setItemReceivedFormData({ ...itemReceivedFormData, received_by: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-teal-500"
+                    />
                   </div>
                 </div>
-              )}
 
-              {/* Choose external lab or display selected lab */}
-              {!["Sent to Lab", "sent_to_lab", "Order Sent to Lab", "In Progress", "in_progress", "in_design", "in_fabrication", "quality_check", "Order Received", "Received from Lab", "received_from_lab", "Completed", "completed", "Fitted", "fitted"].includes(dispatchOrder.status) ? (
-                <>
-                  <div className="bg-gray-50 border border-gray-155 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-1">
-                      <Truck className="w-4 h-4 text-indigo-600" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Choose external lab</span>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Physical Condition</label>
+                  <select 
+                    value={itemReceivedFormData.item_condition}
+                    onChange={(e) => setItemReceivedFormData({ ...itemReceivedFormData, item_condition: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none cursor-pointer"
+                  >
+                    <option value="Good">Good (Intact & Fit for Delivery)</option>
+                    <option value="Damaged">Damaged (Defect / Needs Attention)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Remarks (Optional)</label>
+                  <textarea 
+                    rows="2"
+                    value={itemReceivedFormData.item_remarks}
+                    onChange={(e) => setItemReceivedFormData({ ...itemReceivedFormData, item_remarks: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-800 outline-none"
+                    placeholder="e.g. Checked crown margin under microscope."
+                  />
+                </div>
+              </div>
+
+              {/* Section 2: External Lab Invoice Details */}
+              <div className="p-4 bg-indigo-50/40 border border-indigo-150 rounded-2xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
+                  <span>📑</span> Section 2: External Lab Supplier Invoice
+                </h4>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">External Lab Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={itemReceivedFormData.vendor_name}
+                      onChange={(e) => setItemReceivedFormData({ ...itemReceivedFormData, vendor_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Invoice Number</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={itemReceivedFormData.vendor_invoice_number}
+                      onChange={(e) => setItemReceivedFormData({ ...itemReceivedFormData, vendor_invoice_number: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500"
+                      placeholder="e.g. INV-2451"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Lab Invoice Amount (₹) * Required</label>
+                  <input 
+                    type="number" 
+                    required
+                    min="0"
+                    step="10"
+                    value={itemReceivedFormData.vendor_invoice_amount}
+                    onChange={(e) => setItemReceivedFormData({ ...itemReceivedFormData, vendor_invoice_amount: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-black text-rose-600 outline-none focus:border-indigo-500"
+                    placeholder="2400"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-0.5">Required: This actual cost will be passed directly to the Accountant for final patient bill calculation.</p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Upload Invoice (PDF / Image Optional)</label>
+                  <input 
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={(e) => setInvoiceFile(e.target.files[0] || null)}
+                    className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-3 text-[11px] font-medium text-teal-900 flex items-start gap-2">
+                <span className="shrink-0 text-sm">🔔</span>
+                <p>Clicking <strong>Save & Notify Accountant</strong> will log the lab receipt, pass the recorded invoice cost to the Accountant's <strong>Pending Lab Billing</strong> queue, and notify the Receptionist.</p>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsItemReceivedModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={uploadingInvoice}
+                  className="px-5 py-2.5 text-xs font-extrabold text-white bg-teal-600 rounded-xl hover:bg-teal-700 transition-colors shadow-md shadow-teal-600/20 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {uploadingInvoice ? "Uploading..." : "Save & Notify Accountant ↗"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Send to External Lab Modal */}
+      {isDispatchModalOpen && dispatchOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white text-gray-800 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-100 font-sans text-left my-6">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 bg-indigo-50/40 flex justify-between items-center">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-100/70 px-2.5 py-0.5 rounded-full">
+                  External Dental Lab Dispatch Terminal
+                </span>
+                <h2 className="text-xl font-black text-gray-900 mt-1">
+                  Order #{dispatchOrder.id} — Patient: {dispatchOrder.patientName}
+                </h2>
+              </div>
+              <button 
+                onClick={() => setIsDispatchModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleDispatchSubmit} className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                
+                {/* Left Column: Measurements & Notes */}
+                <div className="space-y-4">
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                      <FileText className="w-4 h-4 text-indigo-600" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Measurements & Doctor Specs</span>
                     </div>
 
-                    <div className="space-y-3">
-                      <select
-                        value={dispatchFormData.selectedPartnerKey}
-                        onChange={(e) => {
-                          const key = e.target.value;
-                          setDispatchFormData({
-                            selectedPartnerKey: key,
-                            email: LAB_PARTNERS[key]?.email || "",
-                          });
-                        }}
-                        className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800 cursor-pointer"
-                      >
-                        {Object.entries(LAB_PARTNERS).map(([key, partner]) => (
-                          <option key={key} value={key} className="bg-white text-gray-800">
-                            {partner.name} — {partner.email}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="space-y-2 text-xs font-medium text-gray-800">
+                      {getMeasurementsList(dispatchOrder).map(({ label, value, isMissing, isRevised }) => (
+                        <div key={label} className={`flex justify-between border-b pb-1.5 px-2.5 py-1.5 rounded-xl transition-all ${
+                          isRevised
+                            ? "bg-emerald-50 border border-emerald-300 text-emerald-900 font-extrabold"
+                            : isMissing
+                            ? "bg-rose-50 border border-rose-200"
+                            : "border-gray-200/50"
+                        }`}>
+                          <span className={isRevised ? "text-emerald-900 font-black flex items-center gap-1.5 text-xs" : isMissing ? "text-rose-700 font-bold flex items-center gap-1 text-xs" : "text-gray-500"}>
+                            {isMissing && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
+                            {label}
+                          </span>
+                          <span className={isRevised ? "text-emerald-900 font-black flex items-center gap-1.5 text-xs" : isMissing ? "text-rose-700 font-black uppercase text-[11px]" : "text-gray-900 font-bold"}>
+                            {value}
+                            {isRevised && (
+                              <span className="bg-emerald-200 text-emerald-900 text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider">
+                                Revised by Doctor
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      ))}
 
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-xs">
-                          <Mail className="w-4 h-4" />
-                        </span>
-                        <input
-                          type="text"
-                          readOnly
-                          value={dispatchFormData.email}
-                          className="w-full pl-8 pr-4 py-2.5 bg-gray-100/50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-500 outline-none"
-                        />
+                      {dispatchOrder.notes ? (
+                        <div className="pt-2 border-t border-gray-200 mt-2">
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Doctor&apos;s notes</p>
+                          <p className="text-gray-800 text-xs font-semibold leading-relaxed bg-white p-3 rounded-xl border border-gray-200">{dispatchOrder.notes}</p>
+                        </div>
+                      ) : (
+                        <div className="pt-2 border-t border-rose-200 mt-2">
+                          <p className="text-[10px] font-bold text-rose-700 uppercase tracking-wide mb-1">Doctor&apos;s notes</p>
+                          <p className="text-rose-700 text-xs font-bold bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                            Missing (Doctor did not provide notes)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Attachments */}
+                  {(dispatchOrder.scanFile || dispatchOrder.opposingBiteScan || (dispatchOrder.attachments && dispatchOrder.attachments.length > 0)) && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-3 max-w-full overflow-hidden">
+                      <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2">
+                        <Paperclip className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Clinical Attachments</span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 max-w-full overflow-hidden">
+                        {dispatchOrder.scanFile && (
+                          <a 
+                            href={`/api/lab/files/${dispatchOrder.scanFile}`} 
+                            download
+                            title={dispatchOrder.scanFile}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-xs max-w-full"
+                          >
+                            <Paperclip className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span className="truncate max-w-[220px] sm:max-w-[260px]">{dispatchOrder.scanFile}</span>
+                          </a>
+                        )}
+                        {dispatchOrder.opposingBiteScan && (
+                          <a 
+                            href={`/api/lab/files/${dispatchOrder.opposingBiteScan}`} 
+                            download
+                            title={dispatchOrder.opposingBiteScan}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-xs max-w-full"
+                          >
+                            <Paperclip className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span className="truncate max-w-[220px] sm:max-w-[260px]">{dispatchOrder.opposingBiteScan}</span>
+                          </a>
+                        )}
+                        {Array.isArray(dispatchOrder.attachments) && dispatchOrder.attachments.map((att, idx) => {
+                          const fname = typeof att === 'string' ? att : (att.name || att.filename || `Attachment ${idx + 1}`);
+                          const url = typeof att === 'string' ? `/api/lab/files/${att}` : (att.url || "#");
+                          return (
+                            <a 
+                              key={idx}
+                              href={url} 
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={fname}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-xs max-w-full"
+                            >
+                              <Paperclip className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                              <span className="truncate max-w-[220px] sm:max-w-[260px]">{fname}</span>
+                            </a>
+                          );
+                        })}
                       </div>
                     </div>
-                  </div>
+                  )}
+                </div>
 
-                  {/* Info banner */}
-                  <div className="bg-primary/5 border border-primary/20 rounded-xl p-3.5 text-xs text-primary flex items-start gap-2.5">
-                    <Mail className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                    <p className="font-semibold leading-relaxed">
-                      An email with the measurements, notes, and attachment links will be sent directly to this lab.
-                    </p>
-                  </div>
+                {/* Right Column: Vendor Selection & Actions */}
+                <div className="space-y-4">
+                  {!["Sent to Lab", "sent_to_lab", "Order Sent to Lab", "In Progress", "Completed", "completed"].includes(dispatchOrder.status) ? (
+                    <>
+                      <div className="bg-indigo-50/60 border border-indigo-100/80 rounded-2xl p-4.5 space-y-3">
+                        <div className="flex items-center gap-1.5 border-b border-indigo-100/80 pb-2">
+                          <Truck className="w-4 h-4 text-indigo-600 shrink-0" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Choose External Laboratory</span>
+                        </div>
 
-                  {/* Buttons */}
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsDispatchModalOpen(false)}
-                      className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-center"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-2.5 text-sm font-semibold text-white bg-primary rounded-xl hover:bg-primary/90 transition-colors shadow-sm shadow-primary/30 cursor-pointer text-center flex items-center justify-center gap-1.5"
-                    >
-                      Send to lab ↗
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Read-only Lab details & Receipt tracking */}
-                  <div className="bg-gray-50 border border-gray-155 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center gap-1.5 border-b border-gray-200 pb-2 mb-1">
-                      <Truck className="w-4 h-4 text-indigo-600" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">External lab partner</span>
-                    </div>
-                    <div className="text-xs font-semibold text-gray-800">
-                      <p>{dispatchOrder.labName || LAB_PARTNERS[dispatchFormData.selectedPartnerKey]?.name || "Apex Dental Laboratories"}</p>
-                      <p className="text-gray-500 mt-1 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" /> {dispatchFormData.email}</p>
-                    </div>
-                  </div>
+                        <div className="space-y-3">
+                          <select
+                            value={dispatchFormData.selectedPartnerKey}
+                            onChange={(e) => {
+                              const key = e.target.value;
+                              setDispatchFormData({
+                                selectedPartnerKey: key,
+                                email: LAB_PARTNERS[key]?.email || "",
+                              });
+                            }}
+                            className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-800 cursor-pointer"
+                          >
+                            {Object.entries(LAB_PARTNERS).map(([key, partner]) => (
+                              <option key={key} value={key} className="bg-white text-gray-800 font-semibold">
+                                {partner.name} — {partner.email}
+                              </option>
+                            ))}
+                          </select>
 
-                  {/* Item receipt checkbox */}
-                  <div className="bg-gray-50 border border-gray-155 rounded-xl p-4 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        id="modal-received-check"
-                        checked={isReceived || ["Order Received", "Completed", "Fitted", "fitted"].includes(dispatchOrder.status)}
-                        onChange={async (e) => {
-                          const checked = e.target.checked;
-                          setIsReceived(checked);
-                          const newStatus = checked ? "Order Received" : "Sent to Lab";
-                          const ok = await updateDbStatus(dispatchOrder.id, newStatus);
-                          if (ok) {
-                            setDispatchOrder({ ...dispatchOrder, status: newStatus });
-                          }
-                        }}
-                        className="mt-0.5 w-4 h-4 accent-primary shrink-0 cursor-pointer rounded"
-                      />
-                      <div className="flex-1">
-                        <label htmlFor="modal-received-check" className="text-xs font-bold text-gray-800 cursor-pointer">
-                          Item Received at Clinic
-                        </label>
-                        <p className="text-[10px] text-gray-555 mt-0.5">Tick this once the package arrives from the lab.</p>
-                        {(isReceived || ["Order Received", "Completed", "Fitted", "fitted"].includes(dispatchOrder.status)) && (
-                          <div className="mt-3">
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Date & Time Received</label>
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-xs">
+                              <Mail className="w-4 h-4 text-indigo-500" />
+                            </span>
                             <input
-                              type="datetime-local"
-                              value={receivedDate}
-                              onChange={async (e) => {
-                                setReceivedDate(e.target.value);
-                                await updateLabOrder(dispatchOrder.id, {
-                                  received_date: e.target.value
-                                });
-                              }}
-                              className="w-full px-3 py-2 border border-gray-250 rounded-lg text-xs outline-none bg-white text-gray-800"
+                              type="text"
+                              readOnly
+                              value={dispatchFormData.email}
+                              className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none"
                             />
                           </div>
-                        )}
+                        </div>
+                      </div>
+
+                      {/* Contract Pricing Status Banner */}
+                      {!pricingCheck.configured ? (
+                        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 flex items-start gap-2.5 shadow-xs">
+                          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-black uppercase tracking-wider block text-[11px] text-rose-700">Pricing Configuration Missing</span>
+                            <p className="font-medium text-[11px] leading-relaxed mt-0.5">
+                              Admin must configure contract pricing for this vendor and restoration type before proceeding.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 text-xs text-emerald-900 flex items-center justify-between shadow-xs">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span className="font-bold text-[11px]">Contract Pricing Verified</span>
+                          </div>
+                          <span className="font-black text-sky-700 bg-white px-2.5 py-1 rounded-xl border border-sky-200 text-xs">
+                            Patient Charge: ₹{(pricingCheck.patient_charge || dispatchOrder.patient_charge || dispatchOrder.patient_total_amount || 3500).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Buttons */}
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsDispatchModalOpen(false)}
+                          className="flex-1 py-2.5 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-center"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={!pricingCheck.configured || pricingCheck.loading}
+                          className="flex-1 py-2.5 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-all shadow-lg shadow-indigo-600/20 cursor-pointer text-center flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={!pricingCheck.configured ? "Admin must configure pricing rule before proceeding" : ""}
+                        >
+                          Send to External Lab
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-2">
+                        <span className="text-[10px] font-black uppercase text-indigo-600">External Lab Status</span>
+                        <p className="font-bold text-sm text-gray-900">{dispatchOrder.labName || LAB_PARTNERS[dispatchFormData.selectedPartnerKey]?.name || "Apex Dental Laboratories"}</p>
+                        <p className="text-xs text-gray-500">{dispatchFormData.email}</p>
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setIsDispatchModalOpen(false)}
+                          className="px-4 py-2 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer"
+                        >
+                          Close
+                        </button>
                       </div>
                     </div>
-                  </div>
+                  )}
+                </div>
 
-                  {/* Close and Return for Correction buttons */}
-                  <div className="flex flex-col gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const ok = await updateDbStatus(dispatchOrder.id, "Ready for Pickup");
-                        if (ok) {
-                          triggerToast(`Order #${dispatchOrder.id} marked Ready for Pickup! Receptionist informed.`);
-                          setIsDispatchModalOpen(false);
-                          fetchOrders();
-                        } else {
-                          triggerToast("Failed to update order status.", "error");
-                        }
-                      }}
-                      className="w-full py-2.5 text-xs font-black text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-all shadow-sm cursor-pointer text-center flex items-center justify-center gap-1.5"
-                    >
-                      <CheckCircle className="w-4 h-4" /> Inform Receptionist (Order Ready for Patient Pickup)
-                    </button>
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsDispatchModalOpen(false);
-                          handleOpenReworkModal(dispatchOrder);
-                        }}
-                        className="flex-1 py-2 text-xs font-semibold text-danger bg-danger/10 hover:bg-danger hover:text-white border border-danger/20 rounded-xl transition-colors cursor-pointer text-center"
-                      >
-                        Return for Correction
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsDispatchModalOpen(false)}
-                        className="flex-1 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer text-center"
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-
+              </div>
             </form>
           </div>
         </div>
@@ -2213,6 +2719,119 @@ export default function LabOrders() {
           </div>
         </div>
       )}
-    </div>
+    
+      {/* ── EDIT PROPOSAL MODAL ── */}
+      {isEditProposalModalOpen && proposalTargetOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 font-sans text-left">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-indigo-50/60">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full">Email Completion Review</span>
+                <h2 className="text-lg font-black text-gray-900 mt-1">Review / Edit Details — Case #{proposalTargetOrder.id}</h2>
+              </div>
+              <button onClick={() => setIsEditProposalModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full font-bold">✕</button>
+            </div>
+            <form onSubmit={handleConfirmEditProposalSubmit} className="p-6 space-y-4">
+              <div className="bg-gray-50 p-3 rounded-2xl border text-xs text-gray-700">
+                <p>Patient: <strong>{proposalTargetOrder.patient_name || proposalTargetOrder.patientName}</strong></p>
+                <p>Status transition: <strong>{proposalTargetOrder.pendingEmailProposal?.proposed_status || "Completed by External Lab"}</strong></p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Courier Name</label>
+                <input type="text" required value={proposalFormData.courier_name} onChange={(e) => setProposalFormData({ ...proposalFormData, courier_name: e.target.value })} placeholder="e.g. BlueDart, DHL, Professional Courier" className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Tracking Number</label>
+                <input type="text" required value={proposalFormData.tracking_number} onChange={(e) => setProposalFormData({ ...proposalFormData, tracking_number: e.target.value })} placeholder="e.g. BD4587921" className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Expected Delivery Date</label>
+                <input type="text" required value={proposalFormData.expected_delivery_date} onChange={(e) => setProposalFormData({ ...proposalFormData, expected_delivery_date: e.target.value })} placeholder="e.g. 09-Aug-2026" className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Remarks / Notes</label>
+                <textarea rows={2} value={proposalFormData.remarks} onChange={(e) => setProposalFormData({ ...proposalFormData, remarks: e.target.value })} placeholder="Add any special remarks or handle instructions..." className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex justify-end gap-3">
+                <button type="button" onClick={() => setIsEditProposalModalOpen(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl border-none cursor-pointer">Cancel</button>
+                <button type="submit" className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl border-none cursor-pointer shadow-md">✓ Confirm Completion</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── UNMATCHED EMAILS QUEUE MODAL ── */}
+      {isUnmatchedModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 font-sans text-left">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-amber-50/80">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-800 bg-amber-200/80 px-2.5 py-0.5 rounded-full">Unmatched Queue</span>
+                <h2 className="text-lg font-black text-gray-900 mt-1">Unmatched External Lab Emails ({unmatchedEmails.length})</h2>
+              </div>
+              <button onClick={() => setIsUnmatchedModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full font-bold">✕</button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {unmatchedEmails.length === 0 ? (
+                <p className="text-xs text-gray-500 italic text-center py-6">No unmatched external lab emails in queue.</p>
+              ) : (
+                unmatchedEmails.map((item) => (
+                  <div key={item.id} className="p-4 bg-gray-50 border border-gray-200 rounded-2xl space-y-3 text-xs">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-extrabold text-gray-900">From: {item.sender_email || "Unknown Vendor"}</span>
+                        <span className="text-[10px] text-gray-400 block mt-0.5">Received: {item.created_at ? new Date(item.created_at).toLocaleString() : "Just now"}</span>
+                      </div>
+                      <button type="button" onClick={async () => { try { await dismissUnmatchedEmail(item.id); fetchUnmatchedEmailsList(); triggerToast("Email dismissed."); } catch(err) { triggerToast("Failed.", "error"); } }} className="text-xs text-rose-600 hover:underline font-bold">Dismiss</button>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-gray-200 font-mono text-[11px] text-gray-800 whitespace-pre-wrap max-h-32 overflow-y-auto">{item.raw_body}</div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <input type="text" placeholder="Enter Case ID to assign (e.g. CASE-2026-649)..." value={assignTargetOrderId} onChange={(e) => setAssignTargetOrderId(e.target.value)} className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold outline-none" />
+                      <button type="button" onClick={async () => { if (!assignTargetOrderId.trim()) return; try { await assignUnmatchedEmail(item.id, assignTargetOrderId.trim()); triggerToast(`Assigned email to Case #${assignTargetOrderId.trim()}`); setAssignTargetOrderId(""); setIsUnmatchedModalOpen(false); fetchOrders(); fetchUnmatchedEmailsList(); } catch(err) { triggerToast("Failed to assign email.", "error"); } }} className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl border-none cursor-pointer">Assign to Case</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-4 border-t border-gray-100 bg-gray-50/50 text-right">
+              <button type="button" onClick={() => setIsUnmatchedModalOpen(false)} className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs rounded-xl border-none cursor-pointer">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SIMULATE EMAIL REPLY MODAL ── */}
+      {isSimulateEmailModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 font-sans text-left">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-sky-50">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-sky-800 bg-sky-200 px-2.5 py-0.5 rounded-full">Email Reply Simulator</span>
+                <h2 className="text-lg font-black text-gray-900 mt-1">Simulate External Lab Completion Email</h2>
+              </div>
+              <button onClick={() => setIsSimulateEmailModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full font-bold">✕</button>
+            </div>
+            <form onSubmit={handleSimulateEmailSubmit} className="p-6 space-y-4">
+              <p className="text-xs text-gray-500">Paste the raw completion email reply from an external dental laboratory to test automatic extraction & fault tolerance.</p>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Raw Email Text</label>
+                <textarea rows={8} required value={simRawEmailText} onChange={(e) => setSimRawEmailText(e.target.value)} placeholder={`Case Number:\nCASE-2026-649\n\nStatus:\nCOMPLETED\n\nCourier:\nBlueDart\n\nTracking Number:\nBD4587921\n\nExpected Delivery:\n09-Aug-2026\n\nRemarks:\nHandle carefully.`} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-800 outline-none" />
+              </div>
+              <div className="pt-2 flex justify-end gap-3">
+                <button type="button" onClick={() => setIsSimulateEmailModalOpen(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl border-none cursor-pointer">Cancel</button>
+                <button type="submit" className="px-6 py-2 bg-sky-600 hover:bg-sky-700 text-white font-black text-xs rounded-xl border-none cursor-pointer shadow-md">Process Email Reply</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+</div>
   );
 }

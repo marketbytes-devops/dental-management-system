@@ -800,41 +800,6 @@ export const notifyPatientForLabOrder = async (orderId, note) => {
   return response.data;
 };
 
-<<<<<<< HEAD
-// ==========================================
-// 15. Support & Complaint Management
-// ==========================================
-
-export const getMyComplaints = async () => {
-  try {
-    const response = await client.get("/complaints/mine");
-    return response.data;
-  } catch (err) {
-    return [];
-  }
-};
-
-export const submitComplaint = async (data) => {
-  const response = await client.post("/complaints", data);
-  return response.data;
-};
-
-export const reopenComplaint = async (id, reason) => {
-  const response = await client.post(`/complaints/${id}/reopen`, { reason });
-  return response.data;
-};
-
-export const getComplaintLogs = async (id) => {
-  try {
-    const response = await client.get(`/complaints/${id}/logs`);
-    return response.data;
-  } catch (err) {
-    return [];
-  }
-};
-=======
->>>>>>> d6caa895b3f2033da5deb56596a5dfe1517cdeff
-
 export const getConsultationFees = async () => {
   const response = await client.get("/payment/consultation-fees");
   return response.data;
@@ -845,11 +810,8 @@ export const updateConsultationFees = async (tariffData) => {
   return response.data;
 };
 
-<<<<<<< HEAD
-=======
-
 // ==========================================
-// 14. Support & Complaints API Endpoints
+// 15. Support & Complaints API Endpoints
 // ==========================================
 
 /**
@@ -857,8 +819,12 @@ export const updateConsultationFees = async (tariffData) => {
  * @returns {Array} List of complaint objects
  */
 export const getMyComplaints = async () => {
-  const response = await client.get("/complaints/mine");
-  return response.data;
+  try {
+    const response = await client.get("/complaints/mine");
+    return response.data;
+  } catch (err) {
+    return [];
+  }
 };
 
 /**
@@ -867,7 +833,7 @@ export const getMyComplaints = async () => {
  * @returns {Object} The newly created complaint record
  */
 export const submitComplaint = async (payload) => {
-  const response = await client.post("/complaints/", payload);
+  const response = await client.post("/complaints", payload);
   return response.data;
 };
 
@@ -877,8 +843,12 @@ export const submitComplaint = async (payload) => {
  * @returns {Array} List of log entries
  */
 export const getComplaintLogs = async (complaintId) => {
-  const response = await client.get(`/complaints/${complaintId}/logs`);
-  return response.data;
+  try {
+    const response = await client.get(`/complaints/${complaintId}/logs`);
+    return response.data;
+  } catch (err) {
+    return [];
+  }
 };
 
 /**
@@ -891,7 +861,6 @@ export const reopenComplaint = async (complaintId, reason) => {
   const response = await client.post(`/complaints/${complaintId}/reopen`, { reason });
   return response.data;
 };
->>>>>>> d6caa895b3f2033da5deb56596a5dfe1517cdeff
 export const getAnalyticsSummary = async () => {
   const response = await client.get("/billing/analytics/summary");
   return response.data;
@@ -899,7 +868,6 @@ export const getAnalyticsSummary = async () => {
 
 export const getAnalyticsReports = async () => {
   const response = await client.get("/billing/analytics/reports");
-<<<<<<< HEAD
   return response.data;
 };
 
@@ -924,7 +892,5 @@ export const updateLabPricingItem = async (id, payload) => {
 
 export const deleteLabPricingItem = async (id) => {
   const response = await client.delete(`/lab/pricing-catalog/${id}`);
-=======
->>>>>>> d6caa895b3f2033da5deb56596a5dfe1517cdeff
   return response.data;
 };

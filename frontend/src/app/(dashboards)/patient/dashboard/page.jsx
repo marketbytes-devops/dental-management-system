@@ -114,9 +114,9 @@ export default function PatientDashboardPage() {
   };
 
   // Derived values
-  const confirmedAppointments = appointments.filter(a => a.status === "Confirmed" || a.status === "Pending" || a.status === "Pending OTP" || a.status === "Waiting");
+  const confirmedAppointments = appointments.filter(a => a.status === "Confirmed" || a.status === "Pending" || a.status === "Pending OTP" || a.status === "Waiting" || a.status === "Checked In" || a.status === "In Chair");
   const nextAppointment = confirmedAppointments[0];
-  const completedAppointments = appointments.filter(a => a.status === "Completed");
+  const completedAppointments = appointments.filter(a => a.status === "Completed" || a.status === "Finished Consultation");
   const missedAppointments = appointments.filter(a => a.status === "Missed");
   const lastVisit = completedAppointments[0];
 
@@ -150,12 +150,20 @@ export default function PatientDashboardPage() {
               </p>
             </div>
           </div>
-          <Link
-            href="/patient/appointments"
-            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all shrink-0"
-          >
-            Reschedule Visit →
-          </Link>
+          <div className="flex gap-2 shrink-0">
+            <Link
+              href="/patient/appointments"
+              className="px-4 py-2 border border-amber-500 text-amber-700 hover:bg-amber-500 hover:text-white text-xs font-bold rounded-xl transition-all"
+            >
+              Cancel
+            </Link>
+            <Link
+              href="/patient/appointments"
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+            >
+              Reschedule Visit →
+            </Link>
+          </div>
         </div>
       )}
 
@@ -231,14 +239,16 @@ export default function PatientDashboardPage() {
                   {nextAppointment.status}
                 </span>
               </div>
-              <div className="flex gap-2">
-                <Link href="/patient/check-in" className="flex-1 text-xs font-medium bg-primary/5 border border-primary/20 text-primary rounded-xl py-2 hover:bg-primary hover:text-white hover:border-primary transition-colors text-center shadow-sm">
-                  Check In
-                </Link>
-                <Link href="/patient/appointments" className="flex-1 text-xs font-medium bg-primary/5 border border-primary/20 text-primary rounded-xl py-2 hover:bg-primary hover:text-white hover:border-primary transition-colors text-center shadow-sm">
-                  Reschedule
-                </Link>
-              </div>
+              {!["Checked In", "In Chair", "Waiting"].includes(nextAppointment.status) && (
+                <div className="flex gap-2">
+                  <Link href="/patient/check-in" className="flex-1 text-xs font-medium bg-primary/5 border border-primary/20 text-primary rounded-xl py-2 hover:bg-primary hover:text-white hover:border-primary transition-colors text-center shadow-sm">
+                    Check In
+                  </Link>
+                  <Link href="/patient/appointments" className="flex-1 text-xs font-medium bg-primary/5 border border-primary/20 text-primary rounded-xl py-2 hover:bg-primary hover:text-white hover:border-primary transition-colors text-center shadow-sm">
+                    Reschedule
+                  </Link>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-6">

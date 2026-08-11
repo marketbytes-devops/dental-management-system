@@ -253,13 +253,13 @@ export default function DoctorDashboardPage() {
 
       {/* KPI Cards */}
       <KpiCards
-        activePatientName={activePatientForSpec?.name}
-        activePatientToken={activePatientTokenForSpec}
+        activePatientName={activePatient?.name}
+        activePatientToken={activePatientToken}
         totalWaiting={totalWaiting}
         totalAlerts={totalAlerts}
         flaggedCasesCount={flaggedCasesCount}
         hasUrgentInQueue={hasUrgentInQueue}
-        activePatientHref={activePatientTokenForSpec ? `/doctor/workspace/${selectedSpecialty}?patientToken=${activePatientTokenForSpec}` : `/doctor/workspace/${selectedSpecialty}`}
+        activePatientHref={activePatientToken ? `/doctor/workspace?patientToken=${activePatientToken}` : `/doctor/workspace`}
       />
 
       {/* Flagged Cases Quick Widget */}

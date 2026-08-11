@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, UserCheck, Calendar, Shield, Clock } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Search, UserCheck, CheckCircle2, AlertCircle, Loader2, MapPin, X } from "lucide-react";
 import { 
   getDoctorLeaves, 
   getAllPatients, 
@@ -11,12 +11,83 @@ import {
   directCheckin 
 } from "@/services/api";
 
+// ─── Validation Helpers ────────────────────────────────────────────────────
+const PHONE_RE = /^[6-9]\d{9}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NAME_RE  = /^[a-zA-Z\s\-'\.]{2,80}$/;
+
+function validate(form) {
+  const errs = {};
+
+  // Full Name
+  if (!form.name.trim()) {
+    errs.name = "Full name is required.";
+  } else if (!NAME_RE.test(form.name.trim())) {
+    errs.name = "Name can only contain letters, spaces, hyphens, or apostrophes.";
+  }
+
+  // Date of Birth
+  if (!form.date_of_birth) {
+    errs.date_of_birth = "Date of birth is required.";
+  } else {
+    const dob = new Date(form.date_of_birth);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (dob >= today) {
+      errs.date_of_birth = "Date of birth must be in the past.";
+    } else {
+      const ageDiff = today.getFullYear() - dob.getFullYear();
+      if (ageDiff < 1) errs.date_of_birth = "Patient must be at least 1 year old.";
+    }
+  }
+
+  // Phone
+  if (!form.phone.trim()) {
+    errs.phone = "Phone number is required.";
+  } else if (!PHONE_RE.test(form.phone.replace(/\s+/g, ""))) {
+    errs.phone = "Enter a valid 10-digit Indian mobile number (starts with 6-9).";
+  }
+
+  // Email
+  if (!form.email.trim()) {
+    errs.email = "Email address is required.";
+  } else if (!EMAIL_RE.test(form.email.trim())) {
+    errs.email = "Enter a valid email address.";
+  }
+
+  // Password
+  if (!form.password) {
+    errs.password = "Password is required.";
+  } else if (form.password.length < 8) {
+    errs.password = "Password must be at least 8 characters.";
+  }
+
+  // Confirm Password
+  if (!form.confirm_password) {
+    errs.confirm_password = "Please confirm the password.";
+  } else if (form.password !== form.confirm_password) {
+    errs.confirm_password = "Passwords do not match.";
+  }
+
+  // Pincode — optional but if provided must be 6 digits
+  if (form.pincode && !/^\d{6}$/.test(form.pincode.trim())) {
+    errs.pincode = "Pincode must be exactly 6 digits.";
+  }
+
+  // Emergency contact phone — optional but if provided must be valid
+  if (form.emergency_contact_phone && !PHONE_RE.test(form.emergency_contact_phone.replace(/\s+/g, ""))) {
+    errs.emergency_contact_phone = "Enter a valid 10-digit phone number.";
+  }
+
+  return errs;
+}
+
 export default function ReceptionistPatients() {
   const [patients, setPatients] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
 
-  const [form, setForm] = useState({
+  const emptyForm = {
     name: "",
     date_of_birth: "",
     gender: "Female",
@@ -26,13 +97,23 @@ export default function ReceptionistPatients() {
     password: "SmileCare123!",
     confirm_password: "SmileCare123!",
     address_line1: "",
+    landmark: "",
+    area: "",
+    district: "",
     city: "",
     state: "",
     pincode: "",
     emergency_contact_name: "",
     emergency_contact_phone: "",
     known_allergies: ""
-  });
+  };
+
+  const [form, setForm] = useState(emptyForm);
+  const [errors, setErrors] = useState({});
+  const [pincodeStatus, setPincodeStatus] = useState("idle"); // idle | loading | success | error
+  const [areaOptions, setAreaOptions] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successToast, setSuccessToast] = useState(null); // { name, token }
 
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [registeredPatient, setRegisteredPatient] = useState(null);
@@ -88,7 +169,7 @@ export default function ReceptionistPatients() {
       });
       
       if (isOnLeave) {
-        alert(`${bookingForm.doctor_name} is on leave on this day. Please select another date.`);
+        setErrors(prev => ({ ...prev, appointment_date: `${bookingForm.doctor_name} is on leave on this day. Please select another date.` }));
         setBookingForm(prev => ({ ...prev, appointment_date: "" }));
       }
     }
@@ -129,10 +210,12 @@ export default function ReceptionistPatients() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    // Clear the error for this field as the user types
+    if (errors[name]) setErrors(prev => { const e = { ...prev }; delete e[name]; return e; });
+
     setForm(prev => {
       const updated = { ...prev, [name]: value };
-      
-      // Auto-generate password from phone number if phone changes, for flexibility
+      // Auto-generate password from phone number
       if (name === "phone" && value.trim()) {
         const cleanPhone = value.replace(/\D/g, "");
         if (cleanPhone.length >= 6) {
@@ -140,8 +223,52 @@ export default function ReceptionistPatients() {
           updated.confirm_password = `SmileCare${cleanPhone}`;
         }
       }
+      // Reset pincode-derived fields when pincode is manually cleared
+      if (name === "pincode" && !value.trim()) {
+        setPincodeStatus("idle");
+        setAreaOptions([]);
+        updated.area = "";
+        updated.city = "";
+        updated.district = "";
+        updated.state = "";
+      }
       return updated;
     });
+  };
+
+  // ─── Pincode Auto-fill ──────────────────────────────────────────────────
+  const handlePincodeLookup = async () => {
+    const pin = form.pincode.trim();
+    if (!pin || !/^\d{6}$/.test(pin)) return;
+    setPincodeStatus("loading");
+    setAreaOptions([]);
+    try {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const json = await res.json();
+      if (json[0]?.Status === "Success" && json[0].PostOffice?.length > 0) {
+        const offices = json[0].PostOffice;
+        const firstOffice = offices[0];
+        // Extract unique area names for the dropdown
+        const uniqueAreas = [...new Set(offices.map(o => o.Name))];
+        setAreaOptions(uniqueAreas);
+        setForm(prev => ({
+          ...prev,
+          state: firstOffice.State || prev.state,
+          city: firstOffice.District || prev.city,
+          district: firstOffice.District || prev.district,
+          area: uniqueAreas[0] || prev.area
+        }));
+        setPincodeStatus("success");
+        // Clear any pincode error
+        setErrors(prev => { const e = { ...prev }; delete e.pincode; return e; });
+      } else {
+        setPincodeStatus("error");
+        setErrors(prev => ({ ...prev, pincode: "No results found for this pincode." }));
+      }
+    } catch {
+      setPincodeStatus("error");
+      setErrors(prev => ({ ...prev, pincode: "Could not fetch pincode details. Please fill manually." }));
+    }
   };
 
   const handleBookingInputChange = (e) => {
@@ -152,17 +279,18 @@ export default function ReceptionistPatients() {
     }));
   };
 
-  // Submit patient registration
+  // ─── Submit patient registration ────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.phone || !form.date_of_birth || !form.email) {
-      alert("Please fill in Name, Date of Birth, Phone, and Email.");
+    const validationErrors = validate(form);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      // Scroll to first error
+      const firstErrorKey = Object.keys(validationErrors)[0];
+      document.getElementById(`field-${firstErrorKey}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    if (form.password !== form.confirm_password) {
-      alert("Passwords do not match.");
-      return;
-    }
+    setIsSubmitting(true);
 
     try {
       const payload = {
@@ -173,7 +301,11 @@ export default function ReceptionistPatients() {
         phone: form.phone.replace(/\s+/g, ""),
         email: form.email.trim(),
         password: form.password,
-        address_line1: form.address_line1.trim() || null,
+        address_line1: [
+          form.address_line1.trim(),
+          form.landmark.trim() ? `Landmark: ${form.landmark.trim()}` : "",
+          form.area.trim()
+        ].filter(Boolean).join(", ") || null,
         city: form.city.trim() || null,
         state: form.state || null,
         pincode: form.pincode.trim() || null,
@@ -184,35 +316,24 @@ export default function ReceptionistPatients() {
 
       const data = await registerPatient(payload);
 
-      // Success
-      alert(`Patient ${data.name} registered successfully! ID Token: ${data.token}`);
+      // Success toast instead of alert
+      setSuccessToast({ name: data.name, token: data.token });
+      setTimeout(() => setSuccessToast(null), 6000);
       setRegisteredPatient(data);
       fetchPatients();
 
       // Reset form
-      setForm({
-        name: "",
-        date_of_birth: "",
-        gender: "Female",
-        blood_group: "",
-        phone: "",
-        email: "",
-        password: "SmileCare123!",
-        confirm_password: "SmileCare123!",
-        address_line1: "",
-        city: "",
-        state: "",
-        pincode: "",
-        emergency_contact_name: "",
-        emergency_contact_phone: "",
-        known_allergies: ""
-      });
+      setForm(emptyForm);
+      setErrors({});
+      setPincodeStatus("idle");
+      setAreaOptions([]);
 
       // Show booking redirection modal
       setShowBookingModal(true);
-
     } catch (err) {
-      alert(err.message || "An error occurred during registration.");
+      setErrors({ _global: err.message || "An error occurred during registration." });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -283,45 +404,70 @@ export default function ReceptionistPatients() {
         <p className="text-sm text-gray-500 mt-1">Register new patients and view EDR profile summaries.</p>
       </div>
 
+      {/* ── Success Toast ─────────────────────────────────────────────── */}
+      {successToast && (
+        <div className="fixed top-5 right-5 z-[9999] flex items-start gap-3 bg-white border border-success/30 rounded-2xl shadow-2xl p-4 w-80 animate-slide-in">
+          <div className="p-2 bg-success/10 rounded-xl shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-success" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-gray-900">Patient Registered!</p>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">{successToast.name}</p>
+            <p className="text-xs font-mono text-primary mt-0.5">Token: {successToast.token}</p>
+          </div>
+          <button onClick={() => setSuccessToast(null)} className="shrink-0 text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Registration Form (4 cols) */}
-        <form onSubmit={handleSubmit} className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="lg:col-span-4 bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
           <h3 className="text-base font-extrabold text-gray-900">Register New Patient</h3>
+
+          {/* Global error */}
+          {errors._global && (
+            <div className="flex items-center gap-2 bg-danger/5 border border-danger/20 rounded-xl p-3">
+              <AlertCircle className="w-4 h-4 text-danger shrink-0" />
+              <p className="text-xs text-danger font-medium">{errors._global}</p>
+            </div>
+          )}
 
           <div className="max-h-[68vh] overflow-y-auto pr-1 space-y-4">
             
-            {/* Section 1: Personal Info */}
+            {/* ── Section 1: Personal Info ─────────────────────────────── */}
             <div className="space-y-3">
               <p className="text-[10px] uppercase font-bold text-primary tracking-wider border-b border-gray-100 pb-1">Personal Info</p>
               
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-505 uppercase">Full Name *</label>
+              <div id="field-name" className="space-y-1">
+                <label className="text-xs font-bold text-gray-600 uppercase">Full Name *</label>
                 <input
                   type="text"
                   name="name"
                   placeholder="e.g. Rahul Kumar"
                   value={form.name}
                   onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                  className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${errors.name ? "border-danger/60 bg-danger/5" : "border-gray-200 focus:border-primary"}`}
                 />
+                {errors.name && <p className="text-[10px] text-danger mt-0.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.name}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-505 uppercase">DOB *</label>
+                <div id="field-date_of_birth" className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">DOB *</label>
                   <input
                     type="date"
                     name="date_of_birth"
                     value={form.date_of_birth}
                     onChange={handleInputChange}
-                    required
                     max={new Date().toISOString().split("T")[0]}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                    className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${errors.date_of_birth ? "border-danger/60 bg-danger/5" : "border-gray-200 focus:border-primary"}`}
                   />
+                  {errors.date_of_birth && <p className="text-[10px] text-danger mt-0.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.date_of_birth}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-505 uppercase">Gender *</label>
+                  <label className="text-xs font-bold text-gray-600 uppercase">Gender *</label>
                   <select
                     name="gender"
                     value={form.gender}
@@ -337,7 +483,7 @@ export default function ReceptionistPatients() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-505 uppercase">Blood Group</label>
+                  <label className="text-xs font-bold text-gray-600 uppercase">Blood Group</label>
                   <select
                     name="blood_group"
                     value={form.blood_group}
@@ -350,123 +496,168 @@ export default function ReceptionistPatients() {
                     ))}
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-550 uppercase">Phone *</label>
+                <div id="field-phone" className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">Phone *</label>
                   <input
                     type="text"
                     name="phone"
                     placeholder="e.g. 9876543210"
                     value={form.phone}
+                    maxLength={10}
                     onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                    className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${errors.phone ? "border-danger/60 bg-danger/5" : "border-gray-200 focus:border-primary"}`}
                   />
+                  {errors.phone && <p className="text-[10px] text-danger mt-0.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.phone}</p>}
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-550 uppercase">Email Address *</label>
+              <div id="field-email" className="space-y-1">
+                <label className="text-xs font-bold text-gray-600 uppercase">Email Address *</label>
                 <input
                   type="email"
                   name="email"
                   placeholder="e.g. patient@example.com"
                   value={form.email}
                   onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                  className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${errors.email ? "border-danger/60 bg-danger/5" : "border-gray-200 focus:border-primary"}`}
                 />
+                {errors.email && <p className="text-[10px] text-danger mt-0.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.email}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-550 uppercase">Password *</label>
+                <div id="field-password" className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">Password *</label>
                   <input
                     type="password"
                     name="password"
                     value={form.password}
                     onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                    className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${errors.password ? "border-danger/60 bg-danger/5" : "border-gray-200 focus:border-primary"}`}
                   />
+                  {errors.password && <p className="text-[10px] text-danger mt-0.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.password}</p>}
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-550 uppercase">Confirm *</label>
+                <div id="field-confirm_password" className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">Confirm *</label>
                   <input
                     type="password"
                     name="confirm_password"
                     value={form.confirm_password}
                     onChange={handleInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                    className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${errors.confirm_password ? "border-danger/60 bg-danger/5" : "border-gray-200 focus:border-primary"}`}
                   />
+                  {errors.confirm_password && <p className="text-[10px] text-danger mt-0.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.confirm_password}</p>}
                 </div>
               </div>
             </div>
 
-            {/* Section 2: Address */}
+            {/* ── Section 2: Address Details ────────────────────────────── */}
             <div className="space-y-3 pt-2">
               <p className="text-[10px] uppercase font-bold text-primary tracking-wider border-b border-gray-100 pb-1">Address Details</p>
-              
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-550 uppercase">Address Line 1</label>
+
+              {/* Pincode — triggers auto-fill on blur */}
+              <div id="field-pincode" className="space-y-1">
+                <label className="text-xs font-bold text-gray-600 uppercase flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3" /> Pincode
+                  {pincodeStatus === "loading" && <Loader2 className="w-3 h-3 animate-spin text-primary ml-1" />}
+                  {pincodeStatus === "success" && <CheckCircle2 className="w-3 h-3 text-success ml-1" />}
+                  {pincodeStatus === "error" && <AlertCircle className="w-3 h-3 text-danger ml-1" />}
+                </label>
                 <input
                   type="text"
-                  name="address_line1"
-                  placeholder="Street / Apt / Suite"
-                  value={form.address_line1}
+                  name="pincode"
+                  placeholder="6-digit pincode"
+                  value={form.pincode}
+                  maxLength={6}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                  onBlur={handlePincodeLookup}
+                  className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${errors.pincode ? "border-danger/60 bg-danger/5" : pincodeStatus === "success" ? "border-success/50 bg-success/5" : "border-gray-200 focus:border-primary"}`}
                 />
+                {errors.pincode && <p className="text-[10px] text-danger mt-0.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.pincode}</p>}
+                {pincodeStatus === "success" && <p className="text-[10px] text-success mt-0.5">✓ Location details auto-filled from pincode</p>}
               </div>
 
+              {/* Area / Locality dropdown — shown after pincode lookup */}
+              {areaOptions.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">Area / Locality</label>
+                  <select
+                    name="area"
+                    value={form.area}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-success/40 bg-success/5 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                  >
+                    {areaOptions.map((a) => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* City & State — auto-filled, editable */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-550 uppercase">City</label>
+                  <label className="text-xs font-bold text-gray-600 uppercase">City / District</label>
                   <input
                     type="text"
                     name="city"
                     placeholder="City"
                     value={form.city}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                    className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${pincodeStatus === "success" ? "border-success/40 bg-success/5" : "border-gray-200 focus:border-primary"}`}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-550 uppercase">Pincode</label>
-                  <input
-                    type="text"
-                    name="pincode"
-                    placeholder="Pincode"
-                    value={form.pincode}
+                  <label className="text-xs font-bold text-gray-600 uppercase">State</label>
+                  <select
+                    name="state"
+                    value={form.state}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-                  />
+                    className={`w-full px-3 py-2 border bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${pincodeStatus === "success" ? "border-success/40 bg-success/5" : "border-gray-200 focus:border-primary"}`}
+                  >
+                    <option value="">Select State</option>
+                    {INDIAN_STATES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
+              {/* Street Address */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-550 uppercase">State</label>
-                <select
-                  name="state"
-                  value={form.state}
+                <label className="text-xs font-bold text-gray-600 uppercase">Street / Flat / Building</label>
+                <input
+                  type="text"
+                  name="address_line1"
+                  placeholder="e.g. 12B, Shivaji Nagar, Flat 4"
+                  value={form.address_line1}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-200 bg-white rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
-                >
-                  <option value="">Select State</option>
-                  {INDIAN_STATES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                />
+              </div>
+
+              {/* Landmark */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-600 uppercase flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-gray-400" /> Landmark (Optional)
+                </label>
+                <input
+                  type="text"
+                  name="landmark"
+                  placeholder="e.g. Near Apollo Hospital, Opp. HDFC Bank"
+                  value={form.landmark}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                />
               </div>
             </div>
 
-            {/* Section 3: Emergency & Medical */}
+            {/* ── Section 3: Emergency & Medical ───────────────────────── */}
             <div className="space-y-3 pt-2">
               <p className="text-[10px] uppercase font-bold text-primary tracking-wider border-b border-gray-100 pb-1">Emergency &amp; Medical</p>
               
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-550 uppercase">Contact Name</label>
+                  <label className="text-xs font-bold text-gray-600 uppercase">Contact Name</label>
                   <input
                     type="text"
                     name="emergency_contact_name"
@@ -476,21 +667,23 @@ export default function ReceptionistPatients() {
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-550 uppercase">Contact Phone</label>
+                <div id="field-emergency_contact_phone" className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600 uppercase">Contact Phone</label>
                   <input
                     type="text"
                     name="emergency_contact_phone"
                     placeholder="Phone"
+                    maxLength={10}
                     value={form.emergency_contact_phone}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-800"
+                    className={`w-full px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-gray-800 transition-colors ${errors.emergency_contact_phone ? "border-danger/60 bg-danger/5" : "border-gray-200 focus:border-primary"}`}
                   />
+                  {errors.emergency_contact_phone && <p className="text-[10px] text-danger mt-0.5 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.emergency_contact_phone}</p>}
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-550 uppercase">Known Allergies (Optional - Patient can add later)</label>
+                <label className="text-xs font-bold text-gray-600 uppercase">Known Allergies (Optional)</label>
                 <textarea
                   name="known_allergies"
                   placeholder="e.g. Penicillin, Latex, None — Optional (patient can add via portal)"
@@ -506,9 +699,10 @@ export default function ReceptionistPatients() {
 
           <button
             type="submit"
-            className="w-full py-2.5 bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer mt-2"
+            disabled={isSubmitting}
+            className="w-full py-2.5 bg-primary hover:bg-primary/95 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition-colors cursor-pointer mt-2 flex items-center justify-center gap-2"
           >
-            Register Patient
+            {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Registering...</> : "Register Patient"}
           </button>
         </form>
 

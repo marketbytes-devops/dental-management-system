@@ -61,6 +61,46 @@ const STATUS_CONFIG = {
     dateBg: "bg-amber-50",
     dateText: "text-amber-700",
   },
+
+  "Checked In": {
+    label: "Checked In",
+    description: "You are checked in for this appointment",
+    badge: "bg-teal-100 text-teal-800 border-teal-200",
+    dot: "bg-teal-500",
+    icon: CheckCircle2,
+    dateBg: "bg-teal-50",
+    dateText: "text-teal-700",
+  },
+
+  Waiting: {
+    label: "Waiting",
+    description: "Please wait, you will be seen shortly",
+    badge: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    dot: "bg-indigo-500",
+    icon: Clock,
+    dateBg: "bg-indigo-50",
+    dateText: "text-indigo-700",
+  },
+
+  "In Chair": {
+    label: "In Chair",
+    description: "You are currently with the doctor",
+    badge: "bg-violet-100 text-violet-800 border-violet-200",
+    dot: "bg-violet-500",
+    icon: User,
+    dateBg: "bg-violet-50",
+    dateText: "text-violet-700",
+  },
+
+  "Finished Consultation": {
+    label: "Finished Consultation",
+    description: "Your consultation is complete",
+    badge: "bg-primary/10 text-primary border-primary/20",
+    dot: "bg-primary",
+    icon: CheckCircle2,
+    dateBg: "bg-blue-100",
+    dateText: "text-blue-500",
+  },
 };
 
 export default function AppointmentCard({
@@ -86,7 +126,7 @@ export default function AppointmentCard({
   const isUpcoming =
     status === "Confirmed" || status === "Pending";
 
-  const isCompleted = status === "Completed";
+  const isCompleted = status === "Completed" || status === "Finished Consultation";
   const isCancelled = status === "Cancelled";
   const isMissed = status === "Missed";
 
@@ -299,7 +339,7 @@ export default function AppointmentCard({
             Reschedule
           </button>
 
-          {isUpcoming && (
+          {(isUpcoming || isMissed) && (
             <button
               onClick={() =>
                 onCancel?.(appointment)

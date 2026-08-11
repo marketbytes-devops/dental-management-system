@@ -13,7 +13,8 @@ export default function MyAppointmentList({ appointments, onReschedule, onCancel
   const filtered = appointments.filter((appt) => {
     const matchTab =
       activeTab === "All" ||
-      (activeTab === "Upcoming" && (appt.status === "Confirmed" || appt.status === "Pending")) ||
+      (activeTab === "Upcoming" && (appt.status === "Confirmed" || appt.status === "Pending" || appt.status === "Checked In" || appt.status === "Waiting" || appt.status === "In Chair")) ||
+      (activeTab === "Completed" && (appt.status === "Completed" || appt.status === "Finished Consultation")) ||
       appt.status === activeTab;
 
     const q = searchQuery.toLowerCase();
@@ -29,7 +30,9 @@ export default function MyAppointmentList({ appointments, onReschedule, onCancel
   const tabCount = (tab) => {
     if (tab === "All") return appointments.length;
     if (tab === "Upcoming")
-      return appointments.filter((a) => a.status === "Confirmed" || a.status === "Pending").length;
+      return appointments.filter((a) => a.status === "Confirmed" || a.status === "Pending" || a.status === "Checked In" || a.status === "Waiting" || a.status === "In Chair").length;
+    if (tab === "Completed")
+      return appointments.filter((a) => a.status === "Completed" || a.status === "Finished Consultation").length;
     return appointments.filter((a) => a.status === tab).length;
   };
 

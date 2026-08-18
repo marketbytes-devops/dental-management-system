@@ -185,16 +185,18 @@ def get_reminder_queue(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Return upcoming confirmed/pending appointments as a reminder queue.
-    Marks each reminder as Sent if a communication log already exists for that patient."""
+    """Return upcoming confirmed/pending appointments with multi-stage reminder tracking flags."""
     import datetime
+    from twilio_service import generate_whatsapp_web_link
+    from .reminder_service import format_1day_message, format_sameday_message, format_booking_message
+
     today = datetime.date.today()
     tomorrow = today + timedelta(days=1)
 
-    # Fetch upcoming appointments for today and tomorrow that still need reminders
+    # Fetch upcoming appointments for today and tomorrow
     upcoming = db.query(AppointmentModel).filter(
         AppointmentModel.appointment_date.in_([today, tomorrow]),
-        AppointmentModel.status.in_(["Confirmed", "Pending"])
+        AppointmentModel.status.in_(["Confirmed", "Pending", "Scheduled", "Waiting"])
     ).order_by(AppointmentModel.appointment_date.asc(), AppointmentModel.appointment_time.asc()).all()
 
     reminders = []
@@ -203,15 +205,26 @@ def get_reminder_queue(
         if not patient:
             continue
 
-        # Check if a reminder comm-log was already sent for this patient's upcoming appointment
-        # Look for communication logs sent today for this patient
-        existing_reminder = db.query(CommunicationLogModel).filter(
-            CommunicationLogModel.patient_id == appt.patient_id,
-            CommunicationLogModel.template.in_(["appointment_reminder", "manual_reminder"]),
-        ).order_by(CommunicationLogModel.sent_at.desc()).first()
-
-        status = "Sent" if existing_reminder else "Pending"
         is_today = appt.appointment_date == today
+        day_label = "Today" if is_today else "Tomorrow"
+        date_str = appt.appointment_date.strftime("%Y-%m-%d")
+
+        # Determine target message preview
+        if is_today:
+            msg_preview = format_sameday_message(patient.name, date_str, appt.appointment_time, appt.doctor_name, appt.treatment_type or "")
+        else:
+            msg_preview = format_1day_message(patient.name, date_str, appt.appointment_time, appt.doctor_name, appt.treatment_type or "")
+
+        whatsapp_web_url = generate_whatsapp_web_link(patient.phone, msg_preview)
+
+        # Stage status check
+        booked_sent = bool(appt.reminder_booked_sent)
+        oneday_sent = bool(appt.reminder_1day_sent)
+        sameday_sent = bool(appt.reminder_sameday_sent)
+
+        # Relevant stage status for day_label
+        relevant_sent = sameday_sent if is_today else oneday_sent
+        status = "Sent" if relevant_sent else "Pending"
 
         reminders.append({
             "id": appt.id,
@@ -219,17 +232,165 @@ def get_reminder_queue(
             "name": patient.name,
             "phone": patient.phone,
             "email": patient.email,
-            "date": appt.appointment_date.strftime("%Y-%m-%d"),
+            "date": date_str,
             "time": appt.appointment_time,
             "doctor": appt.doctor_name,
             "treatment": appt.treatment_type,
             "status": status,
+            "reminder_booked_sent": booked_sent,
+            "reminder_1day_sent": oneday_sent,
+            "reminder_sameday_sent": sameday_sent,
+            "reminder_booked_at": appt.reminder_booked_at.isoformat() if appt.reminder_booked_at else None,
+            "reminder_1day_at": appt.reminder_1day_at.isoformat() if appt.reminder_1day_at else None,
+            "reminder_sameday_at": appt.reminder_sameday_at.isoformat() if appt.reminder_sameday_at else None,
             "auto": True,
-            "day_label": "Today" if is_today else "Tomorrow",
+            "day_label": day_label,
             "priority": appt.priority,
+            "message_preview": msg_preview,
+            "whatsapp_link": whatsapp_web_url
         })
 
     return reminders
+
+
+@router.post("/reminders/trigger-now")
+def trigger_automated_reminders_now(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Manually trigger the 1-day before and on-the-day automated reminder check engine."""
+    from .reminder_service import run_all_automated_reminders
+    result = run_all_automated_reminders(db)
+    return result
+
+
+@router.post("/reminders/send-whatsapp")
+def send_whatsapp_reminder_endpoint(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Direct API to send WhatsApp reminder to a patient for an appointment."""
+    from twilio_service import send_whatsapp
+    from .reminder_service import format_sameday_message, format_1day_message
+
+    appt_id = payload.get("appointment_id")
+    custom_msg = payload.get("message")
+
+    appt = db.query(AppointmentModel).filter(AppointmentModel.id == appt_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    if not patient or not patient.phone:
+        raise HTTPException(status_code=400, detail="Patient phone number is missing")
+
+    date_str = appt.appointment_date.strftime("%Y-%m-%d")
+    is_today = appt.appointment_date == date.today()
+    
+    if not custom_msg:
+        if is_today:
+            custom_msg = format_sameday_message(patient.name, date_str, appt.appointment_time, appt.doctor_name, appt.treatment_type or "")
+        else:
+            custom_msg = format_1day_message(patient.name, date_str, appt.appointment_time, appt.doctor_name, appt.treatment_type or "")
+
+    success = send_whatsapp(patient.phone, custom_msg)
+
+    # Log communication
+    log = CommunicationLogModel(
+        patient_id=patient.id,
+        appointment_id=appt.id,
+        recipient_name=patient.name,
+        recipient_phone=patient.phone,
+        recipient_email=patient.email,
+        channel="WhatsApp",
+        template="manual_whatsapp_reminder",
+        trigger_type="manual",
+        message_body=custom_msg,
+        status="Sent" if success else "Logged",
+        error_message=None if success else "Twilio WhatsApp skipped or credentials pending",
+        sent_by=current_user.get("name", "Receptionist")
+    )
+    db.add(log)
+
+    if is_today:
+        appt.reminder_sameday_sent = True
+    else:
+        appt.reminder_1day_sent = True
+
+    db.commit()
+    db.refresh(appt)
+
+    return {
+        "status": "success" if success else "logged",
+        "message": "WhatsApp reminder sent successfully" if success else "WhatsApp message generated & logged to communication history",
+        "phone": patient.phone,
+        "appointment_id": appt.id
+    }
+
+
+@router.post("/reminders/send-sms")
+def send_sms_reminder_endpoint(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Direct API to send SMS reminder to a patient for an appointment."""
+    from twilio_service import send_sms
+    from .reminder_service import format_sameday_message, format_1day_message
+
+    appt_id = payload.get("appointment_id")
+    custom_msg = payload.get("message")
+
+    appt = db.query(AppointmentModel).filter(AppointmentModel.id == appt_id).first()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    patient = db.query(PatientModel).filter(PatientModel.id == appt.patient_id).first()
+    if not patient or not patient.phone:
+        raise HTTPException(status_code=400, detail="Patient phone number is missing")
+
+    date_str = appt.appointment_date.strftime("%Y-%m-%d")
+    is_today = appt.appointment_date == date.today()
+
+    if not custom_msg:
+        if is_today:
+            custom_msg = format_sameday_message(patient.name, date_str, appt.appointment_time, appt.doctor_name, appt.treatment_type or "")
+        else:
+            custom_msg = format_1day_message(patient.name, date_str, appt.appointment_time, appt.doctor_name, appt.treatment_type or "")
+
+    success = send_sms(patient.phone, custom_msg)
+
+    log = CommunicationLogModel(
+        patient_id=patient.id,
+        appointment_id=appt.id,
+        recipient_name=patient.name,
+        recipient_phone=patient.phone,
+        recipient_email=patient.email,
+        channel="SMS",
+        template="manual_sms_reminder",
+        trigger_type="manual",
+        message_body=custom_msg,
+        status="Sent" if success else "Logged",
+        error_message=None if success else "Twilio SMS skipped or credentials pending",
+        sent_by=current_user.get("name", "Receptionist")
+    )
+    db.add(log)
+
+    if is_today:
+        appt.reminder_sameday_sent = True
+    else:
+        appt.reminder_1day_sent = True
+
+    db.commit()
+    db.refresh(appt)
+
+    return {
+        "status": "success" if success else "logged",
+        "message": "SMS reminder sent successfully" if success else "SMS logged to communication history",
+        "phone": patient.phone,
+        "appointment_id": appt.id
+    }
 
 
 

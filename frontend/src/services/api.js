@@ -313,6 +313,32 @@ export const sendCommunication = async (commData) => {
   return response.data;
 };
 
+export const getReminderQueue = async () => {
+  const response = await client.get("/frontdesk/reminders");
+  return response.data;
+};
+
+export const triggerAutomatedReminders = async () => {
+  const response = await client.post("/frontdesk/reminders/trigger-now");
+  return response.data;
+};
+
+export const sendWhatsAppReminder = async (appointmentId, message = "") => {
+  const response = await client.post("/frontdesk/reminders/send-whatsapp", {
+    appointment_id: appointmentId,
+    message: message
+  });
+  return response.data;
+};
+
+export const sendSmsReminder = async (appointmentId, message = "") => {
+  const response = await client.post("/frontdesk/reminders/send-sms", {
+    appointment_id: appointmentId,
+    message: message
+  });
+  return response.data;
+};
+
 export const sendAppointmentOtp = async (id) => {
   const response = await client.post(`/frontdesk/appointments/${id}/send-otp`);
   return response.data;
@@ -900,10 +926,6 @@ export const getAnalyticsReports = async () => {
 };
 
 // ==========================================
-<<<<<<< HEAD
-// 13. Admin Lab Pricing Catalog API Endpoints
-// ==========================================
-=======
 // 15. External Dental Lab Portal API Endpoints
 // ==========================================
 
@@ -1124,7 +1146,6 @@ export const paySupplierPayable = async (payableId, payload) => {
   return response.data;
 };
 
->>>>>>> 75bf4d5557928e765e3edd9b5a6f3b10a7cb939d
 
 export const getLabPricingCatalog = async () => {
   const response = await client.get("/lab/pricing-catalog");

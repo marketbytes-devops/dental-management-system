@@ -279,6 +279,43 @@ try:
             add_pay_col_if_missing("shift_id", "INTEGER")
             add_pay_col_if_missing("is_reconciled", "BOOLEAN DEFAULT FALSE")
 
+            # Check appointments table for reminder columns
+            if engine.dialect.name == "sqlite":
+                appt_col_query = conn.execute(text("PRAGMA table_info(appointments);")).fetchall()
+                existing_appt_cols = [row[1] for row in appt_col_query]
+            else:
+                appt_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='appointments';")).fetchall()
+                existing_appt_cols = [row[0] for row in appt_col_query]
+
+            def add_appt_col_if_missing(col_name, col_type):
+                if col_name not in existing_appt_cols:
+                    conn.execute(text(f"ALTER TABLE appointments ADD COLUMN {col_name} {col_type};"))
+                    print(f"Added column {col_name} to appointments table.")
+
+            add_appt_col_if_missing("reminder_booked_sent", "BOOLEAN DEFAULT FALSE")
+            add_appt_col_if_missing("reminder_1day_sent", "BOOLEAN DEFAULT FALSE")
+            add_appt_col_if_missing("reminder_sameday_sent", "BOOLEAN DEFAULT FALSE")
+            add_appt_col_if_missing("reminder_booked_at", "TIMESTAMP WITH TIME ZONE")
+            add_appt_col_if_missing("reminder_1day_at", "TIMESTAMP WITH TIME ZONE")
+            add_appt_col_if_missing("reminder_sameday_at", "TIMESTAMP WITH TIME ZONE")
+
+            # Check communication_logs table
+            if engine.dialect.name == "sqlite":
+                comm_col_query = conn.execute(text("PRAGMA table_info(communication_logs);")).fetchall()
+                existing_comm_cols = [row[1] for row in comm_col_query]
+            else:
+                comm_col_query = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='communication_logs';")).fetchall()
+                existing_comm_cols = [row[0] for row in comm_col_query]
+
+            def add_comm_col_if_missing(col_name, col_type):
+                if col_name not in existing_comm_cols:
+                    conn.execute(text(f"ALTER TABLE communication_logs ADD COLUMN {col_name} {col_type};"))
+                    print(f"Added column {col_name} to communication_logs table.")
+
+            add_comm_col_if_missing("appointment_id", "INTEGER")
+            add_comm_col_if_missing("trigger_type", "VARCHAR")
+            add_comm_col_if_missing("error_message", "VARCHAR")
+
             print("Database migrations applied successfully.")
 except Exception as e:
     print(f"Error running database migrations: {e}")
@@ -386,6 +423,32 @@ def on_startup():
         start_email_listener()
     except Exception as e:
         print(f"[STARTUP WARNING] Could not start IMAP email listener: {e}", flush=True)
+
+    # Start periodic background reminder scheduler daemon thread
+    try:
+        import threading
+        import time
+
+        def _reminder_background_loop():
+            print("[REMINDER SCHEDULER] Automated WhatsApp & SMS reminder engine started.", flush=True)
+            while True:
+                try:
+                    db_session = SessionLocal()
+                    from modules.frontdesk.reminder_service import run_all_automated_reminders
+                    res = run_all_automated_reminders(db_session)
+                    if res.get("total_dispatched", 0) > 0:
+                        print(f"[REMINDER SCHEDULER] Dispatched {res['total_dispatched']} automated reminders.", flush=True)
+                    db_session.close()
+                except Exception as loop_err:
+                    print(f"[REMINDER SCHEDULER ERROR] {loop_err}", flush=True)
+                # Sleep for 15 minutes (900 seconds) between automated sweeps
+                time.sleep(900)
+
+        reminder_thread = threading.Thread(target=_reminder_background_loop, daemon=True)
+        reminder_thread.start()
+        print("[REMINDER SCHEDULER] Background worker thread launched successfully.", flush=True)
+    except Exception as e:
+        print(f"[STARTUP WARNING] Could not start background reminder scheduler: {e}", flush=True)
 
 
 @app.get("/")

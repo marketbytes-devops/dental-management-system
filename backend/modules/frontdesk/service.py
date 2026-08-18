@@ -105,6 +105,14 @@ def create_appointment(db: Session, appt_in: AppointmentCreate) -> AppointmentMo
     db.add(db_appt)
     db.commit()
     db.refresh(db_appt)
+
+    # 5. Trigger instant automated WhatsApp & SMS booking reminder ("Active when booked")
+    try:
+        from .reminder_service import send_booked_reminder
+        send_booked_reminder(db, db_appt)
+    except Exception as e:
+        logger.warning(f"Could not trigger instant booking reminder for appointment {db_appt.id}: {e}")
+
     return db_appt
 
 def get_today_appointments(db: Session):

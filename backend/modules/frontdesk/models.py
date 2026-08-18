@@ -1,5 +1,5 @@
 # models.py - database table definitions
-from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Float, Boolean
 from sqlalchemy.sql import func
 from database import Base
 
@@ -20,6 +20,15 @@ class AppointmentModel(Base):
     checked_in_at = Column(DateTime(timezone=True), nullable=True)
     symptoms = Column(String, nullable=True)
     payment_status = Column(String, default="Unpaid")
+    
+    # Automated Reminder Tracking Flags
+    reminder_booked_sent = Column(Boolean, default=False)
+    reminder_1day_sent = Column(Boolean, default=False)
+    reminder_sameday_sent = Column(Boolean, default=False)
+    reminder_booked_at = Column(DateTime(timezone=True), nullable=True)
+    reminder_1day_at = Column(DateTime(timezone=True), nullable=True)
+    reminder_sameday_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class TransactionModel(Base):
